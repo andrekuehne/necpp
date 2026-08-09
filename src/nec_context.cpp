@@ -3383,6 +3383,43 @@ void nec_context::etmns_circular_wave( nec_float /*cth*/, nec_float /*sth*/, nec
   }
 }
 
+/**
+ * nec_context::etmns_patch_base - locate a patch in the n+2m rhs layout
+ * @patch_index: zero-based patch index
+ *
+ * Return: the first of the patch's two tangential slots.
+ */
+int nec_context::etmns_patch_base( int patch_index ) const
+{
+  return m_geometry->n_segments + patch_index*2;
+}
+
+/*-----------------------------------------------------------------------*/
+
+/**
+ * nec_context::etmns_zero_element - zero one element's excitation entries
+ * @e: right hand side of the matrix equation
+ * @i: index over the n+m segments and patches
+ *
+ * A segment owns e[i]. A patch owns two tangential entries in the n+2m
+ * layout.
+ */
+void nec_context::etmns_zero_element( complex_array& e, int i )
+{
+  int n = m_geometry->n_segments;
+
+  if ( i < n )
+    e[i] = cplx_00();
+  else
+  {
+    int i1 = etmns_patch_base(i - n);
+    e[i1] = cplx_00();
+    e[i1+1] = cplx_00();
+  }
+}
+
+/*-----------------------------------------------------------------------*/
+
 /*!\brief Incident field of an elementary current source. */
 void nec_context::etmns_current_source( nec_float p1, nec_float p2, nec_float p3,
     nec_float p4, nec_float p5, nec_float p6, complex_array& e )
@@ -3418,8 +3455,13 @@ void nec_context::etmns_current_source( nec_float p1, nec_float p2, nec_float p3
     
     nec_float rs = norm2(pxl,pyl,pzl);
     if ( rs < 1.0e-30)
+    {
+      // Zero the coincident element because the source supplies no field while
+      // the solver reads every right-hand-side row.
+      etmns_zero_element(e, i);
       continue;
-  
+    }
+
     nec_float r = sqrt(rs);
     pxl = pxl/r;
     pyl = pyl/r;
@@ -3462,8 +3504,8 @@ void nec_context::etmns_current_source( nec_float p1, nec_float p2, nec_float p3
     else // patches
     {
       int patch_index = i - n;
-      int i1 = n + patch_index*2; // two e-vector slots per patch, based at n
-      int i2 = i1+1;
+      int i1 = etmns_patch_base(patch_index);
+      int i2 = i1 + 1;
       
       pxl = wy*qz - wz*qy; // cross product here...
       pyl = wz*qx - wx*qz;

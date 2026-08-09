@@ -1016,6 +1016,8 @@ private:
 	      nec_float p6, nec_float incident_amplitude, enum excitation_type excite_type, complex_array& e);
 	  void etmns_current_source(nec_float p1, nec_float p2, nec_float p3, nec_float p4,
 	      nec_float p5, nec_float p6, complex_array& e);
+	  int etmns_patch_base(int patch_index) const;
+	  void etmns_zero_element(complex_array& e, int i);
 	
 	  void fblock( int nrow, int ncol, int64_t imax, int ipsym );
 
