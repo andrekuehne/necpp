@@ -374,3 +374,54 @@ TEST_CASE( "axis_distance throws on a zero-length wire", "[wire]") {
     REQUIRE( std::isfinite(d) );
     REQUIRE( d == Catch::Approx(1.0).margin(1e-12) );
 }
+
+TEST_CASE( "EX type-4 source on a patch centroid zeroes that patch", "[etmns][current_source]") {
+    // Regression test for #128: an elementary current source (EX type 4)
+    // placed exactly on a patch centroid used to skip assigning that patch's
+    // right-hand-side rows, leaving stale/garbage values in the persisting
+    // current vector (the coincident patch printed 9.88E-324 and corrupted
+    // the currents coupled to it). An element centered on the source point
+    // receives no field from it, so its slots must read exactly zero.
+    nec_context nec;
+    nec.initialize();
+
+    c_geometry* geo = nec.get_geometry();
+    // A wire (3 segments) keeps n > 0 so the patch tangential slots are based
+    // at a nonzero index, exercising the offset layout.
+    geo->wire(1, 3, 0.5, -0.05, 0.0, 0.5, 0.05, 0.0, 0.001, 1.0, 1.0);
+    // Three patches tile a plate; the middle sits exactly at the source point
+    // (the origin). SP ns=0: arbitrary shape at (x,y,z), elevation 90, az 0.
+    nec.sp_card(0,  0.1, 0.0, 0.0, 90.0, 0.0, 0.01);
+    nec.sp_card(0,  0.0, 0.0, 0.0, 90.0, 0.0, 0.01);
+    nec.sp_card(0, -0.1, 0.0, 0.0, 90.0, 0.0, 0.01);
+    nec.geometry_complete(0);
+
+    nec.fr_card(0, 1, 300.0, 0.0);
+    // z-directed elementary current source at the origin (ETAI = 90).
+    nec.ex_card(EXCITATION_CURRENT, 0, 0, 0, 0.0, 0.0, 0.0, 90.0, 0.0, 1.0);
+    nec.rp_card(0, 19, 37, 1000, 0, 0, 0, 0.0, 0.0, 10.0, 10.0, 0.0, 0.0);
+
+    nec_structure_currents* sc = nec.get_structure_currents(0);
+    REQUIRE(sc != nullptr);
+
+    // Patches: the coincident (middle, index 1) one must read zero in every
+    // component. Before the fix its slots carried stale values.
+    REQUIRE(sc->get_patch_e_x().size() == 3);
+    REQUIRE(std::abs(sc->get_patch_e_x()[1]) < 1e-9);
+    REQUIRE(std::abs(sc->get_patch_e_y()[1]) < 1e-9);
+    REQUIRE(std::abs(sc->get_patch_e_z()[1]) < 1e-9);
+
+    // A z-directed source imposes antisymmetric wire currents about the
+    // source plane: segments 1 and 3 are equal and opposite, the center nulls.
+    REQUIRE(sc->get_current().size() == 3);
+    const nec_complex c1 = sc->get_current()[0];
+    const nec_complex c2 = sc->get_current()[1];
+    const nec_complex c3 = sc->get_current()[2];
+    REQUIRE(std::abs(c2) < 1e-8);
+    REQUIRE(std::real(c1) == Catch::Approx(-std::real(c3)).margin(1e-12));
+    REQUIRE(std::imag(c1) == Catch::Approx(-std::imag(c3)).margin(1e-12));
+    // Absolute values agree with the reference (cross-validated against
+    // nec2c / xnec2c / NEC-2 Fortran).
+    REQUIRE(std::real(c1) == Catch::Approx(6.9547e-05).margin(1e-7));
+    REQUIRE(std::imag(c1) == Catch::Approx(-1.5977e-05).margin(1e-7));
+}

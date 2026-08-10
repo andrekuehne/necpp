@@ -2,7 +2,11 @@
 
 ### Bug Fixes
 * **EX type-4 current source coincident with an element center now zeroes its rhs rows:** `etmns_current_source()` skipped assigning the right-hand-side entries owned by a segment or patch the source sits exactly on (its `continue` at the coincidence guard fired before the write). Because `current_vector` is a persisting member reused across frequency steps and expanded in place by the solver, the skipped slot carried stale or garbage values — a source centered on a patch centroid printed `9.88E-324` for that patch and corrupted currents coupled to it. The guard now calls `etmns_zero_element()` (one slot for a segment, two tangential slots for a patch) before continuing, matching the geometry — an element at the source point receives no field from it — as well as `nec2c`, `xnec2c`, and the NEC-2 Fortran. After the fix the wire currents are antisymmetric about the source plane, as a z-directed source imposes (#128, @KJ7LNW).
+
 * **Network table lookup now fails loudly on a missing source segment:** `netwk_compute_inputs()` indexed the `ntsca`/`rhnx` arrays with an unguarded lookup. If a voltage-source segment was absent from the network node table (an internal inconsistency), the computed row index could go negative and read out of bounds. The lookup now throws a `nec_exception` (`NETWORK DATA ERROR: SOURCE SEGMENT [N] NOT FOUND IN NETWORK TABLE`) instead of performing the out-of-bounds read. No numeric behavior change for valid inputs — validated against the full unit suite (591 assertions) and the regression harness.
+
+### Tests
+* EX type-4 source coincident with a patch centroid: the coincident patch reads zero in every component and the wire currents are antisymmetric about the source plane (fails on the unfixed code — the coincident patch's slots carried stale values).
 
 ## Version 2.3.4
 
