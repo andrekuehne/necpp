@@ -1,5 +1,8 @@
 ## Unreleased
 
+### Bug Fixes
+* **`nec2diff` no longer reports spurious radiation-pattern differences:** at angles where the polarization is undefined (HORIZ gain `-999.99`, e.g. at the horizon) NEC leaves the SENSE column blank. The `RadiationInput` parser read the next numeric token as the sense string, shifting the remaining columns left by one, and `read_fixed`/`read_sci` returned **uninitialized memory** when the stream was exhausted — so comparing a file against itself reported a nonzero difference with garbage values (observed on `bruce_sommerfeld`). The parser now detects the blank SENSE column, and the readers return 0.0 on extraction failure. All 52 testharness decks now self-compare exactly clean; genuine differences are still flagged.
+
 ### Performance
 * **Triangular solves now use Eigen's blocked `solveInPlace`:** `solve()` (`matrix_algebra.cpp`) replaced its hand-rolled scalar forward/back substitution with `triangularView<UnitLower>/triangularView<Upper>` `solveInPlace`, eliminating two heap temporaries per call and the cache-hostile row-walk of column-major data. Hot in plane-wave sweeps (one solve per incidence angle).
 * **LU factorization is now truly in-place:** `lu_decompose()` constructs `Eigen::PartialPivLU` directly on the `Eigen::Map` of the NEC-format matrix, so the factors land in the caller's storage with no O(n²) copies into and out of the LU object.

@@ -19,6 +19,8 @@
 #pragma once
 
 #include <vector>
+#include <cctype>
+#include <cstdlib>
 
 #include "BaseInput.h"
 
@@ -70,9 +72,23 @@ public:
 					pol_axial_ratio.push_back(read_fixed(ss));
 					pol_tilt.push_back(read_fixed(ss));
 									
-					ss >> pol_sense;
-					
-					E_theta_mag.push_back(read_sci(ss));
+					string sense_token;
+					ss >> sense_token;
+					if (!sense_token.empty() && isalpha(static_cast<unsigned char>(sense_token[0])))
+					{
+						/* SENSE column present (LINEAR/LEFT/RIGHT) */
+						pol_sense = sense_token;
+						E_theta_mag.push_back(read_sci(ss));
+					}
+					else
+					{
+						/* SENSE column is blank when the polarization is
+						   undefined (e.g. HORIZ gain = -999.99 at the horizon).
+						   The token just read is E_theta_mag, not a sense. */
+						pol_sense = "";
+						E_theta_mag.push_back(sense_token.empty() ? 0.0 : atof(sense_token.c_str()));
+					}
+
 					E_theta_phase.push_back(read_fixed(ss));
 	
 					E_phi_mag.push_back(read_sci(ss));

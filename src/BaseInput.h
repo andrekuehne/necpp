@@ -91,7 +91,7 @@ protected:
 
 	double read_sci(std::istream& is)
 	{
-		double x;
+		double x = 0.0;	/* zero on extraction failure (was returned uninitialized) */
 		is.setf(ios_base::skipws);
 		is >> x;
 		return x;
@@ -99,7 +99,7 @@ protected:
 
 	double read_fixed(std::istream& is)
 	{
-		double x;
+		double x = 0.0;	/* zero on extraction failure (was returned uninitialized) */
 		is.setf(ios_base::skipws);
 		is >> x;
 		return x;

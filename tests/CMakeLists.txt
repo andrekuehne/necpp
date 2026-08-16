@@ -39,6 +39,7 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/math_util_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_context_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec2cpp_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/radiation_input_tb.cpp
 )
 
 # Test runner = Catch2 main + test sources + nec2cpp.cpp (main renamed) + the
