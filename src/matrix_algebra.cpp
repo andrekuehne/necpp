@@ -239,16 +239,16 @@ void lu_decompose(nec_output_file& s_output, int64_t n, complex_array& a_in, int
 
     /* Factor using Eigen's PartialPivLU through an in-place Map.
        Both nec_complex and Eigen use std::complex<double>, and both
-       use column-major storage, so the memory layout is identical. */
+       use column-major storage, so the memory layout is identical.
+       Constructing the LU object directly on the (non-const) Map makes
+       Eigen factorize in place: the factors land in a_in with no copies. */
     using MatrixXcd = Eigen::Matrix<std::complex<nec_float>, Eigen::Dynamic, Eigen::Dynamic>;
-    Eigen::Map<MatrixXcd, 0, Eigen::OuterStride<> > A_map(
+    using MapType = Eigen::Map<MatrixXcd, 0, Eigen::OuterStride<> >;
+    MapType A_map(
         reinterpret_cast<std::complex<nec_float>*>(a_in.data()), n, n,
         Eigen::OuterStride<>(static_cast<int>(ndim)));
-    
-    Eigen::PartialPivLU<MatrixXcd> lu(A_map);
-    
-    /* Copy LU factors back into a_in (modifies through the Map). */
-    A_map = lu.matrixLU();
+
+    Eigen::PartialPivLU<MapType> lu(A_map);
 
     /* Store Eigen's permutation indices in ip (1-based for compatibility).
        solve will use these directly instead of the GE pivot format. */
@@ -286,24 +286,12 @@ void solve( int64_t n, complex_array& a, int_array& ip,
     for (int64_t i = 0; i < n; i++)
         P.indices()[i] = static_cast<int>(ip[i] - 1);
     
-    /* Apply permutation: pb = P * rhs */
-    VectorXcd pb = P * rhs;
-    
-    /* Forward substitution: solve L * z = pb */
-    VectorXcd z = pb;
-    for (int64_t i = 0; i < n; i++) {
-        for (int64_t j = i + 1; j < n; j++)
-            z[j] -= LU(j, i) * z[i];
-    }
-    
-    /* Backward substitution: solve U * rhs_out = z */
-    for (int64_t k = 0; k < n; k++) {
-        int64_t i = n - k - 1;
-        std::complex<nec_float> sum(0.0, 0.0);
-        for (int64_t j = i + 1; j < n; j++)
-            sum += LU(i, j) * rhs[j];
-        rhs[i] = (z[i] - sum) / LU(i, i);
-    }
+    /* Apply permutation and solve in place with Eigen's blocked,
+       vectorized triangular solvers (no temporaries beyond the
+       permutation product). */
+    rhs = P * rhs;
+    LU.template triangularView<Eigen::UnitLower>().solveInPlace(rhs);
+    LU.template triangularView<Eigen::Upper>().solveInPlace(rhs);
 }
 /*-----------------------------------------------------------------------*/
 

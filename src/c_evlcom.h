@@ -42,13 +42,13 @@ public:
 		the step increment may be changed from dela to delb.  Shank's 
 		algorithm to accelerate convergence of a slowly converging series
 		is used. */
-	void gshank( nec_complex start, nec_complex dela, complex_array& sum,
-		int nans, complex_array& seed, int ibk, nec_complex bk, nec_complex delb );
+	void gshank( nec_complex start, nec_complex dela, nec_complex* sum,
+		int nans, nec_complex* seed, int ibk, nec_complex bk, nec_complex delb );
 
 
 	/*! \brief rom1 integrates the 6 Sommerfeld integrals from m_contour_a to m_contour_b in lambda.
 		The method of variable interval width Romberg integration is used. */
-	void rom1( int n, complex_array& sum, int nx );
+	void rom1( int n, nec_complex* sum, int nx );
 	
 	/*! \brief saoa computes the integrand for each of the 6 Sommerfeld
 		integrals for source and observer above ground. */

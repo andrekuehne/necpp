@@ -1,3 +1,13 @@
+## Unreleased
+
+### Performance
+* **Triangular solves now use Eigen's blocked `solveInPlace`:** `solve()` (`matrix_algebra.cpp`) replaced its hand-rolled scalar forward/back substitution with `triangularView<UnitLower>/triangularView<Upper>` `solveInPlace`, eliminating two heap temporaries per call and the cache-hostile row-walk of column-major data. Hot in plane-wave sweeps (one solve per incidence angle).
+* **LU factorization is now truly in-place:** `lu_decompose()` constructs `Eigen::PartialPivLU` directly on the `Eigen::Map` of the NEC-format matrix, so the factors land in the caller's storage with no O(n²) copies into and out of the LU object.
+* **No heap allocation in the Sommerfeld field hot path:** the fixed 9-element work arrays in `efld`/`efld_compute`/`rom2`/`sflds`/`pcint`/`cmsw` (`nec_context.cpp`) and the 6-element integration accumulators in `c_evlcom::evlua`/`rom1`/`gshank` (`c_evlcom.cpp`) are stack arrays passed as `nec_complex*` instead of heap-backed `complex_array`. These run per segment pair (O(N²) per frequency), so each call previously paid a malloc/free pair (nine per `rom2` call).
+* **`em::impedance()`/`em::speed_of_light()` cache their square roots:** the derived constants are recomputed only when permittivity/permeability change, removing several out-of-line `sqrt` evaluations per matrix element.
+* **Link-time optimization enabled by default** (new `NECPP_ENABLE_LTO` option, auto-detected via `check_ipo_supported`), letting hot cross-TU calls such as the Sommerfeld kernels inline. New opt-in `NECPP_NATIVE_ARCH` option (`-march=native`, off by default to keep binaries portable) lets Eigen use AVX/FMA in the O(n³) factorization.
+* Measured on an 8×8 dipole array (1216 segments, 5 frequencies): ~4% faster from the code changes, ~17% total with `NECPP_NATIVE_ARCH=ON`. Numerical output is bit-identical on all 52 testharness decks.
+
 ## Version 2.3.5
 
 ### Bug Fixes

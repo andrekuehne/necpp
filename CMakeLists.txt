@@ -43,6 +43,30 @@ option(NECPP_BUILD_TESTS    "Build the Catch2 unit tests"                  ON)
 option(NECPP_BUILD_WASM     "Build the Emscripten/WASM target (needs emcc)" OFF)
 option(NECPP_BUILD_DOCS     "Build the Doxygen documentation"              OFF)
 option(BUILD_SHARED_LIBS    "Also build a shared libnecpp in addition to the static one" ON)
+option(NECPP_ENABLE_LTO     "Enable link-time optimization (IPO) when supported" ON)
+option(NECPP_NATIVE_ARCH    "Optimize for the build machine's CPU (-march=native). Not for distributable binaries." OFF)
+
+# Link-time optimization lets hot cross-TU calls (e.g. the Sommerfeld
+# integration kernels in c_evlcom.cpp) inline across object files.
+if(NECPP_ENABLE_LTO AND NOT NECPP_BUILD_WASM)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT _necpp_ipo_ok OUTPUT _necpp_ipo_msg)
+    if(_necpp_ipo_ok)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    else()
+        message(STATUS "IPO/LTO not supported: ${_necpp_ipo_msg}")
+    endif()
+endif()
+
+# Optional CPU-specific optimization. Off by default so binaries stay
+# portable; distributors should leave it off.
+if(NECPP_NATIVE_ARCH)
+    if(MSVC)
+        add_compile_options(/arch:AVX2)
+    else()
+        add_compile_options(-march=native)
+    endif()
+endif()
 
 # Bundled Eigen is always used; there is no external-Eigen path.
 set(NECPP_EIGEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/eigen)

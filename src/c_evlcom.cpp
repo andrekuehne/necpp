@@ -46,8 +46,8 @@ void c_evlcom::lambda( nec_float t, nec_complex *xlam, nec_complex *dxlam ) cons
 	the step increment may be changed from dela to delb.  Shank's 
 	algorithm to accelerate convergence of a slowly converging series
 	is used. */
-void c_evlcom::gshank( nec_complex start, nec_complex dela, complex_array& sum,
-	int nans, complex_array& seed, int ibk, nec_complex bk, nec_complex delb )
+void c_evlcom::gshank( nec_complex start, nec_complex dela, nec_complex* sum,
+	int nans, nec_complex* seed, int ibk, nec_complex bk, nec_complex delb )
 {
 	bool brk = false;
 	int ibx, jm;
@@ -217,7 +217,7 @@ void c_evlcom::gshank( nec_complex start, nec_complex dela, complex_array& sum,
 
 /*! \brief rom1 integrates the 6 Sommerfeld integrals from m_contour_a to m_contour_b in lambda.
 	The method of variable interval width Romberg integration is used. */
-void c_evlcom::rom1( int n, complex_array& sum, int nx )
+void c_evlcom::rom1( int n, nec_complex* sum, int nx )
 {
 	int ns, nt;
 	/* All of these are written before they are read within rom1, and the
@@ -490,7 +490,7 @@ void c_evlcom::evlua( nec_complex *erv, nec_complex *ezv,
 	static nec_float del, slope, rmis;
 	static nec_complex cp1, cp2, cp3, bk, delta, delta2;
 	
-	complex_array sum(6), ans(6);
+	nec_complex sum[6], ans[6];
 	
 	del=m_zph;
 	if ( m_rho > del )

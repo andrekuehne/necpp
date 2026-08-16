@@ -2312,7 +2312,7 @@ void nec_context::cmsw( int j1, int j2, int i1, int i2, complex_array& in_cm,
     complex_array& cw, int64_t ncw, int64_t nrow, int itrp )
 {
   nec_float fsign=1.0;
-  complex_array emel(9);
+  nec_complex emel[9];
   
   /*! -1 offset to "m_geometry->jsno" for array indexing */
   int jsnox = m_geometry->jsno-1;
@@ -2777,7 +2777,7 @@ void nec_context::couple( complex_array& in_currents, nec_float in_wavelength )
 nec_float nec_context::efld_compute(
     nec_float xij, nec_float yij, nec_float ai,
     nec_float salpr, nec_float zij, bool ijx,
-    complex_array& egnd)
+    nec_complex* egnd)
 {
   nec_complex tezs, ters, tezc, terc, tezk, terk;
 
@@ -2859,7 +2859,7 @@ void nec_context::efld( nec_float xi, nec_float yi, nec_float zi, nec_float ai, 
   nec_float xymag, xspec, yspec, rhospc, dmin, shaf;
   nec_complex epx, epy, refs, refps, zrsin, zratx, zscrn;
   nec_complex ters, terc, terk;  // used in Sommerfeld/Norton section
-  complex_array egnd(9);
+  nec_complex egnd[9];
 
   nec_float xij = xi - xj;
   nec_float yij = yi - yj;
@@ -5308,7 +5308,7 @@ void nec_context::nhfld( nec_float xob, nec_float yob, nec_float zob,
 /**\brief Integrate over patches at wire connection point 
 */
 void nec_context::pcint( nec_float xi, nec_float yi, nec_float zi, nec_float cabi,
-    nec_float sabi, nec_float salpi, complex_array& e)
+    nec_float sabi, nec_float salpi, nec_complex* e)
 {
   nec_float d, ds, da, gcon, fcon, xxj, xyj, xzj, xs, s1;
   nec_float xss, yss, zss, s2x;
@@ -5628,7 +5628,7 @@ S/m  Rin     Xin    Avg. Gain  Rin     Xin     Avg. Gain
 1.0  -4.87995E+00  1.01535E+02  -4.060    1.59479E+01   8.70547E+01   1.218
 5.0  -4.21415E+01  3.45929E+02  -0.492    .42931E+01   8.59620E+01   1.472
 */
-void nec_context::rom2( nec_float a, nec_float b, complex_array& sum, nec_float dmin )
+void nec_context::rom2( nec_float a, nec_float b, nec_complex* sum, nec_float dmin )
 {
 /*
       Z=A
@@ -5662,16 +5662,17 @@ void nec_context::rom2( nec_float a, nec_float b, complex_array& sum, nec_float 
       NT=0
       CALL SFLDS (Z,G1)
 */
-  complex_array g1(9), g2(9), g3(9), g4(9), g5(9);
-  complex_array t01(9), t10(9), t20(9), t11(9);
+  nec_complex g1[9], g2[9], g3[9], g4[9], g5[9];
+  nec_complex t01[9], t10[9], t20[9], t11[9];
 
   /*! tolerance for hitting upper limit */
   const nec_float ep = _s/(1.0e4 * nma);
 
   /*! upper limit */
   const nec_float zend = ze - ep;
-  
-  vector_fill(sum,0,n,cplx_00());
+
+  for (int i = 0; i < n; i++)
+    sum[i] = cplx_00();
   
   int ns = nx;
   /*! counter to control increasing subinterval size */
@@ -5888,12 +5889,10 @@ C
   \param b upper limit of integral
   \param dmin Set in EFLD to 1% of the magnitude of the electric field
 */
-void nec_context::rom2( nec_float a, nec_float b, complex_array& sum, nec_float dmin )
+void nec_context::rom2( nec_float a, nec_float b, nec_complex* sum, nec_float dmin )
 {
-  ASSERT(sum.size() == 9);
-  
   bool recalculate_fields = true;
-  
+
   int nts = 4, nx = 1, n = 9, nma = 65536;
 
   /*! subinterval size */
@@ -5904,26 +5903,27 @@ void nec_context::rom2( nec_float a, nec_float b, complex_array& sum, nec_float 
 
   /*! relative error limit */
   nec_float rx = 1.0e-8;
-  
-  complex_array g1(9), g2(9), g3(9), g4(9), g5(9);
-  complex_array t01(9), t10(9), t20(9);
-  
+
+  nec_complex g1[9], g2[9], g3[9], g4[9], g5[9];
+  nec_complex t01[9], t10[9], t20[9];
+
   nec_float _z = a;
   const nec_float ze = b;
   const nec_float _s = b - a;
-  
+
   if ( _s < 0.0)
   {
     throw nec_exception("ERROR - B LESS THAN A IN ROM2");
   }
-  
+
   /*! tolerance for hitting upper limit */
   const nec_float ep = _s/(1.0e4 * nma);
 
   /*! upper limit */
   const nec_float zend = ze - ep;
-  
-  vector_fill(sum,0,n,cplx_00());
+
+  for (int i = 0; i < n; i++)
+    sum[i] = cplx_00();
   
   int ns = nx;
 
@@ -6063,7 +6063,7 @@ void nec_context::rom2( nec_float a, nec_float b, complex_array& sum, nec_float 
   sflds returns the field due to ground for a current element on
   the source segment at t relative to the segment center.
 */
-void nec_context::sflds(const nec_float t, complex_array& e )
+void nec_context::sflds(const nec_float t, nec_complex* e )
 {
   static nec_complex __const1(0.0,4.771341189);
 

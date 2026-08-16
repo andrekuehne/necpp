@@ -994,7 +994,7 @@ private:
 
   void efld(nec_float xi, nec_float yi, nec_float zi, nec_float ai, bool not_on_source_segment);
   nec_float efld_compute(nec_float xij, nec_float yij, nec_float ai, nec_float salpr,
-      nec_float zij, bool ijx, complex_array& egnd);
+      nec_float zij, bool ijx, nec_complex* egnd);
   void eksc(nec_float s, nec_float z, nec_float rh, nec_float xk, int ij,
       nec_complex *ezs, nec_complex *ers, nec_complex *ezc,
       nec_complex *erc, nec_complex *ezk, nec_complex *erk);
@@ -1058,14 +1058,14 @@ private:
   void nhfld(nec_float xob, nec_float yob, nec_float zob, nec_complex *hx,
       nec_complex *hy, nec_complex *hz);
   void pcint(nec_float xi, nec_float yi, nec_float zi, nec_float cabi,
-      nec_float sabi, nec_float salpi, complex_array& e);
+      nec_float sabi, nec_float salpi, nec_complex* e);
   void impedance_print(int in1, int in2, int in3, nec_float fl1, nec_float fl2,
       nec_float fl3, nec_float fl4, nec_float fl5, nec_float fl6, const char *ia);
   void qdsrc(int is, nec_complex v, complex_array& e);
 
   
-  void rom2(nec_float a, nec_float b, complex_array& sum, nec_float dmin);
-  void sflds(const nec_float t, complex_array& e);
+  void rom2(nec_float a, nec_float b, nec_complex* sum, nec_float dmin);
+  void sflds(const nec_float t, nec_complex* e);
   void solgf(nec_complex *a, nec_complex *b, nec_complex *c,
       nec_complex *d, nec_complex *xy, int *ip, int np, int n1,
       int n, int mp, int m1, int m, int n1c, int n2c, int n2cz);

@@ -22,16 +22,39 @@
 nec_float em::constants::permittivity = 8.854e-12;
 nec_float em::constants::permeability = four_pi() * 1.0e-7;
 
+namespace {
+  /* Cache for values derived from permittivity/permeability. These are
+     recomputed (via sqrt) only when the underlying constants change,
+     keeping hot paths (e.g. efld) free of repeated out-of-line sqrts.
+     File-scope statics avoid per-call thread guards. */
+  nec_float g_perm = -1.0;
+  nec_float g_mu = -1.0;
+  nec_float g_cvel = 0.0;   // 1/sqrt(mu*eps)
+  nec_float g_eta = 0.0;    // sqrt(mu/eps)
+
+  inline void update_derived_constants()
+  {
+    nec_float eps = em::permittivity();
+    nec_float mu = em::permeability();
+    if (eps != g_perm || mu != g_mu) {
+      g_perm = eps;
+      g_mu = mu;
+      g_cvel = 1.0 / sqrt(mu * eps);
+      g_eta = sqrt(mu / eps);
+    }
+  }
+}
+
 nec_float em::speed_of_light() // was (CVEL in old nec2) but we have changed it to be in meters per second
 {
-  nec_float ret = 1.0 / sqrt(permeability() * permittivity());
-  return ret; // 299.8e6;
+  update_derived_constants();
+  return g_cvel; // 299.8e6;
 }
 
 nec_float em::impedance()	// was (ETA in old nec2)
 {
-  nec_float ret = sqrt(permeability() / permittivity());
-  return ret; // 376.8
+  update_derived_constants();
+  return g_eta; // 376.8
 }
 
 nec_float em::inverse_impedance()	// was (RETA in old nec2)
