@@ -17,6 +17,8 @@
 */
 #pragma once
 
+#include <array>
+
 #include "math_util.h"
 
 void 	bessel(nec_complex z, nec_complex *j0, nec_complex *j0p);
@@ -50,12 +52,16 @@ public:
 	
 	/*! \brief saoa computes the integrand for each of the 6 Sommerfeld
 		integrals for source and observer above ground. */
-	void saoa( nec_float t, complex_array& ans);
+	void saoa( nec_float t, std::array<nec_complex,6>& ans);
 
 	/*! \brief evlua controls the integration contour in the complex
 		lambda plane for evaluation of the Sommerfeld integrals. */
 	void evlua( nec_complex *erv, nec_complex *ezv,
 		nec_complex *erh, nec_complex *eph );
+
+	/*! \brief Test support: select the Bessel-function form (true) or the
+		Hankel-function form (false) of the integrand used by saoa(). */
+	void set_bessel_flag(bool f) { m_bessel_flag = f; }
 
 private:
 	/*! \brief Flag to select Bessel or Hankel function form (was jh) */

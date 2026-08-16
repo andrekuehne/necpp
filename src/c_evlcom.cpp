@@ -17,6 +17,8 @@
 */
 #include "c_evlcom.h"
 
+#include <array>
+
 #include "matrix_algebra.h" // for test()
 #include "nec_exception.h"
 
@@ -49,11 +51,11 @@ void c_evlcom::gshank( nec_complex start, nec_complex dela, complex_array& sum,
 {
 	bool brk = false;
 	int ibx, jm;
-	static nec_float rbk, amg, den, denm;
+	nec_float rbk, amg, den, denm;
 	nec_complex a1, a2, as1, as2, del, aa;
 	nec_complex q1[6][20], q2[6][20];
 	 
-	complex_array ans1(6), ans2(6);
+	std::array<nec_complex,6> ans1, ans2;
 	
 	rbk=real(bk);
 	del=dela;
@@ -218,10 +220,16 @@ void c_evlcom::gshank( nec_complex start, nec_complex dela, complex_array& sum,
 void c_evlcom::rom1( int n, complex_array& sum, int nx )
 {
 	int ns, nt;
-	static nec_float z, ze, s, ep, zend, dz=0.0, dzot=0.0, tr, ti;
-	static nec_complex t00, t11, t02;
+	/* All of these are written before they are read within rom1, and the
+	   complex scratch buffers only persist across iterations of the loop
+	   below (not across rom1 invocations).  Using automatic locals keeps
+	   the scalars in registers and keeps the 6-element buffers on the
+	   stack, avoiding both the function-local-static round-trip and a
+	   heap allocation per call. */
+	nec_float z, ze, s, ep, zend, dz=0.0, dzot=0.0, tr, ti;
+	nec_complex t00, t11, t02;
 	
-	static complex_array g1(6), g2(6), g3(6), g4(6), g5(6), t01(6), t10(6), t20(6);
+	std::array<nec_complex,6> g1, g2, g3, g4, g5, t01, t10, t20;
 	
 	ASSERT(n == 6);
 	
@@ -379,9 +387,14 @@ void c_evlcom::rom1( int n, complex_array& sum, int nx )
 
 /*! \brief saoa computes the integrand for each of the 6 Sommerfeld
 	integrals for source and observer above ground. */
-void c_evlcom::saoa( nec_float t, complex_array& ans)
+void c_evlcom::saoa( nec_float t, std::array<nec_complex,6>& ans)
 {
-	static nec_complex xl, dxl, cgam1, cgam2, b0, b0p, com, dgam, den1, den2;
+	/* These are all written-before-read within this call, so they are
+	   plain automatic locals.  Keeping them in registers (instead of
+	   function-local statics, which are RAM-resident and serialize
+	   concurrent execution) is important because saoa is the innermost
+	   hot loop of the Sommerfeld integration. */
+	nec_complex xl, dxl, cgam1, cgam2, b0, b0p, com, dgam, den1, den2;
 	
 	lambda(t, &xl, &dxl);
 	if ( m_bessel_flag == true )
@@ -445,23 +458,6 @@ void c_evlcom::saoa( nec_float t, complex_array& ans)
 	{
 		dgam=cgam2-cgam1;
 	}
-	
-#if 0
-	nec_float xlr = real(xl);
-	if ( (xlr >= m_ck2) && (xlr <= m_ck1r))
-	{
-		dgam=cgam2-cgam1;
-	}
-	else
-	{
-		sign = 1.0;
-		if ((imag(xl) >= 0.0) && (xlr < m_ck2))
-			sign = -1.0;
-		
-		nec_floaf temp = 1.0/(xl*xl);
-		dgam=sign*((m_ct3*temp+m_ct2)*temp+m_ct1)/xl;
-	}
-#endif	
 	
 	den2=m_cksm*dgam/(cgam2*(m_ck1sq*cgam2+m_ck2sq*cgam1));
 	den1=1./(cgam1+cgam2)-m_cksm/cgam2;
