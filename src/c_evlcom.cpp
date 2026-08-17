@@ -397,14 +397,18 @@ void c_evlcom::saoa( nec_float t, std::array<nec_complex,6>& ans)
 	nec_complex xl, dxl, cgam1, cgam2, b0, b0p, com, dgam, den1, den2;
 	
 	lambda(t, &xl, &dxl);
+	/* xl^2 is used in cgam1/cgam2, the dgam large-|xl| branches, and the
+	   rho==0 answer; compute it once.  saoa is the innermost hot loop of
+	   the Sommerfeld integration, so this is not premature. */
+	nec_complex xl_sq = xl*xl;
 	if ( m_bessel_flag == true )
 	{
 		/* Bessel function form */
 		bessel(xl*m_rho, &b0, &b0p);
 		b0  *=2.;
 		b0p *=2.;
-		cgam1=sqrt(xl*xl-m_ck1sq);
-		cgam2=sqrt(xl*xl-m_ck2sq);
+		cgam1=sqrt(xl_sq-m_ck1sq);
+		cgam2=sqrt(xl_sq-m_ck2sq);
 		if (real(cgam1) == 0.0)
 			cgam1=nec_complex(0.0,-fabs(imag(cgam1)));
 		if (real(cgam2) == 0.)
@@ -436,21 +440,21 @@ void c_evlcom::saoa( nec_float t, std::array<nec_complex,6>& ans)
 				else
 				{
 					nec_float sign =1.0;
-					dgam=1.0/(xl*xl);
+					dgam=1.0/xl_sq;
 					dgam=sign*((m_ct3*dgam+m_ct2)*dgam+m_ct1)/xl;
 				}
 			}
 			else
 			{
 				nec_float sign = -1.0;
-				dgam=1.0/(xl*xl);
+				dgam=1.0/xl_sq;
 				dgam=sign*((m_ct3*dgam+m_ct2)*dgam+m_ct1)/xl;
 			} /* if (xlr >= m_ck2) */
 		} /* if (imag(xl) >= 0.) */
 		else
 		{
 			nec_float sign=1.0;
-			dgam=1.0/(xl*xl);
+			dgam=1.0/xl_sq;
 			dgam=sign*((m_ct3*dgam+m_ct2)*dgam+m_ct1)/xl;
 		}
 	} /* if (norm(xl) < m_tsmag) */
@@ -473,7 +477,7 @@ void c_evlcom::saoa( nec_float t, std::array<nec_complex,6>& ans)
 	}
 	else
 	{
-		ans[0] = -com*xl*xl*.5;
+		ans[0] = -com*xl_sq*.5;
 		ans[3]=ans[0];
 	}
 	
