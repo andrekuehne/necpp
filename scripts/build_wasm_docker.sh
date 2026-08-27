@@ -21,34 +21,47 @@ echo "=== Building WASM via Emscripten Docker image: $WASM_IMAGE ==="
 
 docker run --rm \
     --user "$(id -u):$(id -g)" \
+    -e BUILD_DIR="$BUILD_DIR" \
     -v "$PROJECT_DIR:/src" \
     -w /src \
     "$WASM_IMAGE" \
-    bash -c "
+    bash -c '
         set -euo pipefail
 
-        # Remove the cache potentially corrupted by an earlier configuration.
         rm -rf "$BUILD_DIR"
+
+        CXX_FLAGS="-O3 -DNDEBUG -flto"
+        LINK_FLAGS="-O3 -flto \
+-sMODULARIZE=1 \
+-sEXPORT_ES6=1 \
+-sEXPORT_NAME=createNecModule \
+-sENVIRONMENT=web,worker \
+-sINVOKE_RUN=0 \
+-sEXIT_RUNTIME=0 \
+-sALLOW_MEMORY_GROWTH=1 \
+-sFILESYSTEM=1 \
+-sEXPORTED_RUNTIME_METHODS=FS,callMain \
+--emit-tsd nec2pp.d.ts"
 
         emcmake cmake -B "$BUILD_DIR" -S . \
             -DCMAKE_BUILD_TYPE=Release \
             -DNECPP_BUILD_WASM=ON \
             -DNECPP_BUILD_TESTS=OFF \
             -DBUILD_SHARED_LIBS=OFF \
-            "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG -flto" \
-            "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=-O3 -flto -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createNecModule -sENVIRONMENT=web,worker -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sFILESYSTEM=1 -sEXPORTED_RUNTIME_METHODS=FS,callMain --emit-tsd nec2pp.d.ts"
+            "-DCMAKE_CXX_FLAGS_RELEASE=$CXX_FLAGS" \
+            "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=$LINK_FLAGS"
 
-        cmake --build $BUILD_DIR --config Release -j\$(nproc)
+        cmake --build "$BUILD_DIR" --config Release -j"$(nproc)"
 
-        test -s $BUILD_DIR/src/nec2pp.js
-        test -s $BUILD_DIR/src/nec2pp.wasm
-        test -s $BUILD_DIR/src/nec2pp.d.ts
+        test -s "$BUILD_DIR/src/nec2pp.js"
+        test -s "$BUILD_DIR/src/nec2pp.wasm"
+        test -s "$BUILD_DIR/src/nec2pp.d.ts"
 
         cp \
-            $BUILD_DIR/src/nec2pp.js \
-            $BUILD_DIR/src/nec2pp.wasm \
-            $BUILD_DIR/src/nec2pp.d.ts \
+            "$BUILD_DIR/src/nec2pp.js" \
+            "$BUILD_DIR/src/nec2pp.wasm" \
+            "$BUILD_DIR/src/nec2pp.d.ts" \
             .
-    "
+    '
 
 echo "=== WASM build complete ==="
