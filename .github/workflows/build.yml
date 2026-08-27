@@ -70,3 +70,10 @@ jobs:
           test -f nec2pp.js
           test -f nec2pp.wasm
           echo "WASM artifacts present: $(ls -la nec2pp.js nec2pp.wasm)"
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: necpp-wasm
+          path: |
+            nec2pp.js
+            nec2pp.wasm
