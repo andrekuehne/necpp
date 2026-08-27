@@ -27,27 +27,16 @@ docker run --rm \
     bash -c "
         set -euo pipefail
 
-        emcmake cmake -B $BUILD_DIR -S . \
+        # Remove the cache potentially corrupted by an earlier configuration.
+        rm -rf "$BUILD_DIR"
+
+        emcmake cmake -B "$BUILD_DIR" -S . \
             -DCMAKE_BUILD_TYPE=Release \
             -DNECPP_BUILD_WASM=ON \
             -DNECPP_BUILD_TESTS=OFF \
             -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_C_FLAGS_RELEASE='-O3 -DNDEBUG -flto' \
-            -DCMAKE_CXX_FLAGS_RELEASE='-O3 -DNDEBUG -flto' \
-            -DCMAKE_EXE_LINKER_FLAGS_RELEASE='
-                -O3
-                -flto
-                -sMODULARIZE=1
-                -sEXPORT_ES6=1
-                -sEXPORT_NAME=createNecModule
-                -sENVIRONMENT=web,worker
-                -sINVOKE_RUN=0
-                -sEXIT_RUNTIME=0
-                -sALLOW_MEMORY_GROWTH=1
-                -sFILESYSTEM=1
-                -sEXPORTED_RUNTIME_METHODS=FS,callMain
-                --emit-tsd nec2pp.d.ts
-            '
+            "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG -flto" \
+            "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=-O3 -flto -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createNecModule -sENVIRONMENT=web,worker -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sFILESYSTEM=1 -sEXPORTED_RUNTIME_METHODS=FS,callMain --emit-tsd nec2pp.d.ts"
 
         cmake --build $BUILD_DIR --config Release -j\$(nproc)
 
