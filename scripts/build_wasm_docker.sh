@@ -52,4 +52,3 @@ docker run --rm \
     "
 
 echo "=== WASM build complete ==="
-ls -lh nec2pp.js nec2pp.wasm nec2pp.d.ts
