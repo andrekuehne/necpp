@@ -43,7 +43,7 @@ docker run --rm \
 
         rm -rf "$BUILD_DIR"
 
-        CXX_FLAGS="-O3 -DNDEBUG -flto"
+        CXX_FLAGS="-O3 -DNDEBUG -flto -fexceptions"
         LINK_FLAGS="-O3 -flto \
 -sMODULARIZE=1 \
 -sEXPORT_ES6=1 \
@@ -54,6 +54,7 @@ docker run --rm \
 -sALLOW_MEMORY_GROWTH=1 \
 -sFILESYSTEM=1 \
 -sEXPORTED_RUNTIME_METHODS=FS,callMain \
+-sDISABLE_EXCEPTION_CATCHING=0 \
 --emit-tsd nec2pp.d.ts"
 
         emcmake cmake -B "$BUILD_DIR" -S . \
