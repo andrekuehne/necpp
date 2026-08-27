@@ -27,19 +27,21 @@ jobs:
 
       - name: Build optimized WASM
         run: ./scripts/build_wasm_docker.sh
-
+        
       - name: Prepare package artifacts
         shell: bash
         run: |
           test -s nec2pp.js
           test -s nec2pp.wasm
+          test -s nec2pp.d.ts
 
           mkdir -p wasm-dist
-          cp nec2pp.js nec2pp.wasm wasm-dist/
+          cp nec2pp.js nec2pp.wasm nec2pp.d.ts wasm-dist/
 
           sha256sum \
             wasm-dist/nec2pp.js \
             wasm-dist/nec2pp.wasm \
+            wasm-dist/nec2pp.d.ts \
             > wasm-dist/SHA256SUMS
 
           echo "Generated artifacts:"
@@ -53,3 +55,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 6
+
+
+          
