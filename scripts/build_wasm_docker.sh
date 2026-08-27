@@ -8,19 +8,6 @@
 
 set -euo pipefail
 
-TS_TOOLS_DIR="/tmp/emscripten-ts-tools"
-export npm_config_cache="/tmp/npm-cache"
-
-npm install \
-    --prefix "$TS_TOOLS_DIR" \
-    --no-save \
-    --no-package-lock \
-    typescript@5.8.3
-
-export PATH="$TS_TOOLS_DIR/node_modules/.bin:$PATH"
-
-tsc --version
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_DIR="build-wasm"
@@ -40,6 +27,19 @@ docker run --rm \
     "$WASM_IMAGE" \
     bash -c '
         set -euo pipefail
+
+        TS_TOOLS_DIR="/tmp/emscripten-ts-tools"
+        export npm_config_cache="/tmp/npm-cache"
+
+        npm install \
+            --prefix "$TS_TOOLS_DIR" \
+            --no-save \
+            --no-package-lock \
+            typescript@5.8.3
+        
+        export PATH="$TS_TOOLS_DIR/node_modules/.bin:$PATH"
+        
+        tsc --version
 
         rm -rf "$BUILD_DIR"
 
