@@ -689,17 +689,44 @@ public:
 
   // On destruction we write to a file.
   ~nec_results()  {
-    // write_to_file();
-    for (int i=0;i<_n;i++)  {
-      delete _results[i];
-      _results[i] = NULL;
-    }
+    clear();
   }
   
   void add(nec_base_result* br)  {
     br->set_result_format(m_result_format);
     _results.push_back(br);
     _n++;
+  }
+
+  /*! Delete every retained result.
+   *
+   * The deck-oriented API deliberately accumulates results across frequency
+   * sweeps.  Stateful consumers instead call this before a new consumer
+   * solve so the native collection has bounded size.
+   */
+  void clear()  {
+    for (nec_base_result* result : _results)
+      delete result;
+    _results.clear();
+    _n = 0;
+  }
+
+  /*! Delete retained results of one type, preserving all other types. */
+  void erase(enum nec_result_type result_type)  {
+    auto it = _results.begin();
+    while (it != _results.end()) {
+      if ((*it)->get_result_type() == result_type) {
+        delete *it;
+        it = _results.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    _n = static_cast<int>(_results.size());
+  }
+
+  size_t size() const  {
+    return _results.size();
   }
   
   /*!\brief Get the nth result that matches the specified result type

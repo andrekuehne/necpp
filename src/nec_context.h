@@ -87,6 +87,32 @@ public:
   
 
   void calc_prepare();
+
+  /*! Fill and factor the interaction matrix without executing an excitation.
+   *
+   * This is the narrow native hook used by nec_stateful_model.  Unlike an FR
+   * card followed by XQ, it stops at excitation setup so subsequent voltage
+   * right-hand sides reuse the retained LU factorization.
+   */
+  void stateful_prepare_frequency(nec_float frequency_mhz);
+
+  /*! Solve one exact simultaneous voltage-source right-hand side.
+   *
+   * Segment numbers are absolute and one-based.  Zero-valued sources are
+   * retained exactly; this intentionally bypasses ex_card()'s legacy
+   * near-zero-to-one substitution.
+   */
+  void stateful_solve_voltage_sources(
+    const std::vector<int>& absolute_segments,
+    const std::vector<nec_complex>& voltages);
+
+  /*! Clear load cards without relying on LD card sequencing state. */
+  void stateful_clear_loads();
+
+  /*! Result ownership helpers for the stateful layer. */
+  void stateful_clear_results()  { m_results.clear(); }
+  void stateful_clear_results(enum nec_result_type type)  { m_results.erase(type); }
+  size_t stateful_result_count() const  { return m_results.size(); }
   
   void reset_processing_to_structure_loading() {
       switch (processing_state) {
@@ -376,8 +402,10 @@ public:
           From these parameters a speed of light is chosen.
   */
   void medium_parameters(nec_float permittivity, nec_float permeability)  {
-    em::constants::permittivity = permittivity;
-    em::constants::permeability = permeability;
+    if (!(permittivity > 0.0) || !(permeability > 0.0))
+      throw nec_exception("MEDIUM PERMITTIVITY AND PERMEABILITY MUST BE POSITIVE");
+    m_medium_permittivity = permittivity;
+    m_medium_permeability = permeability;
   }
   
   
@@ -977,6 +1005,14 @@ private:
   nec_float xpr1, xpr2, xpr3, xpr4, xpr5, xpr7;
   
   nec_structure_currents* structure_currents;
+
+  // The numerical kernels still read electromagnetic constants through the
+  // legacy em namespace.  Keeping the requested values on each context and
+  // activating them at operation boundaries prevents sequentially
+  // interleaved models from contaminating one another.
+  nec_float m_medium_permittivity;
+  nec_float m_medium_permeability;
+  void activate_medium_parameters();
   
   void load();
 

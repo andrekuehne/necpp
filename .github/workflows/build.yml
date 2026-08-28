@@ -1,60 +1,392 @@
-name: Build WASM
+name: Build, test, and release WASM
 
 on:
   push:
     branches: [master, main]
+    tags: ["wasm-v*"]
   pull_request:
     branches: [master, main]
   workflow_dispatch:
 
-# Cancel an obsolete build when newer commits arrive on the same branch/PR.
 concurrency:
   group: wasm-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  NODE_VERSION: "24"
+  EMSCRIPTEN_IMAGE: "emscripten/emsdk:4.0.7"
+  TYPESCRIPT_VERSION: "5.8.3"
+  PLAYWRIGHT_VERSION: "1.62.1"
 
 jobs:
-  wasm:
-    name: Build NEC++ WebAssembly
+  native:
+    name: Native build and legacy Catch2 tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     permissions:
       contents: read
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Configure release build
+        run: >-
+          cmake -S . -B build-ci-native
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_SHARED_LIBS=OFF
+          -DNECPP_BUILD_TESTS=ON
+          -DNECPP_BUILD_WASM=OFF
+      - name: Build native engine and tests
+        run: cmake --build build-ci-native --config Release --parallel 2
+      - name: Run legacy and CLI smoke tests
+        run: >-
+          ctest --test-dir build-ci-native --build-config Release
+          --output-on-failure
+          --tests-regex "^(necpp_unit|necpp_smoke_hertzian_dipole)$"
 
-      - name: Build optimized WASM
-        run: ./scripts/build_wasm_docker.sh
-        
-      - name: Prepare package artifacts
+  native-api:
+    name: Native port, matrix, far-field, and C ABI tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure release build
+        run: >-
+          cmake -S . -B build-ci-api
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_SHARED_LIBS=OFF
+          -DNECPP_BUILD_TESTS=ON
+          -DNECPP_BUILD_WASM=OFF
+      - name: Build native API tests
+        run: cmake --build build-ci-api --config Release --parallel 2
+      - name: Run stateful numerical and ABI partitions
+        run: >-
+          ctest --test-dir build-ci-api --build-config Release
+          --output-on-failure
+          --tests-regex "^necpp_wp[1-4]$"
+
+  wasm-build:
+    name: Reproducible Emscripten build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile with pinned Emscripten SDK
         shell: bash
         run: |
-          test -s nec2pp.js
-          test -s nec2pp.wasm
-          test -s nec2pp.d.ts
-
-          mkdir -p wasm-dist
-          cp nec2pp.js nec2pp.wasm nec2pp.d.ts wasm-dist/
-
-          sha256sum \
-            wasm-dist/nec2pp.js \
-            wasm-dist/nec2pp.wasm \
-            wasm-dist/nec2pp.d.ts \
-            > wasm-dist/SHA256SUMS
-
-          echo "Generated artifacts:"
-          ls -lh wasm-dist
-
-      - name: Upload WASM package
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e BUILD_DIR=build-wasm-ci \
+            -v "$PWD:/src" \
+            -w /src \
+            "$EMSCRIPTEN_IMAGE" \
+            bash scripts/build_wasm_inner.sh
+      - name: Validate raw WASM outputs
+        shell: bash
+        run: |
+          test -s wasm/nec2pp.js
+          test -s wasm/nec2pp.wasm
+          sha256sum wasm/nec2pp.js wasm/nec2pp.wasm \
+            > wasm/SHA256SUMS
+          ls -lh wasm
+      - name: Upload raw WASM build
         uses: actions/upload-artifact@v4
         with:
-          name: necpp-wasm
-          path: wasm-dist/
+          name: necpp-wasm-build
+          path: wasm/
           if-no-files-found: error
           retention-days: 30
-          compression-level: 6
 
+  node-abi:
+    name: Node 24 WASM ABI tests
+    needs: wasm-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-wasm-build
+          path: wasm-artifact
+      - name: Exercise every versioned ABI family
+        run: node scripts/wasm_smoke_test.mjs wasm-artifact/nec2pp.js
 
-          
+  ts-facade:
+    name: Node 24 TypeScript facade tests
+    needs: wasm-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: packages/necpp-wasm/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-wasm-build
+          path: wasm-artifact
+      - name: Install pinned TypeScript toolchain
+        run: npm --prefix packages/necpp-wasm ci
+      - name: Verify pinned TypeScript version
+        shell: bash
+        run: |
+          actual="$(node -p "require('./packages/necpp-wasm/node_modules/typescript/package.json').version")"
+          test "$actual" = "$TYPESCRIPT_VERSION"
+      - name: Install WASM outputs into the facade source tree
+        shell: bash
+        run: |
+          cp wasm-artifact/nec2pp.js packages/necpp-wasm/src/nec2pp.generated.js
+          cp wasm-artifact/nec2pp.wasm packages/necpp-wasm/src/nec2pp.wasm
+      - name: Run strict types, lifecycle, facade, and worker tests
+        run: npm --prefix packages/necpp-wasm test
+
+  package:
+    name: Build the release tarball once
+    needs: [wasm-build, ts-facade]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: packages/necpp-wasm/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-wasm-build
+          path: wasm-artifact
+      - run: npm --prefix packages/necpp-wasm ci
+      - name: Install WASM outputs into the package
+        shell: bash
+        run: |
+          cp wasm-artifact/nec2pp.js packages/necpp-wasm/src/nec2pp.generated.js
+          cp wasm-artifact/nec2pp.wasm packages/necpp-wasm/src/nec2pp.wasm
+      - name: Pack and validate the publish allowlist
+        run: >-
+          npm --prefix packages/necpp-wasm run pack:release --
+          "${{ runner.temp }}/necpp-package"
+      - name: Upload the exact release tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: necpp-npm-package
+          path: ${{ runner.temp }}/necpp-package/
+          if-no-files-found: error
+          retention-days: 30
+
+  package-consumer:
+    name: npm pack clean-consumer test
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: packages/necpp-wasm/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-npm-package
+          path: package-artifact
+      - run: npm --prefix packages/necpp-wasm ci
+      - name: Install and execute the exact tarball in clean Node and Vite fixtures
+        shell: bash
+        run: |
+          tarball="$(find "$PWD/package-artifact" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          NECPP_WASM_TARBALL="$tarball" node \
+            --test --test-timeout=180000 --test-concurrency=1 \
+            packages/necpp-wasm/test/pack/consumer.test.mjs
+
+  browser-direct:
+    name: Browser direct-mode integration
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: packages/necpp-wasm/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-npm-package
+          path: package-artifact
+      - run: npm --prefix packages/necpp-wasm ci
+      - name: Verify pinned Playwright and install Chromium
+        shell: bash
+        run: |
+          actual="$(node -p "require('./packages/necpp-wasm/node_modules/playwright/package.json').version")"
+          test "$actual" = "$PLAYWRIGHT_VERSION"
+          npm --prefix packages/necpp-wasm exec -- \
+            playwright install --with-deps chromium
+      - name: Run a direct solve in Chromium
+        shell: bash
+        run: |
+          tarball="$(find "$PWD/package-artifact" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          NECPP_WASM_TARBALL="$tarball" npm --prefix packages/necpp-wasm \
+            run test:browser -- direct
+
+  browser-worker:
+    name: Browser worker and Vite example integration
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: packages/necpp-wasm/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-npm-package
+          path: package-artifact
+      - run: npm --prefix packages/necpp-wasm ci
+      - name: Verify pinned Playwright and install Chromium
+        shell: bash
+        run: |
+          actual="$(node -p "require('./packages/necpp-wasm/node_modules/playwright/package.json').version")"
+          test "$actual" = "$PLAYWRIGHT_VERSION"
+          npm --prefix packages/necpp-wasm exec -- \
+            playwright install --with-deps chromium
+      - name: Run an isolated worker solve in Chromium
+        shell: bash
+        run: |
+          tarball="$(find "$PWD/package-artifact" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          NECPP_WASM_TARBALL="$tarball" npm --prefix packages/necpp-wasm \
+            run test:browser -- worker
+      - name: Run the documented four-element Vite example in Chromium
+        shell: bash
+        run: |
+          tarball="$(find "$PWD/package-artifact" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          NECPP_WASM_TARBALL="$tarball" npm --prefix packages/necpp-wasm \
+            run test:browser -- example
+
+  artifact-report:
+    name: Artifact size and checksum report
+    needs:
+      - native
+      - native-api
+      - node-abi
+      - ts-facade
+      - package-consumer
+      - browser-direct
+      - browser-worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-wasm-build
+          path: wasm-artifact
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-npm-package
+          path: package-artifact
+      - name: Enforce release guards and report exact bytes
+        shell: bash
+        run: |
+          test "$(stat -c %s wasm-artifact/nec2pp.wasm)" -lt 1048576
+          test "$(stat -c %s wasm-artifact/nec2pp.js)" -lt 204800
+          test -z "$(find package-artifact -type f \
+            \( -name '*.map' -o -name '*.debug' -o -name '*.dSYM' \) -print -quit)"
+          mkdir release
+          cp package-artifact/*.tgz release/
+          cp wasm-artifact/nec2pp.js wasm-artifact/nec2pp.wasm release/
+          (cd release && sha256sum *.tgz nec2pp.js nec2pp.wasm > SHA256SUMS)
+          {
+            echo "Pinned Emscripten image: $EMSCRIPTEN_IMAGE"
+            echo "Pinned TypeScript: $TYPESCRIPT_VERSION"
+            echo "Pinned Playwright: $PLAYWRIGHT_VERSION"
+            echo
+            find release -maxdepth 1 -type f ! -name ARTIFACTS.txt \
+              -printf '%f %s bytes\n' | sort
+          } > release/ARTIFACTS.txt
+          cat release/ARTIFACTS.txt
+          cat release/SHA256SUMS
+          {
+            echo '### WASM release artifacts'
+            echo '```text'
+            cat release/ARTIFACTS.txt
+            cat release/SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload tested release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: necpp-release-artifacts
+          path: release/
+          if-no-files-found: error
+          retention-days: 90
+
+  release:
+    name: Publish tested tag artifacts
+    if: startsWith(github.ref, 'refs/tags/wasm-v')
+    needs: artifact-report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-release-artifacts
+          path: release
+      - name: Verify tag and checksums
+        shell: bash
+        run: |
+          expected="wasm-v$(node -p "require('./packages/necpp-wasm/package.json').version")"
+          test "$GITHUB_REF_NAME" = "$expected"
+          (cd release && sha256sum --check SHA256SUMS)
+      - name: Publish the exact tested tarball
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          tarball="$(find release -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          npm publish "$tarball" --access public --provenance
+      - name: Attach tarball and checksums to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          release/*
+          --verify-tag --generate-notes

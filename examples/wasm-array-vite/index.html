@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="NEC2++ WebAssembly four-element array example">
+    <title>NEC2++ four-element array</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">@necpp-engine/wasm · Web Worker</p>
+        <h1>Four-element array</h1>
+        <p class="lede">
+          Four half-wave dipoles at 300 MHz, driven with a −60° progressive
+          current phase. Values below come directly from the stateful solver.
+        </p>
+      </header>
+
+      <p id="status" role="status">Starting solver…</p>
+
+      <section aria-labelledby="ports-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Solved excitation</p>
+            <h2 id="ports-heading">Port quantities</h2>
+          </div>
+          <p>Current positive into each antenna; active Z = V / I.</p>
+        </div>
+        <div class="table-scroll">
+          <table id="ports">
+            <thead>
+              <tr>
+                <th>Port</th>
+                <th>Requested I (A)</th>
+                <th>Achieved I (A)</th>
+                <th>Required V (V)</th>
+                <th>Active Z (Ω)</th>
+                <th>Power (W)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="matrix-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Prepared model</p>
+            <h2 id="matrix-heading">Impedance matrix Z (Ω)</h2>
+          </div>
+          <p id="condition"></p>
+        </div>
+        <div class="table-scroll">
+          <table id="matrix"><tbody></tbody></table>
+        </div>
+      </section>
+
+      <section aria-labelledby="pattern-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Complex far field at 1 m</p>
+            <h2 id="pattern-heading">Azimuth cut · θ = 90°</h2>
+          </div>
+          <p>Combined |Eθ| and |Eφ|, normalized to the cut maximum.</p>
+        </div>
+        <svg id="plot" role="img" aria-labelledby="plot-title plot-description"></svg>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

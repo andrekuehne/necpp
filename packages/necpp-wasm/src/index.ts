@@ -1,0 +1,88 @@
+export {
+  NecConditioningError,
+  NecError,
+  NecGeometryError,
+  NecInputError,
+  NecPortError,
+  NecRuntimeError,
+  NecSolverError,
+  NecStateError,
+} from "./errors.js";
+
+export { abiVersion, engineVersion, packageVersion } from "./versions.js";
+
+export type { NecErrorCode, NecErrorOptions } from "./errors.js";
+
+export type {
+  AngleSweep,
+  CartesianPointM,
+  CompleteGeometryOptions,
+  ComplexMatrix,
+  ComplexVector,
+  ConductivityLoad,
+  CreateNecModelOptions,
+  CreateNecWorkerModelOptions,
+  DeckResult,
+  DistributedParallelRlcLoad,
+  DistributedSeriesRlcLoad,
+  EmbeddedFarFieldResult,
+  EmbeddedFieldNormalization,
+  FarFieldRequest,
+  FarFieldResult,
+  FiniteGround,
+  FreeSpaceGround,
+  GroundConnection,
+  GroundModel,
+  ImpedanceLoad,
+  ImpedanceResult,
+  LoadDefinition,
+  NecModel,
+  NecModelState,
+  NecWorkerModel,
+  NecWorkerOperation,
+  NecWorkerProgressEvent,
+  NecWorkerProgressListener,
+  ParallelRlcLoad,
+  PerfectGround,
+  PortDefinition,
+  PortSolution,
+  PrepareOptions,
+  RunDeckOptions,
+  SegmentSelection,
+  SeriesRlcLoad,
+  WireDefinition,
+} from "./types.js";
+
+import { runDeckWithModule, validateDeckText } from "./deck.js";
+import { NecInputError } from "./errors.js";
+import { instantiateNecModule } from "./loader.js";
+import { createModelFromModule } from "./model.js";
+import type {
+  CreateNecModelOptions,
+  DeckResult,
+  NecModel,
+  RunDeckOptions,
+} from "./types.js";
+
+/** Create an isolated stateful NEC model backed by a new WASM module instance. */
+export async function createNecModel(
+  options?: CreateNecModelOptions,
+): Promise<NecModel> {
+  const module = await instantiateNecModule(options);
+  return createModelFromModule(module);
+}
+
+/** Compatibility escape hatch for complete NEC text decks. */
+export async function runDeck(
+  deck: string,
+  options?: RunDeckOptions,
+): Promise<DeckResult> {
+  validateDeckText(deck);
+  if (options?.signal?.aborted === true) {
+    throw new NecInputError("Deck execution was aborted before it started", {
+      details: { operation: "runDeck", aborted: true },
+    });
+  }
+  const module = await instantiateNecModule(options);
+  return runDeckWithModule(module, deck, options);
+}

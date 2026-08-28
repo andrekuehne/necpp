@@ -17,7 +17,7 @@ project(necpp
     VERSION 2.3.4
     DESCRIPTION "NEC2++ antenna modelling library and tools"
     HOMEPAGE_URL "https://github.com/tmolteno/necpp"
-    LANGUAGES CXX)
+    LANGUAGES C CXX)
 
 # --- C++ standard ----------------------------------------------------------
 # C++17 is required by the codebase (structured bindings, etc.).

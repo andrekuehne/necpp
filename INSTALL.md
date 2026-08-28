@@ -88,40 +88,55 @@ Two ways:
 
     emcmake cmake -B build-wasm -DNECPP_BUILD_WASM=ON -DNECPP_BUILD_TESTS=OFF
     cmake --build build-wasm -j4
+    mkdir -p wasm
+    cp build-wasm/src/nec2pp.js build-wasm/src/nec2pp.wasm wasm/
 
 **Docker wrapper** (no local emsdk needed):
 
-    ./scripts/build_wasm_docker.sh
+    ./scripts/build_wasm_docker.sh          # Linux / macOS / Git Bash
+    .\scripts\build_wasm_docker.ps1         # Windows PowerShell (Docker Desktop)
 
-Both produce `nec2pp.js` + `nec2pp.wasm` exposing a C API
-(`nec_create_context`, `nec_process_input`, `nec_get_output`, …).
+On Windows, run the PowerShell script from the repo root. Docker Desktop must
+be running; WSL2 is used by Docker Desktop but you do not need to invoke the
+build from inside WSL. If you prefer WSL, enable *Settings → Resources → WSL
+Integration* for your distro so `docker` works inside Ubuntu, then use the
+`.sh` script from there.
+
+Both produce `wasm/nec2pp.js` + `wasm/nec2pp.wasm` exposing the versioned
+`necpp_wasm_v1_*` C API declared in `src/necpp_wasm_v1.h`.
 
 The module is an ES module factory. Runtime helpers and C exports are available
 on the initialized module object:
 
 ```js
-import createNecModule from "./nec2pp.js";
+import createNecModule from "./wasm/nec2pp.js";
 
 const module = await createNecModule();
-const context = module._nec_create_context();
+const encoded = new TextEncoder().encode(necInputText);
+const input = module._malloc(encoded.length);
+module.HEAPU8.set(encoded, input);
+const deck = module._necpp_wasm_v1_deck_create();
 try {
-    const status = module.ccall(
-        "nec_process_input", "number", ["number", "string"],
-        [context, necInputText]);
-    const length = module._nec_get_output_length(context);
-    const output = module.UTF8ToString(
-        module._nec_get_output(context), length);
+    const status = module._necpp_wasm_v1_deck_process(
+        deck, input, encoded.length);
+    const length = module._necpp_wasm_v1_deck_output_length(deck);
+    const pointer = module._necpp_wasm_v1_deck_output(deck);
+    const output = new TextDecoder().decode(
+        module.HEAPU8.subarray(pointer, pointer + length));
     if (status !== 0)
-        throw new Error(output);
+        throw new Error("NEC deck solve failed");
 } finally {
-    module._nec_delete_context(context);
+    module._free(input);
+    module._necpp_wasm_v1_deck_delete(deck);
 }
 ```
 
-`nec_process_input` consumes the supplied complete deck and returns `0` on
-success. Parse and solver failures return a negative status with a controlled
-message available through `nec_get_output`; C++ exceptions do not cross the
-WASM boundary.
+`necpp_wasm_v1_deck_process` consumes an explicit UTF-8 pointer and byte
+length and returns `0` on success. Failures return a stable positive status
+with a controlled message available through
+`necpp_wasm_v1_deck_last_error`; C++ exceptions do not cross the WASM
+boundary. Stateful geometry, matrix, excitation, and complex far-field calls
+use the separate model handle documented in `docs/wp4-stable-wasm-abi.md`.
 
 ## Using the library from another project
 

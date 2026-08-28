@@ -29,7 +29,7 @@ set(CATCH_INSTALL_HELPERS OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(Catch2)
 
-# All 7 test files (including math_util_tb.cpp, which the old Makefile
+# All test files (including math_util_tb.cpp, which the old Makefile
 # excluded for historical reasons — it has a legitimate [nec_3vector] test).
 set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/safe_array_tb.cpp
@@ -40,6 +40,12 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/nec_context_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec2cpp_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/radiation_input_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/wasm_api_contract_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp2_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp3_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1_c_tb.c
+    ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1_tb.cpp
 )
 
 # Test runner = Catch2 main + test sources + nec2cpp.cpp (main renamed) + the
@@ -64,9 +70,12 @@ add_executable(nec2++_tests
     ${CMAKE_SOURCE_DIR}/src/nec_exception.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_ground.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_output.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_port_matrix.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_radiation_pattern.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_results.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_stateful_model.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_structure_currents.cpp
+    ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1.cpp
 )
 
 target_include_directories(nec2++_tests PRIVATE
@@ -87,12 +96,28 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(nec2++_tests PRIVATE m)
 endif()
 
-# Run all test cases.
+# Keep the long-established numerical suite and WP1's explicit 1,000-solve
+# stress suite on independent timeout budgets. Otherwise a slow numerical
+# fixture can consume the aggregate timeout just before the bounded WP1 loop.
 add_test(NAME necpp_unit
-    COMMAND nec2++_tests -s)
+    COMMAND nec2++_tests "~[wp1]~[wp2]~[wp3]~[wp4]")
+add_test(NAME necpp_wp1
+    COMMAND nec2++_tests "[wp1]")
+add_test(NAME necpp_wp2
+    COMMAND nec2++_tests "[wp2]")
+add_test(NAME necpp_wp3
+    COMMAND nec2++_tests "[wp3]")
+add_test(NAME necpp_wp4
+    COMMAND nec2++_tests "[wp4]")
 # Hard cap so a hung test fails fast (and CTest surfaces its output) instead of
-# blocking the CI runner for its full timeout ceiling.
-set_tests_properties(necpp_unit PROPERTIES TIMEOUT 300)
+# blocking the CI runner for its full timeout ceiling. WP1 deliberately adds a
+# 1,000-excitation retained-factorization stress case; it completes in a few
+# seconds on Windows. The legacy numerical aggregate needs a wider allowance.
+set_tests_properties(necpp_unit PROPERTIES TIMEOUT 480)
+set_tests_properties(necpp_wp1 PROPERTIES TIMEOUT 180)
+set_tests_properties(necpp_wp2 PROPERTIES TIMEOUT 180)
+set_tests_properties(necpp_wp3 PROPERTIES TIMEOUT 180)
+set_tests_properties(necpp_wp4 PROPERTIES TIMEOUT 180)
 
 # Smoke test: run a real simulation through the binary and check it produced
 # the expected output marker.

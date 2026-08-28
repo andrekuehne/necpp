@@ -1,0 +1,69 @@
+{
+  "name": "@necpp-engine/wasm",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Stateful NEC2++ electromagnetic solver for Node and the browser",
+  "keywords": [
+    "antenna",
+    "electromagnetics",
+    "nec2",
+    "simulation",
+    "typescript",
+    "wasm",
+    "webassembly"
+  ],
+  "license": "GPL-2.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrekuehne/necpp.git",
+    "directory": "packages/necpp-wasm"
+  },
+  "homepage": "https://github.com/andrekuehne/necpp#readme",
+  "bugs": {
+    "url": "https://github.com/andrekuehne/necpp/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js",
+      "default": "./dist/worker.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "COPYING"
+  ],
+  "scripts": {
+    "build": "node scripts/build-dist.mjs",
+    "prepack": "npm run build",
+    "build:test": "node test/build.mjs",
+    "test": "npm run build:test && node --test test/*.test.mjs && npm run typecheck",
+    "test:wasm": "node test/require-wasm.mjs && npm test && npm run test:pack",
+    "test:pack": "node test/require-wasm.mjs && node --test --test-timeout=180000 --test-concurrency=1 test/pack/manifest.test.mjs test/pack/consumer.test.mjs",
+    "test:browser": "node test/browser-integration.mjs",
+    "pack:release": "node scripts/pack-release.mjs",
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "playwright": "1.62.1",
+    "typescript": "5.8.3",
+    "yaml": "2.9.0"
+  }
+}

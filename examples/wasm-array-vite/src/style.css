@@ -1,0 +1,197 @@
+:root {
+  color: #19231f;
+  background: #eef3ee;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+main {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 64px 0 80px;
+}
+
+header {
+  max-width: 780px;
+  margin-bottom: 28px;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(3rem, 9vw, 6.6rem);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.9;
+}
+
+h2 {
+  margin-bottom: 0;
+  font-size: 1.35rem;
+}
+
+.eyebrow {
+  margin-bottom: 12px;
+  color: #32725b;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.lede {
+  color: #52635c;
+  font-size: 1.08rem;
+  line-height: 1.65;
+}
+
+#status {
+  width: fit-content;
+  margin-bottom: 22px;
+  padding: 9px 13px;
+  border: 1px solid #ccd9d0;
+  border-radius: 999px;
+  color: #52635c;
+  background: #f8faf8;
+  font-size: 0.82rem;
+}
+
+#status.ready {
+  border-color: #9bcbb9;
+  color: #1f654d;
+  background: #e7f5ed;
+}
+
+#status.error {
+  border-color: #dfaaa0;
+  color: #8b2e20;
+  background: #fff0ed;
+  white-space: pre-wrap;
+}
+
+section {
+  margin-top: 18px;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid #d6dfd8;
+  border-radius: 18px;
+  background: #fbfcfa;
+  box-shadow: 0 14px 38px rgb(35 55 45 / 7%);
+}
+
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 20px;
+}
+
+.section-heading p:last-child {
+  max-width: 480px;
+  margin-bottom: 0;
+  color: #66746e;
+  font-size: 0.88rem;
+  text-align: right;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+th,
+td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #e0e7e2;
+  text-align: right;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+th {
+  color: #52635c;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+td {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+}
+
+tr:last-child td,
+tr:last-child th {
+  border-bottom: 0;
+}
+
+#plot {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+  color: #697970;
+}
+
+.grid line {
+  stroke: #dbe3dd;
+  stroke-width: 1;
+}
+
+.grid text {
+  fill: currentColor;
+  font-size: 11px;
+}
+
+.pattern {
+  fill: none;
+  stroke: #e55c3c;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+}
+
+@media (max-width: 720px) {
+  main {
+    width: min(100% - 20px, 1120px);
+    padding-top: 34px;
+  }
+
+  section {
+    padding: 18px;
+  }
+
+  .section-heading {
+    display: block;
+  }
+
+  .section-heading p:last-child {
+    margin-top: 9px;
+    text-align: left;
+  }
+}

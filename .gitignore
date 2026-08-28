@@ -16,8 +16,16 @@
 # spots so neither tree shows stray binaries in git status.
 /src/nec2++
 /src/nec2diff
-nec2pp.js
-nec2pp.wasm
+/wasm/nec2pp.js
+/wasm/nec2pp.wasm
+/wasm/nec2pp.d.ts
+/wasm/SHA256SUMS
+/packages/necpp-wasm/src/nec2pp.generated.js
+/packages/necpp-wasm/src/nec2pp.wasm
+/packages/necpp-wasm/.test-build/
+/packages/necpp-wasm/dist/
+/packages/necpp-wasm/COPYING
+/packages/necpp-wasm/.pack-work/
 # Legacy test binary name (pre-CMake era); kept ignored in case of stale trees.
 src/necpp_test
 src/test_manager
@@ -49,6 +57,7 @@ antlr/build/
 
 # Packages #
 ############
+node_modules/
 # it's better to unpack these files and commit the raw source
 # git has its own built in compression methods
 *.7z

@@ -1,10 +1,9 @@
 #!/bin/bash
 # Build the reusable NEC++ WebAssembly module inside the Emscripten Docker image.
 #
-# Produces in the repository root:
+# Produces in wasm/:
 #   nec2pp.js
 #   nec2pp.wasm
-#   nec2pp.d.ts
 
 set -euo pipefail
 
@@ -15,7 +14,14 @@ WASM_IMAGE="emscripten/emsdk:4.0.7"
 
 cd "$PROJECT_DIR"
 
-rm -f nec2pp.js nec2pp.wasm nec2pp.d.ts
+node -e 'if (Number(process.versions.node.split(".")[0]) < 24) process.exit(1)' || {
+    echo "Node 24 or later is required to build and test the WASM package" >&2
+    exit 1
+}
+npm --prefix packages/necpp-wasm ci
+
+rm -f wasm/nec2pp.js wasm/nec2pp.wasm wasm/nec2pp.d.ts
+mkdir -p wasm
 
 echo "=== Building WASM via Emscripten Docker image: $WASM_IMAGE ==="
 
@@ -25,60 +31,9 @@ docker run --rm \
     -v "$PROJECT_DIR:/src" \
     -w /src \
     "$WASM_IMAGE" \
-    bash -c '
-        set -euo pipefail
+    bash scripts/build_wasm_inner.sh
 
-        TS_TOOLS_DIR="/tmp/emscripten-ts-tools"
-        export npm_config_cache="/tmp/npm-cache"
-
-        npm install \
-            --prefix "$TS_TOOLS_DIR" \
-            --no-save \
-            --no-package-lock \
-            typescript@5.8.3
-        
-        export PATH="$TS_TOOLS_DIR/node_modules/.bin:$PATH"
-        
-        tsc --version
-
-        rm -rf "$BUILD_DIR"
-
-        CXX_FLAGS="-O3 -DNDEBUG -flto -fexceptions"
-        LINK_FLAGS="-O3 -flto \
--sMODULARIZE=1 \
--sEXPORT_ES6=1 \
--sEXPORT_NAME=createNecModule \
--sENVIRONMENT=web,worker,node \
--sINVOKE_RUN=0 \
--sEXIT_RUNTIME=0 \
--sALLOW_MEMORY_GROWTH=1 \
--sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,lengthBytesUTF8 \
--sDISABLE_EXCEPTION_CATCHING=0 \
---emit-tsd nec2pp.d.ts"
-
-        emcmake cmake -B "$BUILD_DIR" -S . \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DNECPP_BUILD_WASM=ON \
-            -DNECPP_BUILD_TESTS=OFF \
-            -DBUILD_SHARED_LIBS=OFF \
-            "-DCMAKE_CXX_FLAGS_RELEASE=$CXX_FLAGS" \
-            "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=$LINK_FLAGS"
-
-        cmake --build "$BUILD_DIR" --config Release -j"$(nproc)"
-
-        test -s "$BUILD_DIR/src/nec2pp.js"
-        test -s "$BUILD_DIR/src/nec2pp.wasm"
-        test -s "$BUILD_DIR/src/nec2pp.d.ts"
-
-        node --experimental-default-type=module \
-            scripts/wasm_smoke_test.mjs \
-            "$BUILD_DIR/src/nec2pp.js"
-
-        cp \
-            "$BUILD_DIR/src/nec2pp.js" \
-            "$BUILD_DIR/src/nec2pp.wasm" \
-            "$BUILD_DIR/src/nec2pp.d.ts" \
-            .
-    '
+node scripts/wasm_smoke_test.mjs packages/necpp-wasm/src/nec2pp.generated.js
+npm --prefix packages/necpp-wasm run test:wasm
 
 echo "=== WASM build complete ==="

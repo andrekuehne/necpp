@@ -29,6 +29,12 @@ Timothy C.A. Molteno, ''NEC2++: An NEC-2 compatible Numerical Electromagnetics C
 Online documentation built form the source code is available at http://tmolteno.github.io/necpp/. 
 A guide to [using nec2++ from python](http://astroelec.blogspot.co.nz/2015/05/modeling-antennas-in-python-with-nec2.html).
 
+For Node and browser applications, the versioned `@necpp-engine/wasm` npm
+package provides a high-level TypeScript API with multi-port matrices, complex
+far fields, and an optional Web Worker facade. See the
+[package guide](packages/necpp-wasm/README.md) and the
+[four-element Vite example](examples/wasm-array-vite/README.md).
+
 ## Installation
 
 nec2++ builds with CMake (≥ 3.16) and a C++17 compiler — Eigen is bundled, so

@@ -78,6 +78,11 @@ nec_radiation_pattern::nec_radiation_pattern(int in_n_theta, int in_n_phi,
   _e_theta.resize(n_theta, n_phi);
   _e_phi.resize(n_theta, n_phi);
   _e_r.resize(n_theta, n_phi);
+  // Ground-backed RP calculations intentionally skip theta samples below the
+  // ground plane. Keep those entries deterministic for bulk field consumers.
+  _e_theta.setConstant(nec_complex(0.0, 0.0));
+  _e_phi.setConstant(nec_complex(0.0, 0.0));
+  _e_r.setConstant(nec_complex(0.0, 0.0));
   
   _ifar = in_ifar;
   _wavelength = in_wavelength;
