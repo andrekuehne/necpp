@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { once } from "node:events";
 import {
   cpSync,
   existsSync,
@@ -17,6 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { chromium } from "playwright";
 
 import { resolveNpmInvocation } from "../scripts/npm-cli.mjs";
+import { stopChild, waitForHttpServer } from "./http-server-process.mjs";
 
 const mode = process.argv[2];
 if (mode !== "direct" && mode !== "worker" && mode !== "example") {
@@ -101,34 +101,21 @@ async function startPreview() {
     },
   );
   let output = "";
-  await new Promise((resolveReady, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error(`Vite preview did not start:\n${output}`));
-    }, 30_000);
-    const consume = (chunk) => {
-      output += chunk.toString();
-      if (output.includes(`http://127.0.0.1:${port}`)) {
-        clearTimeout(timeout);
-        resolveReady();
-      }
-    };
-    child.stdout?.on("data", consume);
-    child.stderr?.on("data", consume);
-    child.on("error", reject);
-    child.on("exit", (code) => {
-      reject(new Error(`Vite preview exited ${code}:\n${output}`));
-    });
-  });
+  const consume = (chunk) => {
+    output += chunk.toString();
+  };
+  child.stdout?.on("data", consume);
+  child.stderr?.on("data", consume);
+  const origin = `http://127.0.0.1:${port}`;
+  try {
+    await waitForHttpServer(child, origin, () => output);
+  } catch (error) {
+    await stopChild(child);
+    throw error;
+  }
   return {
-    origin: `http://127.0.0.1:${port}`,
-    async close() {
-      if (child.exitCode !== null) {
-        return;
-      }
-      const exited = once(child, "exit");
-      child.kill();
-      await exited;
-    },
+    origin,
+    close: () => stopChild(child),
   };
 }
 

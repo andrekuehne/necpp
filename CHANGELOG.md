@@ -1,10 +1,11 @@
-## Unreleased
+## 0.1.0 - 2026-08-28
 
 ### Added
 * **Initial `@necpp-engine/wasm` 0.1.0 package:** a stateful, high-level TypeScript API for Node and browsers, direct and Web Worker entry points, complex multi-port Z/Y matrices and solves, complex far fields and embedded patterns, packed-tarball consumer tests, and a four-element Vite array example.
 * Comprehensive npm documentation covering numerical conventions, lifecycle, errors, loading, beamforming, performance, browser memory, and GPL-2.0-or-later distribution obligations. README TypeScript examples and the downstream Vite example are checked against the exact release tarball in CI.
 
 ### Bug Fixes
+* **Browser and clean-consumer preview tests no longer parse Vite's styled startup log:** GitHub runners can insert ANSI control sequences into the displayed URL, causing a healthy preview server to time out and leave an orphan process behind. Tests now probe the assigned HTTP origin directly and reliably terminate the preview process on success or startup failure.
 * **Clean-consumer tests now locate npm under GitHub `setup-node`:** direct `node --test` jobs do not set `npm_execpath`, and the old helper assumed npm lived beside the Node binary as it commonly does on Windows. npm invocation now supports the POSIX `../lib/node_modules/npm` layout used by hosted runners, the Windows layout, and a PATH fallback, with a regression test that explicitly removes `npm_execpath`.
 * **The pinned Emscripten CI build no longer requires an undeclared `tsc`:** removed the unused `--emit-tsd` output from the compile-only Docker job and its artifact/checksum pipeline. The package already uses a committed handwritten internal module declaration, so the generated declaration was redundant. A workflow regression test now keeps TypeScript out of the Emscripten container.
 * **`nec2diff` no longer reports spurious radiation-pattern differences:** at angles where the polarization is undefined (HORIZ gain `-999.99`, e.g. at the horizon) NEC leaves the SENSE column blank. The `RadiationInput` parser read the next numeric token as the sense string, shifting the remaining columns left by one, and `read_fixed`/`read_sci` returned **uninitialized memory** when the stream was exhausted — so comparing a file against itself reported a nonzero difference with garbage values (observed on `bruce_sommerfeld`). The parser now detects the blank SENSE column, and the readers return 0.0 on extraction failure. All 52 testharness decks now self-compare exactly clean; genuine differences are still flagged.

@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { once } from "node:events";
 import { createServer as createNetServer } from "node:net";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+
+import { stopChild, waitForHttpServer } from "../http-server-process.mjs";
 
 import {
   VITE_VERSION,
@@ -84,54 +85,21 @@ async function startVitePreview(root) {
   );
 
   let output = "";
-  let settled = false;
-  let timeout;
-
-  const ready = new Promise((resolve, reject) => {
-    const fail = (reason) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeout);
-      reject(reason instanceof Error ? reason : new Error(String(reason)));
-    };
-    const succeed = () => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeout);
-      resolve();
-    };
-    const onChunk = (chunk) => {
-      output += chunk.toString();
-      if (output.includes(`http://127.0.0.1:${port}`)) {
-        succeed();
-      }
-    };
-    child.stdout?.on("data", onChunk);
-    child.stderr?.on("data", onChunk);
-    child.on("error", fail);
-    child.on("exit", (code) => {
-      fail(new Error(`vite preview exited ${code}: ${output}`));
-    });
-    timeout = setTimeout(() => {
-      fail(new Error(`vite preview did not start:\n${output}`));
-    }, 30_000);
-  });
-
-  await ready;
+  const onChunk = (chunk) => {
+    output += chunk.toString();
+  };
+  child.stdout?.on("data", onChunk);
+  child.stderr?.on("data", onChunk);
+  const origin = `http://127.0.0.1:${port}`;
+  try {
+    await waitForHttpServer(child, origin, () => output);
+  } catch (error) {
+    await stopChild(child);
+    throw error;
+  }
   return {
-    origin: `http://127.0.0.1:${port}`,
-    async close() {
-      if (child.exitCode !== null) {
-        return;
-      }
-      const exited = once(child, "exit");
-      child.kill();
-      await exited;
-    },
+    origin,
+    close: () => stopChild(child),
   };
 }
 
