@@ -7,7 +7,9 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
+
+import { resolveNpmInvocation } from "./npm-cli.mjs";
 
 const packageDirectory = resolve(import.meta.dirname, "..");
 const outputDirectory = resolve(process.argv[2] ?? join(packageDirectory, ".pack-work"));
@@ -27,27 +29,16 @@ if (
 
 mkdirSync(outputDirectory, { recursive: true });
 
-const configuredNpmCli = process.env.npm_execpath;
-const bundledNpmCli = resolve(
-  dirname(process.execPath),
-  "node_modules/npm/bin/npm-cli.js",
-);
-const npmCli = typeof configuredNpmCli === "string" && configuredNpmCli.length > 0
-  ? configuredNpmCli
-  : bundledNpmCli;
-if (!existsSync(npmCli)) {
-  throw new Error(`Could not locate the npm CLI at ${npmCli}`);
-}
-
-const packed = spawnSync(process.execPath, [
-  npmCli,
+const invocation = resolveNpmInvocation([
   "pack",
   "--pack-destination",
   outputDirectory,
   "--json",
-], {
+]);
+const packed = spawnSync(invocation.command, invocation.args, {
   cwd: packageDirectory,
   encoding: "utf8",
+  shell: invocation.shell,
   stdio: ["ignore", "pipe", "inherit"],
 });
 if (packed.error) {

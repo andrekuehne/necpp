@@ -12,6 +12,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
+import { resolveNpmInvocation } from "../../scripts/npm-cli.mjs";
+
 export const packageDirectory = resolve(import.meta.dirname, "../..");
 export const VITE_VERSION = "6.3.5";
 
@@ -27,23 +29,9 @@ export const hasWasmArtifacts = (
 
 function resolveSpawn(command, args) {
   if (command !== "npm") {
-    return { command, args };
+    return { command, args, shell: false };
   }
-  const configuredNpmCli = process.env.npm_execpath;
-  const bundledNpmCli = resolve(
-    dirname(process.execPath),
-    "node_modules/npm/bin/npm-cli.js",
-  );
-  const npmCli = typeof configuredNpmCli === "string" && configuredNpmCli.length > 0
-    ? configuredNpmCli
-    : bundledNpmCli;
-  if (!existsSync(npmCli)) {
-    throw new Error(`Could not locate the npm CLI at ${npmCli}`);
-  }
-  return {
-    command: process.execPath,
-    args: [npmCli, ...args],
-  };
+  return resolveNpmInvocation(args);
 }
 
 export function run(command, args, options = {}) {
@@ -52,7 +40,7 @@ export function run(command, args, options = {}) {
     cwd: options.cwd ?? packageDirectory,
     encoding: "utf8",
     env: options.env ?? process.env,
-    shell: options.shell ?? false,
+    shell: options.shell ?? invocation.shell,
     stdio: options.stdio ?? "inherit",
     windowsHide: true,
   });
@@ -70,10 +58,11 @@ export function run(command, args, options = {}) {
 
 export function runAsync(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const invocation = resolveSpawn(command, args);
+    const child = spawn(invocation.command, invocation.args, {
       cwd: options.cwd ?? packageDirectory,
       env: options.env ?? process.env,
-      shell: options.shell ?? command === "npm",
+      shell: options.shell ?? invocation.shell,
       stdio: options.stdio ?? "inherit",
       windowsHide: true,
     });

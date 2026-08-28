@@ -16,6 +16,8 @@ import { dirname, join, resolve } from "node:path";
 
 import { chromium } from "playwright";
 
+import { resolveNpmInvocation } from "../scripts/npm-cli.mjs";
+
 const mode = process.argv[2];
 if (mode !== "direct" && mode !== "worker" && mode !== "example") {
   throw new Error("usage: npm run test:browser -- direct|worker|example");
@@ -44,17 +46,13 @@ function writeFixture(relativePath, contents) {
 }
 
 function run(command, args) {
-  const npmCli = process.env.npm_execpath ?? resolve(
-    dirname(process.execPath),
-    "node_modules/npm/bin/npm-cli.js",
-  );
   const invocation = command === "npm"
-    ? { command: process.execPath, args: [npmCli, ...args] }
-    : { command, args };
+    ? resolveNpmInvocation(args)
+    : { command, args, shell: false };
   const result = spawnSync(invocation.command, invocation.args, {
     cwd: fixture,
     encoding: "utf8",
-    shell: false,
+    shell: invocation.shell,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
