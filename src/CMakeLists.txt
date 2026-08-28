@@ -24,6 +24,7 @@ set(NECPP_LIB_SRCS
     nec_output.cpp
     nec_radiation_pattern.cpp
     nec_results.cpp
+    nec_stateful_model.cpp
     nec_structure_currents.cpp
 )
 
@@ -35,6 +36,7 @@ set(NECPP_PUBLIC_HEADERS
     nec_ground.h
     nec_radiation_pattern.h
     nec_results.h
+    nec_stateful_model.h
     nec_structure_currents.h
     nec_output.h
     nec_exception.h

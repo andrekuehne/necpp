@@ -68,9 +68,18 @@ nec_context::nec_context() : fnorm(0,0), current_vector(0) {
 
   /*structure_currents is a pointer to the "nec_base_result" which takes care of storing and printing of the currents*/
   structure_currents = NULL;
+
+  m_medium_permittivity = 8.854e-12;
+  m_medium_permeability = four_pi() * 1.0e-7;
           
   // allocate the ground grid
   initialize();
+}
+
+void nec_context::activate_medium_parameters()
+{
+  em::constants::permittivity = m_medium_permittivity;
+  em::constants::permeability = m_medium_permeability;
 }
 
 nec_context::~nec_context() {
@@ -293,8 +302,99 @@ This function prepares for a calculation by calling calc_prepare().
 */
 void nec_context::geometry_complete(int gpflag) {
   DEBUG_TRACE("geometry_complete()");
+  activate_medium_parameters();
   m_geometry->geometry_complete(this, gpflag);
   calc_prepare();
+}
+
+void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
+{
+  if (!(frequency_mhz > 0.0) || !std::isfinite(frequency_mhz))
+    throw nec_exception("FREQUENCY MUST BE A POSITIVE FINITE VALUE IN MHZ");
+
+  activate_medium_parameters();
+  fr_card(0, 1, frequency_mhz, 0.0);
+
+  const int64_t matrix_size =
+    m_geometry->n_plus_2m * (m_geometry->np + 3 * m_geometry->mp);
+  cm.resize(matrix_size);
+
+  nop = int32_t(neq / npeq);
+  symmetry_array.resize(nop * nop);
+  fblock(npeq, neq, matrix_size, m_geometry->m_ipsym);
+
+  _wavelength = em::get_wavelength(1.0e6 * freq_mhz);
+  m_geometry->frequency_scale(freq_mhz);
+  processing_state = PROCESSING_STRUCTURE_LOADING;
+  structure_segment_loading();
+
+  // Stateful solves own their result lifetime and do not request the verbose
+  // structure-current result produced by the legacy PT default.
+  pt_card(-1, 0, 0, 0);
+  m_near = -1;
+  ifar = -1;
+  processing_state = PROCESSING_EXCITATION_SETUP;
+  ntsol = 0;
+}
+
+void nec_context::stateful_solve_voltage_sources(
+  const std::vector<int>& absolute_segments,
+  const std::vector<nec_complex>& voltages)
+{
+  if (absolute_segments.empty() || absolute_segments.size() != voltages.size())
+    throw nec_exception("STATEFUL VOLTAGE SOURCE DIMENSIONS DO NOT MATCH");
+
+  activate_medium_parameters();
+  init_voltage_sources();
+  voltage_source_count = static_cast<int>(absolute_segments.size());
+  source_segment_array.resize(voltage_source_count);
+  source_voltage_array.resize(voltage_source_count);
+
+  for (int index = 0; index < voltage_source_count; ++index) {
+    const int segment = absolute_segments[static_cast<size_t>(index)];
+    if (segment <= 0 || segment > m_geometry->n_segments)
+      throw nec_exception("STATEFUL VOLTAGE SOURCE SEGMENT IS OUT OF RANGE");
+    const nec_complex voltage = voltages[static_cast<size_t>(index)];
+    if (!std::isfinite(voltage.real()) || !std::isfinite(voltage.imag()))
+      throw nec_exception("STATEFUL VOLTAGE SOURCE MUST BE FINITE");
+    source_segment_array[index] = segment;
+    source_voltage_array[index] = voltage;
+  }
+
+  m_excitation_type = EXCITATION_VOLTAGE;
+  masym = 0;
+  iped = 0;
+  iflow = 5;
+  ntsol = 0;
+  m_near = -1;
+  ifar = -1;
+  processing_state = PROCESSING_EXCITATION_SETUP;
+  nthic = 1;
+  nphic = 1;
+  inc = 1;
+  nprint = 0;
+
+  excitation_return result = excitation_process_inner(1);
+  if (result != FREQ_PHASE_COMPLETE)
+    throw nec_exception("UNEXPECTED STATEFUL EXCITATION LOOP CONTROL RESULT");
+
+  // The latest currents are now available for a subsequent far-field-only
+  // pass without repeating excitation or factorization.
+  processing_state = PROCESSING_NEAR_FIELD;
+}
+
+void nec_context::stateful_clear_loads()
+{
+  nload = 0;
+  ldtyp.resize(0);
+  ldtag.resize(0);
+  ldtagf.resize(0);
+  ldtagt.resize(0);
+  zlr.resize(0);
+  zli.resize(0);
+  zlc.resize(0);
+  iflow = 3;
+  reset_processing_to_structure_loading();
 }
 
 /*! Add a wire to the geometry,
@@ -1030,6 +1130,8 @@ void nec_context::pl_card(const char* ploutput_filename, int itmp1, int itmp2, i
 */
 void nec_context::simulate(bool far_field_flag) {
   DEBUG_TRACE("simulate(" << far_field_flag << ")");
+
+  activate_medium_parameters();
 
   /* Allocate the normalization buffer */
   if ( iped )

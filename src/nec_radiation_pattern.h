@@ -135,7 +135,7 @@ public:
   
   /*! \brief Return a complex array for the electric field E(THETA)
   */
-  complex_array get_e_theta()  {
+  complex_array get_e_theta() const  {
     return _e_theta;
   }
   
@@ -153,11 +153,11 @@ public:
   
   /*! \brief Return a complex array for the electric field E(PHI)
   */
-  complex_array get_e_phi()  {
+  complex_array get_e_phi() const  {
     return _e_phi;
   }
   
-  complex_array get_e_r()  {
+  complex_array get_e_r() const  {
     return _e_r;
   }
   

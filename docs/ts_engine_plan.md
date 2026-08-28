@@ -150,6 +150,8 @@ The next open package on the critical path is WP1.
 
 ## WP1 — Stateful native solver layer
 
+**Status: complete (2026-08-28).**
+
 Introduce an explicit stateful C++ layer above `nec_context`. It should not depend on parsing or formatting a NEC deck.
 
 Capabilities:
@@ -183,6 +185,43 @@ DoD:
 - One prepared model supports at least 1,000 repeated excitation solves without unbounded memory growth.
 - Cache invalidation is covered by deterministic unit tests.
 - The legacy string/deck API remains operational.
+
+### WP1 progress
+
+- Added the installed native [`nec_stateful_model`](../src/nec_stateful_model.h)
+  layer above `nec_context`. It owns geometry, ordered tag-relative ports,
+  loads, ground, lifecycle state, preparation, retained factorization, exact
+  simultaneous complex voltage solves, latest port currents, and deterministic
+  factorization/solve generations without generating or parsing a deck.
+- Split matrix fill/factorization from excitation in `nec_context` through a
+  narrow stateful hook. The direct excitation hook accepts exact zero volts,
+  bypassing the legacy EX-card near-zero substitution while leaving the card
+  and deck paths unchanged.
+- Added explicit result replacement to `nec_results`. A new consumer solve
+  deletes prior input/field results before retaining its replacement; changing
+  only the far-field grid replaces just the radiation pattern and preserves
+  the latest port solution.
+- Configuration mutations conservatively invalidate prepared state. Repeating
+  the same preparation is a no-op; frequency, ground, and load changes advance
+  the factorization generation; excitation changes advance only the solve
+  generation; far-field grid changes advance neither.
+- Stored electromagnetic medium parameters per `nec_context` and reactivate
+  them at geometry, preparation, solve, and simulation boundaries. This makes
+  sequentially interleaved contexts deterministic. The remaining concurrency
+  boundary and static-state audit are documented in
+  [`wp1-native-engine.md`](wp1-native-engine.md).
+- Added seven native Catch2 cases covering deck-free construction/solve,
+  exact-zero multi-port excitation, cache invalidation, far-field reuse,
+  duplicate/missing ports, interleaved contexts, and 1,000 repeated solves.
+  The stress case holds the factorization generation at one, advances the
+  solve generation to 1,000, and retains one native result.
+- Validation completed on Windows/MSVC: all 77 legacy native cases pass (738
+  assertions), all seven WP1 cases pass (54 assertions), the CLI smoke test
+  passes, and the strict TypeScript lifecycle/type tests remain green. CTest
+  registers the legacy and WP1 partitions independently so each has a bounded
+  timeout appropriate to its workload.
+
+The next open package on the critical path is WP2.
 
 ---
 
