@@ -329,6 +329,13 @@ export function serveWasm(bytes) {
   });
 }
 
-export function readPackedWasm() {
-  return readFileSync(join(packageDirectory, "dist", "nec2pp.wasm"));
+export function readInstalledWasm(fixtureRoot) {
+  return readFileSync(join(
+    fixtureRoot,
+    "node_modules",
+    "@necpp-engine",
+    "wasm",
+    "dist",
+    "nec2pp.wasm",
+  ));
 }

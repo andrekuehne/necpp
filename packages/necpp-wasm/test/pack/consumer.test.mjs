@@ -15,7 +15,7 @@ import {
   hasWasmArtifacts,
   installFixture,
   packPackage,
-  readPackedWasm,
+  readInstalledWasm,
   run,
   runAsync,
   serveWasm,
@@ -177,8 +177,7 @@ test("custom wasmUrl loads the binary from an HTTP CDN-style origin", {
   const fixture = createCleanFixture("cdn");
   installFixture(fixture.root);
   writeFixtureFile(fixture.root, "cdn-dipole.mjs", cdnDipoleScript);
-  packPackage();
-  const server = await serveWasm(readPackedWasm());
+  const server = await serveWasm(readInstalledWasm(fixture.root));
   try {
     const result = parseJsonLine((await runAsync("node", ["cdn-dipole.mjs"], {
       cwd: fixture.root,
