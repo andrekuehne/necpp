@@ -96,6 +96,33 @@ Two ways:
 Both produce `nec2pp.js` + `nec2pp.wasm` exposing a C API
 (`nec_create_context`, `nec_process_input`, `nec_get_output`, …).
 
+The module is an ES module factory. Runtime helpers and C exports are available
+on the initialized module object:
+
+```js
+import createNecModule from "./nec2pp.js";
+
+const module = await createNecModule();
+const context = module._nec_create_context();
+try {
+    const status = module.ccall(
+        "nec_process_input", "number", ["number", "string"],
+        [context, necInputText]);
+    const length = module._nec_get_output_length(context);
+    const output = module.UTF8ToString(
+        module._nec_get_output(context), length);
+    if (status !== 0)
+        throw new Error(output);
+} finally {
+    module._nec_delete_context(context);
+}
+```
+
+`nec_process_input` consumes the supplied complete deck and returns `0` on
+success. Parse and solver failures return a negative status with a controlled
+message available through `nec_get_output`; C++ exceptions do not cross the
+WASM boundary.
+
 ## Using the library from another project
 
 After `cmake --install`, necpp exposes both pkg-config and a CMake package

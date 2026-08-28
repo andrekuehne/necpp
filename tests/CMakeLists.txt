@@ -59,6 +59,7 @@ add_executable(nec2++_tests
     ${CMAKE_SOURCE_DIR}/src/libNEC.cpp
     ${CMAKE_SOURCE_DIR}/src/matrix_algebra.cpp
     ${CMAKE_SOURCE_DIR}/src/misc.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_deck.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_context.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_exception.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_ground.cpp

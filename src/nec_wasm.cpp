@@ -1,108 +1,148 @@
 /*
- * WASM wrapper for nec2++ — exposes a minimal C API for Emscripten builds.
+ * String-based C ABI for the reusable Emscripten module.
  *
- * Build with:
- *   emcc -std=c++17 -O2 -I src -isystem src/eigen -I build/simple \
- *        -s WASM=1 -s EXPORTED_FUNCTIONS='[\"_nec_create_context\",\"_nec_delete_context\",\"_nec_process_input\",\"_nec_get_output\",\"_nec_get_output_length\",\"_nec_free\"]' \
- *        -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"UTF8ToString\",\"lengthBytesUTF8\"]' \
- *        -s ALLOW_MEMORY_GROWTH=1 \
- *        -o nec2pp.js src/nec_wasm.cpp ...
+ * The WASM target intentionally has no CLI main(). JavaScript supplies a
+ * complete NEC deck to nec_process_input(), then reads the generated report
+ * with nec_get_output(). Every exported function contains its exceptions so
+ * no C++ exception can cross the C/WASM boundary.
  */
 
 #include "nec_context.h"
-#include "c_geometry.h"
+#include "nec_deck.h"
 #include "nec_exception.h"
+#include "nec_output.h"
 
-#include <string>
+#include <climits>
+#include <exception>
+#include <memory>
 #include <sstream>
-#include <cstring>
+#include <string>
+
+struct nec_wasm_context {
+    std::unique_ptr<nec_context> context;
+    std::string output_buffer;
+    bool has_results = false;
+};
+
+namespace {
+
+void store_error(nec_wasm_context* context,
+                 const char* prefix,
+                 const char* message) noexcept
+{
+    if (nullptr == context)
+        return;
+
+    context->has_results = false;
+    try {
+        context->output_buffer.assign(prefix ? prefix : "Error: ");
+        if (message)
+            context->output_buffer.append(message);
+    } catch (...) {
+        /* An allocation failure while reporting an error must not escape ABI. */
+        try {
+            context->output_buffer.clear();
+        } catch (...) {
+        }
+    }
+}
+
+} // namespace
 
 extern "C" {
 
-/* Opaque handle for a NEC simulation context. */
-struct nec_wasm_context {
-	nec_context ctx;
-	std::string output_buffer;
-	bool initialized = false;
-	bool has_results = false;
-};
-
-nec_wasm_context* nec_create_context(void)
+nec_wasm_context* nec_create_context(void) noexcept
 {
-	return new nec_wasm_context();
+    try {
+        return new nec_wasm_context();
+    } catch (...) {
+        return nullptr;
+    }
 }
 
-void nec_delete_context(nec_wasm_context* c)
+void nec_delete_context(nec_wasm_context* context) noexcept
 {
-	delete c;
+    try {
+        delete context;
+    } catch (...) {
+        /* C++ destructors are not allowed to escape the C ABI. */
+    }
 }
 
 /*
- * Process a complete NEC input file (as a C string).
+ * Process a complete NEC input deck supplied as a UTF-8 C string.
  * Returns 0 on success, or a negative error code:
  *   -1 : null context or input
  *   -2 : parse/execution error (message stored in output)
  */
-int nec_process_input(nec_wasm_context* c, const char* input_text)
+int nec_process_input(nec_wasm_context* context, const char* input_text) noexcept
 {
-	if (!c || !input_text)
-		return -1;
+    if ((nullptr == context) || (nullptr == input_text))
+        return -1;
 
-	try {
-		std::istringstream input(input_text);
-		std::ostringstream output;
+    try {
+        context->has_results = false;
+        context->output_buffer.clear();
 
-		nec_output_file s_output;
-		s_output.set_stream(output);
-		nec_output_flags s_output_flags;
+        /* Each call gets a fresh solver so a failed deck cannot poison the next. */
+        std::unique_ptr<nec_context> solver(new nec_context());
+        std::ostringstream report;
+        nec_output_file output;
+        output.set_stream(report);
 
-		c->ctx.set_output(s_output, s_output_flags);
-		c->ctx.initialize();
+        nec_process_deck(input_text, *solver, output);
 
-		/* Parse geometry from the stream. */
-		/* TODO: Wire up stream-based geometry parsing when available. */
-		/* For now, this is a stub showing the API shape. */
-		c->ctx.get_geometry()->parse_geometry(&c->ctx, stdin);
-
-		c->ctx.calc_prepare();
-
-		c->output_buffer = output.str();
-		c->has_results = true;
-		return 0;
-
-	} catch (const nec_exception& e) {
-		c->output_buffer = std::string("Error: ") + e.get_message();
-		return -2;
-	} catch (const std::exception& e) {
-		c->output_buffer = std::string("Error: ") + e.what();
-		return -2;
-	} catch (...) {
-		c->output_buffer = "Unknown error";
-		return -2;
-	}
+        context->output_buffer = report.str();
+        context->context = std::move(solver);
+        context->has_results = true;
+        return 0;
+    } catch (const nec_exception& error) {
+        try {
+            const std::string message = error.get_message();
+            store_error(context, "Error: ", message.c_str());
+        } catch (...) {
+            store_error(context, "Error: ", "NEC++ exception");
+        }
+        return -2;
+    } catch (const std::exception& error) {
+        store_error(context, "Error: ", error.what());
+        return -2;
+    } catch (const char* error) {
+        store_error(context, "Error: ", error);
+        return -2;
+    } catch (...) {
+        store_error(context, "Error: ", "Unknown exception");
+        return -2;
+    }
 }
 
-/* Returns the output buffer (caller must NOT free). */
-const char* nec_get_output(nec_wasm_context* c)
+/* Returns the output buffer; the caller must not free it. */
+const char* nec_get_output(nec_wasm_context* context) noexcept
 {
-	if (!c)
-		return "";
-	return c->output_buffer.c_str();
+    try {
+        return context ? context->output_buffer.c_str() : "";
+    } catch (...) {
+        return "";
+    }
 }
 
-/* Length of the output string, for JS interop. */
-int nec_get_output_length(nec_wasm_context* c)
+int nec_get_output_length(nec_wasm_context* context) noexcept
 {
-	if (!c)
-		return 0;
-	return static_cast<int>(c->output_buffer.size());
+    try {
+        if (!context)
+            return 0;
+        const size_t length = context->output_buffer.size();
+        return length > static_cast<size_t>(INT_MAX)
+            ? INT_MAX
+            : static_cast<int>(length);
+    } catch (...) {
+        return 0;
+    }
 }
 
-/* Free a string returned by the API (for future use). */
-void nec_free(void* ptr)
+/* Reserved for a future API returning caller-owned allocations. */
+void nec_free(void*) noexcept
 {
-	/* Currently unused — strings are owned by nec_wasm_context. */
-	(void)ptr;
 }
 
 } /* extern "C" */

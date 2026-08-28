@@ -112,7 +112,8 @@ void str_toupper(std::string &str)
 }
 /* input card mnemonic list (for reference):
    "GW", "GX", "GR", "GS", "GE", "GM", "SP", "SM", "GA", "SC", "GH", "GF" */
-void c_geometry::parse_geometry(nec_context* in_context, FILE* input_fp )
+template <typename Input>
+void c_geometry::parse_geometry_impl(nec_context* in_context, Input& input)
 {
   geometry_parse_state st;
 
@@ -127,7 +128,7 @@ void c_geometry::parse_geometry(nec_context* in_context, FILE* input_fp )
   /* read geometry data card and dispatch to the handler for the requested operation */
   do
   {
-    read_geometry_card(input_fp, st.gm, &st.card_int_1, &st.card_int_2,
+    read_geometry_card(input, st.gm, &st.card_int_1, &st.card_int_2,
                        &st.xw1, &st.yw1, &st.zw1, &st.xw2, &st.yw2, &st.zw2, &st.rad);
 
     std::string card_id(st.gm);
@@ -145,7 +146,7 @@ void c_geometry::parse_geometry(nec_context* in_context, FILE* input_fp )
     /* Dispatch by first character then second character */
     char c0 = card_id[0], c1 = card_id[1];
     if (c0 == 'G') {
-      if      (c1 == 'W') parse_gw_card(input_fp, st);
+      if      (c1 == 'W') parse_gw_card(input, st);
       else if (c1 == 'X') gx_card(st.card_int_1, st.card_int_2);
       else if (c1 == 'R') parse_gr_card(st);
       else if (c1 == 'S') parse_gs_card(st);
@@ -156,8 +157,8 @@ void c_geometry::parse_geometry(nec_context* in_context, FILE* input_fp )
       else if (c1 == 'A') parse_ga_card(st);
       else parse_geometry_error(st);
     } else if (c0 == 'S') {
-      if      (c1 == 'P') parse_sp_card(input_fp, st);
-      else if (c1 == 'M') parse_sm_card(input_fp, st);
+      if      (c1 == 'P') parse_sp_card(input, st);
+      else if (c1 == 'M') parse_sm_card(input, st);
       else if (c1 == 'C') parse_sc_card(st);
       else parse_geometry_error(st);
     } else {
@@ -165,6 +166,16 @@ void c_geometry::parse_geometry(nec_context* in_context, FILE* input_fp )
     }
   }
   while( true );
+}
+
+void c_geometry::parse_geometry(nec_context* in_context, FILE* input_fp)
+{
+  parse_geometry_impl(in_context, input_fp);
+}
+
+void c_geometry::parse_geometry(nec_context* in_context, std::istream& input)
+{
+  parse_geometry_impl(in_context, input);
 }
 
 /* Print the one-time "STRUCTURE SPECIFICATION" banner. */
@@ -186,7 +197,8 @@ void c_geometry::parse_structure_header()
    whose taper ratio and end radii follow on a "GC" continuation card.
      card_int_1 - tag no.    card_int_2 - no. segments
      xw1,yw1,zw1 - end 1      xw2,yw2,zw2 - end 2      rad - wire radius */
-void c_geometry::parse_gw_card(FILE* input_fp, geometry_parse_state& st)
+template <typename Input>
+void c_geometry::parse_gw_card(Input& input, geometry_parse_state& st)
 {
   int64_t wire_segment_count = st.card_int_2;
   int64_t wire_tag = st.card_int_1;
@@ -211,7 +223,7 @@ void c_geometry::parse_gw_card(FILE* input_fp, geometry_parse_state& st)
     int ix,iy;
     nec_float zs1, dummy;
     char gm[3];
-    read_geometry_card(input_fp, gm, &ix, &iy, &xs1, &ys1, &zs1,
+    read_geometry_card(input, gm, &ix, &iy, &xs1, &ys1, &zs1,
       &dummy, &dummy, &dummy, &dummy);
 
     if ( strcmp(gm, "GC" ) != 0 )
@@ -269,7 +281,8 @@ void c_geometry::parse_gm_card(geometry_parse_state& st)
 
 /* "SP" card: generate a single new surface patch. For multi-corner patches the
    remaining corner data follows on an "SC" continuation card. */
-void c_geometry::parse_sp_card(FILE* input_fp, geometry_parse_state& st)
+template <typename Input>
+void c_geometry::parse_sp_card(Input& input, geometry_parse_state& st)
 {
   const char ipt[4] = { 'P', 'R', 'T', 'Q' };
   int64_t i1= m+1;
@@ -291,7 +304,7 @@ void c_geometry::parse_sp_card(FILE* input_fp, geometry_parse_state& st)
     int ix,iy;
     nec_float dummy;
     char gm[3];
-    read_geometry_card(input_fp, gm, &ix, &iy, &st.x3, &st.y3, &st.z3, &st.x4, &st.y4, &st.z4, &dummy);
+    read_geometry_card(input, gm, &ix, &iy, &st.x3, &st.y3, &st.z3, &st.x4, &st.y4, &st.z4, &dummy);
 
     if ( (st.card_int_2 == 2) || (st.card_int_1 > 0) )
     {
@@ -318,7 +331,8 @@ void c_geometry::parse_sp_card(FILE* input_fp, geometry_parse_state& st)
 
 /* "SM" card: generate a multiple-patch surface. The opposite-corner data
    follows on an "SC" continuation card. */
-void c_geometry::parse_sm_card(FILE* input_fp, geometry_parse_state& st)
+template <typename Input>
+void c_geometry::parse_sm_card(Input& input, geometry_parse_state& st)
 {
   const char ipt[4] = { 'P', 'R', 'T', 'Q' };
   int64_t i1= m+1;
@@ -333,7 +347,7 @@ void c_geometry::parse_sm_card(FILE* input_fp, geometry_parse_state& st)
   int ix,iy;
   nec_float dummy;
   char gm[3];
-  read_geometry_card(input_fp, gm, &ix, &iy, &st.x3, &st.y3, &st.z3, &st.x4, &st.y4, &st.z4, &dummy);
+  read_geometry_card(input, gm, &ix, &iy, &st.x3, &st.y3, &st.z3, &st.x4, &st.y4, &st.z4, &dummy);
 
   if ( (st.card_int_2 == 2) || (st.card_int_1 > 0) )
   {

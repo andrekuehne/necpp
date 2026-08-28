@@ -17,6 +17,7 @@ set(NECPP_LIB_SRCS
     libNEC.cpp
     matrix_algebra.cpp
     misc.cpp
+    nec_deck.cpp
     nec_context.cpp
     nec_exception.cpp
     nec_ground.cpp
@@ -143,17 +144,20 @@ endif()
 if(NECPP_BUILD_WASM)
     add_executable(nec2pp_wasm
         ${CMAKE_CURRENT_SOURCE_DIR}/nec_wasm.cpp
-        XGetopt.cpp
         ${NECPP_LIB_SRCS})
     target_include_directories(nec2pp_wasm PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${NECPP_EIGEN_DIR}
         ${CMAKE_BINARY_DIR})
-    # Flags carried verbatim from the old Makefile wasm target.
+    # Exceptions must be enabled while compiling every source in the target and
+    # while linking the Emscripten module so the C ABI can contain failures.
+    target_compile_options(nec2pp_wasm PRIVATE -fexceptions)
     target_link_options(nec2pp_wasm PRIVATE
+        -fexceptions
         -sWASM=1
         "-sEXPORTED_FUNCTIONS=[\"_nec_create_context\",\"_nec_delete_context\",\"_nec_process_input\",\"_nec_get_output\",\"_nec_get_output_length\",\"_nec_free\"]"
         "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"UTF8ToString\",\"lengthBytesUTF8\"]"
+        -sDISABLE_EXCEPTION_CATCHING=0
         -sALLOW_MEMORY_GROWTH=1
         --no-entry)
     # OUTPUT_NAME nec2pp + SUFFIX .js → Emscripten emits nec2pp.js + nec2pp.wasm,

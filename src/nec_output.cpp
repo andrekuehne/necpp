@@ -17,9 +17,12 @@
 */
 #include "nec_output.h"
 #include "nec_exception.h"
+#include <cstdarg>
+#include <cstdio>
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <vector>
 
 
 /* ---------------------------------------------------------------------*/
@@ -117,19 +120,11 @@ void nec_output_file::real(nec_float in_nec_float)
 
 void nec_output_file::integer(long in_integer)
 {
-	if (NULL == m_output_fp)
-		return;
-	
-	fprintf(m_output_fp,"%ld",in_integer);
-	if (m_error_mode)
-		std::cerr << in_integer;
+	nec_printf("%ld", in_integer);
 }
 
 void nec_output_file::real_out(int w, int p, nec_float f, bool sci)
 {
-	if (NULL == m_output_fp)
-		return;
-	
 	std::stringstream ss;
 	ss << "%" << w << "." << p;
 	
@@ -141,102 +136,26 @@ void nec_output_file::real_out(int w, int p, nec_float f, bool sci)
 	std::string s = ss.str();
 	const char* fmt = s.c_str();
 	
-	fprintf(m_output_fp,fmt,f);
-	if (m_error_mode)
-		std::cerr << f;
+	nec_printf(fmt, f);
 }
-
-
-#include "stdarg.h"
-#include "safe_array.h"
 
 void nec_output_file::nec_printf(const char* fmt, ...)
 {
-	if (NULL == m_output_fp)
+	if ((NULL == m_output_fp) && (nullptr == m_output_os))
 		return;
-	
-	{	
-	va_list ap; 		/* special type for variable    */
-	
-	safe_array<char> format(2048);	/* argument lists               */
-	int count = 0;
-	int i, j;		/* Need all these to store      */
-	char c;			/* values below in switch       */
-	double d;
-	unsigned u;
-	char *s;
-	void *v;
-	
-	va_start(ap, fmt); 	/* must be called before work   */
-	while (*fmt)
-	{
-		for (j = 0; fmt[j] && fmt[j] != '%'; j++)
-			format[j] = fmt[j];                    /* not a format string          */
-		if (j)
-		{
-			format[j] = '\0';
-			count += fprintf(m_output_fp, "%s", format.data());    /* log it verbatim              */
-			fmt += j;
-		} 
-		else
-		{
-			for (j = 0; !isalpha(fmt[j]); j++)
-			{   /* find end of format specifier */
-				format[j] = fmt[j];
-				if (j && fmt[j] == '%')              /* special case printing '%'    */
-					break;
-			}
-			format[j] = fmt[j];                    /* finish writing specifier     */
-			format[j + 1] = '\0';                  /* don't forget NULL terminator */
-			fmt += j + 1;
-			
-			switch (format[j])
-			{                   /* cases for all specifiers     */
-				case 'd':
-				case 'i':                              /* many use identical actions   */
-					i = va_arg(ap, int);                 /* process the argument         */
-					count += fprintf(m_output_fp, format.data(), i); /* and log it                 */
-					break;
-				case 'o':
-				case 'x':
-				case 'X':
-				case 'u':
-					u = va_arg(ap, unsigned);
-					count += fprintf(m_output_fp, format.data(), u);
-					break;
-				case 'c':
-					            c = static_cast<char>(va_arg(ap, int));          /* must cast!                   */
-					count += fprintf(m_output_fp, format.data(), c);
-					break;
-				case 's':
-					s = va_arg(ap, char *);
-					count += fprintf(m_output_fp, format.data(), s);
-					break;
-				case 'f':
-				case 'e':
-				case 'E':
-				case 'g':
-				case 'G':
-					d = va_arg(ap, double);
-					count += fprintf(m_output_fp, format.data(), d);
-					break;
-				case 'p':
-					v = va_arg(ap, void *);
-					count += fprintf(m_output_fp, format.data(), v);
-					break;
-				case 'n':
-					count += fprintf(m_output_fp, "%d", count);
-					break;
-				case '%':
-					count += fprintf(m_output_fp, "%%");
-					break;
-				default:
-					throw nec_exception("Invalid format specifier in nec_printf()");
-			}
-		}
-	}
-	
-	va_end(ap);	/* clean up */
-	}
+
+	va_list sizing_args;
+	va_start(sizing_args, fmt);
+	const int required = std::vsnprintf(nullptr, 0, fmt, sizing_args);
+	va_end(sizing_args);
+	if (required < 0)
+		throw nec_exception("Unable to format NEC output");
+
+	std::vector<char> buffer(static_cast<size_t>(required) + 1);
+	va_list writing_args;
+	va_start(writing_args, fmt);
+	std::vsnprintf(buffer.data(), buffer.size(), fmt, writing_args);
+	va_end(writing_args);
+	do_output(buffer.data());
 }
 

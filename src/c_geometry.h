@@ -170,6 +170,10 @@ public:
   */
   void parse_geometry(nec_context* m_context, FILE* input_fp);
 
+  /*!\brief Parse an NEC geometry description from a C++ input stream.
+  */
+  void parse_geometry(nec_context* m_context, std::istream& input);
+
   
   /*!\brief Helper method to decide whether extended. thin-wire approximation can be used 
   */
@@ -287,13 +291,19 @@ private:
     int nwire = 0;  // running count of wire/arc/helix elements
   };
 
+  template <typename Input>
+  void parse_geometry_impl(nec_context* in_context, Input& input);
+
   void parse_structure_header();
-  void parse_gw_card(FILE* input_fp, geometry_parse_state& st);
+  template <typename Input>
+  void parse_gw_card(Input& input, geometry_parse_state& st);
   void parse_gr_card(geometry_parse_state& st);
   void parse_gs_card(geometry_parse_state& st);
   void parse_gm_card(geometry_parse_state& st);
-  void parse_sp_card(FILE* input_fp, geometry_parse_state& st);
-  void parse_sm_card(FILE* input_fp, geometry_parse_state& st);
+  template <typename Input>
+  void parse_sp_card(Input& input, geometry_parse_state& st);
+  template <typename Input>
+  void parse_sm_card(Input& input, geometry_parse_state& st);
   void parse_ga_card(geometry_parse_state& st);
   void parse_sc_card(geometry_parse_state& st);
   void parse_gh_card(geometry_parse_state& st);

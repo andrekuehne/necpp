@@ -48,12 +48,11 @@ docker run --rm \
 -sMODULARIZE=1 \
 -sEXPORT_ES6=1 \
 -sEXPORT_NAME=createNecModule \
--sENVIRONMENT=web,worker \
+-sENVIRONMENT=web,worker,node \
 -sINVOKE_RUN=0 \
 -sEXIT_RUNTIME=0 \
 -sALLOW_MEMORY_GROWTH=1 \
--sFILESYSTEM=1 \
--sEXPORTED_RUNTIME_METHODS=FS,callMain \
+-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,lengthBytesUTF8 \
 -sDISABLE_EXCEPTION_CATCHING=0 \
 --emit-tsd nec2pp.d.ts"
 
@@ -70,6 +69,10 @@ docker run --rm \
         test -s "$BUILD_DIR/src/nec2pp.js"
         test -s "$BUILD_DIR/src/nec2pp.wasm"
         test -s "$BUILD_DIR/src/nec2pp.d.ts"
+
+        node --experimental-default-type=module \
+            scripts/wasm_smoke_test.mjs \
+            "$BUILD_DIR/src/nec2pp.js"
 
         cp \
             "$BUILD_DIR/src/nec2pp.js" \
