@@ -7,11 +7,10 @@ import {
   statSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, relative, resolve } from "node:path";
 
-const packageDirectory = fileURLToPath(new URL("../", import.meta.url));
-const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const packageDirectory = resolve(import.meta.dirname, "..");
+const repositoryRoot = resolve(import.meta.dirname, "../../..");
 const sourceDirectory = join(packageDirectory, "src");
 const distDirectory = join(packageDirectory, "dist");
 const localCompiler = join(packageDirectory, "node_modules", "typescript", "bin", "tsc");
@@ -55,11 +54,14 @@ if (!existsSync(licenseSource)) {
 
 rmSync(distDirectory, { force: true, recursive: true });
 
-const compiler = existsSync(localCompiler) ? process.execPath : "tsc";
-const compilerArguments = existsSync(localCompiler)
-  ? [localCompiler, "--project", "tsconfig.dist.json"]
-  : ["--project", "tsconfig.dist.json"];
-const result = spawnSync(compiler, compilerArguments, {
+if (!existsSync(localCompiler)) {
+  throw new Error("The pinned TypeScript compiler is missing; run npm install first");
+}
+const result = spawnSync(process.execPath, [
+  localCompiler,
+  "--project",
+  "tsconfig.dist.json",
+], {
   cwd: packageDirectory,
   stdio: "inherit",
 });

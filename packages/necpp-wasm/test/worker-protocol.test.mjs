@@ -68,7 +68,7 @@ test("typed errors round-trip through the worker protocol", () => {
   assert.equal(runtime.message, "boom");
 });
 
-test("create options copy wasm bytes and reject mixed overrides", () => {
+test("create options copy wasm bytes and reject invalid overrides", () => {
   const bytes = new Uint8Array([1, 2, 3]);
   const serialized = serializeCreateOptions({ wasmBinary: bytes });
   assert.ok(serialized.payload.wasmBinary instanceof ArrayBuffer);
@@ -81,6 +81,10 @@ test("create options copy wasm bytes and reject mixed overrides", () => {
       wasmUrl: "https://example.test/nec2pp.wasm",
       wasmBinary: bytes,
     }),
+    NecInputError,
+  );
+  assert.throws(
+    () => serializeCreateOptions({ wasmBinary: "not WASM" }),
     NecInputError,
   );
 });

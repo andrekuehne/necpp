@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { createServer as createNetServer } from "node:net";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -80,6 +81,7 @@ async function startVitePreview(root) {
 
   let output = "";
   let settled = false;
+  let timeout;
 
   const ready = new Promise((resolve, reject) => {
     const fail = (reason) => {
@@ -87,6 +89,7 @@ async function startVitePreview(root) {
         return;
       }
       settled = true;
+      clearTimeout(timeout);
       reject(reason instanceof Error ? reason : new Error(String(reason)));
     };
     const succeed = () => {
@@ -94,6 +97,7 @@ async function startVitePreview(root) {
         return;
       }
       settled = true;
+      clearTimeout(timeout);
       resolve();
     };
     const onChunk = (chunk) => {
@@ -108,7 +112,7 @@ async function startVitePreview(root) {
     child.on("exit", (code) => {
       fail(new Error(`vite preview exited ${code}: ${output}`));
     });
-    setTimeout(() => {
+    timeout = setTimeout(() => {
       fail(new Error(`vite preview did not start:\n${output}`));
     }, 30_000);
   });
@@ -116,8 +120,13 @@ async function startVitePreview(root) {
   await ready;
   return {
     origin: `http://127.0.0.1:${port}`,
-    close() {
+    async close() {
+      if (child.exitCode !== null) {
+        return;
+      }
+      const exited = once(child, "exit");
       child.kill();
+      await exited;
     },
   };
 }
@@ -181,7 +190,7 @@ test("a clean Vite fixture builds, serves WASM with the correct MIME type, and b
   const fixture = createCleanFixture("vite");
   writeFixtureFile(fixture.root, "vite.config.js", `export default {
   build: {
-    target: "es2022",
+    target: "es2024",
   },
   worker: {
     format: "es",
@@ -308,6 +317,6 @@ try {
     assert.match(mime, /application\/wasm/);
     assert.ok((await wasmResponse.arrayBuffer()).byteLength > 0);
   } finally {
-    preview.close();
+    await preview.close();
   }
 });

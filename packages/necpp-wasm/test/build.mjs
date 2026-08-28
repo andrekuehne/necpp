@@ -5,26 +5,23 @@ import {
   rmSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
-const packageDirectory = fileURLToPath(new URL("../", import.meta.url));
-const outputDirectory = fileURLToPath(
-  new URL("../.test-build/", import.meta.url),
-);
-const localCompiler = fileURLToPath(
-  new URL("../node_modules/typescript/bin/tsc", import.meta.url),
+const packageDirectory = resolve(import.meta.dirname, "..");
+const outputDirectory = resolve(packageDirectory, ".test-build");
+const localCompiler = resolve(
+  packageDirectory,
+  "node_modules/typescript/bin/tsc",
 );
 
 rmSync(outputDirectory, { force: true, recursive: true });
 
-const compiler = existsSync(localCompiler) ? process.execPath : "tsc";
-const compilerArguments = existsSync(localCompiler)
-  ? [localCompiler, "--project", "tsconfig.build.json"]
-  : ["--project", "tsconfig.build.json"];
+if (!existsSync(localCompiler)) {
+  throw new Error("The pinned TypeScript compiler is missing; run npm install first");
+}
 const result = spawnSync(
-  compiler,
-  compilerArguments,
+  process.execPath,
+  [localCompiler, "--project", "tsconfig.build.json"],
   {
     cwd: packageDirectory,
     stdio: "inherit",
@@ -37,10 +34,8 @@ if (result.status !== 0) {
   process.exit(result.status ?? 1);
 }
 
-const sourceDirectory = fileURLToPath(new URL("../src/", import.meta.url));
-const builtSourceDirectory = fileURLToPath(
-  new URL("../.test-build/src/", import.meta.url),
-);
+const sourceDirectory = resolve(packageDirectory, "src");
+const builtSourceDirectory = resolve(outputDirectory, "src");
 mkdirSync(builtSourceDirectory, { recursive: true });
 
 for (const name of ["nec2pp.generated.js", "nec2pp.wasm"]) {

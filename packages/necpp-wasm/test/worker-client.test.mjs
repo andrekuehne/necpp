@@ -128,6 +128,7 @@ function createLoopbackHost(createModel, options = {}) {
   const { port1, port2 } = new MessageChannel();
   const session = { model: undefined };
   let queue = Promise.resolve();
+  let exitListener;
   const calls = [];
 
   port2.on("message", (request) => {
@@ -152,6 +153,9 @@ function createLoopbackHost(createModel, options = {}) {
 
   return {
     calls,
+    simulateExit(code) {
+      exitListener?.(code);
+    },
     postMessage(data, transfer = []) {
       port1.postMessage(data, transfer);
     },
@@ -162,6 +166,12 @@ function createLoopbackHost(createModel, options = {}) {
     },
     subscribeError() {
       return () => undefined;
+    },
+    subscribeExit(listener) {
+      exitListener = listener;
+      return () => {
+        exitListener = undefined;
+      };
     },
     terminate() {
       port1.close();
@@ -348,6 +358,31 @@ test("termination releases the worker and rejects outstanding operations", async
   assert.equal(model.state, "disposed");
   await assert.rejects(model.prepare({ frequencyMHz: 300 }), NecStateError);
   model.terminate();
+  release();
+});
+
+test("an unexpected worker exit rejects the outstanding operation", async () => {
+  let release;
+  const hang = {
+    filter: (request) => request.method === "addWire",
+    gate: new Promise((resolve) => {
+      release = resolve;
+    }),
+  };
+  const host = createLoopbackHost(async () => createFakeModel(), { hang });
+  const model = await createNecWorkerModelFromHost(host);
+
+  const pending = model.addWire(dipoleWire);
+  await new Promise((resolve) => setImmediate(resolve));
+  host.simulateExit(2);
+
+  await assert.rejects(pending, (error) => (
+    error instanceof NecRuntimeError
+    && error.message.includes("exited unexpectedly")
+    && error.details?.exitCode === 2
+  ));
+  assert.equal(model.state, "disposed");
+  await assert.rejects(model.addWire(dipoleWire), NecStateError);
   release();
 });
 

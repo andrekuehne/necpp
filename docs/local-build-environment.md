@@ -120,8 +120,9 @@ Emscripten flags manually:
 .\scripts\build_wasm_docker.ps1
 ```
 
-It uses `emscripten/emsdk:4.0.7`, TypeScript 5.8.3, and a container-local build
-directory under `/tmp`. Building on the container filesystem is intentional:
+It uses `emscripten/emsdk:4.0.7`, Node 24, TypeScript 5.8.3, and a
+container-local build directory under `/tmp`. Building on the container
+filesystem is intentional:
 Emscripten link steps can fail when writing intermediate files directly to a
 Windows bind mount. Successful artifacts are copied to:
 
@@ -147,16 +148,16 @@ The WP5 implementation was verified with:
   successfully in the Docker Release build;
 - Emscripten 4.0.7: the versioned ABI matrix, solve, combined/embedded field,
   memory-growth, controlled-error, and complete-deck smoke paths passed.
-- TypeScript 5.8.3 and Node ESM: the public facade passed strict compilation,
+- TypeScript 5.8.3 and Node 24 ESM: the public facade passed strict compilation,
   real matrix/solve/field operations, copied-result lifetime and disposal
   checks, default/URL/binary WASM loading, and complete-deck execution.
 
 The WP6 worker facade was verified on the same host with TypeScript 5.8.3 and
-Node ESM: all 24 package tests passed, including transferable result buffers,
+Node 24 ESM: all 24 package tests passed, including transferable result buffers,
 client-thread heartbeats during outstanding work, independent worker models,
 termination, and real WASM Z-matrix/far-field agreement with direct mode.
 
-The WP7 package assembly is packed with `npm pack` from
+The WP7 package assembly requires Node 24 or later and is packed with `npm pack` from
 `packages/necpp-wasm`. Clean-consumer tests install that tarball in a
 temporary fixture, import `@necpp/wasm` and `@necpp/wasm/worker` by name, and
 build a Vite app. Run them after a WASM build:

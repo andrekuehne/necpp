@@ -12,6 +12,7 @@ The final npm package name is **`@necpp/wasm`**. The unscoped name
 while the scoped name identifies this repository and leaves room for future `@necpp/*`
 packages. Publication requires control of the `necpp` npm scope, but the API
 name will not change if the package is initially distributed as a tarball.
+The package is ESM-only and requires Node 24 or later for Node consumers.
 
 The packed package exports three version identifiers that can be imported
 without constructing a model:

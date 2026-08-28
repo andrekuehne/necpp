@@ -318,8 +318,10 @@ export function reviveEmbeddedFarFieldResult(
   };
 }
 
-export function cloneFloat64(source: Float64Array): Float64Array {
-  return new Float64Array(source);
+export function cloneFloat64(
+  source: Float64Array,
+): Float64Array<ArrayBuffer> {
+  return Float64Array.from(source);
 }
 
 export function serializeCreateOptions(
@@ -348,15 +350,20 @@ export function serializeCreateOptions(
   }
 
   if (options.wasmBinary !== undefined) {
-    let bytes: Uint8Array;
+    let bytes: Uint8Array<ArrayBuffer>;
     try {
-      bytes = options.wasmBinary instanceof Uint8Array
-        ? options.wasmBinary.slice()
-        : new Uint8Array(options.wasmBinary.slice(0));
+      if (options.wasmBinary instanceof Uint8Array) {
+        bytes = Uint8Array.from(options.wasmBinary);
+      } else if (options.wasmBinary instanceof ArrayBuffer) {
+        bytes = new Uint8Array(options.wasmBinary.slice(0));
+      } else {
+        throw new TypeError("wasmBinary is not an ArrayBuffer or Uint8Array");
+      }
     } catch (cause) {
-      throw new NecInputError("wasmBinary must reference readable WASM bytes", {
-        cause,
-      });
+      throw new NecInputError(
+        "wasmBinary must be an ArrayBuffer or Uint8Array with readable WASM bytes",
+        { cause },
+      );
     }
     payload.wasmBinary = bytes.buffer;
     transfer.push(bytes.buffer);

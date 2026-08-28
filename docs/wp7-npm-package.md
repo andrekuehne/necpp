@@ -27,7 +27,8 @@ packages/necpp-wasm/
 `package.json` is `"type": "module"` with encapsulated `exports` for `.` and
 `./worker`. The `files` allowlist is `dist`, `README.md`, and `COPYING`. The
 package remains `private` until the `necpp` npm scope is available;
-`npm pack` is the distribution path.
+`npm pack` is the distribution path. Node 24 is the minimum supported Node
+runtime and the TypeScript facade is emitted as ES2024.
 
 `prepack` runs `scripts/build-dist.mjs`, which compiles `src/` to `dist/`,
 copies the generated loader and WASM, copies `COPYING`, and rejects source
@@ -59,8 +60,8 @@ Package tests never import workspace `src/` or `.test-build`. They:
    emitted `.wasm` with `Content-Type: application/wasm`
 
 Direct `createNecModel()` needs no bundler config. Vite apps that import the
-worker subpath set `worker: { format: "es" }` and `build.target: "es2022"`,
-which match the module worker and ES2022 syntax the package ships.
+worker subpath set `worker: { format: "es" }` and `build.target: "es2024"`,
+which match the module worker and ES2024 syntax the package ships.
 
 The fixture's resolved module path must contain `node_modules/@necpp/wasm`
 and must not contain `packages/necpp-wasm/src`.

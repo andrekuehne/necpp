@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -7,11 +8,15 @@ import {
 } from "./helpers.mjs";
 
 const skip = !hasWasmArtifacts && "WASM artifacts have not been built";
+const packageJson = JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+);
 
 test("npm pack contains only the documented publish files", { skip }, () => {
   const packed = packPackage();
   assert.equal(packed.version, "0.0.0-wp7");
   assert.match(packed.filename, /^necpp-wasm-0\.0\.0-wp7\.tgz$/);
+  assert.equal(packageJson.engines.node, ">=24");
 
   const files = new Set(packed.files);
   const required = [

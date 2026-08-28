@@ -36,6 +36,7 @@ export interface WorkerHost {
   postMessage(data: unknown, transfer?: readonly ArrayBuffer[]): void;
   subscribe(listener: (data: unknown) => void): () => void;
   subscribeError(listener: (error: unknown) => void): () => void;
+  subscribeExit?(listener: (code: number) => void): () => void;
   terminate(): void;
 }
 
@@ -53,10 +54,7 @@ function createWebWorker(): Worker {
 async function openWorkerHost(): Promise<WorkerHost> {
   if (isNodeRuntime()) {
     const { Worker: NodeWorker } = await import("node:worker_threads");
-    const worker = new NodeWorker(
-      new URL("./worker-entry.js", import.meta.url),
-      { type: "module" },
-    );
+    const worker = new NodeWorker(new URL("./worker-entry.js", import.meta.url));
     return {
       postMessage(data, transfer = []) {
         worker.postMessage(data, transfer);
@@ -77,6 +75,15 @@ async function openWorkerHost(): Promise<WorkerHost> {
         worker.on("error", handler);
         return () => {
           worker.off("error", handler);
+        };
+      },
+      subscribeExit(listener) {
+        const handler = (code: number): void => {
+          listener(code);
+        };
+        worker.on("exit", handler);
+        return () => {
+          worker.off("exit", handler);
         };
       },
       terminate() {
@@ -100,12 +107,17 @@ async function openWorkerHost(): Promise<WorkerHost> {
       };
     },
     subscribeError(listener) {
-      const handler = (event: ErrorEvent): void => {
+      const errorHandler = (event: ErrorEvent): void => {
         listener(event.error ?? event.message);
       };
-      worker.addEventListener("error", handler);
+      const messageErrorHandler = (): void => {
+        listener(new Error("The NEC worker could not deserialize a message"));
+      };
+      worker.addEventListener("error", errorHandler);
+      worker.addEventListener("messageerror", messageErrorHandler);
       return () => {
-        worker.removeEventListener("error", handler);
+        worker.removeEventListener("error", errorHandler);
+        worker.removeEventListener("messageerror", messageErrorHandler);
       };
     },
     terminate() {
@@ -136,6 +148,7 @@ class WorkerNecModel implements NecWorkerModel {
   readonly #listeners = new Set<NecWorkerProgressListener>();
   readonly #unsubscribeMessage: () => void;
   readonly #unsubscribeError: () => void;
+  readonly #unsubscribeExit: () => void;
 
   constructor(host: WorkerHost, onProgress?: NecWorkerProgressListener) {
     this.#host = host;
@@ -150,6 +163,14 @@ class WorkerNecModel implements NecWorkerModel {
         new NecRuntimeError("The NEC worker failed", { cause: error }),
       );
     });
+    this.#unsubscribeExit = host.subscribeExit?.((code) => {
+      if (!this.#terminated) {
+        this.#failAll(new NecRuntimeError(
+          `The NEC worker exited unexpectedly with code ${code}`,
+          { details: { exitCode: code } },
+        ));
+      }
+    }) ?? (() => undefined);
   }
 
   get state(): NecModelState {
@@ -257,6 +278,7 @@ class WorkerNecModel implements NecWorkerModel {
     this.#state = "disposed";
     this.#unsubscribeMessage();
     this.#unsubscribeError();
+    this.#unsubscribeExit();
     const error = new NecRuntimeError("The NEC worker was terminated");
     for (const pending of this.#pending.values()) {
       pending.reject(error);
@@ -280,8 +302,14 @@ class WorkerNecModel implements NecWorkerModel {
   }
 
   #failAll(error: NecRuntimeError): void {
+    if (this.#terminated) {
+      return;
+    }
     this.#terminated = true;
     this.#state = "disposed";
+    this.#unsubscribeMessage();
+    this.#unsubscribeError();
+    this.#unsubscribeExit();
     for (const pending of this.#pending.values()) {
       pending.reject(error);
     }

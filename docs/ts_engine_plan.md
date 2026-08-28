@@ -674,6 +674,9 @@ packages/necpp-wasm/
 ```json
 {
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -737,7 +740,8 @@ DoD:
   `./worker`, a `dist/` emit of the handwritten facade, and the generated
   `nec2pp.generated.js` plus `nec2pp.wasm` copied beside it. `prepack` builds
   that tree, copies `COPYING`, and rejects source maps, oversize artifacts,
-  and version drift against `package.json` and CMake.
+  and version drift against `package.json` and CMake. Node 24 is the minimum
+  Node runtime, with Node 24 typings and ES2024 output.
 - Exported `packageVersion`, `engineVersion`, and `abiVersion`. Module
   instantiation checks the native ABI and engine strings. HTTP(S) `wasmUrl`
   values are fetched into a copied `wasmBinary` so CDN loading works in Node.
@@ -747,7 +751,7 @@ DoD:
   the worker and serves `.wasm` as `application/wasm`. Those tests never
   import workspace `src/` or `.test-build`. Direct mode needs no bundler
   config; the Vite worker fixture sets `worker: { format: "es" }` and
-  `build.target: "es2022"` because the package ships an ES2022 module worker.
+  `build.target: "es2024"` because the package ships an ES2024 module worker.
 - Documented GPL-2.0-or-later distribution implications in the package
   README and [`docs/wp7-npm-package.md`](wp7-npm-package.md). The package
   remains `private` until the `necpp` npm scope is available.
@@ -771,6 +775,10 @@ Required CI jobs:
 7. Browser direct-mode integration test.
 8. Browser worker integration test.
 9. Artifact size and checksum reporting.
+
+The Node ABI, facade, and packed-consumer jobs run on Node 24. The Emscripten
+container only compiles the WASM artifacts; JavaScript verification runs on
+the Node 24 host after the artifacts are copied out.
 
 Keep Emscripten and TypeScript versions pinned. Upgrade them deliberately in isolated changes. Emscripten’s `--emit-tsd` may continue producing internal glue typings, but the handwritten package types remain authoritative. [Emscripten compiler documentation](https://emscripten.org/docs/tools_reference/emcc.html)
 

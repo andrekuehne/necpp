@@ -10,19 +10,6 @@ set -euo pipefail
 # writes from a non-root container user, which breaks emscripten link steps.
 CONTAINER_BUILD_DIR="/tmp/necpp-${BUILD_DIR}"
 
-TS_TOOLS_DIR="/tmp/emscripten-ts-tools"
-export npm_config_cache="/tmp/npm-cache"
-
-npm install \
-    --prefix "$TS_TOOLS_DIR" \
-    --no-save \
-    --no-package-lock \
-    typescript@5.8.3
-
-export PATH="$TS_TOOLS_DIR/node_modules/.bin:$PATH"
-
-tsc --version
-
 rm -f \
     packages/necpp-wasm/src/nec2pp.generated.js \
     packages/necpp-wasm/src/nec2pp.wasm
@@ -55,16 +42,10 @@ test -s "$CONTAINER_BUILD_DIR/src/nec2pp.js"
 test -s "$CONTAINER_BUILD_DIR/src/nec2pp.wasm"
 test -s "$CONTAINER_BUILD_DIR/src/nec2pp.d.ts"
 
-node --experimental-default-type=module \
-    scripts/wasm_smoke_test.mjs \
-    "$CONTAINER_BUILD_DIR/src/nec2pp.js"
-
 cp "$CONTAINER_BUILD_DIR/src/nec2pp.js" \
     packages/necpp-wasm/src/nec2pp.generated.js
 cp "$CONTAINER_BUILD_DIR/src/nec2pp.wasm" \
     packages/necpp-wasm/src/nec2pp.wasm
-
-npm --prefix packages/necpp-wasm run test:wasm
 
 mkdir -p "$WASM_OUT_DIR"
 

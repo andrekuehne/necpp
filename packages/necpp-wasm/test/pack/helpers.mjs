@@ -10,10 +10,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
 
-export const packageDirectory = fileURLToPath(new URL("../../", import.meta.url));
+export const packageDirectory = resolve(import.meta.dirname, "../..");
 export const VITE_VERSION = "6.3.5";
 
 const sourceWasm = join(packageDirectory, "src", "nec2pp.wasm");
@@ -21,12 +20,34 @@ const sourceLoader = join(packageDirectory, "src", "nec2pp.generated.js");
 
 export const hasWasmArtifacts = existsSync(sourceWasm) && existsSync(sourceLoader);
 
+function resolveSpawn(command, args) {
+  if (command !== "npm") {
+    return { command, args };
+  }
+  const configuredNpmCli = process.env.npm_execpath;
+  const bundledNpmCli = resolve(
+    dirname(process.execPath),
+    "node_modules/npm/bin/npm-cli.js",
+  );
+  const npmCli = typeof configuredNpmCli === "string" && configuredNpmCli.length > 0
+    ? configuredNpmCli
+    : bundledNpmCli;
+  if (!existsSync(npmCli)) {
+    throw new Error(`Could not locate the npm CLI at ${npmCli}`);
+  }
+  return {
+    command: process.execPath,
+    args: [npmCli, ...args],
+  };
+}
+
 export function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const invocation = resolveSpawn(command, args);
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: options.cwd ?? packageDirectory,
     encoding: "utf8",
     env: options.env ?? process.env,
-    shell: options.shell ?? command === "npm",
+    shell: options.shell ?? false,
     stdio: options.stdio ?? "inherit",
     windowsHide: true,
   });

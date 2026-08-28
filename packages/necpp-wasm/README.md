@@ -24,7 +24,7 @@ From a packed tarball:
 npm install ./necpp-wasm-0.0.0-wp7.tgz
 ```
 
-The package is ESM-only (`"type": "module"`). Node 18.19 or later is required.
+The package is ESM-only (`"type": "module"`). Node 24 or later is required.
 
 ## Quick start
 
@@ -72,8 +72,8 @@ try {
 ```
 
 Geometry is metres, frequency is MHz, port current is positive into the
-antenna, and far fields are complex V/m. The numerical contract is
-[`docs/wasm-api.md`](../../docs/wasm-api.md).
+antenna, and far fields are complex V/m. See the
+[numerical and API contract](https://github.com/tmolteno/necpp/blob/master/docs/wasm-api.md).
 
 ## Versions
 
@@ -105,13 +105,13 @@ Apps that import `@necpp/wasm/worker` and bundle with Vite should set:
 
 ```js
 export default {
-  build: { target: "es2022" },
+  build: { target: "es2024" },
   worker: { format: "es" },
 };
 ```
 
 `worker.format` is Vite's setting for `{ type: "module" }` workers. `build.target`
-must support the ES2022 syntax used by the package. Direct `createNecModel()`
+must support the ES2024 syntax used by the package. Direct `createNecModel()`
 still needs no application source changes and no artifact copying.
 
 ## Worker entry
