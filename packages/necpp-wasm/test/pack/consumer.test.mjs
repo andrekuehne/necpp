@@ -22,6 +22,10 @@ import {
   writeFixtureFile,
 } from "./helpers.mjs";
 
+const packageJson = JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+);
+
 const skip = !hasWasmArtifacts && "WASM artifacts have not been built";
 
 function parseJsonLine(stdout) {
@@ -143,7 +147,7 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
     cwd: fixture.root,
     stdio: ["ignore", "pipe", "inherit"],
   }).stdout);
-  assert.equal(direct.packageVersion, "0.0.0-wp7");
+  assert.equal(direct.packageVersion, packageJson.version);
   assert.equal(direct.engineVersion, "2.3.4");
   assert.equal(direct.abiVersion, 1);
   assert.ok(direct.resistanceOhm > 0);
@@ -156,7 +160,7 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
       stdio: ["ignore", "pipe", "inherit"],
     }).stdout,
   );
-  assert.equal(worker.packageVersion, "0.0.0-wp7");
+  assert.equal(worker.packageVersion, packageJson.version);
   assert.ok(Math.abs(worker.resistanceOhm - direct.resistanceOhm) < 1e-9);
 });
 

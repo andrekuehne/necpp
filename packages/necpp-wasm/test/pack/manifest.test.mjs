@@ -14,8 +14,8 @@ const packageJson = JSON.parse(
 
 test("npm pack contains only the documented publish files", { skip }, () => {
   const packed = packPackage();
-  assert.equal(packed.version, "0.0.0-wp7");
-  assert.match(packed.filename, /^necpp-wasm-0\.0\.0-wp7\.tgz$/);
+  assert.equal(packed.version, packageJson.version);
+  assert.equal(packed.filename, `necpp-wasm-${packageJson.version}.tgz`);
   assert.equal(packageJson.engines.node, ">=24");
 
   const files = new Set(packed.files);

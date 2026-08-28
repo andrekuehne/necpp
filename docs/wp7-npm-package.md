@@ -26,9 +26,11 @@ packages/necpp-wasm/
 
 `package.json` is `"type": "module"` with encapsulated `exports` for `.` and
 `./worker`. The `files` allowlist is `dist`, `README.md`, and `COPYING`. The
-package remains `private` until the `necpp` npm scope is available;
-`npm pack` is the distribution path. Node 24 is the minimum supported Node
-runtime and the TypeScript facade is emitted as ES2024.
+package was initially kept `private` until the WP8 release gate existed;
+`npm pack` was the distribution path. WP8 makes the manifest publishable and
+guards registry publication behind the complete tagged release workflow. Node
+24 is the minimum supported Node runtime and the TypeScript facade is emitted
+as ES2024.
 
 `prepack` runs `scripts/build-dist.mjs`, which compiles `src/` to `dist/`,
 copies the generated loader and WASM, copies `COPYING`, and rejects source

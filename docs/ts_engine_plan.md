@@ -762,6 +762,8 @@ The next open package on the critical path is WP8.
 
 ## WP8 — CI and release pipeline
 
+**Status: complete (2026-08-28).**
+
 Extend the existing WASM workflow in [.github/workflows/build.yml](C:/Users/andre/VSCode_Projects/necpp/.github/workflows/build.yml:1).
 
 Required CI jobs:
@@ -803,6 +805,29 @@ DoD:
 - Published bytes are the same bytes tested in the clean consumer jobs.
 - Failed numerical, browser, packaging or licensing checks prevent publication.
 - A release can be reproduced from a tagged checkout and pinned toolchain.
+
+### WP8 progress
+
+- Replaced the compile-only workflow with dependency-ordered native legacy,
+  native stateful/API, pinned Emscripten, Node 24 ABI, strict TypeScript
+  facade, exact-tarball consumer, Chromium direct, Chromium worker, and final
+  artifact-report jobs.
+- The Emscripten 4.0.7 container only compiles. Node 24 performs all JavaScript
+  verification after downloading the raw artifacts. TypeScript 5.8.3 and
+  Playwright 1.62.1 are pinned and checked in CI.
+- Added real Vite/Chromium acceptance for both public browser entry points.
+  Each creates the canonical dipole, extracts impedance, solves, computes a
+  complex far field, and verifies that the browser fetched WASM as
+  `application/wasm`.
+- Added a release packer that creates and checks one tarball, records its npm
+  file manifest and SHA-256 digest, and lets every clean-consumer and browser
+  job install that exact file through `NECPP_WASM_TARBALL`.
+- Added size/debug guards and a final checksum report. `wasm-v<packageVersion>`
+  tags publish the tested tarball with provenance and attach the same tarball
+  and checksums to a GitHub release only after the full graph succeeds.
+- Documented toolchain pins, job boundaries, artifact identity, tag naming,
+  permissions, and the required protected npm environment in
+  [`docs/wp8-ci-release.md`](wp8-ci-release.md).
 
 ---
 
@@ -862,6 +887,5 @@ The package is ready when all of the following are true:
 - The exact packed tarball passes clean-consumer tests before publication.
 - Versioning, licensing, release artifacts and documentation are complete.
 
-The completed critical path is WP0 → WP1 → WP2 → WP3 → WP4 → WP5 → WP7.
-Remaining release work is WP8 (CI and release pipeline) and WP9 (documentation
-and example application).
+The completed critical path is WP0 → WP1 → WP2 → WP3 → WP4 → WP5 → WP7 → WP8.
+The remaining release work is WP9 (documentation and example application).

@@ -14,14 +14,15 @@ obligations for the intended product before shipping. The full license text is
 in `COPYING`.
 
 Publication to the public npm registry requires control of the `necpp` scope.
-Until then, install the packed tarball produced by `npm pack`.
+Tagged releases are gated by the full WP8 CI pipeline; until registry access is
+configured, install the exact packed tarball produced by that workflow.
 
 ## Install
 
 From a packed tarball:
 
 ```bash
-npm install ./necpp-wasm-0.0.0-wp7.tgz
+npm install ./necpp-wasm-0.0.0-wp8.tgz
 ```
 
 The package is ESM-only (`"type": "module"`). Node 24 or later is required.

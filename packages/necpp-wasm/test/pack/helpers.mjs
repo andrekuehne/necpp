@@ -17,8 +17,13 @@ export const VITE_VERSION = "6.3.5";
 
 const sourceWasm = join(packageDirectory, "src", "nec2pp.wasm");
 const sourceLoader = join(packageDirectory, "src", "nec2pp.generated.js");
+const suppliedTarball = process.env.NECPP_WASM_TARBALL;
 
-export const hasWasmArtifacts = existsSync(sourceWasm) && existsSync(sourceLoader);
+export const hasWasmArtifacts = (
+  typeof suppliedTarball === "string"
+  && suppliedTarball.length > 0
+  && existsSync(resolve(suppliedTarball))
+) || (existsSync(sourceWasm) && existsSync(sourceLoader));
 
 function resolveSpawn(command, args) {
   if (command !== "npm") {
@@ -105,6 +110,23 @@ let packedCache;
 
 export function packPackage() {
   if (packedCache !== undefined) {
+    return packedCache;
+  }
+  if (typeof suppliedTarball === "string" && suppliedTarball.length > 0) {
+    const tarball = resolve(suppliedTarball);
+    if (!existsSync(tarball)) {
+      throw new Error(`NECPP_WASM_TARBALL does not exist: ${tarball}`);
+    }
+    const packageJson = JSON.parse(
+      readFileSync(join(packageDirectory, "package.json"), "utf8"),
+    );
+    packedCache = {
+      files: [],
+      filename: tarball.slice(Math.max(tarball.lastIndexOf("/"), tarball.lastIndexOf("\\")) + 1),
+      tarball,
+      version: packageJson.version,
+      workDirectory: dirname(tarball),
+    };
     return packedCache;
   }
   const workDirectory = mkdtempSync(join(tmpdir(), "necpp-wasm-pack-"));
