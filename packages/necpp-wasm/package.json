@@ -1,6 +1,6 @@
 {
   "name": "@necpp/wasm",
-  "version": "0.0.0-wp5",
+  "version": "0.0.0-wp6",
   "private": true,
   "type": "module",
   "description": "TypeScript facade for the NEC2++ WebAssembly engine",

@@ -573,11 +573,14 @@ DoD:
   deck execution. The pinned Docker WASM build stages its generated artifacts
   privately and runs the full facade suite.
 
-The next open package on the critical path is WP7; WP6 can proceed in parallel.
+The next open package on the critical path is WP7; WP6 worker support is
+complete and can land independently of package assembly.
 
 ---
 
 ## WP6 — Web Worker entry point
+
+**Status: complete (2026-08-28).**
 
 Browser solves are synchronous and potentially expensive, so include an optional worker facade:
 
@@ -609,6 +612,34 @@ DoD:
 - A browser application can perform realistic solves without blocking its UI thread.
 - Worker setup requires only importing the documented subpath.
 - No consumer-authored worker bootstrap file is needed.
+
+### WP6 progress
+
+- Added `createNecWorkerModel()` on the `@necpp/wasm/worker` subpath. The
+  package ships `worker-entry.ts`; the client constructs
+  `new Worker(new URL("./worker-entry.js", import.meta.url), { type: "module" })`
+  in browsers and uses `node:worker_threads` in Node. No consumer bootstrap
+  file is required.
+- Each worker model keeps one isolated Emscripten instance and native handle
+  across requests. Client calls are serialized per model. Two worker models
+  do not share state.
+- Result `ArrayBuffer`s are posted with a transfer list. Input typed arrays
+  are copied first so caller buffers are never detached. Port snapshots are
+  re-frozen on the client.
+- Coarse `start`/`complete` progress events are emitted at operation
+  boundaries, including worker-only `create`. `terminate()` kills the worker
+  and rejects outstanding work; `dispose()` destroys the native model first.
+- Added protocol, loopback-host, and Node ESM tests for transfer (detached
+  buffers), heartbeats during outstanding work, queue serialization,
+  independent models, typed-error revival, and termination. Real WASM
+  integration compares Z matrices and far fields with direct mode at `1e-12`
+  when artifacts are present.
+- Documented the worker contract in [`docs/wasm-api.md`](wasm-api.md) and
+  [`docs/wp6-web-worker.md`](wp6-web-worker.md). Direct `createNecModel()` is
+  unchanged.
+
+The next open package on the critical path is WP7; browser CI for the worker
+subpath is WP8.
 
 ---
 

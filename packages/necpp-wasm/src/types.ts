@@ -249,3 +249,65 @@ export interface NecModel {
   /** Idempotent. After disposal, every operation except `state` and `dispose` fails. */
   dispose(): void;
 }
+
+/** Coarse worker-boundary operation names, including worker-only `create`. */
+export type NecWorkerOperation =
+  | "create"
+  | "addWire"
+  | "completeGeometry"
+  | "definePorts"
+  | "addLoad"
+  | "clearLoads"
+  | "setGround"
+  | "prepare"
+  | "computeImpedanceMatrix"
+  | "solveVoltages"
+  | "solveCurrents"
+  | "computeFarField"
+  | "computeEmbeddedFarFields"
+  | "dispose";
+
+export interface NecWorkerProgressEvent {
+  readonly operation: NecWorkerOperation;
+  readonly phase: "start" | "complete";
+}
+
+export type NecWorkerProgressListener = (event: NecWorkerProgressEvent) => void;
+
+export interface CreateNecWorkerModelOptions extends CreateNecModelOptions {
+  /** Invoked on the client thread at worker operation start and completion. */
+  readonly onProgress?: NecWorkerProgressListener;
+}
+
+/**
+ * Worker-backed model. Methods are asynchronous, serialized per instance, and
+ * otherwise match `NecModel`. `terminate()` is the cancellation mechanism.
+ */
+export interface NecWorkerModel {
+  readonly state: NecModelState;
+
+  addWire(wire: WireDefinition): Promise<void>;
+  completeGeometry(options?: CompleteGeometryOptions): Promise<void>;
+  definePorts(ports: readonly PortDefinition[]): Promise<void>;
+  addLoad(load: LoadDefinition): Promise<void>;
+  clearLoads(): Promise<void>;
+  setGround(ground: GroundModel): Promise<void>;
+  prepare(options: PrepareOptions): Promise<void>;
+  computeImpedanceMatrix(): Promise<ImpedanceResult>;
+  solveVoltages(voltages: ComplexVector): Promise<PortSolution>;
+  solveCurrents(currents: ComplexVector): Promise<PortSolution>;
+  computeFarField(request: FarFieldRequest): Promise<FarFieldResult>;
+  computeEmbeddedFarFields(
+    request: FarFieldRequest,
+    normalization?: EmbeddedFieldNormalization,
+  ): Promise<EmbeddedFarFieldResult>;
+  /** Idempotent. Disposes the native model, then releases the worker thread. */
+  dispose(): Promise<void>;
+  /**
+   * Immediately kills the worker and rejects outstanding operations.
+   * Idempotent. The `state` getter afterwards is `"disposed"`.
+   */
+  terminate(): void;
+  /** Register a progress listener. Returns an unsubscribe function. */
+  subscribeProgress(listener: NecWorkerProgressListener): () => void;
+}

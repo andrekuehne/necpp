@@ -1,9 +1,9 @@
 # `@necpp/wasm` API and numerical contract
 
-Status: normative specification, updated through WP5 on 2026-08-28. The
-stateful native layer, versioned C/WASM ABI, and handwritten TypeScript facade
-are implemented. The committed TypeScript surface is in
-[`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
+Status: normative specification, updated through WP6 on 2026-08-28. The
+stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
+and optional Web Worker entry point are implemented. The committed TypeScript
+surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
 
 ## Package and runtime boundary
 
@@ -14,11 +14,13 @@ packages. Publication requires control of the `necpp` npm scope, but the API
 name will not change if the package is initially distributed as a tarball.
 
 `createNecModel()` asynchronously initializes the Emscripten module and
-returns a stateful `NecModel`. After creation, model methods are synchronous;
-large browser calculations should use the worker facade planned in WP6.
-`runDeck()` is an asynchronous compatibility escape hatch for a complete NEC
-text deck. It is not part of a `NecModel` lifecycle and returns a `DeckResult`
-containing the formatted report and engine version.
+returns a stateful `NecModel`. After creation, those model methods are
+synchronous. Large browser calculations should use `createNecWorkerModel()`
+from `@necpp/wasm/worker`; its methods are asynchronous, serialized per model,
+and otherwise observe this contract. `runDeck()` is an asynchronous
+compatibility escape hatch for a complete NEC text deck. It is not part of a
+`NecModel` lifecycle and returns a `DeckResult` containing the formatted
+report and engine version.
 
 The JavaScript facade owns the native handle and is solely responsible for
 destroying it. A consumer never receives a pointer, heap view, generated
@@ -170,6 +172,7 @@ enumerates every operation/state pair plus both `prepare()` branches.
 | Method | Inputs and units | Output | Failures beyond illegal state |
 |---|---|---|---|
 | `createNecModel(options?)` | Optional `wasmUrl` or caller-owned WASM bytes | Promise of an `empty` model | `NecRuntimeError` for load/instantiate/version failure; `NecInputError` if both overrides are supplied |
+| `createNecWorkerModel(options?)` | Same loading overrides plus optional `onProgress` | Promise of an `empty` worker model | Same loading failures; `NecRuntimeError` if the worker cannot start or is terminated |
 | `addWire(wire)` | Positive integer tag/count; distinct finite endpoints and positive finite radius, all in m | `void`; copies the definition | `NecInputError` for shape/range errors; `NecGeometryError` for engine geometry limits |
 | `completeGeometry(options?)` | Ground connection: `none` (default), `interpolate`, or `zero-current` | `void` | `NecGeometryError` for intersections, invalid junctions, or a ground-incompatible structure |
 | `definePorts(ports)` | Nonempty ordered tag and one-based segment pairs | `void`; copies and freezes order | `NecPortError` for missing/duplicate ports or non-source-capable segments; `NecInputError` for malformed integers |
@@ -183,6 +186,7 @@ enumerates every operation/state pair plus both `prepare()` branches.
 | `computeFarField(request)` | Positive radius in m (default 1), finite angle starts/steps, positive integer counts | Complex V/m for latest solution | `NecInputError` for grid/range/size overflow; `NecSolverError` for field calculation failure |
 | `computeEmbeddedFarFields(request, normalization?)` | Same grid plus unit-voltage (default) or unit-current normalization | Basis-major complex V/m arrays | Matrix/conditioning and far-field failures above |
 | `dispose()` | None | `void`; idempotent | No failure is exposed; cleanup errors are contained |
+| `terminate()` | Worker models only | `void`; kills the worker immediately | Outstanding promises reject with `NecRuntimeError` |
 | `runDeck(deck, options?)` | Complete UTF-8 deck string; optional pre-start abort signal | Promise of formatted report and engine version | `NecInputError` for empty/invalid deck or pre-abort; `NecSolverError` for execution; `NecRuntimeError` for module failure |
 
 All native exceptions are contained at the C ABI. The TypeScript layer maps a
@@ -207,6 +211,29 @@ surface. Validation failures do not mutate model state. A failed calculation
 keeps the last successfully prepared factorization and consumer solution when
 the native layer can prove they are intact; otherwise it rolls back to
 `geometry-complete` and discards prepared data.
+
+## Worker facade
+
+`createNecWorkerModel()` is imported from `@necpp/wasm/worker`. The package
+supplies the worker script; a consumer does not write a bootstrap file. Each
+call creates an isolated worker and Emscripten instance. Methods match
+`NecModel` but return promises and are serialized per model. Progress
+callbacks fire at coarse `start`/`complete` boundaries, including worker-only
+`create`. Large result `ArrayBuffer`s are transferred, not structured-cloned.
+Input arrays remain caller-owned.
+
+`terminate()` is the cancellation mechanism: it kills the worker, rejects
+outstanding operations with `NecRuntimeError`, and leaves the model
+`disposed`. `dispose()` destroys the native handle first, then terminates.
+The direct `createNecModel()` entry point is unchanged for Node, tests, and
+small models. Browser integration of this subpath after bundling is a WP7/WP8
+packaging concern; the worker client constructs
+
+```ts
+new Worker(new URL("./worker-entry.js", import.meta.url), { type: "module" })
+```
+
+so bundlers can rewrite the worker URL without extra consumer configuration.
 
 ## Canonical test models
 

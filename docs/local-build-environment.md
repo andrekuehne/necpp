@@ -150,3 +150,8 @@ The WP5 implementation was verified with:
 - TypeScript 5.8.3 and Node ESM: the public facade passed strict compilation,
   real matrix/solve/field operations, copied-result lifetime and disposal
   checks, default/URL/binary WASM loading, and complete-deck execution.
+
+The WP6 worker facade was verified on the same host with TypeScript 5.8.3 and
+Node ESM: all 24 package tests passed, including transferable result buffers,
+client-thread heartbeats during outstanding work, independent worker models,
+termination, and real WASM Z-matrix/far-field agreement with direct mode.
