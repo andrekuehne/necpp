@@ -29,7 +29,7 @@ set(CATCH_INSTALL_HELPERS OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(Catch2)
 
-# All 7 test files (including math_util_tb.cpp, which the old Makefile
+# All test files (including math_util_tb.cpp, which the old Makefile
 # excluded for historical reasons — it has a legitimate [nec_3vector] test).
 set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/safe_array_tb.cpp
@@ -43,6 +43,7 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/wasm_api_contract_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp2_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp3_tb.cpp
 )
 
 # Test runner = Catch2 main + test sources + nec2cpp.cpp (main renamed) + the
@@ -96,11 +97,13 @@ endif()
 # stress suite on independent timeout budgets. Otherwise a slow numerical
 # fixture can consume the aggregate timeout just before the bounded WP1 loop.
 add_test(NAME necpp_unit
-    COMMAND nec2++_tests "~[wp1]~[wp2]")
+    COMMAND nec2++_tests "~[wp1]~[wp2]~[wp3]")
 add_test(NAME necpp_wp1
     COMMAND nec2++_tests "[wp1]")
 add_test(NAME necpp_wp2
     COMMAND nec2++_tests "[wp2]")
+add_test(NAME necpp_wp3
+    COMMAND nec2++_tests "[wp3]")
 # Hard cap so a hung test fails fast (and CTest surfaces its output) instead of
 # blocking the CI runner for its full timeout ceiling. WP1 deliberately adds a
 # 1,000-excitation retained-factorization stress case; it completes in a few
@@ -108,6 +111,7 @@ add_test(NAME necpp_wp2
 set_tests_properties(necpp_unit PROPERTIES TIMEOUT 480)
 set_tests_properties(necpp_wp1 PROPERTIES TIMEOUT 180)
 set_tests_properties(necpp_wp2 PROPERTIES TIMEOUT 180)
+set_tests_properties(necpp_wp3 PROPERTIES TIMEOUT 180)
 
 # Smoke test: run a real simulation through the binary and check it produced
 # the expected output marker.

@@ -17,8 +17,6 @@
 #include <vector>
 
 class nec_context;
-class nec_radiation_pattern;
-
 enum class nec_model_state {
   empty,
   geometry_building,
@@ -90,6 +88,53 @@ struct nec_far_field_grid {
   nec_float phi_start_deg = 0.0;
   int phi_count = 1;
   nec_float phi_step_deg = 0.0;
+};
+
+/*! Copied complex far fields in theta-fast angular order.
+ *
+ * Sample index is phi_index * theta_deg.size() + theta_index. Fields are
+ * volts per metre and include the exp(-j k R) / R propagation factor.
+ */
+struct nec_far_field_result {
+  nec_float radius_m = 1.0;
+  nec_float frequency_mhz = 0.0;
+  std::vector<nec_float> theta_deg;
+  std::vector<nec_float> phi_deg;
+  std::vector<nec_complex> e_theta;
+  std::vector<nec_complex> e_phi;
+
+  size_t sample_count() const { return e_theta.size(); }
+
+  const nec_complex& e_theta_at(size_t theta_index, size_t phi_index) const;
+  const nec_complex& e_phi_at(size_t theta_index, size_t phi_index) const;
+};
+
+enum class nec_embedded_field_normalization {
+  unit_voltage,
+  unit_current,
+};
+
+/*! One copied complex far-field basis per port in stable port order.
+ *
+ * Embedded index is port_index * samples_per_port plus the theta-fast sample
+ * index used by nec_far_field_result.
+ */
+struct nec_embedded_far_field_result {
+  nec_float radius_m = 1.0;
+  nec_float frequency_mhz = 0.0;
+  std::vector<nec_float> theta_deg;
+  std::vector<nec_float> phi_deg;
+  std::vector<nec_port_definition> ports;
+  nec_embedded_field_normalization normalization =
+    nec_embedded_field_normalization::unit_voltage;
+  size_t samples_per_port = 0;
+  std::vector<nec_complex> e_theta;
+  std::vector<nec_complex> e_phi;
+
+  const nec_complex& e_theta_at(
+    size_t port_index, size_t theta_index, size_t phi_index) const;
+  const nec_complex& e_phi_at(
+    size_t port_index, size_t theta_index, size_t phi_index) const;
 };
 
 /*! Dense complex matrix in stable row-major port order. */
@@ -181,13 +226,18 @@ public:
 
   const nec_port_solution& last_port_solution() const;
 
-  /*! Calculate a raw NEC radiation-pattern result for the latest solution.
+  /*! Copy complex far fields for the latest consumer solution. */
+  const nec_far_field_result& compute_far_field(const nec_far_field_grid& grid);
+
+  /*! Copy one voltage- or current-normalized complex field basis per port.
    *
-   * WP3 supplies the stable copied complex-field API.  This WP1 hook exists
-   * to exercise far-field sampling against the retained factorization.  The
-   * reference remains valid until the next solve or far-field call.
+   * Internal solves preserve a prior consumer solution and public generation;
+   * from prepared state the model remains prepared.
    */
-  const nec_radiation_pattern& compute_far_field(const nec_far_field_grid& grid);
+  const nec_embedded_far_field_result& compute_embedded_far_fields(
+    const nec_far_field_grid& grid,
+    nec_embedded_field_normalization normalization =
+      nec_embedded_field_normalization::unit_voltage);
 
   const std::vector<nec_port_definition>& ports() const { return m_ports; }
   const std::vector<nec_complex>& port_currents() const { return m_port_currents; }
@@ -211,6 +261,9 @@ private:
     std::vector<nec_complex>& achieved_currents);
   void restore_after_internal_solves(
     bool had_solution, const nec_port_solution& saved_solution);
+  nec_far_field_result calculate_far_field(
+    const nec_far_field_grid& grid,
+    const std::vector<nec_complex>& currents);
   const nec_port_solution& finish_consumer_solve(
     nec_port_drive drive,
     const std::vector<nec_complex>& requested,
@@ -225,6 +278,8 @@ private:
   nec_complex_matrix m_admittance_matrix;
   nec_impedance_result m_impedance_result;
   nec_port_solution m_last_port_solution;
+  nec_far_field_result m_far_field_result;
+  nec_embedded_far_field_result m_embedded_far_field_result;
   nec_float m_frequency_mhz = 0.0;
   uint64_t m_factorization_generation = 0;
   uint64_t m_solve_generation = 0;

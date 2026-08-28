@@ -18,12 +18,12 @@ solved state. Changing frequency, ground, or loads invalidates prepared data;
 the next successful preparation advances the generation. A voltage solve
 advances only the solve generation.
 
-Each consumer solve replaces the previous native result collection. A raw WP1
+Each consumer solve replaces the previous native result collection. A
 far-field calculation retains the current antenna-input result and replaces
 only the prior radiation-pattern result. Thus repeated solves and repeated
-field grids have bounded native ownership. WP3 will copy the complex field
-components into its stable bulk result type; the raw WP1 radiation-pattern
-reference is deliberately temporary.
+field grids have bounded native ownership. WP3 now copies the temporary
+radiation-pattern components into the stable bulk result type documented in
+[`wp3-complex-far-field.md`](wp3-complex-far-field.md).
 
 Exact zero-valued voltage sources are preserved by the stateful excitation
 hook. This differs intentionally from the legacy `EX` card compatibility path,

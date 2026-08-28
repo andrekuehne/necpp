@@ -342,6 +342,8 @@ The next open package on the critical path is WP3.
 
 ## WP3 — Complex far-field API
 
+**Status: complete (2026-08-28).**
+
 Expose bulk far-field results from the most recent current solution:
 
 ```ts
@@ -389,6 +391,34 @@ DoD:
 - Direct combined fields and superposed basis fields agree numerically.
 - Returned data contains enough metadata to interpret every sample without external assumptions.
 - No formatted NEC report parsing occurs.
+
+### WP3 progress
+
+- Replaced the temporary raw radiation-pattern return from
+  [`nec_stateful_model`](../src/nec_stateful_model.h) with copied complex
+  far-field results containing radius, frequency, theta/phi axes, and
+  theta-fast \(E_\theta\)/\(E_\phi\) vectors in V/m.
+- Added voltage- and current-normalized embedded fields in stable port-major
+  order. Current bases use columns of the cached impedance matrix, so arbitrary
+  current weights superpose directly.
+- Internal embedded-field solves preserve a prior consumer solution, public
+  lifecycle state, factorization generation, and solve generation. Starting
+  from `prepared`, they leave no arbitrary basis result behind.
+- Added explicit exact-zero handling so a zero excitation returns finite exact
+  zero fields without entering NEC's gain-normalization calculations.
+- Added six WP3 Catch2 cases covering copied metadata and indexing, the
+  complex radial propagation law, voltage and current basis superposition,
+  solution restoration, exact-zero output, and center-fed dipole
+  nulls/symmetry, plus deterministic zero output for ground-skipped angles.
+- Added [`docs/wp3-complex-far-field.md`](wp3-complex-far-field.md) documenting
+  field ownership, layouts, normalizations, lifecycle behavior, and
+  beamforming equations. Native-to-WASM equality remains an ABI integration
+  assertion for WP4 because the stateful C boundary does not exist yet.
+- Validation completed on Windows/MSVC and Linux/GCC: all six WP3 cases pass
+  with 206 assertions, the WP0/WP1/WP2 partitions remain green, both native
+  production targets build, and the legacy CLI smoke test passes.
+
+The next open package on the critical path is WP4.
 
 ---
 

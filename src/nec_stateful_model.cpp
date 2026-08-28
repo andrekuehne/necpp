@@ -34,12 +34,94 @@ void fail(const char* operation, const char* reason)
   throw error;
 }
 
-bool finite(nec_float value)
+bool finite_value(nec_float value)
 {
   return std::isfinite(value);
 }
 
+size_t checked_field_sample_count(
+  const nec_far_field_grid& grid, const char* operation)
+{
+  if (!finite_value(grid.radius_m) || !(grid.radius_m > 0.0) ||
+      !finite_value(grid.theta_start_deg) || !finite_value(grid.theta_step_deg) ||
+      !finite_value(grid.phi_start_deg) || !finite_value(grid.phi_step_deg) ||
+      grid.theta_count <= 0 || grid.phi_count <= 0)
+    fail(operation, "GRID VALUES ARE INVALID");
+
+  const size_t theta_count = static_cast<size_t>(grid.theta_count);
+  const size_t phi_count = static_cast<size_t>(grid.phi_count);
+  if (theta_count > std::numeric_limits<size_t>::max() / phi_count)
+    fail(operation, "GRID SAMPLE COUNT OVERFLOWS");
+  const size_t sample_count = theta_count * phi_count;
+  if (sample_count > std::vector<nec_complex>().max_size())
+    fail(operation, "GRID SAMPLE COUNT IS TOO LARGE");
+  return sample_count;
+}
+
+void populate_field_axes(
+  const nec_far_field_grid& grid,
+  std::vector<nec_float>& theta_deg,
+  std::vector<nec_float>& phi_deg,
+  const char* operation)
+{
+  theta_deg.resize(static_cast<size_t>(grid.theta_count));
+  phi_deg.resize(static_cast<size_t>(grid.phi_count));
+  for (size_t index = 0; index < theta_deg.size(); ++index) {
+    theta_deg[index] =
+      grid.theta_start_deg + static_cast<nec_float>(index) * grid.theta_step_deg;
+    if (!finite_value(theta_deg[index]))
+      fail(operation, "THETA AXIS CONTAINS A NONFINITE VALUE");
+  }
+  for (size_t index = 0; index < phi_deg.size(); ++index) {
+    phi_deg[index] =
+      grid.phi_start_deg + static_cast<nec_float>(index) * grid.phi_step_deg;
+    if (!finite_value(phi_deg[index]))
+      fail(operation, "PHI AXIS CONTAINS A NONFINITE VALUE");
+  }
+}
+
+size_t checked_angular_index(
+  size_t theta_count, size_t phi_count,
+  size_t theta_index, size_t phi_index)
+{
+  if (theta_index >= theta_count || phi_index >= phi_count)
+    throw std::out_of_range("NEC far-field index is out of range");
+  return phi_index * theta_count + theta_index;
+}
+
 } // namespace
+
+const nec_complex& nec_far_field_result::e_theta_at(
+  size_t theta_index, size_t phi_index) const
+{
+  return e_theta.at(checked_angular_index(
+    theta_deg.size(), phi_deg.size(), theta_index, phi_index));
+}
+
+const nec_complex& nec_far_field_result::e_phi_at(
+  size_t theta_index, size_t phi_index) const
+{
+  return e_phi.at(checked_angular_index(
+    theta_deg.size(), phi_deg.size(), theta_index, phi_index));
+}
+
+const nec_complex& nec_embedded_far_field_result::e_theta_at(
+  size_t port_index, size_t theta_index, size_t phi_index) const
+{
+  if (port_index >= ports.size())
+    throw std::out_of_range("NEC embedded-field port index is out of range");
+  return e_theta.at(port_index * samples_per_port + checked_angular_index(
+    theta_deg.size(), phi_deg.size(), theta_index, phi_index));
+}
+
+const nec_complex& nec_embedded_far_field_result::e_phi_at(
+  size_t port_index, size_t theta_index, size_t phi_index) const
+{
+  if (port_index >= ports.size())
+    throw std::out_of_range("NEC embedded-field port index is out of range");
+  return e_phi.at(port_index * samples_per_port + checked_angular_index(
+    theta_deg.size(), phi_deg.size(), theta_index, phi_index));
+}
 
 nec_stateful_model::nec_stateful_model()
   : m_context(std::make_unique<nec_context>())
@@ -97,9 +179,9 @@ void nec_stateful_model::add_wire(const nec_wire_definition& wire)
     fail("ADD WIRE", "GEOMETRY IS ALREADY COMPLETE");
   if (wire.tag <= 0 || wire.segments <= 0)
     fail("ADD WIRE", "TAG AND SEGMENT COUNT MUST BE POSITIVE");
-  if (!finite(wire.x1) || !finite(wire.y1) || !finite(wire.z1) ||
-      !finite(wire.x2) || !finite(wire.y2) || !finite(wire.z2) ||
-      !finite(wire.radius_m) || !(wire.radius_m > 0.0))
+  if (!finite_value(wire.x1) || !finite_value(wire.y1) || !finite_value(wire.z1) ||
+      !finite_value(wire.x2) || !finite_value(wire.y2) || !finite_value(wire.z2) ||
+      !finite_value(wire.radius_m) || !(wire.radius_m > 0.0))
     fail("ADD WIRE", "COORDINATES AND POSITIVE RADIUS MUST BE FINITE");
   if (wire.x1 == wire.x2 && wire.y1 == wire.y2 && wire.z1 == wire.z2)
     fail("ADD WIRE", "ENDPOINTS MUST BE DISTINCT");
@@ -188,7 +270,9 @@ void nec_stateful_model::add_load(const nec_load_definition& load)
   const int load_kind = static_cast<int>(load.kind);
   if (load_kind < 0 || load_kind > 5)
     fail("ADD LOAD", "UNKNOWN LOAD KIND");
-  if (!finite(load.value1) || !finite(load.value2) || !finite(load.value3))
+  if (!finite_value(load.value1) ||
+      !finite_value(load.value2) ||
+      !finite_value(load.value3))
     fail("ADD LOAD", "LOAD VALUES MUST BE FINITE");
 
   const int last_segment =
@@ -232,8 +316,8 @@ void nec_stateful_model::set_ground(const nec_ground_definition& ground)
   }
 
   if (ground_type == 0 || ground_type == 2) {
-    if (!finite(ground.relative_permittivity) ||
-        !finite(ground.conductivity_s_per_m) ||
+    if (!finite_value(ground.relative_permittivity) ||
+        !finite_value(ground.conductivity_s_per_m) ||
         !(ground.relative_permittivity > 0.0) ||
         !(ground.conductivity_s_per_m > 0.0))
       fail("SET GROUND", "FINITE GROUND PARAMETERS MUST BE POSITIVE AND FINITE");
@@ -251,7 +335,7 @@ void nec_stateful_model::prepare(nec_float frequency_mhz)
   require_configurable("PREPARE");
   if (m_ports.empty())
     fail("PREPARE", "PORTS HAVE NOT BEEN DEFINED");
-  if (!finite(frequency_mhz) || !(frequency_mhz > 0.0))
+  if (!finite_value(frequency_mhz) || !(frequency_mhz > 0.0))
     fail("PREPARE", "FREQUENCY MUST BE POSITIVE AND FINITE");
 
   if (!m_configuration_dirty && m_frequency_mhz == frequency_mhz)
@@ -291,10 +375,10 @@ void nec_stateful_model::execute_voltage_solve(
       achieved_currents.size() != m_ports.size())
     fail("PORT VOLTAGE SOLVE", "ENGINE RETURNED THE WRONG PORT COUNT");
   for (size_t index = 0; index < m_ports.size(); ++index) {
-    if (!finite(achieved_voltages[index].real()) ||
-        !finite(achieved_voltages[index].imag()) ||
-        !finite(achieved_currents[index].real()) ||
-        !finite(achieved_currents[index].imag()))
+    if (!finite_value(achieved_voltages[index].real()) ||
+        !finite_value(achieved_voltages[index].imag()) ||
+        !finite_value(achieved_currents[index].real()) ||
+        !finite_value(achieved_currents[index].imag()))
       fail("PORT VOLTAGE SOLVE", "ENGINE RETURNED A NONFINITE PORT VALUE");
   }
 }
@@ -343,7 +427,7 @@ const nec_port_solution& nec_stateful_model::solve_port_voltages_detailed(
   if (voltages.size() != m_ports.size())
     fail("SOLVE PORT VOLTAGES", "VOLTAGE COUNT MUST MATCH PORT COUNT");
   for (const nec_complex voltage : voltages) {
-    if (!finite(voltage.real()) || !finite(voltage.imag()))
+    if (!finite_value(voltage.real()) || !finite_value(voltage.imag()))
       fail("SOLVE PORT VOLTAGES", "VOLTAGES MUST BE FINITE");
   }
 
@@ -475,7 +559,7 @@ const nec_port_solution& nec_stateful_model::solve_port_currents(
   if (currents.size() != m_ports.size())
     fail("SOLVE PORT CURRENTS", "CURRENT COUNT MUST MATCH PORT COUNT");
   for (const nec_complex current : currents) {
-    if (!finite(current.real()) || !finite(current.imag()))
+    if (!finite_value(current.real()) || !finite_value(current.imag()))
       fail("SOLVE PORT CURRENTS", "CURRENTS MUST BE FINITE");
   }
 
@@ -510,17 +594,27 @@ const nec_port_solution& nec_stateful_model::last_port_solution() const
   return m_last_port_solution;
 }
 
-const nec_radiation_pattern& nec_stateful_model::compute_far_field(
-  const nec_far_field_grid& grid)
+nec_far_field_result nec_stateful_model::calculate_far_field(
+  const nec_far_field_grid& grid,
+  const std::vector<nec_complex>& currents)
 {
-  require_state(nec_model_state::solved, "COMPUTE FAR FIELD");
-  if (!finite(grid.radius_m) || !(grid.radius_m > 0.0) ||
-      !finite(grid.theta_start_deg) || !finite(grid.theta_step_deg) ||
-      !finite(grid.phi_start_deg) || !finite(grid.phi_step_deg) ||
-      grid.theta_count <= 0 || grid.phi_count <= 0)
-    fail("COMPUTE FAR FIELD", "GRID VALUES ARE INVALID");
+  const size_t sample_count =
+    checked_field_sample_count(grid, "COMPUTE FAR FIELD");
+  nec_far_field_result copied;
+  copied.radius_m = grid.radius_m;
+  copied.frequency_mhz = m_frequency_mhz;
+  populate_field_axes(
+    grid, copied.theta_deg, copied.phi_deg, "COMPUTE FAR FIELD");
+  copied.e_theta.assign(sample_count, nec_complex(0.0, 0.0));
+  copied.e_phi.assign(sample_count, nec_complex(0.0, 0.0));
 
   m_context->stateful_clear_results(RESULT_RADIATION_PATTERN);
+  const bool zero_excitation = std::all_of(
+    currents.begin(), currents.end(),
+    [](nec_complex current) { return current == nec_complex(0.0, 0.0); });
+  if (zero_excitation)
+    return copied;
+
   m_context->rp_card(
     0, grid.theta_count, grid.phi_count,
     0, 0, 0, 0,
@@ -531,7 +625,116 @@ const nec_radiation_pattern& nec_stateful_model::compute_far_field(
   nec_radiation_pattern* result = m_context->get_radiation_pattern(0);
   if (result == nullptr)
     fail("COMPUTE FAR FIELD", "ENGINE DID NOT RETURN A RADIATION PATTERN");
-  return *result;
+  const complex_array e_theta = result->get_e_theta();
+  const complex_array e_phi = result->get_e_phi();
+  if (static_cast<size_t>(e_theta.size()) != sample_count ||
+      static_cast<size_t>(e_phi.size()) != sample_count)
+    fail("COMPUTE FAR FIELD", "ENGINE RETURNED THE WRONG FIELD SAMPLE COUNT");
+
+  for (size_t index = 0; index < sample_count; ++index) {
+    copied.e_theta[index] = e_theta[static_cast<int64_t>(index)];
+    copied.e_phi[index] = e_phi[static_cast<int64_t>(index)];
+    if (!finite_value(copied.e_theta[index].real()) ||
+        !finite_value(copied.e_theta[index].imag()) ||
+        !finite_value(copied.e_phi[index].real()) ||
+        !finite_value(copied.e_phi[index].imag()))
+      fail("COMPUTE FAR FIELD", "ENGINE RETURNED A NONFINITE FIELD VALUE");
+  }
+  return copied;
+}
+
+const nec_far_field_result& nec_stateful_model::compute_far_field(
+  const nec_far_field_grid& grid)
+{
+  require_state(nec_model_state::solved, "COMPUTE FAR FIELD");
+  nec_far_field_result result = calculate_far_field(grid, m_port_currents);
+  m_far_field_result = std::move(result);
+  return m_far_field_result;
+}
+
+const nec_embedded_far_field_result&
+nec_stateful_model::compute_embedded_far_fields(
+  const nec_far_field_grid& grid,
+  nec_embedded_field_normalization normalization)
+{
+  if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
+    fail("COMPUTE EMBEDDED FAR FIELDS", "MODEL IS NOT PREPARED");
+
+  const size_t samples_per_port =
+    checked_field_sample_count(grid, "COMPUTE EMBEDDED FAR FIELDS");
+  switch (normalization) {
+  case nec_embedded_field_normalization::unit_voltage:
+  case nec_embedded_field_normalization::unit_current:
+    break;
+  default:
+    fail("COMPUTE EMBEDDED FAR FIELDS", "UNKNOWN NORMALIZATION");
+  }
+  if (m_ports.size() >
+      std::vector<nec_complex>().max_size() / samples_per_port)
+    fail("COMPUTE EMBEDDED FAR FIELDS", "EMBEDDED SAMPLE COUNT IS TOO LARGE");
+
+  const nec_complex_matrix* impedance = nullptr;
+  if (normalization == nec_embedded_field_normalization::unit_current)
+    impedance = &compute_impedance_matrix().impedance;
+
+  const bool had_solution = m_has_port_solution;
+  const nec_port_solution saved_solution = m_last_port_solution;
+  const size_t embedded_sample_count = m_ports.size() * samples_per_port;
+  nec_embedded_far_field_result embedded;
+  embedded.radius_m = grid.radius_m;
+  embedded.frequency_mhz = m_frequency_mhz;
+  embedded.ports = m_ports;
+  embedded.normalization = normalization;
+  embedded.samples_per_port = samples_per_port;
+  populate_field_axes(
+    grid, embedded.theta_deg, embedded.phi_deg,
+    "COMPUTE EMBEDDED FAR FIELDS");
+  embedded.e_theta.assign(
+    embedded_sample_count, nec_complex(0.0, 0.0));
+  embedded.e_phi.assign(
+    embedded_sample_count, nec_complex(0.0, 0.0));
+
+  try {
+    std::vector<nec_complex> basis_voltages(
+      m_ports.size(), nec_complex(0.0, 0.0));
+    std::vector<nec_complex> achieved_voltages;
+    std::vector<nec_complex> achieved_currents;
+    for (size_t port_index = 0; port_index < m_ports.size(); ++port_index) {
+      std::fill(
+        basis_voltages.begin(), basis_voltages.end(),
+        nec_complex(0.0, 0.0));
+      if (normalization == nec_embedded_field_normalization::unit_voltage) {
+        basis_voltages[port_index] = nec_complex(1.0, 0.0);
+      } else {
+        for (size_t row = 0; row < impedance->rows; ++row)
+          basis_voltages[row] = impedance->at(row, port_index);
+      }
+
+      execute_voltage_solve(
+        basis_voltages, achieved_voltages, achieved_currents);
+      const nec_far_field_result basis =
+        calculate_far_field(grid, achieved_currents);
+      const size_t offset = port_index * samples_per_port;
+      std::copy(
+        basis.e_theta.begin(), basis.e_theta.end(),
+        embedded.e_theta.begin() + static_cast<std::ptrdiff_t>(offset));
+      std::copy(
+        basis.e_phi.begin(), basis.e_phi.end(),
+        embedded.e_phi.begin() + static_cast<std::ptrdiff_t>(offset));
+    }
+  } catch (...) {
+    const std::exception_ptr failure = std::current_exception();
+    try {
+      restore_after_internal_solves(had_solution, saved_solution);
+    } catch (...) {
+      // Never expose an arbitrary basis solution if restoration fails.
+    }
+    std::rethrow_exception(failure);
+  }
+  restore_after_internal_solves(had_solution, saved_solution);
+
+  m_embedded_far_field_result = std::move(embedded);
+  return m_embedded_far_field_result;
 }
 
 size_t nec_stateful_model::retained_result_count() const

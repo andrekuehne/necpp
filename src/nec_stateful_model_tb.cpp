@@ -2,7 +2,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "nec_exception.h"
-#include "nec_radiation_pattern.h"
 #include "nec_stateful_model.h"
 
 #include <cmath>
@@ -165,18 +164,18 @@ TEST_CASE("WP1 far-field grids do not invalidate the factorization",
   build_dipole(model);
   solve_dipole(model, 300.0);
 
-  const nec_radiation_pattern& first = model.compute_far_field({
+  const nec_far_field_result& first = model.compute_far_field({
     1.0, 0.0, 3, 45.0, 0.0, 2, 90.0,
   });
-  REQUIRE(first.get_e_theta().size() == 6);
+  REQUIRE(first.e_theta.size() == 6);
   REQUIRE(model.factorization_generation() == 1);
   REQUIRE(model.solve_generation() == 1);
   REQUIRE(model.retained_result_count() == 2);
 
-  const nec_radiation_pattern& second = model.compute_far_field({
+  const nec_far_field_result& second = model.compute_far_field({
     2.0, 10.0, 2, 20.0, 15.0, 3, 30.0,
   });
-  REQUIRE(second.get_e_theta().size() == 6);
+  REQUIRE(second.e_theta.size() == 6);
   REQUIRE(model.factorization_generation() == 1);
   REQUIRE(model.solve_generation() == 1);
   REQUIRE(model.retained_result_count() == 2);
