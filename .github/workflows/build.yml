@@ -361,10 +361,11 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
       - uses: actions/download-artifact@v4
         with:
           name: necpp-release-artifacts
@@ -380,7 +381,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          tarball="$(find release -maxdepth 1 -name '*.tgz' -print -quit)"
+          tarball="$(find "$PWD/release" -maxdepth 1 -name '*.tgz' -print -quit)"
           test -n "$tarball"
           npm publish "$tarball" --access public --provenance
       - name: Attach tarball and checksums to the GitHub release
