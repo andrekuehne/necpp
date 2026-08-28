@@ -1,4 +1,4 @@
-# `@necpp/wasm`
+# `@necpp-engine/wasm`
 
 Stateful NEC2++ antenna solver for Node and the browser. Consumers import a
 high-level TypeScript API; they never copy WASM artifacts, parse NEC reports,
@@ -13,7 +13,7 @@ later, including the obligation to provide corresponding source. Review those
 obligations for the intended product before shipping. The full license text is
 in `COPYING`.
 
-Publication to the public npm registry requires control of the `necpp` scope.
+Publication to the public npm registry requires control of the `necpp-engine` scope.
 Tagged releases are gated by the full WP8 CI pipeline; until registry access is
 configured, install the exact packed tarball produced by that workflow.
 
@@ -22,7 +22,7 @@ configured, install the exact packed tarball produced by that workflow.
 From a packed tarball:
 
 ```bash
-npm install ./necpp-wasm-0.0.0-wp8.tgz
+npm install ./necpp-engine-wasm-0.0.0-wp8.tgz
 ```
 
 The package is ESM-only (`"type": "module"`). Node 24 or later is required.
@@ -35,7 +35,7 @@ import {
   createNecModel,
   engineVersion,
   packageVersion,
-} from "@necpp/wasm";
+} from "@necpp-engine/wasm";
 
 console.log({ packageVersion, engineVersion, abiVersion });
 
@@ -74,7 +74,7 @@ try {
 
 Geometry is metres, frequency is MHz, port current is positive into the
 antenna, and far fields are complex V/m. See the
-[numerical and API contract](https://github.com/tmolteno/necpp/blob/master/docs/wasm-api.md).
+[numerical and API contract](https://github.com/andrekuehne/necpp/blob/master/docs/wasm-api.md).
 
 ## Versions
 
@@ -102,7 +102,7 @@ Overrides:
 
 Bundlers such as Vite rewrite the default `import.meta.url` resolution; no
 extra consumer config or artifact copying is required for `createNecModel()`.
-Apps that import `@necpp/wasm/worker` and bundle with Vite should set:
+Apps that import `@necpp-engine/wasm/worker` and bundle with Vite should set:
 
 ```js
 export default {
@@ -120,7 +120,7 @@ still needs no application source changes and no artifact copying.
 Large browser solves should use the worker subpath:
 
 ```ts
-import { createNecWorkerModel } from "@necpp/wasm/worker";
+import { createNecWorkerModel } from "@necpp-engine/wasm/worker";
 
 const model = await createNecWorkerModel();
 ```

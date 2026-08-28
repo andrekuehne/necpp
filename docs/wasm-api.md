@@ -1,4 +1,4 @@
-# `@necpp/wasm` API and numerical contract
+# `@necpp-engine/wasm` API and numerical contract
 
 Status: normative specification, updated through WP7 on 2026-08-28. The
 stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
@@ -7,11 +7,12 @@ The committed TypeScript surface is in [`packages/necpp-wasm/src`](../packages/n
 
 ## Package and runtime boundary
 
-The final npm package name is **`@necpp/wasm`**. The unscoped name
+The final npm package name is **`@necpp-engine/wasm`**. The unscoped name
 `necpp-wasm` is already occupied by a separately published distribution,
-while the scoped name identifies this repository and leaves room for future `@necpp/*`
-packages. Publication requires control of the `necpp` npm scope, but the API
-name will not change if the package is initially distributed as a tarball.
+while the scoped name identifies this repository and leaves room for future
+`@necpp-engine/*` packages. Publication requires control of the `necpp-engine`
+npm scope, but the API name will not change if the package is initially
+distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
 
 The packed package exports three version identifiers that can be imported
@@ -27,7 +28,7 @@ not match those constants.
 `createNecModel()` asynchronously initializes the Emscripten module and
 returns a stateful `NecModel`. After creation, those model methods are
 synchronous. Large browser calculations should use `createNecWorkerModel()`
-from `@necpp/wasm/worker`; its methods are asynchronous, serialized per model,
+from `@necpp-engine/wasm/worker`; its methods are asynchronous, serialized per model,
 and otherwise observe this contract. `runDeck()` is an asynchronous
 compatibility escape hatch for a complete NEC text deck. It is not part of a
 `NecModel` lifecycle and returns a `DeckResult` containing the formatted
@@ -225,7 +226,7 @@ the native layer can prove they are intact; otherwise it rolls back to
 
 ## Worker facade
 
-`createNecWorkerModel()` is imported from `@necpp/wasm/worker`. The package
+`createNecWorkerModel()` is imported from `@necpp-engine/wasm/worker`. The package
 supplies the worker script; a consumer does not write a bootstrap file. Each
 call creates an isolated worker and Emscripten instance. Methods match
 `NecModel` but return promises and are serialized per model. Progress

@@ -2,7 +2,7 @@
 
 WP6 adds an optional worker facade so browser applications can keep realistic
 NEC solves off the UI thread. The public factory is
-`createNecWorkerModel()` from the `@necpp/wasm/worker` subpath. Direct
+`createNecWorkerModel()` from the `@necpp-engine/wasm/worker` subpath. Direct
 `createNecModel()` remains the Node, test, and small-model entry point.
 
 The package ships the worker script. Consumers import the documented subpath

@@ -1,7 +1,7 @@
 # WP7 npm package assembly
 
 WP7 turns the handwritten TypeScript facade and generated WASM into a
-packable ESM package named `@necpp/wasm`. Consumers install a tarball (or a
+packable ESM package named `@necpp-engine/wasm`. Consumers install a tarball (or a
 future npm publish) and import the documented entry points. They do not copy
 artifacts, author a worker bootstrap, or depend on this repository's source
 tree.
@@ -54,9 +54,9 @@ Package tests never import workspace `src/` or `.test-build`. They:
 
 1. `npm pack` the assembled package
 2. install the `.tgz` into a temporary fixture
-3. `import { createNecModel } from "@necpp/wasm"` by name
+3. `import { createNecModel } from "@necpp-engine/wasm"` by name
 4. solve the centre-fed dipole
-5. import `@necpp/wasm/worker` and repeat
+5. import `@necpp-engine/wasm/worker` and repeat
 6. load WASM from an HTTP `wasmUrl`
 7. build a Vite fixture, confirm the worker is bundled, and fetch the
    emitted `.wasm` with `Content-Type: application/wasm`
@@ -65,7 +65,7 @@ Direct `createNecModel()` needs no bundler config. Vite apps that import the
 worker subpath set `worker: { format: "es" }` and `build.target: "es2024"`,
 which match the module worker and ES2024 syntax the package ships.
 
-The fixture's resolved module path must contain `node_modules/@necpp/wasm`
+The fixture's resolved module path must contain `node_modules/@necpp-engine/wasm`
 and must not contain `packages/necpp-wasm/src`.
 
 ## License

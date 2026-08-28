@@ -1,5 +1,5 @@
 {
-  "name": "@necpp/wasm",
+  "name": "@necpp-engine/wasm",
   "version": "0.0.0-wp8",
   "private": false,
   "type": "module",
@@ -7,10 +7,10 @@
   "license": "GPL-2.0-or-later",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tmolteno/necpp.git",
+    "url": "git+https://github.com/andrekuehne/necpp.git",
     "directory": "packages/necpp-wasm"
   },
-  "homepage": "https://github.com/tmolteno/necpp",
+  "homepage": "https://github.com/andrekuehne/necpp",
   "engines": {
     "node": ">=24"
   },

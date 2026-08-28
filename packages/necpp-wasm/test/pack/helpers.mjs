@@ -168,7 +168,7 @@ export function createCleanFixture(name) {
     private: true,
     type: "module",
     dependencies: {
-      "@necpp/wasm": `file:${tarballPosix}`,
+      "@necpp-engine/wasm": `file:${tarballPosix}`,
     },
   }, null, 2)}\n`);
   return { packed, root, tarballPosix };
@@ -187,9 +187,9 @@ export const dipoleScript = `import {
   createNecModel,
   engineVersion,
   packageVersion,
-} from "@necpp/wasm";
+} from "@necpp-engine/wasm";
 
-const resolved = import.meta.resolve("@necpp/wasm");
+const resolved = import.meta.resolve("@necpp-engine/wasm");
 if (!resolved.includes("node_modules")) {
   throw new Error(\`Package did not resolve from node_modules: \${resolved}\`);
 }
@@ -233,9 +233,9 @@ export const workerDipoleScript = `import {
   createNecWorkerModel,
   engineVersion,
   packageVersion,
-} from "@necpp/wasm/worker";
+} from "@necpp-engine/wasm/worker";
 
-const resolved = import.meta.resolve("@necpp/wasm/worker");
+const resolved = import.meta.resolve("@necpp-engine/wasm/worker");
 if (!resolved.includes("node_modules")) {
   throw new Error(\`Worker entry did not resolve from node_modules: \${resolved}\`);
 }
@@ -268,7 +268,7 @@ try {
 }
 `;
 
-export const cdnDipoleScript = `import { createNecModel } from "@necpp/wasm";
+export const cdnDipoleScript = `import { createNecModel } from "@necpp-engine/wasm";
 
 const wasmUrl = process.env.NEC_WASM_URL;
 if (typeof wasmUrl !== "string" || wasmUrl.length === 0) {

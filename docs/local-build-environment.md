@@ -159,7 +159,7 @@ termination, and real WASM Z-matrix/far-field agreement with direct mode.
 
 The WP7 package assembly requires Node 24 or later and is packed with `npm pack` from
 `packages/necpp-wasm`. Clean-consumer tests install that tarball in a
-temporary fixture, import `@necpp/wasm` and `@necpp/wasm/worker` by name, and
+temporary fixture, import `@necpp-engine/wasm` and `@necpp-engine/wasm/worker` by name, and
 build a Vite app. Run them after a WASM build:
 
 ```powershell

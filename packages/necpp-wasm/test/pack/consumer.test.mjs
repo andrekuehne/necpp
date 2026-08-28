@@ -151,7 +151,7 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
   assert.equal(direct.engineVersion, "2.3.4");
   assert.equal(direct.abiVersion, 1);
   assert.ok(direct.resistanceOhm > 0);
-  assert.match(direct.resolved.replaceAll("\\", "/"), /node_modules\/@necpp\/wasm/);
+  assert.match(direct.resolved.replaceAll("\\", "/"), /node_modules\/@necpp-engine\/wasm/);
   assert.doesNotMatch(direct.resolved, /packages[/\\]necpp-wasm[/\\]src[/\\]/);
 
   const worker = parseJsonLine(
@@ -218,8 +218,8 @@ test("a clean Vite fixture builds, serves WASM with the correct MIME type, and b
   createNecModel,
   engineVersion,
   packageVersion,
-} from "@necpp/wasm";
-import { createNecWorkerModel } from "@necpp/wasm/worker";
+} from "@necpp-engine/wasm";
+import { createNecWorkerModel } from "@necpp-engine/wasm/worker";
 
 const out = document.getElementById("out");
 

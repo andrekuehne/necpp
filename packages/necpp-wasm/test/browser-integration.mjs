@@ -133,8 +133,8 @@ async function startPreview() {
 }
 
 const modelImport = mode === "direct"
-  ? `import { abiVersion, createNecModel, engineVersion, packageVersion } from "@necpp/wasm";`
-  : `import { abiVersion, engineVersion, packageVersion } from "@necpp/wasm";\nimport { createNecWorkerModel } from "@necpp/wasm/worker";`;
+  ? `import { abiVersion, createNecModel, engineVersion, packageVersion } from "@necpp-engine/wasm";`
+  : `import { abiVersion, engineVersion, packageVersion } from "@necpp-engine/wasm";\nimport { createNecWorkerModel } from "@necpp-engine/wasm/worker";`;
 const factory = mode === "direct" ? "createNecModel" : "createNecWorkerModel";
 const awaitPrefix = mode === "direct" ? "" : "await ";
 
@@ -143,7 +143,7 @@ writeFixture("package.json", `${JSON.stringify({
   private: true,
   type: "module",
   dependencies: {
-    "@necpp/wasm": `file:${tarball.replaceAll("\\", "/")}`,
+    "@necpp-engine/wasm": `file:${tarball.replaceAll("\\", "/")}`,
   },
   devDependencies: {
     vite: "6.3.5",

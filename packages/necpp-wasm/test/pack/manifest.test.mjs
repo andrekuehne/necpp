@@ -15,7 +15,8 @@ const packageJson = JSON.parse(
 test("npm pack contains only the documented publish files", { skip }, () => {
   const packed = packPackage();
   assert.equal(packed.version, packageJson.version);
-  assert.equal(packed.filename, `necpp-wasm-${packageJson.version}.tgz`);
+  const filenamePrefix = packageJson.name.slice(1).replace("/", "-");
+  assert.equal(packed.filename, `${filenamePrefix}-${packageJson.version}.tgz`);
   assert.equal(packageJson.engines.node, ">=24");
 
   const files = new Set(packed.files);

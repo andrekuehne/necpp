@@ -1,9 +1,9 @@
-The target should be a versioned, stateful npm package—provisionally `@necpp/wasm`—with a high-level TypeScript API. Consumers should never touch raw WASM pointers, copy artifacts manually, parse NEC reports, or understand Emscripten.
+The target should be a versioned, stateful npm package—`@necpp-engine/wasm`—with a high-level TypeScript API. Consumers should never touch raw WASM pointers, copy artifacts manually, parse NEC reports, or understand Emscripten.
 
 A successful consumer experience would look like:
 
 ```ts
-import { createNecModel } from "@necpp/wasm";
+import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel();
 
@@ -120,9 +120,10 @@ DoD:
   specification. It fixes lifecycle behavior, units, coordinates, phasor and
   power conventions, matrix/field layouts, embedded-field normalization,
   ownership, method failures, canonical fixtures, and numerical tolerances.
-- Chose `@necpp/wasm` as the final package name. The existing unscoped
+- Initially chose `@necpp/wasm`; WP8 renamed the final package to
+  `@necpp-engine/wasm` so the project can claim a dedicated npm organization. The existing unscoped
   `necpp-wasm` name is occupied by a separately published distribution;
-  publication of the scoped package will require control of the `necpp` npm
+  publication of the scoped package requires control of the `necpp-engine` npm
   scope.
 - Added the strict public TypeScript contract under
   `packages/necpp-wasm/src`, including typed errors and an executable lifecycle
@@ -585,7 +586,7 @@ complete and can land independently of package assembly.
 Browser solves are synchronous and potentially expensive, so include an optional worker facade:
 
 ```ts
-import { createNecWorkerModel } from "@necpp/wasm/worker";
+import { createNecWorkerModel } from "@necpp-engine/wasm/worker";
 
 const model = await createNecWorkerModel();
 ```
@@ -615,7 +616,7 @@ DoD:
 
 ### WP6 progress
 
-- Added `createNecWorkerModel()` on the `@necpp/wasm/worker` subpath. The
+- Added `createNecWorkerModel()` on the `@necpp-engine/wasm/worker` subpath. The
   package ships `worker-entry.ts`; the client constructs
   `new Worker(new URL("./worker-entry.js", import.meta.url), { type: "module" })`
   in browsers and uses `node:worker_threads` in Node. No consumer bootstrap
@@ -736,7 +737,7 @@ DoD:
 
 ### WP7 progress
 
-- Assembled `@necpp/wasm` as an ESM package with `exports` for `.` and
+- Assembled the package, now named `@necpp-engine/wasm`, as an ESM package with `exports` for `.` and
   `./worker`, a `dist/` emit of the handwritten facade, and the generated
   `nec2pp.generated.js` plus `nec2pp.wasm` copied beside it. `prepack` builds
   that tree, copies `COPYING`, and rejects source maps, oversize artifacts,
@@ -754,7 +755,7 @@ DoD:
   `build.target: "es2024"` because the package ships an ES2024 module worker.
 - Documented GPL-2.0-or-later distribution implications in the package
   README and [`docs/wp7-npm-package.md`](wp7-npm-package.md). The package
-  remains `private` until the `necpp` npm scope is available.
+  remained `private` until the WP8 release gate and final namespace were available.
 
 The next open package on the critical path is WP8.
 
