@@ -7,9 +7,9 @@ export {
   NecRuntimeError,
   NecSolverError,
   NecStateError,
-} from "./errors.ts";
+} from "./errors.js";
 
-export type { NecErrorCode, NecErrorOptions } from "./errors.ts";
+export type { NecErrorCode, NecErrorOptions } from "./errors.js";
 
 export type {
   AngleSweep,
@@ -44,17 +44,38 @@ export type {
   SegmentSelection,
   SeriesRlcLoad,
   WireDefinition,
-} from "./types.ts";
+} from "./types.js";
 
+import { runDeckWithModule, validateDeckText } from "./deck.js";
+import { NecInputError } from "./errors.js";
+import { instantiateNecModule } from "./loader.js";
+import { createModelFromModule } from "./model.js";
 import type {
   CreateNecModelOptions,
   DeckResult,
   NecModel,
   RunDeckOptions,
-} from "./types.ts";
+} from "./types.js";
 
-/** WP0 contract declaration. The runtime factory is implemented in WP5. */
-export declare function createNecModel(options?: CreateNecModelOptions): Promise<NecModel>;
+/** Create an isolated stateful NEC model backed by a new WASM module instance. */
+export async function createNecModel(
+  options?: CreateNecModelOptions,
+): Promise<NecModel> {
+  const module = await instantiateNecModule(options);
+  return createModelFromModule(module);
+}
 
 /** Compatibility escape hatch for complete NEC text decks. */
-export declare function runDeck(deck: string, options?: RunDeckOptions): Promise<DeckResult>;
+export async function runDeck(
+  deck: string,
+  options?: RunDeckOptions,
+): Promise<DeckResult> {
+  validateDeckText(deck);
+  if (options?.signal?.aborted === true) {
+    throw new NecInputError("Deck execution was aborted before it started", {
+      details: { operation: "runDeck", aborted: true },
+    });
+  }
+  const module = await instantiateNecModule(options);
+  return runDeckWithModule(module, deck, options);
+}

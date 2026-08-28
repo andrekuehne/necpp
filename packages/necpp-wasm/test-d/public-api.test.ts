@@ -5,7 +5,7 @@ import {
   type ComplexMatrix,
   type FarFieldResult,
   type PortSolution,
-} from "../src/index.ts";
+} from "../src/index.js";
 
 async function validConsumer(): Promise<void> {
   const model = await createNecModel();

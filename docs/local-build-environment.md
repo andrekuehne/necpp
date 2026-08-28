@@ -131,12 +131,14 @@ wasm/nec2pp.wasm
 wasm/nec2pp.d.ts
 ```
 
-The wrapper also runs `scripts/wasm_smoke_test.mjs`. Generated WASM artifacts
-and all `build-*` directories are ignored by Git.
+The wrapper runs `scripts/wasm_smoke_test.mjs`, stages the generated loader and
+binary beside the handwritten TypeScript facade, and runs the strict facade
+and Node ESM integration tests. Generated WASM artifacts, the facade's
+`.test-build` directory, and all `build-*` directories are ignored by Git.
 
 ## Known-good verification
 
-The WP4 implementation was verified with:
+The WP5 implementation was verified with:
 
 - Windows/MSVC: all six CTest entries passed, including the CLI smoke test;
 - focused WP4: the C caller contract and native bulk-buffer comparison passed;
@@ -145,3 +147,6 @@ The WP4 implementation was verified with:
   successfully in the Docker Release build;
 - Emscripten 4.0.7: the versioned ABI matrix, solve, combined/embedded field,
   memory-growth, controlled-error, and complete-deck smoke paths passed.
+- TypeScript 5.8.3 and Node ESM: the public facade passed strict compilation,
+  real matrix/solve/field operations, copied-result lifetime and disposal
+  checks, default/URL/binary WASM loading, and complete-deck execution.

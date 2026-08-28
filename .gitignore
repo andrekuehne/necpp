@@ -20,6 +20,9 @@
 /wasm/nec2pp.wasm
 /wasm/nec2pp.d.ts
 /wasm/SHA256SUMS
+/packages/necpp-wasm/src/nec2pp.generated.js
+/packages/necpp-wasm/src/nec2pp.wasm
+/packages/necpp-wasm/.test-build/
 # Legacy test binary name (pre-CMake era); kept ignored in case of stale trees.
 src/necpp_test
 src/test_manager

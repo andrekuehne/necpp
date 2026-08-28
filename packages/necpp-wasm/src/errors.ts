@@ -1,4 +1,4 @@
-import type { NecModelState } from "./types.ts";
+import type { NecModelState } from "./types.js";
 
 export type NecErrorCode =
   | "NEC_STATE"

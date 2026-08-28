@@ -498,6 +498,8 @@ The next open package on the critical path is WP5.
 
 ## WP5 — TypeScript facade
 
+**Status: complete (2026-08-28).**
+
 Create a handwritten TypeScript layer that is the actual package API.
 
 Responsibilities:
@@ -546,6 +548,32 @@ DoD:
 - The normal consumer never sees the generated `MainModule`.
 - Quick-start code contains no filesystem paths, `locateFile`, raw memory or glue-module calls.
 - Node and browser expose the same public types and numerical behavior.
+
+### WP5 progress
+
+- Implemented the handwritten facade under
+  [`packages/necpp-wasm/src`](../packages/necpp-wasm/src). `createNecModel()`
+  asynchronously creates an isolated modular Emscripten instance, resolves the
+  adjacent `nec2pp.wasm` by default, and accepts mutually exclusive `wasmUrl`
+  and copied `wasmBinary` overrides.
+- Added runtime validation for geometry, ports, loads, ground, frequency,
+  complex-vector dimensions, finite values, and far-field grids. The facade
+  enforces the public state machine before crossing the ABI and maps every v1
+  status category to its documented `NecError` subclass.
+- Added private allocation helpers for split `Int32Array` and `Float64Array`
+  inputs. Every matrix, solution, coordinate axis, combined field, and
+  embedded field is copied immediately into JavaScript-owned arrays; generated
+  Emscripten types and heap views remain private.
+- Added idempotent deterministic `dispose()`, frozen port snapshots, and the
+  asynchronous `runDeck()` compatibility path with UTF-8 ownership and
+  pre-start abort handling.
+- Added strict emit/type tests and Node ESM integration tests covering a real
+  dipole matrix, repeated solves, copied-result lifetime, combined and embedded
+  fields, disposal, default/URL/binary loading, controlled errors, and complete
+  deck execution. The pinned Docker WASM build stages its generated artifacts
+  privately and runs the full facade suite.
+
+The next open package on the critical path is WP7; WP6 can proceed in parallel.
 
 ---
 

@@ -1,5 +1,5 @@
-import { NecStateError } from "./errors.ts";
-import type { NecModelState } from "./types.ts";
+import { NecStateError } from "./errors.js";
+import type { NecModelState } from "./types.js";
 
 export type ModelOperation =
   | "addWire"

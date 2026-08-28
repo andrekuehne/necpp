@@ -1,12 +1,14 @@
 {
   "name": "@necpp/wasm",
-  "version": "0.0.0-wp0",
+  "version": "0.0.0-wp5",
   "private": true,
   "type": "module",
-  "description": "Public TypeScript contract for the NEC2++ WebAssembly engine",
+  "description": "TypeScript facade for the NEC2++ WebAssembly engine",
   "license": "GPL-2.0-or-later",
   "scripts": {
-    "test": "node --test test/*.test.mjs && npm run typecheck",
+    "build:test": "node test/build.mjs",
+    "test": "npm run build:test && node --test test/*.test.mjs && npm run typecheck",
+    "test:wasm": "node test/require-wasm.mjs && npm test",
     "typecheck": "tsc --project tsconfig.json"
   },
   "devDependencies": {

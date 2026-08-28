@@ -1,8 +1,8 @@
 # `@necpp/wasm` API and numerical contract
 
-Status: normative specification, updated through WP4 on 2026-08-28. The
-stateful native layer and versioned C/WASM ABI are implemented; the handwritten
-TypeScript facade follows in WP5. The committed TypeScript surface is in
+Status: normative specification, updated through WP5 on 2026-08-28. The
+stateful native layer, versioned C/WASM ABI, and handwritten TypeScript facade
+are implemented. The committed TypeScript surface is in
 [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
 
 ## Package and runtime boundary
@@ -17,8 +17,8 @@ name will not change if the package is initially distributed as a tarball.
 returns a stateful `NecModel`. After creation, model methods are synchronous;
 large browser calculations should use the worker facade planned in WP6.
 `runDeck()` is an asynchronous compatibility escape hatch for a complete NEC
-text deck. It is not part of a `NecModel` lifecycle and returns the formatted
-report as a string.
+text deck. It is not part of a `NecModel` lifecycle and returns a `DeckResult`
+containing the formatted report and engine version.
 
 The JavaScript facade owns the native handle and is solely responsible for
 destroying it. A consumer never receives a pointer, heap view, generated

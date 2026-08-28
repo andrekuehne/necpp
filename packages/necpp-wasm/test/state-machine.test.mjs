@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { NecStateError } from "../src/errors.ts";
+import { NecStateError } from "../.test-build/src/errors.js";
 import {
   MODEL_TRANSITIONS,
   transitionModelState,
-} from "../src/state-machine.ts";
+} from "../.test-build/src/state-machine.js";
 
 const states = [
   "empty",

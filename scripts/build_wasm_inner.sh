@@ -23,6 +23,9 @@ export PATH="$TS_TOOLS_DIR/node_modules/.bin:$PATH"
 
 tsc --version
 
+rm -f \
+    packages/necpp-wasm/src/nec2pp.generated.js \
+    packages/necpp-wasm/src/nec2pp.wasm
 rm -rf "$CONTAINER_BUILD_DIR"
 
 CXX_FLAGS="-O3 -DNDEBUG -flto -fexceptions"
@@ -55,6 +58,13 @@ test -s "$CONTAINER_BUILD_DIR/src/nec2pp.d.ts"
 node --experimental-default-type=module \
     scripts/wasm_smoke_test.mjs \
     "$CONTAINER_BUILD_DIR/src/nec2pp.js"
+
+cp "$CONTAINER_BUILD_DIR/src/nec2pp.js" \
+    packages/necpp-wasm/src/nec2pp.generated.js
+cp "$CONTAINER_BUILD_DIR/src/nec2pp.wasm" \
+    packages/necpp-wasm/src/nec2pp.wasm
+
+npm --prefix packages/necpp-wasm run test:wasm
 
 mkdir -p "$WASM_OUT_DIR"
 
