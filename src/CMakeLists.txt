@@ -27,6 +27,7 @@ set(NECPP_LIB_SRCS
     nec_results.cpp
     nec_stateful_model.cpp
     nec_structure_currents.cpp
+    necpp_wasm_v1.cpp
 )
 
 # Public-facing headers installed alongside the library.
@@ -39,6 +40,7 @@ set(NECPP_PUBLIC_HEADERS
     nec_results.h
     nec_stateful_model.h
     nec_structure_currents.h
+    necpp_wasm_v1.h
     nec_output.h
     nec_exception.h
     c_evlcom.h
@@ -146,7 +148,6 @@ endif()
 # --- WASM target (opt-in via -DNECPP_BUILD_WASM=ON, needs emcc) ------------
 if(NECPP_BUILD_WASM)
     add_executable(nec2pp_wasm
-        ${CMAKE_CURRENT_SOURCE_DIR}/nec_wasm.cpp
         ${NECPP_LIB_SRCS})
     target_include_directories(nec2pp_wasm PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -158,8 +159,7 @@ if(NECPP_BUILD_WASM)
     target_link_options(nec2pp_wasm PRIVATE
         -fexceptions
         -sWASM=1
-        "-sEXPORTED_FUNCTIONS=[\"_nec_create_context\",\"_nec_delete_context\",\"_nec_process_input\",\"_nec_get_output\",\"_nec_get_output_length\",\"_nec_free\"]"
-        "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"UTF8ToString\",\"lengthBytesUTF8\"]"
+        "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_necpp_wasm_v1_abi_version\",\"_necpp_wasm_v1_engine_version\",\"_necpp_wasm_v1_model_create\",\"_necpp_wasm_v1_model_delete\",\"_necpp_wasm_v1_model_state\",\"_necpp_wasm_v1_last_status\",\"_necpp_wasm_v1_last_error\",\"_necpp_wasm_v1_add_wire\",\"_necpp_wasm_v1_complete_geometry\",\"_necpp_wasm_v1_define_ports\",\"_necpp_wasm_v1_add_load\",\"_necpp_wasm_v1_clear_loads\",\"_necpp_wasm_v1_set_ground\",\"_necpp_wasm_v1_prepare\",\"_necpp_wasm_v1_compute_impedance\",\"_necpp_wasm_v1_solve_voltages\",\"_necpp_wasm_v1_solve_currents\",\"_necpp_wasm_v1_compute_far_field\",\"_necpp_wasm_v1_compute_embedded_far_fields\",\"_necpp_wasm_v1_port_count\",\"_necpp_wasm_v1_port_tags\",\"_necpp_wasm_v1_port_segments\",\"_necpp_wasm_v1_impedance_order\",\"_necpp_wasm_v1_impedance_frequency_mhz\",\"_necpp_wasm_v1_impedance_condition_estimate\",\"_necpp_wasm_v1_impedance_factorization_generation\",\"_necpp_wasm_v1_solution_count\",\"_necpp_wasm_v1_solution_drive\",\"_necpp_wasm_v1_solution_frequency_mhz\",\"_necpp_wasm_v1_solution_factorization_generation\",\"_necpp_wasm_v1_solution_generation\",\"_necpp_wasm_v1_far_field_radius_m\",\"_necpp_wasm_v1_far_field_frequency_mhz\",\"_necpp_wasm_v1_far_field_theta_count\",\"_necpp_wasm_v1_far_field_phi_count\",\"_necpp_wasm_v1_embedded_radius_m\",\"_necpp_wasm_v1_embedded_frequency_mhz\",\"_necpp_wasm_v1_embedded_theta_count\",\"_necpp_wasm_v1_embedded_phi_count\",\"_necpp_wasm_v1_embedded_port_count\",\"_necpp_wasm_v1_embedded_samples_per_port\",\"_necpp_wasm_v1_embedded_normalization\",\"_necpp_wasm_v1_result_buffer\",\"_necpp_wasm_v1_result_buffer_length\",\"_necpp_wasm_v1_deck_create\",\"_necpp_wasm_v1_deck_delete\",\"_necpp_wasm_v1_deck_process\",\"_necpp_wasm_v1_deck_last_status\",\"_necpp_wasm_v1_deck_last_error\",\"_necpp_wasm_v1_deck_output\",\"_necpp_wasm_v1_deck_output_length\"]"
         -sDISABLE_EXCEPTION_CATCHING=0
         -sALLOW_MEMORY_GROWTH=1
         --no-entry)

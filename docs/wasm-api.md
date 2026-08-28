@@ -1,8 +1,8 @@
 # `@necpp/wasm` API and numerical contract
 
-Status: WP0 specification, 2026-08-28. This document is normative for the
-stateful native layer, C/WASM ABI, and handwritten TypeScript facade that
-follow. The committed TypeScript surface is in
+Status: normative specification, updated through WP4 on 2026-08-28. The
+stateful native layer and versioned C/WASM ABI are implemented; the handwritten
+TypeScript facade follows in WP5. The committed TypeScript surface is in
 [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
 
 ## Package and runtime boundary

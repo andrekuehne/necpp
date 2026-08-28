@@ -7,9 +7,12 @@
 #include "nec_exception.h"
 #include "nec_output.h"
 
+#include <cmath>
 #include <cstring>
+#include <limits>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -32,7 +35,7 @@ void read_comments_or_rewind(std::istream& input, nec_output_file& output)
     char line[LINE_LEN + 1] = {0};
 
     if ((load_line(line, input) == EOF) && (line[0] == '\0'))
-        throw nec_exception("Error reading input text.");
+        throw nec_deck_input_exception("Error reading input text.");
 
     std::strncpy(mnemonic, line, 2);
     if ((0 != std::strcmp(mnemonic, "CM")) &&
@@ -40,7 +43,7 @@ void read_comments_or_rewind(std::istream& input, nec_output_file& output)
         input.clear();
         input.seekg(job_start);
         if (!input)
-            throw nec_exception("Unable to rewind NEC input text.");
+            throw nec_deck_input_exception("Unable to rewind NEC input text.");
         return;
     }
 
@@ -52,14 +55,16 @@ void read_comments_or_rewind(std::istream& input, nec_output_file& output)
     while (0 == std::strcmp(mnemonic, "CM")) {
         line[0] = '\0';
         if ((load_line(line, input) == EOF) && (line[0] == '\0'))
-            throw nec_exception("Error reading input text (comments not terminated?).");
+            throw nec_deck_input_exception(
+                "Error reading input text (comments not terminated?).");
         std::strncpy(mnemonic, line, 2);
         mnemonic[2] = '\0';
         output.line(&line[2]);
     }
 
     if (0 != std::strcmp(mnemonic, "CE"))
-        throw nec_exception("ERROR: INCORRECT LABEL FOR A COMMENT CARD");
+        throw nec_deck_input_exception(
+            "ERROR: INCORRECT LABEL FOR A COMMENT CARD");
 }
 
 nec_card read_control_card(std::istream& input)
@@ -74,13 +79,13 @@ nec_card read_control_card(std::istream& input)
             end.mnemonic = "EN";
             return end;
         }
-        throw nec_exception(
+        throw nec_deck_input_exception(
             "COMMAND DATA CARD ERROR: CARD'S MNEMONIC CODE TOO SHORT OR MISSING.");
     }
 
     nec_card card = parse_nec_card(line);
     if (card.mnemonic == "XT")
-        throw nec_exception("XT is not supported by the string API.");
+        throw nec_deck_input_exception("XT is not supported by the string API.");
     return card;
 }
 
@@ -95,6 +100,47 @@ void print_control_card(nec_output_file& output, int count, const nec_card& card
         card.f[3], card.f[4], card.f[5]);
 }
 
+bool checked_count_product(const int* counts, size_t count)
+{
+    size_t product = 1;
+    for (size_t index = 0; index < count; ++index) {
+        if (counts[index] < 0)
+            return false;
+        const size_t value = counts[index] == 0
+            ? size_t(1)
+            : static_cast<size_t>(counts[index]);
+        if (product > std::numeric_limits<size_t>::max() / value)
+            return false;
+        product *= value;
+    }
+    return product <= std::vector<nec_complex>().max_size();
+}
+
+void validate_execution_card(const nec_card& card)
+{
+    for (double value : card.f) {
+        if (!std::isfinite(value))
+            throw nec_deck_input_exception(
+                "EXECUTION CARD CONTAINS A NONFINITE VALUE.");
+    }
+
+    if (card.mnemonic == "XQ") {
+        if (card.i[0] < 0 || card.i[0] > 3)
+            throw nec_deck_input_exception(
+                "XQ CARD MODE MUST BE BETWEEN ZERO AND THREE.");
+    } else if (card.mnemonic == "RP") {
+        const int counts[] = {card.i[1], card.i[2]};
+        if (!checked_count_product(counts, 2))
+            throw nec_deck_input_exception(
+                "RP CARD SAMPLE COUNTS MUST BE POSITIVE AND FIT IN MEMORY.");
+    } else if (card.mnemonic == "NE" || card.mnemonic == "NH") {
+        const int counts[] = {card.i[1], card.i[2], card.i[3]};
+        if (!checked_count_product(counts, 3))
+            throw nec_deck_input_exception(
+                "NEAR-FIELD CARD SAMPLE COUNTS MUST BE POSITIVE AND FIT IN MEMORY.");
+    }
+}
+
 } // namespace
 
 void nec_process_deck(const std::string& input_text,
@@ -102,7 +148,7 @@ void nec_process_deck(const std::string& input_text,
                       nec_output_file& output)
 {
     if (input_text.empty())
-        throw nec_exception("NEC input text is empty.");
+        throw nec_deck_input_exception("NEC input text is empty.");
 
     std::istringstream input(input_text);
     nec_output_flags output_flags;
@@ -113,8 +159,14 @@ void nec_process_deck(const std::string& input_text,
         print_program_header(output);
         read_comments_or_rewind(input, output);
 
-        context.get_geometry()->parse_geometry(&context, input);
-        context.calc_prepare();
+        try {
+            context.get_geometry()->parse_geometry(&context, input);
+            context.calc_prepare();
+        } catch (const nec_deck_input_exception&) {
+            throw;
+        } catch (const nec_exception& error) {
+            throw nec_deck_input_exception(error.get_message().c_str());
+        }
         output.end_section();
 
         int data_card_count = 0;
@@ -129,12 +181,29 @@ void nec_process_deck(const std::string& input_text,
                 return;
             }
             if (card.mnemonic == "PL")
-                throw nec_exception("PL is not supported by the string API.");
+                throw nec_deck_input_exception(
+                    "PL is not supported by the string API.");
 
             const card_handler* handler = find_handler(card.mnemonic);
             if (nullptr == handler)
-                throw nec_exception("FAULTY DATA CARD LABEL AFTER GEOMETRY SECTION.");
-            handler->dispatch(context, card);
+                throw nec_deck_input_exception(
+                    "FAULTY DATA CARD LABEL AFTER GEOMETRY SECTION.");
+
+            const bool executes_solver =
+                card.mnemonic == "XQ" || card.mnemonic == "RP" ||
+                card.mnemonic == "NE" || card.mnemonic == "NH";
+            if (executes_solver) {
+                validate_execution_card(card);
+                handler->dispatch(context, card);
+            } else {
+                try {
+                    handler->dispatch(context, card);
+                } catch (const nec_deck_input_exception&) {
+                    throw;
+                } catch (const nec_exception& error) {
+                    throw nec_deck_input_exception(error.get_message().c_str());
+                }
+            }
         }
     }
 }
@@ -196,7 +265,7 @@ void handle_cp(nec_context& ctx, const nec_card& c) {
 void handle_pl(nec_context&, const nec_card&) {}
 void handle_en(nec_context& ctx, const nec_card&) { ctx.all_jobs_completed(); }
 void handle_wg(nec_context&, const nec_card&) {
-    throw nec_exception("\"WG\" card, not supported.");
+    throw nec_deck_input_exception("\"WG\" card, not supported.");
 }
 void handle_mp(nec_context& ctx, const nec_card& c) {
     ctx.medium_parameters(c.f[0], c.f[1]);

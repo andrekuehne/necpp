@@ -418,7 +418,7 @@ DoD:
   with 206 assertions, the WP0/WP1/WP2 partitions remain green, both native
   production targets build, and the legacy CLI smoke test passes.
 
-The next open package on the critical path is WP4.
+The WP4 boundary built on these results is summarized below.
 
 ---
 
@@ -465,6 +465,34 @@ DoD:
 - The generated Emscripten module exposes only the documented ABI and necessary runtime memory helpers.
 - The public JS layer contains no C++ ownership concepts.
 - ABI versioning allows future additions without silently changing existing signatures.
+
+### WP4 progress
+
+- Added the C-compatible
+  [`necpp_wasm_v1.h`](../src/necpp_wasm_v1.h) boundary with opaque stateful
+  model and complete-deck handles. Every symbol is versioned and ABI/engine
+  version getters are available.
+- Contained all native exceptions and added stable state, input, geometry,
+  port, conditioning, solver, and runtime status categories with a diagnostic
+  string retained independently by each handle.
+- Added pointer-plus-length port and complex-drive inputs. Matrices, complete
+  port solutions, combined complex fields, and embedded complex fields are
+  copied into model-owned split binary64 buffers with explicit lengths and
+  scalar metadata.
+- Restricted the generated Emscripten surface to the versioned ABI,
+  `_malloc`/`_free`, and the required `HEAPU8`, `HEAP32`, and `HEAPF64` views.
+  The unversioned deck ABI and `ccall`/`cwrap` helpers are no longer exported.
+- Added a contract test compiled as C and a native-to-ABI bulk-buffer
+  comparison in the `[wp4]` partition. They cover controlled failures,
+  lifecycle and invalidation behavior, every result family, both drive and
+  embedded normalization modes, deck compatibility, and repeated cleanup.
+- Expanded the Docker smoke test to perform real matrix, solve, combined-field,
+  embedded-field, and deck operations through direct WASM exports. It also
+  forces memory growth after copying a field result.
+- Added [`docs/wp4-stable-wasm-abi.md`](wp4-stable-wasm-abi.md) as the ABI,
+  ownership, status, and Emscripten export reference.
+
+The next open package on the critical path is WP5.
 
 ---
 

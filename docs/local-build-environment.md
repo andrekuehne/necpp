@@ -22,7 +22,7 @@ command executed by Docker.
 ## Existing Windows/MSVC build
 
 `build-wp0` is the usable host build tree. Despite its historical name, it is
-regenerated from the current source and contains the WP1, WP2, and WP3 test
+regenerated from the current source and contains the WP1 through WP4 test
 partitions. Its relevant configuration is:
 
 - generator: `Visual Studio 17 2022`
@@ -74,11 +74,11 @@ Run all registered tests:
 Run one Catch2 work-package partition directly:
 
 ```powershell
-& "build-wp0\tests\Release\nec2++_tests.exe" "[wp3]"
+& "build-wp0\tests\Release\nec2++_tests.exe" "[wp4]"
 ```
 
 Registered CTest entries are `necpp_unit`, `necpp_wp1`, `necpp_wp2`,
-`necpp_wp3`, and `necpp_smoke_hertzian_dipole`. The test binary is compiled
+`necpp_wp3`, `necpp_wp4`, and `necpp_smoke_hertzian_dipole`. The test binary is compiled
 with `NEC_ERROR_CHECK=1`, so direct runs can emit substantial solver tracing.
 
 ## Docker native build
@@ -136,10 +136,12 @@ and all `build-*` directories are ignored by Git.
 
 ## Known-good verification
 
-The WP3 implementation was verified with:
+The WP4 implementation was verified with:
 
-- Windows/MSVC: all five CTest entries passed, including the CLI smoke test;
-- focused WP3: 6 cases and 206 assertions passed;
-- Linux/GCC in Docker: all five CTest entries passed;
+- Windows/MSVC: all six CTest entries passed, including the CLI smoke test;
+- focused WP4: the C caller contract and native bulk-buffer comparison passed;
+- Linux/GCC in Docker: all six CTest entries passed;
 - both native production executables, `nec2++` and `nec2diff`, built
-  successfully in the Docker Release build.
+  successfully in the Docker Release build;
+- Emscripten 4.0.7: the versioned ABI matrix, solve, combined/embedded field,
+  memory-growth, controlled-error, and complete-deck smoke paths passed.
