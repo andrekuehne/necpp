@@ -3,7 +3,6 @@
 # Produces in wasm/:
 #   nec2pp.js
 #   nec2pp.wasm
-#   nec2pp.d.ts
 #
 # Usage (from repo root or scripts/):
 #   .\scripts\build_wasm_docker.ps1

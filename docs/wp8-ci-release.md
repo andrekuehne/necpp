@@ -14,17 +14,19 @@ The workflow declares its release tool versions once:
 - TypeScript 5.8.3;
 - Playwright 1.62.1.
 
-The Emscripten container only invokes `scripts/build_wasm_inner.sh`. Node ABI,
-TypeScript, package, and browser verification all run on the Node 24 host using
-the artifacts copied out of that container. The npm lockfile fixes the complete
+The Emscripten container only invokes `scripts/build_wasm_inner.sh`. It emits
+the loader and WASM binary without invoking TypeScript. Node ABI, TypeScript,
+package, and browser verification all run on the Node 24 host using the
+artifacts copied out of that container. The npm lockfile fixes the complete
 JavaScript test dependency graph.
 
 ## Verification graph
 
 The native jobs independently cover the legacy Catch2/CLI suite and the WP1–4
-stateful port, matrix, far-field, and C ABI partitions. The generated loader,
-WASM binary, and internal declaration file are uploaded once and consumed by
-the Node ABI and facade jobs.
+stateful port, matrix, far-field, and C ABI partitions. The generated loader
+and WASM binary are uploaded once and consumed by the Node ABI and facade jobs.
+The committed handwritten declaration for the generated factory remains the
+authoritative internal TypeScript boundary.
 
 After the facade passes, `scripts/pack-release.mjs` creates one npm tarball. It
 validates the publish allowlist, license file, package version, source/debug

@@ -12,6 +12,10 @@ const workflowSource = readFileSync(
   "utf8",
 );
 const workflow = parse(workflowSource);
+const innerBuildSource = readFileSync(
+  resolve(repositoryRoot, "scripts/build_wasm_inner.sh"),
+  "utf8",
+);
 const packageJson = JSON.parse(
   readFileSync(resolve(packageDirectory, "package.json"), "utf8"),
 );
@@ -77,4 +81,6 @@ test("WP8 workflow packs once and publishes the tested tarball", () => {
     false,
     "the Emscripten container job must compile only",
   );
+  assert.doesNotMatch(innerBuildSource, /--emit-tsd/);
+  assert.doesNotMatch(workflowSource, /nec2pp\.d\.ts/);
 });

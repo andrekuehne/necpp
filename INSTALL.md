@@ -89,7 +89,7 @@ Two ways:
     emcmake cmake -B build-wasm -DNECPP_BUILD_WASM=ON -DNECPP_BUILD_TESTS=OFF
     cmake --build build-wasm -j4
     mkdir -p wasm
-    cp build-wasm/src/nec2pp.js build-wasm/src/nec2pp.wasm build-wasm/src/nec2pp.d.ts wasm/
+    cp build-wasm/src/nec2pp.js build-wasm/src/nec2pp.wasm wasm/
 
 **Docker wrapper** (no local emsdk needed):
 

@@ -129,7 +129,6 @@ Windows bind mount. Successful artifacts are copied to:
 ```text
 wasm/nec2pp.js
 wasm/nec2pp.wasm
-wasm/nec2pp.d.ts
 ```
 
 The wrapper runs `scripts/wasm_smoke_test.mjs`, stages the generated loader and

@@ -783,7 +783,7 @@ The Node ABI, facade, and packed-consumer jobs run on Node 24. The Emscripten
 container only compiles the WASM artifacts; JavaScript verification runs on
 the Node 24 host after the artifacts are copied out.
 
-Keep Emscripten and TypeScript versions pinned. Upgrade them deliberately in isolated changes. Emscripten’s `--emit-tsd` may continue producing internal glue typings, but the handwritten package types remain authoritative. [Emscripten compiler documentation](https://emscripten.org/docs/tools_reference/emcc.html)
+Keep Emscripten and TypeScript versions pinned. Upgrade them deliberately in isolated changes. The build does not use Emscripten's `--emit-tsd`: Emscripten 4.0.7 delegates that option to an external `tsc`, which would couple the compile-only container to the JavaScript toolchain. The committed handwritten internal glue declaration and public package types remain authoritative. [Emscripten compiler documentation](https://emscripten.org/docs/tools_reference/emcc.html)
 
 Initial accidental-debug-build guards can be generous:
 

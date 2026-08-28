@@ -13,6 +13,7 @@ CONTAINER_BUILD_DIR="/tmp/necpp-${BUILD_DIR}"
 rm -f \
     packages/necpp-wasm/src/nec2pp.generated.js \
     packages/necpp-wasm/src/nec2pp.wasm
+rm -f "$WASM_OUT_DIR/nec2pp.d.ts"
 rm -rf "$CONTAINER_BUILD_DIR"
 
 CXX_FLAGS="-O3 -DNDEBUG -flto -fexceptions"
@@ -25,8 +26,7 @@ LINK_FLAGS="-O3 -flto \
 -sEXIT_RUNTIME=0 \
 -sALLOW_MEMORY_GROWTH=1 \
 -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAPF64 \
--sDISABLE_EXCEPTION_CATCHING=0 \
---emit-tsd nec2pp.d.ts"
+-sDISABLE_EXCEPTION_CATCHING=0"
 
 emcmake cmake -B "$CONTAINER_BUILD_DIR" -S . \
     -DCMAKE_BUILD_TYPE=Release \
@@ -40,7 +40,6 @@ cmake --build "$CONTAINER_BUILD_DIR" --config Release -j"$(nproc)"
 
 test -s "$CONTAINER_BUILD_DIR/src/nec2pp.js"
 test -s "$CONTAINER_BUILD_DIR/src/nec2pp.wasm"
-test -s "$CONTAINER_BUILD_DIR/src/nec2pp.d.ts"
 
 cp "$CONTAINER_BUILD_DIR/src/nec2pp.js" \
     packages/necpp-wasm/src/nec2pp.generated.js
@@ -52,5 +51,4 @@ mkdir -p "$WASM_OUT_DIR"
 cp \
     "$CONTAINER_BUILD_DIR/src/nec2pp.js" \
     "$CONTAINER_BUILD_DIR/src/nec2pp.wasm" \
-    "$CONTAINER_BUILD_DIR/src/nec2pp.d.ts" \
     "$WASM_OUT_DIR/"

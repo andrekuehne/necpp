@@ -88,8 +88,7 @@ jobs:
         run: |
           test -s wasm/nec2pp.js
           test -s wasm/nec2pp.wasm
-          test -s wasm/nec2pp.d.ts
-          sha256sum wasm/nec2pp.js wasm/nec2pp.wasm wasm/nec2pp.d.ts \
+          sha256sum wasm/nec2pp.js wasm/nec2pp.wasm \
             > wasm/SHA256SUMS
           ls -lh wasm
       - name: Upload raw WASM build
@@ -323,9 +322,8 @@ jobs:
             \( -name '*.map' -o -name '*.debug' -o -name '*.dSYM' \) -print -quit)"
           mkdir release
           cp package-artifact/*.tgz release/
-          cp wasm-artifact/nec2pp.js wasm-artifact/nec2pp.wasm \
-            wasm-artifact/nec2pp.d.ts release/
-          (cd release && sha256sum *.tgz nec2pp.js nec2pp.wasm nec2pp.d.ts > SHA256SUMS)
+          cp wasm-artifact/nec2pp.js wasm-artifact/nec2pp.wasm release/
+          (cd release && sha256sum *.tgz nec2pp.js nec2pp.wasm > SHA256SUMS)
           {
             echo "Pinned Emscripten image: $EMSCRIPTEN_IMAGE"
             echo "Pinned TypeScript: $TYPESCRIPT_VERSION"

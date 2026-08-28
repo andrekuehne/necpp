@@ -5,6 +5,7 @@
 * Comprehensive npm documentation covering numerical conventions, lifecycle, errors, loading, beamforming, performance, browser memory, and GPL-2.0-or-later distribution obligations. README TypeScript examples and the downstream Vite example are checked against the exact release tarball in CI.
 
 ### Bug Fixes
+* **The pinned Emscripten CI build no longer requires an undeclared `tsc`:** removed the unused `--emit-tsd` output from the compile-only Docker job and its artifact/checksum pipeline. The package already uses a committed handwritten internal module declaration, so the generated declaration was redundant. A workflow regression test now keeps TypeScript out of the Emscripten container.
 * **`nec2diff` no longer reports spurious radiation-pattern differences:** at angles where the polarization is undefined (HORIZ gain `-999.99`, e.g. at the horizon) NEC leaves the SENSE column blank. The `RadiationInput` parser read the next numeric token as the sense string, shifting the remaining columns left by one, and `read_fixed`/`read_sci` returned **uninitialized memory** when the stream was exhausted — so comparing a file against itself reported a nonzero difference with garbage values (observed on `bruce_sommerfeld`). The parser now detects the blank SENSE column, and the readers return 0.0 on extraction failure. All 52 testharness decks now self-compare exactly clean; genuine differences are still flagged.
 
 ### Performance
