@@ -70,13 +70,13 @@ requires a package to exist before a trusted relationship can be configured.
 ## Initial 0.1.0 release checklist
 
 Before merging, the checked-in `package.json`, `packageVersion` export, and tag
-must all identify `0.1.0`. After the WP9 branch reaches `main`:
+must all identify `0.1.0`. After the WP9 branch reaches `master`:
 
 1. Confirm the public npm organization/scope `necpp-engine` exists and the
    publishing account can create packages in it.
 2. Protect the GitHub `npm` environment with required reviewers and add the
    initial granular `NPM_TOKEN` secret.
-3. Wait for the complete `main` workflow to pass.
+3. Wait for the complete `master` workflow to pass.
 4. Create and push `wasm-v0.1.0` at that exact tested commit. Do not publish
    manually and do not rebuild the tarball locally.
 5. Confirm the tag workflow passes every native, WASM, Node, package,
