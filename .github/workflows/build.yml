@@ -31,27 +31,24 @@ jobs:
       - name: Prepare package artifacts
         shell: bash
         run: |
-          test -s nec2pp.js
-          test -s nec2pp.wasm
-          test -s nec2pp.d.ts
-
-          mkdir -p wasm-dist
-          cp nec2pp.js nec2pp.wasm nec2pp.d.ts wasm-dist/
+          test -s wasm/nec2pp.js
+          test -s wasm/nec2pp.wasm
+          test -s wasm/nec2pp.d.ts
 
           sha256sum \
-            wasm-dist/nec2pp.js \
-            wasm-dist/nec2pp.wasm \
-            wasm-dist/nec2pp.d.ts \
-            > wasm-dist/SHA256SUMS
+            wasm/nec2pp.js \
+            wasm/nec2pp.wasm \
+            wasm/nec2pp.d.ts \
+            > wasm/SHA256SUMS
 
           echo "Generated artifacts:"
-          ls -lh wasm-dist
+          ls -lh wasm
 
       - name: Upload WASM package
         uses: actions/upload-artifact@v4
         with:
           name: necpp-wasm
-          path: wasm-dist/
+          path: wasm/
           if-no-files-found: error
           retention-days: 30
           compression-level: 6

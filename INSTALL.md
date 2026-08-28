@@ -88,19 +88,28 @@ Two ways:
 
     emcmake cmake -B build-wasm -DNECPP_BUILD_WASM=ON -DNECPP_BUILD_TESTS=OFF
     cmake --build build-wasm -j4
+    mkdir -p wasm
+    cp build-wasm/src/nec2pp.js build-wasm/src/nec2pp.wasm build-wasm/src/nec2pp.d.ts wasm/
 
 **Docker wrapper** (no local emsdk needed):
 
-    ./scripts/build_wasm_docker.sh
+    ./scripts/build_wasm_docker.sh          # Linux / macOS / Git Bash
+    .\scripts\build_wasm_docker.ps1         # Windows PowerShell (Docker Desktop)
 
-Both produce `nec2pp.js` + `nec2pp.wasm` exposing a C API
+On Windows, run the PowerShell script from the repo root. Docker Desktop must
+be running; WSL2 is used by Docker Desktop but you do not need to invoke the
+build from inside WSL. If you prefer WSL, enable *Settings → Resources → WSL
+Integration* for your distro so `docker` works inside Ubuntu, then use the
+`.sh` script from there.
+
+Both produce `wasm/nec2pp.js` + `wasm/nec2pp.wasm` exposing a C API
 (`nec_create_context`, `nec_process_input`, `nec_get_output`, …).
 
 The module is an ES module factory. Runtime helpers and C exports are available
 on the initialized module object:
 
 ```js
-import createNecModule from "./nec2pp.js";
+import createNecModule from "./wasm/nec2pp.js";
 
 const module = await createNecModule();
 const context = module._nec_create_context();

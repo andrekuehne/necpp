@@ -16,8 +16,10 @@
 # spots so neither tree shows stray binaries in git status.
 /src/nec2++
 /src/nec2diff
-nec2pp.js
-nec2pp.wasm
+/wasm/nec2pp.js
+/wasm/nec2pp.wasm
+/wasm/nec2pp.d.ts
+/wasm/SHA256SUMS
 # Legacy test binary name (pre-CMake era); kept ignored in case of stale trees.
 src/necpp_test
 src/test_manager
