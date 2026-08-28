@@ -1,0 +1,15 @@
+{
+  "name": "@necpp/wasm",
+  "version": "0.0.0-wp0",
+  "private": true,
+  "type": "module",
+  "description": "Public TypeScript contract for the NEC2++ WebAssembly engine",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "test": "node --test test/*.test.mjs && npm run typecheck",
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  }
+}

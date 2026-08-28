@@ -74,6 +74,8 @@ The NEC execution model supports reuse of the expensive interaction-matrix facto
 
 ## WP0 — API and numerical specification
 
+**Status: complete (2026-08-28).**
+
 Deliverables:
 
 - `docs/wasm-api.md` defining lifecycle, units, coordinate systems, phase convention and array layouts.
@@ -111,6 +113,38 @@ DoD:
 - Every public method has defined inputs, outputs, units, ownership and failure behavior.
 - Port-current direction and field phase have executable tests, not only prose.
 - No unresolved numerical convention remains.
+
+### WP0 progress
+
+- Added [`docs/wasm-api.md`](wasm-api.md) as the normative API and numerical
+  specification. It fixes lifecycle behavior, units, coordinates, phasor and
+  power conventions, matrix/field layouts, embedded-field normalization,
+  ownership, method failures, canonical fixtures, and numerical tolerances.
+- Chose `@necpp/wasm` as the final package name. The existing unscoped
+  `necpp-wasm` name is occupied by a separately published distribution;
+  publication of the scoped package will require control of the `necpp` npm
+  scope.
+- Added the strict public TypeScript contract under
+  `packages/necpp-wasm/src`, including typed errors and an executable lifecycle
+  transition table. The package is deliberately `private` at this stage
+  because WP5 and WP7 still need to supply the runtime facade and publishable
+  package assembly.
+- Added TypeScript tests that enumerate all 78 operation/state pairs, exercise
+  the conditional idempotent `prepare()` transition, and compile valid plus
+  intentionally invalid consumer examples under TypeScript 5.8.3 with
+  `strict: true`.
+- Added native Catch2 baselines for the center-fed dipole, two coupled
+  dipoles, and four-element phased array. These construct and solve through
+  `nec_context`/`c_geometry` directly, without generating or parsing a deck.
+- Added executable convention locks for current positive into the antenna via
+  \(P=\tfrac12\operatorname{Re}(VI^*)\), and for the complex far-field range
+  ratio \(e^{-jk\Delta R}R_1/R_2\).
+- Validation completed on Windows/MSVC: all 77 native test cases pass (738
+  assertions), all 5 new `[wasm_api]` cases pass (44 assertions), the strict
+  TypeScript/state tests pass, and the existing deck-based WASM smoke test
+  remains green.
+
+The next open package on the critical path is WP1.
 
 ---
 
