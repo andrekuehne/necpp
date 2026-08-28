@@ -23,6 +23,9 @@
 /packages/necpp-wasm/src/nec2pp.generated.js
 /packages/necpp-wasm/src/nec2pp.wasm
 /packages/necpp-wasm/.test-build/
+/packages/necpp-wasm/dist/
+/packages/necpp-wasm/COPYING
+/packages/necpp-wasm/.pack-work/
 # Legacy test binary name (pre-CMake era); kept ignored in case of stale trees.
 src/necpp_test
 src/test_manager

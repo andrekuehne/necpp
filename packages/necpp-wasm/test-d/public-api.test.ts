@@ -1,6 +1,9 @@
 import {
   NecStateError,
+  abiVersion,
   createNecModel,
+  engineVersion,
+  packageVersion,
   runDeck,
   type ComplexMatrix,
   type FarFieldResult,
@@ -42,6 +45,10 @@ async function validConsumer(): Promise<void> {
   solution.currents.imag[0];
   field.eThetaReal[0];
   model.dispose();
+
+  packageVersion satisfies string;
+  engineVersion satisfies string;
+  abiVersion satisfies 1;
 
   const deck = await runDeck("CE\nEN\n");
   deck.report.toUpperCase();

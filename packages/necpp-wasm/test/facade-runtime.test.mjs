@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import test from "node:test";
 
 import {
   NecInputError,
   NecStateError,
+  abiVersion,
   createNecModel,
+  engineVersion,
+  packageVersion,
   runDeck,
 } from "../.test-build/src/index.js";
 
@@ -48,6 +52,12 @@ function addDipole(model) {
   model.setGround({ kind: "free-space" });
   model.prepare({ frequencyMHz: 300 });
 }
+
+test("package, engine, and ABI versions are exported", () => {
+  assert.equal(packageVersion, "0.0.0-wp7");
+  assert.equal(engineVersion, "2.3.4");
+  assert.equal(abiVersion, 1);
+});
 
 test("loading options reject ambiguous input before module loading", async () => {
   await assert.rejects(
@@ -179,6 +189,39 @@ test("default, explicit URL, and binary WASM loading behave alike", {
   const binaryModel = await createNecModel({ wasmBinary: bytes });
   assert.equal(binaryModel.state, "empty");
   binaryModel.dispose();
+});
+
+test("http wasmUrl downloads bytes for a CDN-style origin", {
+  skip: !hasWasm && "WASM artifacts have not been built",
+}, async () => {
+  const bytes = readFileSync(wasmUrl);
+  const server = createServer((request, response) => {
+    response.writeHead(200, {
+      "Content-Type": "application/wasm",
+      "Content-Length": bytes.length,
+    });
+    response.end(bytes);
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address !== null && typeof address !== "string");
+  try {
+    const model = await createNecModel({
+      wasmUrl: `http://127.0.0.1:${address.port}/nec2pp.wasm`,
+    });
+    assert.equal(model.state, "empty");
+    model.dispose();
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
 });
 
 test("runDeck returns an owned report and engine version", {

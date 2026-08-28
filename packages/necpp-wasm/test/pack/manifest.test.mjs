@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  hasWasmArtifacts,
+  packPackage,
+} from "./helpers.mjs";
+
+const skip = !hasWasmArtifacts && "WASM artifacts have not been built";
+
+test("npm pack contains only the documented publish files", { skip }, () => {
+  const packed = packPackage();
+  assert.equal(packed.version, "0.0.0-wp7");
+  assert.match(packed.filename, /^necpp-wasm-0\.0\.0-wp7\.tgz$/);
+
+  const files = new Set(packed.files);
+  const required = [
+    "package.json",
+    "README.md",
+    "COPYING",
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/worker.js",
+    "dist/worker.d.ts",
+    "dist/worker-entry.js",
+    "dist/nec2pp.generated.js",
+    "dist/nec2pp.wasm",
+  ];
+  for (const path of required) {
+    assert.ok(files.has(path), `missing ${path} in packed tarball`);
+  }
+
+  for (const path of files) {
+    const allowed = path === "package.json"
+      || path === "README.md"
+      || path === "COPYING"
+      || path.startsWith("dist/");
+    assert.ok(allowed, `packed unexpected path ${path}`);
+    assert.equal(path.includes(".."), false);
+    assert.doesNotMatch(path, /\.map$/);
+    assert.doesNotMatch(path, /(^|\/)src\//);
+    assert.doesNotMatch(path, /(^|\/)test\//);
+  }
+});

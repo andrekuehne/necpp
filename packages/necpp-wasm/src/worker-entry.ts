@@ -64,57 +64,61 @@ function isWorkerRequest(value: unknown): value is WorkerRequest {
     && (record.kind === "create" || record.kind === "invoke");
 }
 
-const parent = await connectParent();
-const session: WorkerSession = { model: undefined };
-let queue: Promise<void> = Promise.resolve();
+void startWorker();
 
-function post(response: WorkerResponse, transfer: readonly ArrayBuffer[] = []): void {
-  parent.postMessage(response, transfer);
-}
+async function startWorker(): Promise<void> {
+  const parent = await connectParent();
+  const session: WorkerSession = { model: undefined };
+  let queue: Promise<void> = Promise.resolve();
 
-parent.onMessage((value) => {
-  queue = queue.then(async () => {
-    if (!isWorkerRequest(value)) {
-      post({
-        kind: "crash",
-        error: serializeError(
-          new NecRuntimeError("The NEC worker received a malformed request"),
-        ),
-      });
-      return;
-    }
-    try {
-      const { response, transfer } = await handleWorkerRequest(
-        session,
-        value,
-        {
-          createModel: createNecModel,
-          emitProgress(event) {
-            post({
-              kind: "progress",
-              operation: event.operation,
-              phase: event.phase,
-            });
-          },
-        },
-      );
-      if (!isWorkerResponse(response)) {
+  function post(response: WorkerResponse, transfer: readonly ArrayBuffer[] = []): void {
+    parent.postMessage(response, transfer);
+  }
+
+  parent.onMessage((value) => {
+    queue = queue.then(async () => {
+      if (!isWorkerRequest(value)) {
         post({
-          id: value.id,
-          kind: "error",
+          kind: "crash",
           error: serializeError(
-            new NecRuntimeError("The NEC worker produced an invalid response"),
+            new NecRuntimeError("The NEC worker received a malformed request"),
           ),
         });
         return;
       }
-      post(response, transfer);
-    } catch (error) {
-      post({
-        id: value.id,
-        kind: "error",
-        error: serializeError(error),
-      });
-    }
-  }, () => undefined);
-});
+      try {
+        const { response, transfer } = await handleWorkerRequest(
+          session,
+          value,
+          {
+            createModel: createNecModel,
+            emitProgress(event) {
+              post({
+                kind: "progress",
+                operation: event.operation,
+                phase: event.phase,
+              });
+            },
+          },
+        );
+        if (!isWorkerResponse(response)) {
+          post({
+            id: value.id,
+            kind: "error",
+            error: serializeError(
+              new NecRuntimeError("The NEC worker produced an invalid response"),
+            ),
+          });
+          return;
+        }
+        post(response, transfer);
+      } catch (error) {
+        post({
+          id: value.id,
+          kind: "error",
+          error: serializeError(error),
+        });
+      }
+    }, () => undefined);
+  });
+}

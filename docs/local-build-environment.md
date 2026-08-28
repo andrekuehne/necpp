@@ -155,3 +155,15 @@ The WP6 worker facade was verified on the same host with TypeScript 5.8.3 and
 Node ESM: all 24 package tests passed, including transferable result buffers,
 client-thread heartbeats during outstanding work, independent worker models,
 termination, and real WASM Z-matrix/far-field agreement with direct mode.
+
+The WP7 package assembly is packed with `npm pack` from
+`packages/necpp-wasm`. Clean-consumer tests install that tarball in a
+temporary fixture, import `@necpp/wasm` and `@necpp/wasm/worker` by name, and
+build a Vite app. Run them after a WASM build:
+
+```powershell
+npm --prefix packages/necpp-wasm run test:wasm
+```
+
+`test:wasm` includes the facade suite and the packed-tarball tests. The
+tarball contains `dist/`, `README.md`, and `COPYING` only.

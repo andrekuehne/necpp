@@ -1,6 +1,9 @@
 import {
   NecStateError,
+  abiVersion,
   createNecWorkerModel,
+  engineVersion,
+  packageVersion,
   type ComplexMatrix,
   type FarFieldResult,
   type NecWorkerProgressEvent,
@@ -46,6 +49,10 @@ async function validWorkerConsumer(): Promise<void> {
   unsubscribe();
   await model.dispose();
   model.terminate();
+
+  packageVersion satisfies string;
+  engineVersion satisfies string;
+  abiVersion satisfies 1;
 }
 
 void validWorkerConsumer;

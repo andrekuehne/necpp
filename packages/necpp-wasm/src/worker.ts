@@ -9,6 +9,8 @@ export {
   NecStateError,
 } from "./errors.js";
 
+export { abiVersion, engineVersion, packageVersion } from "./versions.js";
+
 export type { NecErrorCode, NecErrorOptions } from "./errors.js";
 
 export { createNecWorkerModel } from "./worker-client.js";

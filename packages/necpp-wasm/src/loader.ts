@@ -1,12 +1,14 @@
 import { NecInputError, NecRuntimeError } from "./errors.js";
 import type { CreateNecModelOptions } from "./types.js";
+import { abiVersion, engineVersion } from "./versions.js";
+import generatedFactory from "./nec2pp.generated.js";
 import type {
   EmscriptenModuleOptions,
   NecWasmModule,
   NecWasmModuleFactory,
 } from "./wasm-internal.js";
 
-const EXPECTED_ABI_VERSION = 1;
+const textDecoder = new TextDecoder();
 
 function copyWasmBinary(binary: ArrayBuffer | Uint8Array): Uint8Array {
   try {
@@ -41,9 +43,33 @@ function resolveWasmUrl(value: string | URL | undefined): string {
   }
 }
 
-function moduleOptions(
+function isHttpUrl(url: string): boolean {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+async function downloadWasmBinary(wasmUrl: string): Promise<Uint8Array> {
+  try {
+    const response = await fetch(wasmUrl);
+    if (!response.ok) {
+      throw new NecRuntimeError(`Failed to download WASM from ${wasmUrl}`, {
+        details: { status: response.status, wasmUrl },
+      });
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  } catch (error) {
+    if (error instanceof NecRuntimeError) {
+      throw error;
+    }
+    throw new NecRuntimeError("Failed to download WASM", {
+      cause: error,
+      details: { wasmUrl },
+    });
+  }
+}
+
+async function moduleOptions(
   options: CreateNecModelOptions | undefined,
-): EmscriptenModuleOptions {
+): Promise<EmscriptenModuleOptions> {
   if (options !== undefined && (typeof options !== "object" || options === null)) {
     throw new NecInputError("WASM loading options must be an object");
   }
@@ -56,11 +82,29 @@ function moduleOptions(
   }
 
   const wasmUrl = resolveWasmUrl(options?.wasmUrl);
+  if (isHttpUrl(wasmUrl)) {
+    return { wasmBinary: await downloadWasmBinary(wasmUrl) };
+  }
   return {
     locateFile(path, prefix) {
       return path.endsWith(".wasm") ? wasmUrl : `${prefix}${path}`;
     },
   };
+}
+
+function decodeCString(module: NecWasmModule, pointer: number): string {
+  if (
+    !Number.isSafeInteger(pointer)
+    || pointer <= 0
+    || pointer >= module.HEAPU8.length
+  ) {
+    throw new NecRuntimeError("The native module returned an invalid version string");
+  }
+  const end = module.HEAPU8.indexOf(0, pointer);
+  if (end < 0) {
+    throw new NecRuntimeError("The native module returned an unterminated version string");
+  }
+  return textDecoder.decode(module.HEAPU8.slice(pointer, end));
 }
 
 function validateModule(module: NecWasmModule): void {
@@ -79,11 +123,32 @@ function validateModule(module: NecWasmModule): void {
     throw new NecRuntimeError("The loaded Emscripten module has an invalid surface");
   }
 
-  const abiVersion = module._necpp_wasm_v1_abi_version();
-  if (abiVersion !== EXPECTED_ABI_VERSION) {
+  const nativeAbiVersion = module._necpp_wasm_v1_abi_version();
+  if (nativeAbiVersion !== abiVersion) {
     throw new NecRuntimeError(
-      `Unsupported NEC WASM ABI version ${abiVersion}; expected ${EXPECTED_ABI_VERSION}`,
-      { details: { actualAbiVersion: abiVersion, expectedAbiVersion: EXPECTED_ABI_VERSION } },
+      `Unsupported NEC WASM ABI version ${nativeAbiVersion}; expected ${abiVersion}`,
+      {
+        details: {
+          actualAbiVersion: nativeAbiVersion,
+          expectedAbiVersion: abiVersion,
+        },
+      },
+    );
+  }
+
+  const nativeEngineVersion = decodeCString(
+    module,
+    module._necpp_wasm_v1_engine_version(),
+  );
+  if (nativeEngineVersion !== engineVersion) {
+    throw new NecRuntimeError(
+      `NEC engine version ${nativeEngineVersion} does not match package engine ${engineVersion}`,
+      {
+        details: {
+          actualEngineVersion: nativeEngineVersion,
+          expectedEngineVersion: engineVersion,
+        },
+      },
     );
   }
 }
@@ -93,9 +158,8 @@ export async function instantiateNecModule(
   factory?: NecWasmModuleFactory,
 ): Promise<NecWasmModule> {
   try {
-    const selectedOptions = moduleOptions(options);
-    const selectedFactory = factory
-      ?? (await import("./nec2pp.generated.js")).default;
+    const selectedOptions = await moduleOptions(options);
+    const selectedFactory = factory ?? generatedFactory;
     if (typeof selectedFactory !== "function") {
       throw new NecRuntimeError(
         "The generated Emscripten module does not export a default factory",

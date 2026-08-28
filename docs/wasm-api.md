@@ -1,9 +1,9 @@
 # `@necpp/wasm` API and numerical contract
 
-Status: normative specification, updated through WP6 on 2026-08-28. The
+Status: normative specification, updated through WP7 on 2026-08-28. The
 stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
-and optional Web Worker entry point are implemented. The committed TypeScript
-surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
+optional Web Worker entry point, and packable npm package are implemented.
+The committed TypeScript surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
 
 ## Package and runtime boundary
 
@@ -12,6 +12,16 @@ The final npm package name is **`@necpp/wasm`**. The unscoped name
 while the scoped name identifies this repository and leaves room for future `@necpp/*`
 packages. Publication requires control of the `necpp` npm scope, but the API
 name will not change if the package is initially distributed as a tarball.
+
+The packed package exports three version identifiers that can be imported
+without constructing a model:
+
+- `packageVersion` — npm version of this TypeScript API
+- `engineVersion` — NEC2++ version compiled into the shipped WASM
+- `abiVersion` — stable C ABI (`necpp_wasm_v1`), currently `1`
+
+The facade refuses to instantiate a binary whose ABI or engine version does
+not match those constants.
 
 `createNecModel()` asynchronously initializes the Emscripten module and
 returns a stateful `NecModel`. After creation, those model methods are
@@ -234,6 +244,9 @@ new Worker(new URL("./worker-entry.js", import.meta.url), { type: "module" })
 ```
 
 so bundlers can rewrite the worker URL without extra consumer configuration.
+WP7 packs this subpath. Direct mode needs no bundler config. Vite apps that
+import the worker set `worker: { format: "es" }` because the package ships a
+module worker. Browser CI for the worker subpath is WP8.
 
 ## Canonical test models
 

@@ -645,6 +645,8 @@ subpath is WP8.
 
 ## WP7 — npm package assembly
 
+**Status: complete (2026-08-28).**
+
 Recommended layout:
 
 ```text
@@ -728,6 +730,29 @@ DoD:
 - No artifact copying or bundler-specific source changes are necessary.
 - Package version, engine version and ABI version are exposed and documented.
 - `COPYING` and license metadata are included. Because the engine is GPL-2.0-or-later, downstream distribution implications must be clearly documented and reviewed for the intended product.
+
+### WP7 progress
+
+- Assembled `@necpp/wasm` as an ESM package with `exports` for `.` and
+  `./worker`, a `dist/` emit of the handwritten facade, and the generated
+  `nec2pp.generated.js` plus `nec2pp.wasm` copied beside it. `prepack` builds
+  that tree, copies `COPYING`, and rejects source maps, oversize artifacts,
+  and version drift against `package.json` and CMake.
+- Exported `packageVersion`, `engineVersion`, and `abiVersion`. Module
+  instantiation checks the native ABI and engine strings. HTTP(S) `wasmUrl`
+  values are fetched into a copied `wasmBinary` so CDN loading works in Node.
+- Added clean-consumer tests that `npm pack`, install the tarball in a
+  temporary fixture, import the package by name, solve a dipole in direct and
+  worker mode, load WASM from an HTTP URL, and build a Vite app that emits
+  the worker and serves `.wasm` as `application/wasm`. Those tests never
+  import workspace `src/` or `.test-build`. Direct mode needs no bundler
+  config; the Vite worker fixture sets `worker: { format: "es" }` and
+  `build.target: "es2022"` because the package ships an ES2022 module worker.
+- Documented GPL-2.0-or-later distribution implications in the package
+  README and [`docs/wp7-npm-package.md`](wp7-npm-package.md). The package
+  remains `private` until the `necpp` npm scope is available.
+
+The next open package on the critical path is WP8.
 
 ---
 
@@ -829,4 +854,6 @@ The package is ready when all of the following are true:
 - The exact packed tarball passes clean-consumer tests before publication.
 - Versioning, licensing, release artifacts and documentation are complete.
 
-The critical path is WP0 → WP1 → WP2 → WP3 → WP4 → WP5 → WP7. Worker support, CI expansion and documentation can proceed once the TypeScript facade stabilizes, but they remain release requirements for a genuinely browser-ready package.
+The completed critical path is WP0 → WP1 → WP2 → WP3 → WP4 → WP5 → WP7.
+Remaining release work is WP8 (CI and release pipeline) and WP9 (documentation
+and example application).
