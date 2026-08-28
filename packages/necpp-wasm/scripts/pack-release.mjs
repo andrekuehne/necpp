@@ -18,6 +18,12 @@ const packageJson = JSON.parse(
 if (packageJson.private === true) {
   throw new Error("Refusing to create a release tarball while package.json is private");
 }
+if (
+  packageJson.publishConfig?.access !== "public"
+  || packageJson.publishConfig?.registry !== "https://registry.npmjs.org/"
+) {
+  throw new Error("Release package must target the public npm registry with public access");
+}
 
 mkdirSync(outputDirectory, { recursive: true });
 

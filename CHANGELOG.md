@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Added
+* **Initial `@necpp-engine/wasm` 0.1.0 package:** a stateful, high-level TypeScript API for Node and browsers, direct and Web Worker entry points, complex multi-port Z/Y matrices and solves, complex far fields and embedded patterns, packed-tarball consumer tests, and a four-element Vite array example.
+* Comprehensive npm documentation covering numerical conventions, lifecycle, errors, loading, beamforming, performance, browser memory, and GPL-2.0-or-later distribution obligations. README TypeScript examples and the downstream Vite example are checked against the exact release tarball in CI.
+
 ### Bug Fixes
 * **`nec2diff` no longer reports spurious radiation-pattern differences:** at angles where the polarization is undefined (HORIZ gain `-999.99`, e.g. at the horizon) NEC leaves the SENSE column blank. The `RadiationInput` parser read the next numeric token as the sense string, shifting the remaining columns left by one, and `read_fixed`/`read_sci` returned **uninitialized memory** when the stream was exhausted — so comparing a file against itself reported a nonzero difference with garbage values (observed on `bruce_sommerfeld`). The parser now detects the blank SENSE column, and the readers return 0.0 on extraction failure. All 52 testharness decks now self-compare exactly clean; genuine differences are still flagged.
 

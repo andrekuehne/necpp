@@ -251,7 +251,7 @@ jobs:
             run test:browser -- direct
 
   browser-worker:
-    name: Browser worker integration
+    name: Browser worker and Vite example integration
     needs: package
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -283,6 +283,13 @@ jobs:
           test -n "$tarball"
           NECPP_WASM_TARBALL="$tarball" npm --prefix packages/necpp-wasm \
             run test:browser -- worker
+      - name: Run the documented four-element Vite example in Chromium
+        shell: bash
+        run: |
+          tarball="$(find "$PWD/package-artifact" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          NECPP_WASM_TARBALL="$tarball" npm --prefix packages/necpp-wasm \
+            run test:browser -- example
 
   artifact-report:
     name: Artifact size and checksum report

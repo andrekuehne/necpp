@@ -1,16 +1,32 @@
 {
   "name": "@necpp-engine/wasm",
-  "version": "0.0.0-wp8",
+  "version": "0.1.0",
   "private": false,
   "type": "module",
   "description": "Stateful NEC2++ electromagnetic solver for Node and the browser",
+  "keywords": [
+    "antenna",
+    "electromagnetics",
+    "nec2",
+    "simulation",
+    "typescript",
+    "wasm",
+    "webassembly"
+  ],
   "license": "GPL-2.0-or-later",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/andrekuehne/necpp.git",
     "directory": "packages/necpp-wasm"
   },
-  "homepage": "https://github.com/andrekuehne/necpp",
+  "homepage": "https://github.com/andrekuehne/necpp#readme",
+  "bugs": {
+    "url": "https://github.com/andrekuehne/necpp/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "node": ">=24"
   },

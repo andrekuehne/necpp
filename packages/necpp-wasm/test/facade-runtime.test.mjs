@@ -54,7 +54,7 @@ function addDipole(model) {
 }
 
 test("package, engine, and ABI versions are exported", () => {
-  assert.equal(packageVersion, "0.0.0-wp8");
+  assert.equal(packageVersion, "0.1.0");
   assert.equal(engineVersion, "2.3.4");
   assert.equal(abiVersion, 1);
 });

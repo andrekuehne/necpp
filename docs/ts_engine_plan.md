@@ -834,6 +834,8 @@ DoD:
 
 ## WP9 — Documentation and example application
 
+**Status: complete (2026-08-28).**
+
 Documentation must include:
 
 - Five-minute installation and dipole example.
@@ -867,6 +869,28 @@ DoD:
 - Every README code example is compiled or executed in CI.
 - The example demonstrates the exact intended downstream integration path.
 
+### WP9 progress
+
+- Replaced the npm README with a complete consumer guide covering the
+  five-minute dipole, geometry/ports, Z/Y layout, voltage/current drive,
+  active impedance, complex-field conventions, theta/phi coordinates,
+  embedded-pattern beamforming, direct/worker operation, lifecycle, loading,
+  typed errors, performance, memory, versions, and GPL obligations.
+- Added a standalone four-element Vite application under
+  [`examples/wasm-array-vite`](../examples/wasm-array-vite/README.md). It uses
+  the public worker subpath, computes the 4 x 4 matrix, drives progressive
+  complex currents, renders all port quantities, and plots a 361-point
+  azimuth cut without a plotting dependency.
+- Added a clean-tarball documentation gate that compiles every TypeScript
+  README fence under strict TypeScript and executes the five-minute dipole in
+  Node. Added Chromium acceptance that copies, installs, builds, and runs the
+  actual Vite example with the exact release tarball and validates its UI,
+  finite results, plot, and WASM MIME response.
+- Set the initial public API version to `0.1.0`, added npm discovery, issue,
+  and public-registry metadata, documented first-release prerequisites and the
+  post-first-publish migration from a granular token to npm trusted
+  publishing, and added [`wp9-documentation-example.md`](wp9-documentation-example.md).
+
 # Overall release Definition of Done
 
 The package is ready when all of the following are true:
@@ -888,5 +912,6 @@ The package is ready when all of the following are true:
 - The exact packed tarball passes clean-consumer tests before publication.
 - Versioning, licensing, release artifacts and documentation are complete.
 
-The completed critical path is WP0 → WP1 → WP2 → WP3 → WP4 → WP5 → WP7 → WP8.
-The remaining release work is WP9 (documentation and example application).
+The completed critical path is WP0 → WP1 → WP2 → WP3 → WP4 → WP5 → WP7 → WP8
+→ WP9. Publication is an external release action performed from a tagged
+`main` commit after the protected npm environment and scope access are ready.

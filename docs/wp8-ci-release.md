@@ -47,15 +47,44 @@ source maps or debug symbols. It emits final sizes and SHA-256 checksums.
 ## Tag release
 
 The public package version and tag must match exactly. For package version
-`X.Y.Z`, create tag `wasm-vX.Y.Z`. Prerelease identifiers are retained, so the
-WP8 development version uses `wasm-v0.0.0-wp8`.
+`X.Y.Z`, create tag `wasm-vX.Y.Z`. The initial public package version is
+`0.1.0`, so its release tag is `wasm-v0.1.0`.
 
-The repository must configure an `npm` GitHub environment with an `NPM_TOKEN`
-secret authorized to publish the `@necpp-engine/wasm` package. The release job
-has only `contents: write` and `id-token: write` permissions. It verifies the
-tag and all checksums, publishes the already-tested `.tgz` with npm provenance,
-then attaches that same tarball, `SHA256SUMS`, and `ARTIFACTS.txt` to a GitHub
-release. It never runs `npm pack` again.
+The first publication must use the repository's `npm` GitHub environment with
+an `NPM_TOKEN` secret authorized to create a public package in the
+`necpp-engine` scope. The token needs publishing access and npm's required 2FA
+bypass setting. The release job has only `contents: write` and `id-token:
+write` permissions. It verifies the tag and all checksums, publishes the
+already-tested `.tgz` with npm provenance, then attaches that same tarball,
+`SHA256SUMS`, and `ARTIFACTS.txt` to a GitHub release. It never runs `npm pack`
+again.
+
+After `0.1.0` exists on npm, replace the long-lived token with npm trusted
+publishing. Configure the GitHub publisher for repository `andrekuehne/necpp`,
+workflow `build.yml`, environment `npm`, and allowed action `npm publish`;
+then remove `NODE_AUTH_TOKEN` from the release step and revoke the token. npm
+requires a package to exist before a trusted relationship can be configured.
+
+## Initial 0.1.0 release checklist
+
+Before merging, the checked-in `package.json`, `packageVersion` export, and tag
+must all identify `0.1.0`. After the WP9 branch reaches `main`:
+
+1. Confirm the public npm organization/scope `necpp-engine` exists and the
+   publishing account can create packages in it.
+2. Protect the GitHub `npm` environment with required reviewers and add the
+   initial granular `NPM_TOKEN` secret.
+3. Wait for the complete `main` workflow to pass.
+4. Create and push `wasm-v0.1.0` at that exact tested commit. Do not publish
+   manually and do not rebuild the tarball locally.
+5. Confirm the tag workflow passes every native, WASM, Node, package,
+   documentation, Vite-example, and Chromium gate before approving the
+   environment deployment.
+6. Verify the npm page reports public access, version `0.1.0`, repository
+   provenance, `GPL-2.0-or-later`, and both documented exports.
+7. Download the GitHub release tarball and verify it against `SHA256SUMS`.
+8. Configure npm trusted publishing as described above, remove the publish
+   token, and retain environment approval plus tag protection.
 
 Any failure in native numerics, ABI compatibility, strict TypeScript, package
 contents, GPL license inclusion, clean-consumer installation, either browser

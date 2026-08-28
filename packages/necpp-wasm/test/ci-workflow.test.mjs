@@ -69,6 +69,7 @@ test("WP8 workflow packs once and publishes the tested tarball", () => {
   assert.match(workflowSource, /sha256sum --check SHA256SUMS/);
   assert.match(workflowSource, /npm publish "\$tarball" --access public --provenance/);
   assert.match(workflowSource, /gh release create/);
+  assert.match(workflowSource, /run test:browser -- example/);
 
   const wasmSteps = workflow.jobs["wasm-build"].steps;
   assert.equal(

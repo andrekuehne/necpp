@@ -17,7 +17,16 @@ test("npm pack contains only the documented publish files", { skip }, () => {
   assert.equal(packed.version, packageJson.version);
   const filenamePrefix = packageJson.name.slice(1).replace("/", "-");
   assert.equal(packed.filename, `${filenamePrefix}-${packageJson.version}.tgz`);
+  assert.equal(packageJson.version, "0.1.0");
   assert.equal(packageJson.engines.node, ">=24");
+  assert.deepEqual(packageJson.publishConfig, {
+    access: "public",
+    registry: "https://registry.npmjs.org/",
+  });
+  assert.equal(packageJson.repository.url, "git+https://github.com/andrekuehne/necpp.git");
+  assert.equal(packageJson.bugs.url, "https://github.com/andrekuehne/necpp/issues");
+  assert.ok(packageJson.keywords.includes("nec2"));
+  assert.ok(packageJson.keywords.includes("wasm"));
 
   const files = new Set(packed.files);
   const required = [

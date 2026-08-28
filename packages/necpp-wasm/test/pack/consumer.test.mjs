@@ -164,6 +164,45 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
   assert.ok(Math.abs(worker.resistanceOhm - direct.resistanceOhm) < 1e-9);
 });
 
+test("every package README TypeScript example compiles and the quick start executes", {
+  skip,
+}, () => {
+  const fixture = createCleanFixture("readme");
+  installFixture(fixture.root, [
+    `@types/node@${packageJson.devDependencies["@types/node"]}`,
+    `typescript@${packageJson.devDependencies.typescript}`,
+    `vite@${VITE_VERSION}`,
+  ]);
+
+  const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
+  const examples = [...readme.matchAll(/```ts\r?\n([\s\S]*?)```/g)]
+    .map((match) => match[1]);
+  assert.ok(examples.length >= 7, "expected all documented TypeScript examples");
+
+  const paths = examples.map((source, index) => {
+    const path = `readme-example-${index + 1}.ts`;
+    writeFixtureFile(fixture.root, path, source);
+    return path;
+  });
+  const tsc = join(fixture.root, "node_modules", "typescript", "bin", "tsc");
+  run(process.execPath, [
+    tsc,
+    "--noEmit",
+    "--strict",
+    "--noUncheckedIndexedAccess",
+    "--exactOptionalPropertyTypes",
+    "--skipLibCheck",
+    "--target", "ES2024",
+    "--module", "NodeNext",
+    "--moduleResolution", "NodeNext",
+    "--lib", "ES2024,DOM",
+    ...paths,
+  ], { cwd: fixture.root });
+
+  writeFixtureFile(fixture.root, "readme-quick-start.mjs", examples[0]);
+  run("node", ["readme-quick-start.mjs"], { cwd: fixture.root });
+});
+
 test("custom wasmUrl loads the binary from an HTTP CDN-style origin", {
   skip,
 }, async () => {

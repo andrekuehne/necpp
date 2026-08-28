@@ -1,6 +1,6 @@
 # `@necpp-engine/wasm` API and numerical contract
 
-Status: normative specification, updated through WP7 on 2026-08-28. The
+Status: normative specification, updated through WP9 on 2026-08-28. The
 stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
 optional Web Worker entry point, and packable npm package are implemented.
 The committed TypeScript surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
@@ -14,6 +14,7 @@ while the scoped name identifies this repository and leaves room for future
 npm scope, but the API name will not change if the package is initially
 distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
+The initial public TypeScript API release is `0.1.0`.
 
 The packed package exports three version identifiers that can be imported
 without constructing a model:
