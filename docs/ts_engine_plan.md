@@ -221,11 +221,13 @@ DoD:
   registers the legacy and WP1 partitions independently so each has a bounded
   timeout appropriate to its workload.
 
-The next open package on the critical path is WP2.
+WP2 builds on this retained-factorization layer below.
 
 ---
 
 ## WP2 — Multi-port solving and impedance matrices
+
+**Status: complete (2026-08-28).**
 
 Add a port-oriented numerical engine:
 
@@ -300,6 +302,41 @@ DoD:
 - Matrix computation performs one factorization per model/frequency.
 - Arbitrary simultaneous complex voltage and current excitations are supported.
 - All returned port quantities have stable ordering matching `definePorts()`.
+
+### WP2 progress
+
+- Extended [`nec_stateful_model`](../src/nec_stateful_model.h) with dense
+  row-major port matrices, cached admittance and impedance results, detailed
+  voltage-driven solutions, and current-driven solutions using
+  \(\mathbf V=\mathbf Z\mathbf I\). The original WP1 current-only voltage
+  return remains as a compatibility wrapper.
+- Admittance extraction performs one exact unit-voltage back-substitution per
+  port and stores the current responses as columns of \(\mathbf Y\). It never
+  refactors the NEC interaction matrix. Results are cached until frequency,
+  ground, or loads invalidate the prepared configuration.
+- Added SVD-based inversion with a two-norm condition estimate and a controlled
+  diagnostic for singular matrices or estimates above \(10^{12}\). Both
+  \(\mathbf Z\) and \(\mathbf Y\), frequency, and factorization generation are
+  retained in the matrix result.
+- Internal basis solves preserve the public lifecycle and latest consumer
+  solution. If a solution existed, its exact simultaneous voltage excitation
+  is restored without advancing the public solve generation; from `prepared`,
+  matrix extraction leaves no arbitrary basis result behind.
+- Detailed port results contain requested drive values, achieved voltages and
+  currents, active impedances, per-port time-average powers, frequency, and
+  deterministic generations. An exactly zero achieved current produces the
+  specified `NaN + jNaN` active impedance.
+- Added seven WP2 Catch2 cases covering one-port legacy impedance agreement,
+  two-port reciprocity, \(\mathbf Z\mathbf Y\approx\mathbf I\), arbitrary
+  voltage prediction, arbitrary current achievement, weight-dependent active
+  impedance, cache/frequency behavior, exact-zero current drive, and controlled
+  singular/ill-conditioned inversion.
+- Validation completed on Windows/MSVC: the WP2 partition passes all 65
+  assertions, all WP1 cases including the 1,000-solve stress test remain green,
+  the 77-case legacy/WP0 partition and CLI smoke test pass, all production
+  native targets build, and the strict TypeScript tests remain green.
+
+The next open package on the critical path is WP3.
 
 ---
 

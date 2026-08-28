@@ -22,6 +22,7 @@ set(NECPP_LIB_SRCS
     nec_exception.cpp
     nec_ground.cpp
     nec_output.cpp
+    nec_port_matrix.cpp
     nec_radiation_pattern.cpp
     nec_results.cpp
     nec_stateful_model.cpp

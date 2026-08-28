@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 class nec_context;
@@ -91,6 +92,46 @@ struct nec_far_field_grid {
   nec_float phi_step_deg = 0.0;
 };
 
+/*! Dense complex matrix in stable row-major port order. */
+struct nec_complex_matrix {
+  size_t rows = 0;
+  size_t columns = 0;
+  std::vector<nec_complex> values;
+
+  const nec_complex& at(size_t row, size_t column) const
+  {
+    if (row >= rows || column >= columns)
+      throw std::out_of_range("NEC port matrix index is out of range");
+    return values.at(row * columns + column);
+  }
+};
+
+struct nec_impedance_result {
+  nec_complex_matrix impedance;
+  nec_complex_matrix admittance;
+  nec_float condition_estimate = 0.0;
+  nec_float frequency_mhz = 0.0;
+  uint64_t factorization_generation = 0;
+};
+
+enum class nec_port_drive {
+  voltage,
+  current,
+};
+
+/*! Complete quantities for one consumer-visible simultaneous port solve. */
+struct nec_port_solution {
+  nec_port_drive drive = nec_port_drive::voltage;
+  std::vector<nec_complex> requested;
+  std::vector<nec_complex> voltages;
+  std::vector<nec_complex> currents;
+  std::vector<nec_complex> active_impedances;
+  std::vector<nec_float> powers_w;
+  nec_float frequency_mhz = 0.0;
+  uint64_t factorization_generation = 0;
+  uint64_t solve_generation = 0;
+};
+
 /*! A stateful, deck-free native solver above nec_context.
  *
  * The class owns one context and one retained interaction-matrix
@@ -119,8 +160,26 @@ public:
   void set_ground(const nec_ground_definition& ground);
 
   void prepare(nec_float frequency_mhz);
+
+  /*! Backward-compatible WP1 current-only voltage solve. */
   const std::vector<nec_complex>& solve_port_voltages(
     const std::vector<nec_complex>& voltages);
+
+  /*! Simultaneous voltage solve with all WP2 port quantities. */
+  const nec_port_solution& solve_port_voltages_detailed(
+    const std::vector<nec_complex>& voltages);
+
+  /*! Extract Y by unit-voltage basis solves, preserving public solution state. */
+  const nec_complex_matrix& compute_admittance_matrix();
+
+  /*! Return cached row-major Z and Y matrices for the prepared configuration. */
+  const nec_impedance_result& compute_impedance_matrix();
+
+  /*! Convert requested currents through V=ZI and execute one voltage solve. */
+  const nec_port_solution& solve_port_currents(
+    const std::vector<nec_complex>& currents);
+
+  const nec_port_solution& last_port_solution() const;
 
   /*! Calculate a raw NEC radiation-pattern result for the latest solution.
    *
@@ -144,14 +203,33 @@ private:
   void require_configurable(const char* operation) const;
   void invalidate_factorization();
   void validate_load_target(const nec_load_definition& load) const;
+  void clear_matrix_cache();
+  void clear_consumer_solution();
+  void execute_voltage_solve(
+    const std::vector<nec_complex>& voltages,
+    std::vector<nec_complex>& achieved_voltages,
+    std::vector<nec_complex>& achieved_currents);
+  void restore_after_internal_solves(
+    bool had_solution, const nec_port_solution& saved_solution);
+  const nec_port_solution& finish_consumer_solve(
+    nec_port_drive drive,
+    const std::vector<nec_complex>& requested,
+    std::vector<nec_complex> achieved_voltages,
+    std::vector<nec_complex> achieved_currents);
 
   std::unique_ptr<nec_context> m_context;
   nec_model_state m_state = nec_model_state::empty;
   std::vector<nec_port_definition> m_ports;
   std::vector<int> m_absolute_port_segments;
   std::vector<nec_complex> m_port_currents;
+  nec_complex_matrix m_admittance_matrix;
+  nec_impedance_result m_impedance_result;
+  nec_port_solution m_last_port_solution;
   nec_float m_frequency_mhz = 0.0;
   uint64_t m_factorization_generation = 0;
   uint64_t m_solve_generation = 0;
   bool m_configuration_dirty = true;
+  bool m_has_admittance_matrix = false;
+  bool m_has_impedance_result = false;
+  bool m_has_port_solution = false;
 };

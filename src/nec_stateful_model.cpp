@@ -11,10 +11,14 @@
 #include "c_geometry.h"
 #include "nec_context.h"
 #include "nec_exception.h"
+#include "nec_port_matrix.h"
 #include "nec_radiation_pattern.h"
 #include "nec_results.h"
 
+#include <algorithm>
 #include <cmath>
+#include <exception>
+#include <limits>
 #include <set>
 #include <string>
 #include <utility>
@@ -65,9 +69,25 @@ void nec_stateful_model::invalidate_factorization()
 {
   m_configuration_dirty = true;
   m_frequency_mhz = 0.0;
-  m_port_currents.clear();
+  clear_matrix_cache();
+  clear_consumer_solution();
   m_context->stateful_clear_results();
   m_state = nec_model_state::geometry_complete;
+}
+
+void nec_stateful_model::clear_matrix_cache()
+{
+  m_admittance_matrix = {};
+  m_impedance_result = {};
+  m_has_admittance_matrix = false;
+  m_has_impedance_result = false;
+}
+
+void nec_stateful_model::clear_consumer_solution()
+{
+  m_port_currents.clear();
+  m_last_port_solution = {};
+  m_has_port_solution = false;
 }
 
 void nec_stateful_model::add_wire(const nec_wire_definition& wire)
@@ -130,6 +150,8 @@ void nec_stateful_model::define_ports(
 
   m_ports = ports;
   m_absolute_port_segments = std::move(absolute_segments);
+  clear_matrix_cache();
+  clear_consumer_solution();
 }
 
 void nec_stateful_model::validate_load_target(
@@ -241,17 +263,79 @@ void nec_stateful_model::prepare(nec_float frequency_mhz)
   m_context->stateful_clear_results();
   m_configuration_dirty = true;
   m_frequency_mhz = 0.0;
-  m_port_currents.clear();
+  clear_matrix_cache();
+  clear_consumer_solution();
   m_state = nec_model_state::geometry_complete;
   m_context->stateful_prepare_frequency(frequency_mhz);
   m_frequency_mhz = frequency_mhz;
   ++m_factorization_generation;
   m_configuration_dirty = false;
-  m_port_currents.clear();
+  clear_consumer_solution();
   m_state = nec_model_state::prepared;
 }
 
-const std::vector<nec_complex>& nec_stateful_model::solve_port_voltages(
+void nec_stateful_model::execute_voltage_solve(
+  const std::vector<nec_complex>& voltages,
+  std::vector<nec_complex>& achieved_voltages,
+  std::vector<nec_complex>& achieved_currents)
+{
+  m_context->stateful_clear_results();
+  m_context->stateful_solve_voltage_sources(m_absolute_port_segments, voltages);
+
+  nec_antenna_input* input = m_context->get_input_parameters(0);
+  if (input == nullptr)
+    fail("PORT VOLTAGE SOLVE", "ENGINE DID NOT RETURN PORT INPUT DATA");
+  achieved_voltages = input->get_voltage();
+  achieved_currents = input->get_current();
+  if (achieved_voltages.size() != m_ports.size() ||
+      achieved_currents.size() != m_ports.size())
+    fail("PORT VOLTAGE SOLVE", "ENGINE RETURNED THE WRONG PORT COUNT");
+  for (size_t index = 0; index < m_ports.size(); ++index) {
+    if (!finite(achieved_voltages[index].real()) ||
+        !finite(achieved_voltages[index].imag()) ||
+        !finite(achieved_currents[index].real()) ||
+        !finite(achieved_currents[index].imag()))
+      fail("PORT VOLTAGE SOLVE", "ENGINE RETURNED A NONFINITE PORT VALUE");
+  }
+}
+
+const nec_port_solution& nec_stateful_model::finish_consumer_solve(
+  nec_port_drive drive,
+  const std::vector<nec_complex>& requested,
+  std::vector<nec_complex> achieved_voltages,
+  std::vector<nec_complex> achieved_currents)
+{
+  const nec_float nan = std::numeric_limits<nec_float>::quiet_NaN();
+  nec_port_solution solution;
+  solution.drive = drive;
+  solution.requested = requested;
+  solution.voltages = std::move(achieved_voltages);
+  solution.currents = std::move(achieved_currents);
+  solution.active_impedances.reserve(m_ports.size());
+  solution.powers_w.reserve(m_ports.size());
+
+  for (size_t index = 0; index < m_ports.size(); ++index) {
+    const nec_complex voltage = solution.voltages[index];
+    const nec_complex current = solution.currents[index];
+    solution.active_impedances.push_back(
+      current == nec_complex(0.0, 0.0)
+        ? nec_complex(nan, nan)
+        : voltage / current);
+    solution.powers_w.push_back(
+      0.5 * std::real(voltage * std::conj(current)));
+  }
+
+  solution.frequency_mhz = m_frequency_mhz;
+  solution.factorization_generation = m_factorization_generation;
+  solution.solve_generation = ++m_solve_generation;
+  m_last_port_solution = std::move(solution);
+  m_port_currents = m_last_port_solution.currents;
+  m_has_port_solution = true;
+  m_state = nec_model_state::solved;
+  return m_last_port_solution;
+}
+
+const nec_port_solution& nec_stateful_model::solve_port_voltages_detailed(
   const std::vector<nec_complex>& voltages)
 {
   if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
@@ -263,27 +347,167 @@ const std::vector<nec_complex>& nec_stateful_model::solve_port_voltages(
       fail("SOLVE PORT VOLTAGES", "VOLTAGES MUST BE FINITE");
   }
 
-  m_context->stateful_clear_results();
+  std::vector<nec_complex> achieved_voltages;
+  std::vector<nec_complex> achieved_currents;
   try {
-    m_context->stateful_solve_voltage_sources(m_absolute_port_segments, voltages);
+    execute_voltage_solve(voltages, achieved_voltages, achieved_currents);
   } catch (...) {
-    // Back-substitution does not alter the retained LU factorization.  A
-    // failed solve therefore discards only the consumer solution.
-    m_port_currents.clear();
+    // Back-substitution does not alter the retained LU factorization. A failed
+    // consumer solve discards only the consumer-visible solution.
+    clear_consumer_solution();
     m_state = nec_model_state::prepared;
     throw;
   }
 
-  nec_antenna_input* input = m_context->get_input_parameters(0);
-  if (input == nullptr)
-    fail("SOLVE PORT VOLTAGES", "ENGINE DID NOT RETURN PORT INPUT DATA");
-  m_port_currents = input->get_current();
-  if (m_port_currents.size() != m_ports.size())
-    fail("SOLVE PORT VOLTAGES", "ENGINE RETURNED THE WRONG PORT COUNT");
+  return finish_consumer_solve(
+    nec_port_drive::voltage, voltages,
+    std::move(achieved_voltages), std::move(achieved_currents));
+}
 
-  ++m_solve_generation;
-  m_state = nec_model_state::solved;
+const std::vector<nec_complex>& nec_stateful_model::solve_port_voltages(
+  const std::vector<nec_complex>& voltages)
+{
+  solve_port_voltages_detailed(voltages);
   return m_port_currents;
+}
+
+void nec_stateful_model::restore_after_internal_solves(
+  bool had_solution, const nec_port_solution& saved_solution)
+{
+  if (!had_solution) {
+    m_context->stateful_clear_results();
+    clear_consumer_solution();
+    m_state = nec_model_state::prepared;
+    return;
+  }
+
+  std::vector<nec_complex> restored_voltages;
+  std::vector<nec_complex> restored_currents;
+  try {
+    execute_voltage_solve(
+      saved_solution.voltages, restored_voltages, restored_currents);
+  } catch (...) {
+    m_context->stateful_clear_results();
+    clear_consumer_solution();
+    m_state = nec_model_state::prepared;
+    throw;
+  }
+
+  m_last_port_solution = saved_solution;
+  m_port_currents = saved_solution.currents;
+  m_has_port_solution = true;
+  m_state = nec_model_state::solved;
+}
+
+const nec_complex_matrix& nec_stateful_model::compute_admittance_matrix()
+{
+  if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
+    fail("COMPUTE ADMITTANCE MATRIX", "MODEL IS NOT PREPARED");
+  if (m_has_admittance_matrix)
+    return m_admittance_matrix;
+
+  const bool had_solution = m_has_port_solution;
+  const nec_port_solution saved_solution = m_last_port_solution;
+  const size_t order = m_ports.size();
+  nec_complex_matrix admittance;
+  admittance.rows = order;
+  admittance.columns = order;
+  admittance.values.assign(order * order, nec_complex(0.0, 0.0));
+
+  try {
+    std::vector<nec_complex> basis_voltages(order, nec_complex(0.0, 0.0));
+    std::vector<nec_complex> achieved_voltages;
+    std::vector<nec_complex> achieved_currents;
+    for (size_t column = 0; column < order; ++column) {
+      std::fill(basis_voltages.begin(), basis_voltages.end(), nec_complex(0.0, 0.0));
+      basis_voltages[column] = nec_complex(1.0, 0.0);
+      execute_voltage_solve(
+        basis_voltages, achieved_voltages, achieved_currents);
+      for (size_t row = 0; row < order; ++row)
+        admittance.values[row * order + column] = achieved_currents[row];
+    }
+  } catch (...) {
+    const std::exception_ptr failure = std::current_exception();
+    try {
+      restore_after_internal_solves(had_solution, saved_solution);
+    } catch (...) {
+      // The retained factorization is still usable, but no stale consumer
+      // result may be exposed if restoration itself fails.
+    }
+    std::rethrow_exception(failure);
+  }
+  restore_after_internal_solves(had_solution, saved_solution);
+
+  m_admittance_matrix = std::move(admittance);
+  m_has_admittance_matrix = true;
+  return m_admittance_matrix;
+}
+
+const nec_impedance_result& nec_stateful_model::compute_impedance_matrix()
+{
+  if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
+    fail("COMPUTE IMPEDANCE MATRIX", "MODEL IS NOT PREPARED");
+  if (m_has_impedance_result)
+    return m_impedance_result;
+
+  const nec_complex_matrix& admittance = compute_admittance_matrix();
+  const nec_port_matrix_inverse inverse = nec_invert_port_matrix(
+    admittance.values, admittance.rows);
+
+  nec_impedance_result result;
+  result.admittance = admittance;
+  result.impedance.rows = admittance.rows;
+  result.impedance.columns = admittance.columns;
+  result.impedance.values = inverse.values;
+  result.condition_estimate = inverse.condition_estimate;
+  result.frequency_mhz = m_frequency_mhz;
+  result.factorization_generation = m_factorization_generation;
+  m_impedance_result = std::move(result);
+  m_has_impedance_result = true;
+  return m_impedance_result;
+}
+
+const nec_port_solution& nec_stateful_model::solve_port_currents(
+  const std::vector<nec_complex>& currents)
+{
+  if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
+    fail("SOLVE PORT CURRENTS", "MODEL IS NOT PREPARED");
+  if (currents.size() != m_ports.size())
+    fail("SOLVE PORT CURRENTS", "CURRENT COUNT MUST MATCH PORT COUNT");
+  for (const nec_complex current : currents) {
+    if (!finite(current.real()) || !finite(current.imag()))
+      fail("SOLVE PORT CURRENTS", "CURRENTS MUST BE FINITE");
+  }
+
+  const nec_complex_matrix& impedance = compute_impedance_matrix().impedance;
+  std::vector<nec_complex> required_voltages(
+    currents.size(), nec_complex(0.0, 0.0));
+  for (size_t row = 0; row < impedance.rows; ++row) {
+    for (size_t column = 0; column < impedance.columns; ++column)
+      required_voltages[row] += impedance.at(row, column) * currents[column];
+  }
+
+  std::vector<nec_complex> achieved_voltages;
+  std::vector<nec_complex> achieved_currents;
+  try {
+    execute_voltage_solve(
+      required_voltages, achieved_voltages, achieved_currents);
+  } catch (...) {
+    clear_consumer_solution();
+    m_state = nec_model_state::prepared;
+    throw;
+  }
+
+  return finish_consumer_solve(
+    nec_port_drive::current, currents,
+    std::move(achieved_voltages), std::move(achieved_currents));
+}
+
+const nec_port_solution& nec_stateful_model::last_port_solution() const
+{
+  if (m_state != nec_model_state::solved || !m_has_port_solution)
+    fail("LAST PORT SOLUTION", "NO CONSUMER SOLUTION IS AVAILABLE");
+  return m_last_port_solution;
 }
 
 const nec_radiation_pattern& nec_stateful_model::compute_far_field(
