@@ -94,7 +94,7 @@ Phi increases from +X toward +Y; theta increases from +Z toward the XY plane.
 
 The full normative contract, including loads, ground, tolerances, and every
 state transition, is in
-[`docs/wasm-api.md`](https://github.com/andrekuehne/necpp/blob/main/docs/wasm-api.md).
+[`docs/wasm-api.md`](https://github.com/andrekuehne/necpp/blob/master/docs/wasm-api.md).
 
 ## Geometry and ports
 
@@ -372,7 +372,7 @@ try {
 ## Complete Vite array example
 
 The repository's
-[four-element array application](https://github.com/andrekuehne/necpp/tree/main/examples/wasm-array-vite)
+[four-element array application](https://github.com/andrekuehne/necpp/tree/master/examples/wasm-array-vite)
 installs the packed package, computes Z/Y, applies progressive complex current
 weights, displays achieved port quantities, and plots a normalized azimuth
 cut. CI builds and runs that exact application in Chromium from the same
