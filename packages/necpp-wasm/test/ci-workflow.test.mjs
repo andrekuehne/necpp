@@ -71,6 +71,10 @@ test("WP8 workflow packs once and publishes the tested tarball", () => {
   assert.equal((workflowSource.match(/npm publish/g) ?? []).length, 1);
   assert.ok(workflowSource.includes('NECPP_WASM_TARBALL="$tarball"'));
   assert.match(workflowSource, /sha256sum --check SHA256SUMS/);
+  assert.match(
+    workflowSource,
+    /tarball="\$\(find "\$PWD\/release" -maxdepth 1 -name '\*\.tgz' -print -quit\)"/,
+  );
   assert.match(workflowSource, /npm publish "\$tarball" --access public --provenance/);
   assert.match(workflowSource, /gh release create/);
   assert.match(workflowSource, /run test:browser -- example/);
@@ -83,4 +87,10 @@ test("WP8 workflow packs once and publishes the tested tarball", () => {
   );
   assert.doesNotMatch(innerBuildSource, /--emit-tsd/);
   assert.doesNotMatch(workflowSource, /nec2pp\.d\.ts/);
+
+  const releaseSetupNode = workflow.jobs.release.steps.find(
+    (step) => step.uses?.startsWith("actions/setup-node@"),
+  );
+  assert.equal(releaseSetupNode?.uses, "actions/setup-node@v6");
+  assert.equal(releaseSetupNode?.with?.["package-manager-cache"], false);
 });
