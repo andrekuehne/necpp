@@ -161,20 +161,33 @@ const out = document.getElementById("out");
 try {
   const model = await ${factory}();
   try {
-    ${awaitPrefix}model.addWire({
-      tag: 1,
-      segments: 11,
-      start: [0, 0, -0.25],
-      end: [0, 0, 0.25],
-      radiusM: 0.001,
-    });
+    const side = 4;
+    const segments = 11;
+    const frequencyMHz = 300;
+    const wavelengthM = 299792458 / (frequencyMHz * 1e6);
+    const ports = [];
+    for (let y = 0; y < side; y += 1) {
+      for (let x = 0; x < side; x += 1) {
+        const tag = y * side + x + 1;
+        const xM = (x - (side - 1) / 2) * wavelengthM / 2;
+        const yM = (y - (side - 1) / 2) * wavelengthM / 2;
+        ${awaitPrefix}model.addWire({
+          tag,
+          segments,
+          start: [xM, yM, -wavelengthM / 8],
+          end: [xM, yM, wavelengthM / 8],
+          radiusM: wavelengthM / 1000,
+        });
+        ports.push({ tag, segment: (segments + 1) / 2 });
+      }
+    }
     ${awaitPrefix}model.completeGeometry();
-    ${awaitPrefix}model.definePorts([{ tag: 1, segment: 6 }]);
-    ${awaitPrefix}model.prepare({ frequencyMHz: 300 });
+    ${awaitPrefix}model.definePorts(ports);
+    ${awaitPrefix}model.prepare({ frequencyMHz });
     const matrices = ${awaitPrefix}model.computeImpedanceMatrix();
     ${awaitPrefix}model.solveVoltages({
-      real: new Float64Array([1]),
-      imag: new Float64Array([0]),
+      real: new Float64Array(ports.length).fill(1),
+      imag: new Float64Array(ports.length),
     });
     const field = ${awaitPrefix}model.computeFarField({
       radiusM: 1,

@@ -1,3 +1,22 @@
+## 0.1.1 - 2026-08-29
+
+### Added
+* **Process-isolated WASM array benchmark:** a configurable 2 x 2 through
+  16 x 16 benchmark now compares the stateful TypeScript model API with the
+  legacy `runDeck()` compatibility path over equivalent NEC decks. It emits
+  incremental NDJSON and a summary, separates cold and retained-solve timing,
+  and cross-checks source currents parsed from the full legacy report.
+
+### Bug Fixes
+* **WASM solves no longer trap above roughly 150 equations:** the release build
+  now reserves a 4 MiB WebAssembly stack explicitly. Emscripten heap growth
+  does not grow its fixed stack, and Eigen's blocked LU/triangular kernels
+  exhausted the SDK default while preparing or solving larger matrices. A
+  4 x 4, 176-equation array now gates preparation and repeated retained-factor
+  solves in direct, worker, and Chromium package tests. The optimized 8 x 8,
+  1,216-equation, 64-port workload also completes in Node direct and worker
+  modes.
+
 ## 0.1.0 - 2026-08-28
 
 ### Added

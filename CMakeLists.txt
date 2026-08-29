@@ -46,6 +46,13 @@ option(BUILD_SHARED_LIBS    "Also build a shared libnecpp in addition to the sta
 option(NECPP_ENABLE_LTO     "Enable link-time optimization (IPO) when supported" ON)
 option(NECPP_NATIVE_ARCH    "Optimize for the build machine's CPU (-march=native). Not for distributable binaries." OFF)
 
+# Emscripten's stack cannot grow with the heap.  Eigen's optimized, blocked LU
+# kernels exceed the SDK's small default stack on otherwise modest systems, so
+# reserve enough stack for the 1,216-equation release workload plus headroom.
+# Keep this setting in CMake so every WASM build path uses the same value.
+set(NECPP_WASM_STACK_SIZE 4194304 CACHE STRING
+    "WebAssembly stack size in bytes (Emscripten STACK_SIZE)")
+
 # Link-time optimization lets hot cross-TU calls (e.g. the Sommerfeld
 # integration kernels in c_evlcom.cpp) inline across object files.
 if(NECPP_ENABLE_LTO AND NOT NECPP_BUILD_WASM)

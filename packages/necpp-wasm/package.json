@@ -1,6 +1,6 @@
 {
   "name": "@necpp-engine/wasm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "type": "module",
   "description": "Stateful NEC2++ electromagnetic solver for Node and the browser",
@@ -50,6 +50,7 @@
     "COPYING"
   ],
   "scripts": {
+    "bench:array": "node bench/array-benchmark.mjs",
     "build": "node scripts/build-dist.mjs",
     "prepack": "npm run build",
     "build:test": "node test/build.mjs",

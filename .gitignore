@@ -26,6 +26,7 @@
 /packages/necpp-wasm/dist/
 /packages/necpp-wasm/COPYING
 /packages/necpp-wasm/.pack-work/
+/packages/necpp-wasm/bench/results/
 # Legacy test binary name (pre-CMake era); kept ignored in case of stale trees.
 src/necpp_test
 src/test_manager

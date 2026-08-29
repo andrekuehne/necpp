@@ -26,6 +26,7 @@ Pass these on the configure step (e.g. `-DNECPP_BUILD_TESTS=OFF`):
 | `CMAKE_BUILD_TYPE` | `Release` | `Debug` adds `-O0 -g`; use `Release` for `-O2`. |
 | `NECPP_BUILD_TESTS` | `ON` | Build the Catch2 unit tests (run with `ctest --test-dir build`). |
 | `NECPP_BUILD_WASM` | `OFF` | Build the Emscripten/WASM target (needs `emcmake`). |
+| `NECPP_WASM_STACK_SIZE` | `4194304` | Fixed Emscripten stack in bytes; 4 MiB supports the verified 1,216-equation array workload. |
 | `BUILD_SHARED_LIBS` | `ON` | Also build `libnecpp.so` in addition to `libnecpp.a`. |
 
 ### Building for debug
