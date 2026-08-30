@@ -1,73 +1,129 @@
-# Array benchmark results - 2026-08-29
+# Symmetry reference benchmark - 2026-08-30
 
-Three fresh-process rounds per backend on an AMD Ryzen 7 PRO 7840HS, Windows
-10.0.26200, Node 24.14.1, Emscripten 4.0.7, and the 4 MiB-stack optimized WASM
-artifact (`f6b681e1d94b3358ae6ddee0077b1ce40aab6b52dc9978e7a946e8c0c3c4e709`).
-The worktree was dirty with the stack fix and benchmark implementation.
+WP-S7 was measured on an AMD Ryzen 7 PRO 7840HS, Windows 10.0.26200,
+Node 24.14.1, and Emscripten 4.0.7. Every representation/size/round used a
+fresh process and the Section 7 lambda-scaled array over perfect ground.
 
-Each element is a free-space, centre-fed, Z-directed lambda/4 dipole with 11
-segments. Every port is driven simultaneously at 1 + j0 V and 300 MHz.
-`Stateful cold` covers module creation, geometry and port construction,
-preparation, the first solve, and result copying. `Full deck cold` covers deck
-generation, `runDeck()`, the complete formatted report, and source-current
-parsing. Values are medians.
+The current artifact was rebuilt with the pinned Docker image after the run;
+its digest was unchanged:
 
-| Array | Equations | Stateful cold | Full deck cold | Deck delta | Retained solve |
-|---:|---:|---:|---:|---:|---:|
-| 2 x 2 | 44 | 20.0 ms | 26.4 ms | 32.0% | 0.23 ms |
-| 3 x 3 | 99 | 30.4 ms | 38.5 ms | 27.0% | 0.49 ms |
-| 4 x 4 | 176 | 35.8 ms | 46.6 ms | 30.1% | 0.49 ms |
-| 5 x 5 | 275 | 55.6 ms | 73.9 ms | 32.9% | 0.53 ms |
-| 6 x 6 | 396 | 92.8 ms | 108.1 ms | 16.4% | 0.79 ms |
-| 7 x 7 | 539 | 153.5 ms | 174.4 ms | 13.6% | 1.08 ms |
-| 8 x 8 | 704 | 301.2 ms | 310.8 ms | 3.2% | 1.56 ms |
-| 9 x 9 | 891 | 499.6 ms | 542.2 ms | 8.5% | 2.41 ms |
-| 10 x 10 | 1,100 | 862.0 ms | 890.3 ms | 3.3% | 3.33 ms |
-| 11 x 11 | 1,331 | 1,447.7 ms | 1,475.5 ms | 1.9% | 4.63 ms |
-| 12 x 12 | 1,584 | 2,336.6 ms | 2,364.2 ms | 1.2% | 6.39 ms |
-| 13 x 13 | 1,859 | 3,778.9 ms | 3,781.0 ms | 0.1% | 11.20 ms |
-| 14 x 14 | 2,156 | 5,789.7 ms | 5,738.1 ms | -0.9% | 11.86 ms |
-| 15 x 15 | 2,475 | 8,619.1 ms | 8,697.5 ms | 0.9% | 15.83 ms |
-| 16 x 16 | 2,816 | 12,813.7 ms | 12,907.2 ms | 0.7% | 17.30 ms |
+```text
+WASM SHA-256  42d427c52b06792471d92e148cb0ed6ece33b4dabf1edabfe355ddcf4b1e0a28
+WASM bytes    733440
+engine        2.3.4
+package       0.1.1
+commit        52194f5118689e7a2b46076150612c36761964de
+```
 
-All 90 backend cases completed. All 45 stateful/deck pairs passed the
-source-current equivalence check. Relative L2 differences ranged from
-7.54e-6 to 2.07e-5, consistent with the legacy report's five-digit printed
-precision.
+The worktree contained the WP-S7 implementation and status edits plus three
+pre-existing unrelated untracked documents. The exact porcelain status is in
+the ignored metadata record; no claim of a clean worktree is made. The
+artifact itself was a clean pinned-toolchain rebuild of the current native and
+TypeScript sources.
 
-At 16 x 16 the interaction matrix itself is 121 MiB. Median process RSS growth
-was 138.0 MiB for stateful and 138.8 MiB for the deck path; the returned full
-deck report was 640 KiB. Cold-path differences above roughly 700 equations are
-small compared with run-to-run noise because both facades spend nearly all of
-their time in the same matrix preparation. Stateful mode's material advantage
-is reuse: another 256-port drive costs about 17 ms instead of repeating a
-roughly 13-second deck execution and factorization.
+## Correctness and performance
 
-Command:
+All 45 current-artifact cases completed. All 30 manual/automatic comparisons
+passed the `1e-8` relative-L2 and scaled-maximum gates for requested currents,
+achieved currents, voltages, active impedances, powers, and complete complex
+combined far fields. The 2 x 2 and 4 x 4 cases also passed complete
+caller-order complex Z and Y comparison. The largest observed scaled error was
+`1.13e-13` (16 x 16 powers).
+
+Medians from three rounds:
+
+| Array | Equations | Explicit prepare | Manual prepare | Auto prepare | Manual speedup | Auto planner | Planner / auto cold | Auto vs manual |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2 x 2 | 44 | 7.66 ms | 2.85 ms | 2.87 ms | 2.69x | 1.72 ms | 5.50% | +0.93% |
+| 4 x 4 | 176 | 24.33 ms | 11.36 ms | 10.17 ms | 2.14x | 1.92 ms | 3.96% | -10.54% |
+| 8 x 8 | 704 | 297.82 ms | 55.43 ms | 56.72 ms | 5.37x | 3.89 ms | 2.10% | +2.32% |
+| 12 x 12 | 1,584 | 2,445.98 ms | 282.44 ms | 279.11 ms | 8.66x | 7.71 ms | 0.77% | -1.18% |
+| 16 x 16 | 2,816 | 13,196.45 ms | 1,142.14 ms | 1,140.06 ms | 11.55x | 13.30 ms | 0.26% | -0.18% |
+
+The 16 x 16 manual preparation target passes at 11.55x. Auto/manual preparation
+parity passes at every gated size (8 x 8 and larger), and planner overhead is
+below 5% of auto cold time at those sizes. The ungated 4 x 4 timing has a
+10.54% auto/manual difference because both prepare measurements are about
+10 ms; no large-array parity claim is derived from it.
+
+The primary interaction matrix uses `n * np` complex-double entries for this
+wire-only model. Two reflection planes reduce `np` to `n / 4`, producing the
+measured exact fourfold allocation ratio:
+
+| Array | Explicit matrix | Reflected matrix | Reduction |
+|---:|---:|---:|---:|
+| 2 x 2 | 0.03 MiB | 0.01 MiB | 4.00x |
+| 4 x 4 | 0.47 MiB | 0.12 MiB | 4.00x |
+| 8 x 8 | 7.56 MiB | 1.89 MiB | 4.00x |
+| 12 x 12 | 38.29 MiB | 9.57 MiB | 4.00x |
+| 16 x 16 | 121.00 MiB | 30.25 MiB | 4.00x |
+
+RSS samples, every individual phase, retained changed-current solves, and
+median/min/max values remain in the ignored summary rather than being rounded
+into this document.
+
+## Explicit pre-feature comparison
+
+Commit `78bdafe` is the planning-only revision before WP-S0 through WP-S6. It
+was archived into an ignored directory, built with the same Emscripten 4.0.7
+Docker image, and run through the exact schema-v2 protocol using its public
+explicit stateful API.
+
+```text
+pre-feature WASM SHA-256  196fc36329aeae6c3e44d8da2ba560d316f4d4a5f3756b6d72f4212f2af511c3
+pre-feature WASM bytes    698667
+```
+
+| Array | Current vs pre-feature explicit prepare |
+|---:|---:|
+| 2 x 2 | +19.41% (+1.25 ms in the three-round medians) |
+| 4 x 4 | -6.34% |
+| 8 x 8 | -2.12% |
+| 12 x 12 | +0.21% |
+| 16 x 16 | +0.55% |
+
+The matrix-scale explicit path (8 x 8 through 16 x 16) shows no material
+regression. The unqualified 5% gate nevertheless records a **miss** at 2 x 2;
+the benchmark does not hide it or turn it into a pass. A separate 15-round
+2 x 2 check reproduced a smaller but still over-gate +11.48% median delta
+(7.686 ms versus 6.894 ms), while the ranges overlapped. The bounded follow-up
+is to profile the fixed explicit `completeGeometry()`/`prepare()` validation
+and JS/WASM call overhead at 44 equations; it must preserve every symmetry and
+load validation gate and must not delay the large-array feature.
+
+## Commands and retained data
+
+The raw files are ignored by Git:
+
+```text
+packages/necpp-wasm/bench/results/symmetry-prefeature-78bdafe-3round-20260830.ndjson
+packages/necpp-wasm/bench/results/symmetry-prefeature-78bdafe-3round-20260830.summary.json
+packages/necpp-wasm/bench/results/symmetry-current-3round-20260830.ndjson
+packages/necpp-wasm/bench/results/symmetry-current-3round-20260830.summary.json
+```
+
+Reference commands:
 
 ```powershell
 npm --prefix packages/necpp-wasm run bench:array -- `
-  --sides 2-16 --segments 11 --rounds 3 --retained-solves 10 `
-  --timeout-seconds 600 `
-  --output packages/necpp-wasm/bench/results/array-2-16-11seg-3round-20260829.ndjson
+  --sides 2,4,8,12,16 --backends explicit --rounds 3 `
+  --retained-solves 10 --z-matrix-sides 2,4 --timeout-seconds 600 `
+  --module-directory packages/necpp-wasm/bench/results/pre-feature-78bdafe/packages/necpp-wasm/dist `
+  --output packages/necpp-wasm/bench/results/symmetry-prefeature-78bdafe-3round-20260830.ndjson
+
+npm --prefix packages/necpp-wasm run bench:array -- `
+  --sides 2,4,8,12,16 `
+  --backends explicit,manual-reflection,auto-reflection --rounds 3 `
+  --retained-solves 10 --z-matrix-sides 2,4 --timeout-seconds 600 `
+  --baseline-summary packages/necpp-wasm/bench/results/symmetry-prefeature-78bdafe-3round-20260830.summary.json `
+  --output packages/necpp-wasm/bench/results/symmetry-current-3round-20260830.ndjson
 ```
 
-The generated NDJSON and summary JSON remain local under `bench/results/`,
-which is ignored by Git. This was a scaling comparison rather than a
-laboratory-grade performance run: machine power state was not controlled and
-backend order was fixed.
+## Historical stateful/deck comparison
 
-## Historical 19-segment endpoint
-
-The earlier NEC++ performance workload used 19 rather than 11 segments per
-dipole. A separate fresh-process run exercised that discretization at the
-largest array size:
-
-| Array | Equations | Stateful cold | Full deck cold | Deck delta | Retained solve |
-|---:|---:|---:|---:|---:|---:|
-| 16 x 16 | 4,864 | 64,070.6 ms | 64,492.8 ms | 0.7% | 49.86 ms |
-
-Both paths completed with the 4 MiB stack. The interaction matrix alone is 361
-MiB; observed RSS growth was 387.0 MiB stateful and 386.4 MiB for the deck
-path. The 1.25 MiB legacy report contained 15,457 lines. Its 256 source
-currents agreed with the stateful result to 1.33e-5 relative L2 error.
+The 2026-08-29 historical benchmark compared the pre-symmetry free-space
+stateful facade with formatted `runDeck()` output. At 16 x 16 and 11 segments,
+both paths took about 12.8 seconds because they shared the same full matrix;
+a retained stateful solve took 17.3 ms. That result remains useful as evidence
+for factorization reuse, but its rounded report currents and different geometry
+are not an oracle for the symmetry measurements above.

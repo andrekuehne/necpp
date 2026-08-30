@@ -1237,7 +1237,7 @@ Every agent updates this table and the detailed WP section before handing off.
 | WP-S4 Direct and worker TypeScript API | complete | Codex | npm/WASM: 46/46; pack: 5/5; browser: 3/3; native ABI: 8 assertions | WP-S5 may use only the exported descriptors, immutable completion metadata, typed failure details, and direct/worker methods; private ABI `bigint` values never escape. |
 | WP-S5 Transparent symmetrizer | complete | Codex | npm/WASM: 60/60; pack: 5/5; browser: 3/3; focused WP-S5: 14/14 | WP-S6 can consume the public facade without plan-kind branches; caller-order tags, ports, vectors, matrices, and field bases are representation-independent. |
 | WP-S6 End-to-end equivalence suite | complete | Codex | Focused WP-S6: 8/8; npm/WASM: 68/68 + typecheck; native `[wp_s2]` 10,599 and `[wp_s3]` 8 assertions | WP-S7 should reuse the reference fixture, caller-order checks, complex metrics, and ordinary 8 x 8 R3 gate before reporting performance. |
-| WP-S7 Benchmarks and performance gates | not started | — | — | — |
+| WP-S7 Benchmarks and performance gates | complete | Codex | 45/45 isolated current cases; 30/30 binary64 comparisons; 16 x 16 prepare 11.55x; matrix 4.00x | WP-S8 may claim only the measured matrix-scale results; the explicit 2 x 2 pre-feature regression gate remains a documented miss. |
 | WP-S8 Public documentation, examples, and release hardening | not started | — | — | — |
 | WP-S9 Final version bump and release identity | not started | — | — | — |
 
@@ -1843,6 +1843,69 @@ DoD:
 
 Handoff focus: WP-S8 uses measured facts, not theoretical estimates, in public
 documentation.
+
+Completion evidence (2026-08-30, Windows, Node 24.14.1, Emscripten 4.0.7):
+
+- Replaced the historical stateful/report comparison as the default workload
+  with process-isolated `explicit`, `manual-reflection`, and
+  `auto-reflection` paths over the shared Section 7 fixture. The `deck` backend
+  remains available as historical formatted-report coverage.
+- Schema-v2 NDJSON records analysis, module creation, construction, completion,
+  port/environment setup, prepare, first and retained changed-current solves,
+  combined far field, optional complete Z/Y extraction, sampled RSS, exact
+  primary interaction-matrix bytes, artifact/environment identity, classified
+  failures, and median/min/max summaries. CLI help and `bench/README.md`
+  document every option and record type.
+- The three-round current-artifact run completed 45/45 cases at sides 2, 4, 8,
+  12, and 16. All 30 manual/automatic comparisons passed requested/achieved
+  port quantities, powers, complete complex fields, and the 2 x 2 / 4 x 4
+  caller-order complex Z/Y gates at `1e-8`; the largest scaled error was
+  `1.13e-13`.
+- The pinned artifact SHA-256 was
+  `42d427c52b06792471d92e148cb0ed6ece33b4dabf1edabfe355ddcf4b1e0a28`.
+  The 16 x 16 manual prepare median was 1,142.14 ms versus 13,196.45 ms
+  explicit (11.55x). Auto/manual deltas at 8/12/16 were +2.32%, -1.18%, and
+  -0.18%; planner cold shares were 2.10%, 0.77%, and 0.26%. Exact wire-only
+  primary matrix allocation fell from 121.00 MiB to 30.25 MiB at 16 x 16,
+  with the same 4.00x reduction at every size.
+- Built planning-only commit `78bdafe` with the same Docker toolchain and ran
+  its explicit facade through the identical protocol. Current explicit prepare
+  deltas at 4/8/12/16 were -6.34%, -2.12%, +0.21%, and +0.55%. The unqualified
+  5% regression gate remains a transparent miss at 2 x 2: +19.41% in the
+  three-round run and +11.48% in a separate 15-round check with overlapping
+  ranges. `bench/RESULTS.md` records the bounded fixed-overhead profiling
+  follow-up; no numerical or performance tolerance was changed.
+- Raw current/baseline NDJSON and summary JSON remain under ignored
+  `bench/results/`. `bench/RESULTS.md` records both artifact hashes, exact
+  commands, worktree state, tables, interpretations, and the historical deck
+  context.
+- Final regression validation passed: `npm test` ran 69/69 tests plus strict
+  typechecking; packed-consumer tests passed 5/5; browser direct, worker, and
+  example integrations passed against one inspected tarball; native `[wp_s2]`
+  passed 10,599 assertions and `[wp_s3]` passed eight assertions. JavaScript
+  syntax checks, the three focused benchmark tests, the correctness-gated 2 x
+  2 CLI smoke run, and `git diff --check` also passed.
+- The first sandboxed pack/browser attempts could not write the user npm cache
+  (`EPERM`); an unparameterized browser invocation also printed its required
+  mode/tarball usage. They were rerun with npm-cache access, explicit
+  direct/worker/example modes, and the single inspected tarball with SHA-256
+  `80dbd4c3ffb450cadef9c93909f0e1a99ae513ad14572570806f04c042718afa`.
+  `ctest` was not on this PowerShell PATH, so the cached Release Catch2 binary
+  was invoked directly for the native WP-S2/WP-S3 partitions. No test was
+  silently skipped.
+
+Contract decisions for WP-S8 and later:
+
+- Public documentation may state an 11.55x measured 16 x 16 preparation
+  speedup and fourfold primary-matrix allocation reduction only with this host,
+  model, artifact, and three-round context. It must not turn those measurements
+  into an unconditional speedup promise.
+- Planner overhead is measured separately from construction and preparation.
+  Complete Z/Y extraction remains outside the ordinary 8 x 8 through 16 x 16
+  preparation workload unless `--z-matrix-sides` explicitly opts in.
+- The 2 x 2 explicit pre-feature regression miss must remain visible until a
+  later profiling change passes the same protocol without weakening structural
+  symmetry or load validation.
 
 ### WP-S8 — Public documentation, examples, and release hardening
 
