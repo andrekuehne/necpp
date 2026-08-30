@@ -1236,7 +1236,7 @@ Every agent updates this table and the detailed WP section before handing off.
 | WP-S3 Additive C/WASM ABI | complete | Codex | Native `[wp_s3]`: 8 assertions/2 cases plus pure-C contract; CTest 8/8; WASM smoke; npm 38/38; pack 5/5; browser 3/3 | WP-S4 should convert the private WASM `bigint` segment counts to checked safe numbers and derive copy transforms from the validated descriptor. |
 | WP-S4 Direct and worker TypeScript API | complete | Codex | npm/WASM: 46/46; pack: 5/5; browser: 3/3; native ABI: 8 assertions | WP-S5 may use only the exported descriptors, immutable completion metadata, typed failure details, and direct/worker methods; private ABI `bigint` values never escape. |
 | WP-S5 Transparent symmetrizer | complete | Codex | npm/WASM: 60/60; pack: 5/5; browser: 3/3; focused WP-S5: 14/14 | WP-S6 can consume the public facade without plan-kind branches; caller-order tags, ports, vectors, matrices, and field bases are representation-independent. |
-| WP-S6 End-to-end equivalence suite | not started | — | — | — |
+| WP-S6 End-to-end equivalence suite | complete | Codex | Focused WP-S6: 8/8; npm/WASM: 68/68 + typecheck; native `[wp_s2]` 10,599 and `[wp_s3]` 8 assertions | WP-S7 should reuse the reference fixture, caller-order checks, complex metrics, and ordinary 8 x 8 R3 gate before reporting performance. |
 | WP-S7 Benchmarks and performance gates | not started | — | — | — |
 | WP-S8 Public documentation, examples, and release hardening | not started | — | — | — |
 | WP-S9 Final version bump and release identity | not started | — | — | — |
@@ -1768,6 +1768,52 @@ DoD:
 
 Handoff focus: WP-S7 must reuse these fixtures/checks as benchmark correctness
 guards.
+
+Completion evidence (2026-08-30, Windows, Node 24.14.1, TypeScript 5.8.3,
+and the WP-S3 Emscripten artifact):
+
+- Added `test/symmetry-equivalence.test.mjs`, which builds explicit, manually
+  applied, and transparent models from the shared reference description. Its
+  eight real-WASM cases cover R1-R4, T1-T3, G1, N1, O1, E1, and P1, plus a
+  complete structural load orbit. R3's complete 64-port 8 x 8 Z/Y comparison
+  runs in the ordinary tier rather than being deferred to a scheduled job.
+- The suite rejects non-finite data and checks dimensions, frequency, port
+  metadata, generations, two-dimensional caller-order gathering, Z/Y relative
+  L2 and scaled-max error, Z*Y identity, reciprocity, named mutual entries,
+  port quantities, and all complex far-field components. Exact
+  full-versus-symmetric comparisons retain the `1e-8` gates; the separately
+  measured 11-segment explicit reciprocity residual is bounded at `2e-7` for
+  4 x 4 and `3e-7` for 8 x 8.
+- All five canonical 4 x 4 current cases compare requested/achieved currents,
+  voltages, active impedances, powers, complex combined fields, total
+  magnitudes, normalized cuts, stable peak samples, and intended-sample phase.
+  Gathered unit-current embedded bases reproduce each directly solved field by
+  JavaScript complex superposition.
+- N1 and P1 execute the same prepare, Z, current-solve, combined-field, and
+  embedded-field calls as accepted symmetry while retaining the full caller
+  port count and exposing no native tags or copy indices. O1 compares complete
+  complex translated fields, and E1 reports every canonicalization before
+  applying its locked `1e-7` jittered-input bound.
+- `npm --prefix packages/necpp-wasm run build:test` followed by the focused
+  Node command passed 8/8 in 2.63 seconds. `npm --prefix packages/necpp-wasm
+  test` passed 68/68 tests and strict typechecking. `git diff --check` passed.
+- Proportional native regressions from the clean cached Release executable also
+  passed: `[wp_s2]` 10,599 assertions in five cases, `[wp_s3]` eight assertions
+  in two cases, and the aggregate `[symmetry]` selection 10,945 assertions in
+  15 cases. The native WP-S2 run took 175 seconds on this Windows host; it was
+  CPU-active throughout and completed without a skipped assertion.
+
+Contract decisions for WP-S7 and later:
+
+- Performance checks must run only after the same caller-order complex Z/Y
+  equivalence gates; reporting magnitude-only agreement is insufficient.
+- Broadside has physically degenerate azimuth samples. Peak comparison uses the
+  first sample within a `1e-10` relative tie band so representation roundoff
+  cannot manufacture an azimuth disagreement; steered cases additionally
+  check the requested azimuth cut and intended complex sample.
+- Exact representation comparisons remain `1e-8`. The looser reciprocity
+  limits describe the independently measured explicit pulse/basis baseline and
+  must not be reused as full-versus-symmetric tolerances.
 
 ### WP-S7 — Benchmarks and performance gates
 
