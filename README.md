@@ -31,8 +31,12 @@ A guide to [using nec2++ from python](http://astroelec.blogspot.co.nz/2015/05/mo
 
 For Node and browser applications, the versioned `@necpp-engine/wasm` npm
 package provides a high-level TypeScript API with multi-port matrices, complex
-far fields, and an optional Web Worker facade. See the
+far fields, an optional Web Worker facade, explicit NEC reflection/rotation,
+and a transparent full-array solver that conservatively selects symmetry or
+falls back to the unchanged explicit model. Ordinary Z/Y, solve, and field
+results stay in caller port order. See the
 [package guide](packages/necpp-wasm/README.md) and the
+[detailed WASM API and symmetry contract](docs/wasm-api.md), plus the
 [four-element Vite example](examples/wasm-array-vite/README.md).
 
 ## Installation

@@ -3,12 +3,14 @@
   "version": "0.1.1",
   "private": false,
   "type": "module",
-  "description": "Stateful NEC2++ electromagnetic solver for Node and the browser",
+  "description": "Stateful NEC2++ electromagnetic solver and symmetric-array API for Node and browsers",
   "keywords": [
     "antenna",
+    "antenna-array",
     "electromagnetics",
     "nec2",
     "simulation",
+    "symmetry",
     "typescript",
     "wasm",
     "webassembly"

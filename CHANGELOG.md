@@ -1,3 +1,27 @@
+## Unreleased
+
+### Added
+
+* **Stateful geometry symmetry across native, WASM, direct, and worker APIs:**
+  coordinate-plane reflection and N-fold global-Z rotation preserve immutable
+  section/copy metadata through the additive version-1 ABI.
+* **Transparent full-array symmetry planning:** `createNecArraySolver()` accepts
+  one complete positioned-element description, conservatively selects an exact
+  reflection or rotation when eligible, and otherwise builds the unchanged
+  explicit model with stable diagnostics. Z/Y matrices, requested and achieved
+  port quantities, combined fields, and embedded bases stay in caller order in
+  all representations; arbitrary off-broadside excitation weights are covered.
+* **Documented first-release safety boundary:** automatic symmetry accepts only
+  pointwise invariant straight Z-wire patterns. Helices, tilted/off-axis wires,
+  rotated patterns, arcs, patches, fixed elements, asymmetric loads, and
+  incompatible ground fall back or raise a controlled policy error. Epsilon
+  acceptance reports every coordinate canonicalization and the maximum change.
+* **Symmetry equivalence and performance gates:** native/ABI/package/worker/
+  browser tests compare complete complex matrices, port solutions, and fields.
+  The process-isolated 16 x 16 reference run on an AMD Ryzen 7 PRO 7840HS
+  measured 11.55x manual-reflection preparation speedup and a fourfold primary
+  matrix-allocation reduction; these are host- and model-specific measurements.
+
 ## 0.1.1 - 2026-08-29
 
 ### Added

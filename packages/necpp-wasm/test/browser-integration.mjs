@@ -263,6 +263,9 @@ try {
     assert.equal(result.portCount, 4);
     assert.equal(result.fieldSamples, 361);
     assert.equal(result.finite, true);
+    assert.equal(result.representation, "symmetric");
+    assert.equal(result.maxPositionAdjustmentM, 0);
+    assert.deepEqual(result.reasonCodes, []);
     assert.equal(await page.locator("#ports tbody tr").count(), 4);
     assert.equal(await page.locator("#matrix tbody tr").count(), 5);
     assert.equal(await page.locator("#plot .pattern").count(), 1);

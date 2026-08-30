@@ -111,6 +111,13 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
   installFixture(fixture.root);
   writeFixtureFile(fixture.root, "dipole.mjs", dipoleScript);
   writeFixtureFile(fixture.root, "worker-dipole.mjs", workerDipoleScript);
+  for (const name of ["manual-direct.mjs", "manual-worker.mjs"]) {
+    writeFixtureFile(
+      fixture.root,
+      name,
+      readFileSync(new URL(`../../../../examples/wasm-symmetry/${name}`, import.meta.url), "utf8"),
+    );
+  }
 
   const direct = parseJsonLine(run("node", ["dipole.mjs"], {
     cwd: fixture.root,
@@ -144,6 +151,20 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
   assert.equal(worker.packageVersion, packageJson.version);
   assert.equal(worker.sectionCount, 4);
   assert.ok(Math.abs(worker.resistanceOhm - direct.resistanceOhm) < 1e-9);
+
+  for (const [name, mode] of [
+    ["manual-direct.mjs", "direct"],
+    ["manual-worker.mjs", "worker"],
+  ]) {
+    const example = parseJsonLine(run("node", [name], {
+      cwd: fixture.root,
+      stdio: ["ignore", "pipe", "inherit"],
+    }).stdout);
+    assert.equal(example.mode, mode);
+    assert.equal(example.sectionCount, 4);
+    assert.equal(example.portCount, 4);
+    assert.equal(example.finite, true);
+  }
 });
 
 test("every package README TypeScript example compiles and the quick start executes", {
@@ -156,10 +177,29 @@ test("every package README TypeScript example compiles and the quick start execu
     `vite@${VITE_VERSION}`,
   ]);
 
-  const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
+  const readme = readFileSync(join(
+    fixture.root,
+    "node_modules",
+    "@necpp-engine",
+    "wasm",
+    "README.md",
+  ), "utf8");
+  for (const requiredText of [
+    "Symmetric arrays and automatic optimization",
+    "Full NxN input with automatic selection",
+    'symmetry: "auto"',
+    'symmetry: "off"',
+    'symmetry: "require"',
+    "maxPositionAdjustmentM",
+    "UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM",
+    "11.55x",
+    "https://github.com/andrekuehne/necpp/blob/master/docs/wasm-api.md",
+  ]) {
+    assert.ok(readme.includes(requiredText), `packed README is missing ${requiredText}`);
+  }
   const examples = [...readme.matchAll(/```ts\r?\n([\s\S]*?)```/g)]
     .map((match) => match[1]);
-  assert.ok(examples.length >= 7, "expected all documented TypeScript examples");
+  assert.ok(examples.length >= 10, "expected all documented TypeScript examples");
 
   const paths = examples.map((source, index) => {
     const path = `readme-example-${index + 1}.ts`;

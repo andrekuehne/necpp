@@ -56,7 +56,188 @@ try {
 
 This complete example is executed from the packed npm tarball in CI.
 
-## Manual symmetry from one quadrant
+## Symmetric arrays and automatic optimization
+
+For array applications, `createNecArraySolver()` accepts the caller's complete
+element list and keeps one contract whether it builds that geometry explicitly
+or proves that NEC can use a smaller fundamental section. `prepare()`, complete
+Z/Y matrices, current- and voltage-driven solves, combined fields, and embedded
+fields always use the full caller element and port order. Generated tags, copy
+indices, and native copy-major order do not leak into ordinary results.
+
+The facade defaults to `symmetry: "auto"`. Automatic analysis never assumes a
+hidden tolerance, so callers using the default must still provide
+`symmetrizer.positionEpsilonM`. Use `"off"` to force the unchanged explicit
+model or `"require"` to reject a description that cannot use supported
+symmetry. All three modes use a package-supplied worker and expose the same
+asynchronous solver methods.
+
+### Full NxN input with automatic selection
+
+This runnable 4 x 4 example supplies all 16 XY positions in row-major order.
+The only reusable pattern is a Z-directed straight wire on its element-local Z
+axis. The planner recognizes reflection across `x=0` and `y=0`, constructs one
+quadrant, and gathers every result back into the 16-port caller order. The
+current phases are deliberately progressive: excitation weights do not need to
+share the structural symmetry.
+
+```ts
+import {
+  createNecArraySolver,
+  type FullArrayDescription,
+} from "@necpp-engine/wasm";
+
+const frequencyMHz = 300;
+const wavelengthM = (1 / Math.sqrt(8.854e-12 * 4 * Math.PI * 1e-7))
+  / (frequencyMHz * 1e6);
+const side = 4;
+const description: FullArrayDescription = {
+  elements: Array.from({ length: side * side }, (_, index) => {
+    const x = index % side;
+    const y = Math.floor(index / side);
+    return {
+      id: `element-${index}`,
+      positionM: [
+        (x - (side - 1) / 2) * wavelengthM / 2,
+        (y - (side - 1) / 2) * wavelengthM / 2,
+      ] as const,
+      patternId: "dipole",
+    };
+  }),
+  patterns: [{
+    id: "dipole",
+    kind: "straight-wire-pattern",
+    wires: [{
+      id: "radiator",
+      segments: 11,
+      startM: [0, 0, wavelengthM / 12],
+      endM: [0, 0, 5 * wavelengthM / 12],
+      radiusM: wavelengthM / 1000,
+    }],
+    ports: [{ wireId: "radiator", segment: 6, name: "feed" }],
+  }],
+  ground: { kind: "perfect" },
+};
+
+const solver = await createNecArraySolver(description, {
+  symmetry: "auto",
+  symmetrizer: { positionEpsilonM: 1e-9 },
+});
+
+try {
+  await solver.prepare({ frequencyMHz });
+  const { impedance, admittance } = await solver.computeImpedanceMatrix();
+  const currents = {
+    real: Float64Array.from(
+      description.elements,
+      (_, index) => Math.cos(index * Math.PI / 12),
+    ),
+    imag: Float64Array.from(
+      description.elements,
+      (_, index) => Math.sin(index * Math.PI / 12),
+    ),
+  };
+  const solution = await solver.solveCurrents(currents);
+  const request = {
+    radiusM: 1,
+    theta: { startDeg: 90, count: 1, stepDeg: 0 },
+    phi: { startDeg: 0, count: 361, stepDeg: 1 },
+  } as const;
+  const field = await solver.computeFarField(request);
+  const embedded = await solver.computeEmbeddedFarFields(
+    request,
+    { kind: "unit-current", valueA: 1 },
+  );
+  const diagnostics = solver.getDiagnostics();
+
+  console.log({
+    representation: diagnostics.representation,
+    sections: diagnostics.symmetry?.sectionCount,
+    exact: diagnostics.planner.exact,
+    maxAdjustmentM: diagnostics.planner.maxPositionAdjustmentM,
+    warnings: diagnostics.planner.reasons,
+    zOrder: impedance.rows,
+    yOrder: admittance.rows,
+    solvedPorts: solution.ports.length,
+    combinedSamples: field.eThetaReal.length,
+    embeddedPorts: embedded.ports.length,
+  });
+} finally {
+  await solver.dispose();
+}
+```
+
+`positionEpsilonM` is an acceptance and canonicalization tolerance, not a claim
+that the input was exact. Every accepted coordinate replacement appears in
+`diagnostics.planner.canonicalizations`; `exact` and
+`maxPositionAdjustmentM` summarize the adjustment. If an off-origin array is
+recentered for NEC symmetry, combined and embedded complex fields are restored
+to the caller's origin automatically with the package's `e^(+j k u·center)`
+phase correction.
+
+Inspect diagnostics when optimization information matters; ordinary solver
+code does not branch on it. An accepted plan reports `representation:
+"symmetric"`, its reduction metadata, candidate decisions, and coordinate
+adjustments. A fallback reports `representation: "explicit"` and stable reason
+codes such as `FIXED_ELEMENT_ON_REFLECTION_PLANE`,
+`FIXED_ELEMENT_ON_ROTATION_AXIS`, `POSITION_OUTSIDE_EPSILON`,
+`PATTERN_MISMATCH`, `UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM`,
+`UNSYMMETRIC_LOAD`, or `GROUND_BREAKS_SYMMETRY`. Centered odd-sided square
+arrays therefore remain explicit because elements lie on reflection planes and
+the rotation axis; no element is dropped.
+
+The modes are explicit application policy:
+
+```ts
+import {
+  createNecArraySolver,
+  type FullArrayDescription,
+} from "@necpp-engine/wasm";
+
+declare const description: FullArrayDescription;
+
+const automatic = await createNecArraySolver(description, {
+  symmetry: "auto",
+  symmetrizer: { positionEpsilonM: 1e-9 },
+});
+const explicit = await createNecArraySolver(description, { symmetry: "off" });
+const required = await createNecArraySolver(description, {
+  symmetry: "require",
+  symmetrizer: { positionEpsilonM: 0 },
+});
+
+await Promise.all([
+  automatic.dispose(),
+  explicit.dispose(),
+  required.dispose(),
+]);
+```
+
+The first release accepts only pointwise transform-invariant element patterns:
+straight Z-directed wires whose local X and Y coordinates are zero, with zero
+or omitted element rotation. Helices, tilted or off-axis wires, multiple
+off-axis wire sets, arcs, patches, rotated patterns, and transforms whose
+handedness, endpoint direction, segment mapping, or port polarity is unresolved
+fall back under `"auto"`. `"require"` or `onUnsupported: "error"` turns that
+condition into a controlled error. This is structural symmetry: sources,
+requested currents/voltages, and non-radiating networks may be arbitrary, but
+geometry, loads, and the radiating environment must form complete equal orbits.
+
+Supported structural operations are:
+
+| Operation | Free space | Homogeneous horizontal ground | Important restriction |
+|---|---:|---:|---|
+| Reflection in `x=0` and/or `y=0` | Yes | Yes | No wire may lie in or cross a generating plane |
+| Reflection in `z=0` | Yes | No | Ground and structural `z=0` reflection are incompatible |
+| N-fold rotation about global Z | Yes | Yes | Order is at least 2; no element may be fixed on the axis |
+
+The automatic planner may translate the XY origin before applying one of these
+groups. It does not combine reflection and rotation into a general dihedral
+optimization. Loads attached to a reusable pattern are expanded over the
+complete orbit atomically; low-level manual users must supply equal complete
+load orbits before `prepare()`.
+
+### Manual symmetry from one quadrant
 
 When the geometry is known to be symmetric, build only its fundamental section
 and make symmetry the final geometry operation. This 300 MHz reference model
@@ -119,11 +300,52 @@ section count, fundamental/full segment counts, transforms, and offsets. It is
 deeply immutable and has the same shape when returned by the worker API. Use
 `rotationalOrder(n)` for N-fold rotation about global Z.
 
+The worker API uses the same descriptor and returns the same immutable
+metadata; only the operation calls are awaited:
+
+```ts
+import { createNecWorkerModel } from "@necpp-engine/wasm/worker";
+
+const model = await createNecWorkerModel();
+try {
+  await model.addWire({
+    tag: 1,
+    segments: 11,
+    start: [0.25, 0.25, 0.1],
+    end: [0.25, 0.25, 0.4],
+    radiusM: 0.001,
+  });
+  const completion = await model.completeGeometry({
+    symmetry: {
+      kind: "reflection",
+      planes: ["x=0", "y=0"],
+      tagIncrement: 1,
+    },
+  });
+  await model.definePorts(Array.from(
+    { length: 4 },
+    (_, index) => ({ tag: index + 1, segment: 6 }),
+  ));
+  await model.prepare({ frequencyMHz: 300 });
+  console.log(completion.symmetry, await model.computeImpedanceMatrix());
+} finally {
+  await model.dispose();
+}
+```
+
 Plane reflection rejects wires that lie in or cross a generating plane.
 Structural `z=0` reflection is incompatible with ground, while the vertical
 planes used above remain valid over homogeneous horizontal ground. Geometry
 cannot be added after symmetric completion, and structural loads must cover
 complete symmetry orbits before `prepare()`.
+
+On an AMD Ryzen 7 PRO 7840HS running Windows, Node 24.14.1, and the Emscripten
+4.0.7 artifact, the three-round 16 x 16 perfect-ground reference benchmark
+measured 13,196.45 ms explicit preparation versus 1,142.14 ms manual
+two-plane-reflection preparation (11.55x), while the primary interaction
+matrix allocation fell from 121.00 MiB to 30.25 MiB (4.00x). These are
+model- and host-specific measurements, not a universal speedup promise. See
+the [benchmark method and full results](https://github.com/andrekuehne/necpp/blob/master/packages/necpp-wasm/bench/RESULTS.md).
 
 ## Numerical conventions
 
