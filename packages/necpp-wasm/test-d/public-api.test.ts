@@ -1,6 +1,8 @@
 import {
   NecStateError,
   abiVersion,
+  analyzeArraySymmetry,
+  createNecArraySolver,
   createNecModel,
   engineVersion,
   packageVersion,
@@ -12,8 +14,66 @@ import {
   type SymmetryFailureClassification,
   type ComplexMatrix,
   type FarFieldResult,
+  type FullArrayDescription,
   type PortSolution,
 } from "../src/index.js";
+
+const typedArrayDescription: FullArrayDescription = {
+  elements: [
+    { id: "left", positionM: [-0.25, 0.25], patternId: "dipole" },
+    { id: "right", positionM: [0.25, 0.25], patternId: "dipole" },
+  ],
+  patterns: [{
+    id: "dipole",
+    kind: "straight-wire-pattern",
+    wires: [{
+      id: "wire",
+      segments: 11,
+      startM: [0, 0, 0.1],
+      endM: [0, 0, 0.4],
+      radiusM: 0.001,
+    }],
+    ports: [{ wireId: "wire", segment: 6 }],
+  }],
+  ground: { kind: "perfect" },
+};
+
+analyzeArraySymmetry(typedArrayDescription, { positionEpsilonM: 0 });
+
+async function validUnbranchedArrayConsumer(
+  symmetry: "off" | "auto",
+): Promise<void> {
+  const solver = await createNecArraySolver(
+    typedArrayDescription,
+    symmetry === "off"
+      ? { symmetry }
+      : { symmetry, symmetrizer: { positionEpsilonM: 1e-9 } },
+  );
+  await solver.prepare({ frequencyMHz: 300 });
+  await solver.computeImpedanceMatrix();
+  await solver.solveCurrents({
+    real: new Float64Array(2),
+    imag: new Float64Array(2),
+  });
+  await solver.computeFarField({
+    theta: { startDeg: 0, count: 1, stepDeg: 0 },
+    phi: { startDeg: 0, count: 1, stepDeg: 0 },
+  });
+  solver.getDiagnostics().planner.canonicalizations;
+  await solver.dispose();
+}
+
+void validUnbranchedArrayConsumer;
+
+const invalidPatternDescription: FullArrayDescription = {
+  ...typedArrayDescription,
+  patterns: [{
+    ...typedArrayDescription.patterns[0]!,
+    // @ts-expect-error opaque/helix primitives are deliberately not in the first-release type.
+    kind: "helix-pattern",
+  }],
+};
+void invalidPatternDescription;
 
 async function validConsumer(): Promise<void> {
   const model = await createNecModel();

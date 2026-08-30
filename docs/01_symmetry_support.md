@@ -1235,7 +1235,7 @@ Every agent updates this table and the detailed WP section before handing off.
 | WP-S2 Stateful symmetry and validation | complete | Codex | Native `[wp_s2]`: 10,599 assertions; direct WP1-WP4 regressions and npm 38/38 | WP-S3 should call the symmetric overload, then expose only `geometry_completion()` metadata through additive ABI getters. |
 | WP-S3 Additive C/WASM ABI | complete | Codex | Native `[wp_s3]`: 8 assertions/2 cases plus pure-C contract; CTest 8/8; WASM smoke; npm 38/38; pack 5/5; browser 3/3 | WP-S4 should convert the private WASM `bigint` segment counts to checked safe numbers and derive copy transforms from the validated descriptor. |
 | WP-S4 Direct and worker TypeScript API | complete | Codex | npm/WASM: 46/46; pack: 5/5; browser: 3/3; native ABI: 8 assertions | WP-S5 may use only the exported descriptors, immutable completion metadata, typed failure details, and direct/worker methods; private ABI `bigint` values never escape. |
-| WP-S5 Transparent symmetrizer | not started | — | — | — |
+| WP-S5 Transparent symmetrizer | complete | Codex | npm/WASM: 60/60; pack: 5/5; browser: 3/3; focused WP-S5: 14/14 | WP-S6 can consume the public facade without plan-kind branches; caller-order tags, ports, vectors, matrices, and field bases are representation-independent. |
 | WP-S6 End-to-end equivalence suite | not started | — | — | — |
 | WP-S7 Benchmarks and performance gates | not started | — | — | — |
 | WP-S8 Public documentation, examples, and release hardening | not started | — | — | — |
@@ -1678,6 +1678,56 @@ DoD:
 
 Handoff focus: WP-S6 combines public planner and engine paths and should not
 patch around mapping failures in test code.
+
+Completion evidence (2026-08-30, Windows, Node 24.14.1, TypeScript 5.8.3,
+Chromium through Playwright, and the WP-S3 Emscripten artifact):
+
+- `npm --prefix packages/necpp-wasm run test:wasm` passed 60/60 Node tests,
+  strict declaration/type tests, and 5/5 packed-consumer tests. The 14 focused
+  WP-S5 cases cover exact 2 x 2, 4 x 4, and 8 x 8 reflection plans, odd-grid
+  fixed-element fallback, exact cardinal rotation, permutation invariance,
+  epsilon adjustment reporting, outside-epsilon and ambiguous rejection,
+  pattern mismatch, every first-release pattern prohibition, preservation of
+  unsupported local rotation in the explicit fallback, synthetic gather maps,
+  direct plan application, the unbranched facade, and the off-origin complex-
+  field phase-sign proof.
+- `npm --prefix packages/necpp-wasm run pack:release -- .pack-work` produced
+  `necpp-engine-wasm-0.1.1.tgz`, 327,294 bytes, SHA-256
+  `80dbd4c3ffb450cadef9c93909f0e1a99ae513ad14572570806f04c042718afa`.
+  With `NECPP_WASM_TARBALL` set to that artifact, `npm --prefix
+  packages/necpp-wasm run test:browser -- direct`, `worker`, and `example` all
+  passed.
+- The first restricted-sandbox pack and browser attempts failed only because
+  npm could not write its cache below `%LOCALAPPDATA%`. The unchanged commands
+  passed after granting the test processes the required cache/temp access; no
+  source or assertion was changed in response.
+- Native tests were not rerun because WP-S5 changes only the public TypeScript
+  planning/facade layer and consumes the already-tested WP-S4 API. The full
+  package run exercised the real WP-S3 WASM binary through direct, worker,
+  packed Node, Vite, and browser paths.
+
+Contract decisions for WP-S6 and later:
+
+- `analyzeArraySymmetry()` remains pure and requires an explicit finite,
+  nonnegative `positionEpsilonM`. Since `createNecArraySolver()` defaults to
+  `"auto"`, callers selecting auto/require must supply symmetrizer options;
+  `"off"` needs no tolerance and constructs the unchanged explicit model.
+- Automatic rotation enumeration tests divisors from largest to smallest and
+  caps inferred order at 64; configured branded orders are tested explicitly.
+  Equal-section candidates prefer reflection, then the stable documented
+  plane/order sequence.
+- Symmetric fundamental XY coordinates are centered model coordinates.
+  Ordinary impedance and port results are gathered to caller order, while
+  combined and embedded complex fields restore the caller's XY translation
+  with the executable positive-sign phase rule.
+- Ordinary result ports use the same logical caller-order tags in explicit and
+  symmetric representations. Generated tags, copy indices, fundamental port
+  order, and scatter maps remain confined to plans, application metadata, and
+  diagnostics.
+- `applyArrayBuildPlan()` accepts either a direct or worker model. The public
+  `NecArraySolver` factory is worker-backed, expands structural loads over all
+  native copies, and retries the unchanged explicit description at most once
+  for a classified representation-eligibility failure in `"auto"` mode.
 
 ### WP-S6 — End-to-end equivalence suite
 
