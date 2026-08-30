@@ -13,7 +13,7 @@ port quantities, and plots the combined azimuth far-field cut at 1 m.
 ## Run with the published package
 
 From this directory, run `npm install`, then
-`npm install @necpp-engine/wasm@0.1.1`, followed by `npm run dev`. Open the URL
+`npm install @necpp-engine/wasm@0.2.0`, followed by `npm run dev`. Open the URL
 printed by Vite. Use `npm run build` and `npm run preview` to inspect the
 production bundle.
 

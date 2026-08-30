@@ -124,7 +124,7 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
     stdio: ["ignore", "pipe", "inherit"],
   }).stdout);
   assert.equal(direct.packageVersion, packageJson.version);
-  assert.equal(direct.engineVersion, "2.3.4");
+  assert.equal(direct.engineVersion, "2.4.0");
   assert.equal(direct.abiVersion, 1);
   assert.equal(direct.sectionCount, 4);
   assert.ok(direct.resistanceOhm > 0);

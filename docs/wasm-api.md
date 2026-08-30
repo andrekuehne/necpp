@@ -20,8 +20,8 @@ while the scoped name identifies this repository and leaves room for future
 npm scope, but the API name will not change if the package is initially
 distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
-The current package identity is `0.1.1`; WP-S9 assigns the documented symmetry
-release its final `0.2.0` identity after all release gates pass.
+The symmetry release package identity is `0.2.0`; it embeds NEC2++ `2.4.0`
+while preserving WASM ABI version `1`.
 
 The packed package exports three version identifiers that can be imported
 without constructing a model:

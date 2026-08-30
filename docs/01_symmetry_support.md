@@ -1239,7 +1239,7 @@ Every agent updates this table and the detailed WP section before handing off.
 | WP-S6 End-to-end equivalence suite | complete | Codex | Focused WP-S6: 8/8; npm/WASM: 68/68 + typecheck; native `[wp_s2]` 10,599 and `[wp_s3]` 8 assertions | WP-S7 should reuse the reference fixture, caller-order checks, complex metrics, and ordinary 8 x 8 R3 gate before reporting performance. |
 | WP-S7 Benchmarks and performance gates | complete | Codex | 45/45 isolated current cases; 30/30 binary64 comparisons; 16 x 16 prepare 11.55x; matrix 4.00x | WP-S8 may claim only the measured matrix-scale results; the explicit 2 x 2 pre-feature regression gate remains a documented miss. |
 | WP-S8 Public documentation, examples, and release hardening | complete | Codex | npm/WASM 69/69 + typecheck; pack 5/5; browser 3/3; native Release partitions pass | WP-S9 should only assign versions/date, rebuild identities, rerun this checklist, and inspect the final tarball. |
-| WP-S9 Final version bump and release identity | not started | — | — | — |
+| WP-S9 Final version bump and release identity | complete | Codex | native Release + 8 partitions; npm/WASM 69/69 + pack 5/5; browser 3/3; final tarball inspected | Symmetry support is release-ready at package 0.2.0, engine 2.4.0, and ABI 1; publishing/tagging remains a separately authorized action. |
 
 Allowed states are `not started`, `in progress`, `blocked`, and `complete`.
 `complete` requires the WP's DoD, not merely code that compiles.
@@ -2088,6 +2088,46 @@ DoD:
 - the version bump is the last planned source change. Any correction caused by
   final validation is followed by rebuilding, retesting, and rechecking every
   release identity before WP-S9 is marked complete.
+
+Completion evidence (2026-08-30, Windows, Node 24.14.1):
+
+- Finalized `@necpp-engine/wasm` as `0.2.0`, NEC2++ as `2.4.0`, and retained
+  WASM ABI `1`. Package metadata, both lockfile entries, TypeScript exports,
+  CMake metadata, runtime assertions, user-facing versioned examples, and the
+  dated changelog section agree. A repository search found no stale expected
+  `0.1.1` or `2.3.4` identity in active source, tests, generated package
+  metadata, or versioned examples; historical results, changelog entries, and
+  before/after planning text remain intentionally unchanged.
+- The cached native Release tree regenerated after the CMake change and built
+  successfully. The executable reports `nec2++ 2.4.0 [2026-08-30]`; generated
+  `config.h` and `necpp.pc` also report `2.4.0`. Seven non-WP1 CTest partitions
+  passed. The long-output WP1 partition passed as `[wp1]~[stress]` with 49
+  assertions in six cases, and `[stress]` exited zero with output suppressed.
+- `scripts/build_wasm_docker.ps1` rebuilt the module with pinned
+  `emscripten/emsdk:4.0.7`. The ABI smoke test passed; `test:wasm` passed 69/69
+  runtime tests plus strict typechecking and the five packed-package tests.
+  These runs exercised embedded engine `2.4.0`, exported package `0.2.0`, and
+  unchanged ABI `1` in direct and worker modes.
+- The final artifact is `necpp-engine-wasm-0.2.0.tgz` (329,882 bytes, SHA-256
+  `a436b7fc831b942be7156a6df5e99d4d4f40bdcc6955ce24527f5779b37c5d15`).
+  Its manifest contains 39 intended files, including the README, symmetry
+  declarations and implementation, worker entry points, and the 733,440-byte
+  WASM artifact, with no source, debug, test, or benchmark output. The exact
+  tarball passed four clean Node/README/Vite consumer tests and Chromium direct,
+  worker, and transparent-example integration. `npm pack --dry-run --json`
+  reported the identical filename, sizes, hashes, and contents.
+- CMake/CTest were not on this PowerShell PATH, so the cached CMake 3.31.6 tools
+  were invoked by their recorded absolute path. Initial sandboxed Docker and
+  final-pack attempts were denied access to the Docker API and user npm cache;
+  the identical commands passed with the required access. No test was silently
+  skipped. No tag, GitHub release, or npm publication was created.
+
+Final contract decision:
+
+- Package `0.2.0`, engine `2.4.0`, and ABI `1` are the completed symmetry
+  release identities. Any later source correction requires rebuilding and
+  rerunning the release checklist; external tagging and publication require
+  separate user authorization.
 
 ## 14. Global Definition of Done
 

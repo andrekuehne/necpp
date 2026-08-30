@@ -272,7 +272,7 @@ try {
   } else {
     assert.equal(result.mode, mode);
     assert.equal(result.abiVersion, 1);
-    assert.equal(result.engineVersion, "2.3.4");
+    assert.equal(result.engineVersion, "2.4.0");
     assert.ok(result.resistanceOhm > 0);
     assert.equal(result.fieldSamples, 3);
     assert.equal(result.fieldFinite, true);

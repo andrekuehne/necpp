@@ -1,6 +1,6 @@
 {
   "name": "@necpp-engine/wasm",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
   "description": "Stateful NEC2++ electromagnetic solver and symmetric-array API for Node and browsers",
