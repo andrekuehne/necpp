@@ -24,6 +24,8 @@
 
 #include <cstring>
 #include <cctype>
+#include <limits>
+#include <set>
 #include <stdint.h>
 
 /**
@@ -988,15 +990,299 @@ void c_geometry::move( nec_float rox, nec_float roy, nec_float roz, nec_float xs
 
 /*-----------------------------------------------------------------------*/
 
-/* reflect geometry across one symmetry plane (planar) or rotate    */
-/* to complete a cylindrical structure.                               */
-/* sym_plane > 0: bitmask of axes to negate (1=X, 2=Y, 4=Z)          */
+namespace {
+
+constexpr nec_float symmetry_segment_plane_sum_tolerance = 1.0e-5;
+constexpr nec_float symmetry_segment_crossing_tolerance = 1.0e-6;
+constexpr nec_float symmetry_patch_plane_tolerance = 1.0e-10;
+constexpr nec_float symmetry_collision_tolerance = 1.0e-10;
+
+int reflection_section_count(uint32_t plane_mask)
+{
+  int plane_count = 0;
+  for (uint32_t bit = nec_reflection_plane_x;
+       bit <= nec_reflection_plane_z; bit <<= 1u)
+    if ((plane_mask & bit) != 0u)
+      ++plane_count;
+  return 1 << plane_count;
+}
+
+int64_t checked_symmetry_product(
+  int64_t fundamental_count, int section_count, const char* element_name)
+{
+  if (fundamental_count < 0 || section_count < 1 ||
+      fundamental_count >
+        (std::numeric_limits<int64_t>::max)() / section_count) {
+    nec_exception error("GEOMETRY SYMMETRY SIZE ERROR--");
+    error.append(element_name);
+    error.append(" COUNT OVERFLOW");
+    throw error;
+  }
+
+  const int64_t full_count = fundamental_count * section_count;
+  if (full_count > real_array::maximum_size()) {
+    nec_exception error("GEOMETRY SYMMETRY SIZE ERROR--");
+    error.append(element_name);
+    error.append(" ALLOCATION IS TOO LARGE");
+    throw error;
+  }
+  return full_count;
+}
+
+int64_t checked_symmetry_sum(int64_t first, int64_t second)
+{
+  if (first < 0 || second < 0 ||
+      first > (std::numeric_limits<int64_t>::max)() - second)
+    throw nec_exception("GEOMETRY SYMMETRY SIZE ERROR--TAG ARRAY COUNT OVERFLOW");
+  const int64_t result = first + second;
+  if (result > int_array::maximum_size())
+    throw nec_exception("GEOMETRY SYMMETRY SIZE ERROR--TAG ARRAY ALLOCATION IS TOO LARGE");
+  return result;
+}
+
+void validate_generated_tags(
+  const c_geometry& geometry, int section_count, int tag_increment,
+  bool require_unique_tags)
+{
+  std::set<int> fundamental_tags;
+  for (int64_t index = 0; index < geometry.n_segments; ++index) {
+    const int tag = geometry.segment_tags[index];
+    if (require_unique_tags && tag < 0)
+      throw nec_exception("GEOMETRY SYMMETRY TAG ERROR--TAGS MUST NOT BE NEGATIVE");
+    if (tag != 0)
+      fundamental_tags.insert(tag);
+  }
+
+  std::vector<int> tags(fundamental_tags.begin(), fundamental_tags.end());
+  for (const int tag : fundamental_tags) {
+    const int64_t first = tag;
+    const int64_t last = first +
+      static_cast<int64_t>(section_count - 1) * tag_increment;
+    const int64_t minimum = std::min(first, last);
+    const int64_t maximum = std::max(first, last);
+    if (minimum < (std::numeric_limits<int>::min)() ||
+        maximum > (std::numeric_limits<int>::max)())
+        throw nec_exception("GEOMETRY SYMMETRY TAG ERROR--GENERATED TAG OVERFLOW");
+    if (require_unique_tags && minimum <= 0)
+      throw nec_exception("GEOMETRY SYMMETRY TAG ERROR--GENERATED TAGS MUST BE POSITIVE");
+  }
+
+  if (!require_unique_tags)
+    return;
+
+  const int64_t increment = tag_increment;
+  for (size_t first_index = 0; first_index < tags.size(); ++first_index) {
+    for (size_t second_index = first_index + 1;
+         second_index < tags.size(); ++second_index) {
+      const int64_t difference = static_cast<int64_t>(tags[second_index]) -
+        static_cast<int64_t>(tags[first_index]);
+      if (difference % increment == 0 &&
+          difference / increment < section_count)
+        throw nec_exception(
+          "GEOMETRY SYMMETRY TAG ERROR--GENERATED TAGS ARE NOT UNIQUE");
+    }
+  }
+}
+
+bool approximately_equal(nec_float lhs, nec_float rhs)
+{
+  const nec_float scale = 1.0 + std::max(fabs(lhs), fabs(rhs));
+  return fabs(lhs - rhs) <= symmetry_collision_tolerance * scale;
+}
+
+bool vector_rotation_angle(
+  nec_float source_x, nec_float source_y,
+  nec_float target_x, nec_float target_y,
+  nec_float& angle, bool& has_angle)
+{
+  const nec_float source_radius = hypot(source_x, source_y);
+  const nec_float target_radius = hypot(target_x, target_y);
+  if (!approximately_equal(source_radius, target_radius))
+    return false;
+  if (source_radius <= symmetry_collision_tolerance) {
+    if (target_radius > symmetry_collision_tolerance)
+      return false;
+    return true;
+  }
+
+  const nec_float candidate = atan2(
+    source_x * target_y - source_y * target_x,
+    source_x * target_x + source_y * target_y);
+  if (!has_angle) {
+    angle = candidate;
+    has_angle = true;
+  } else if (!approximately_equal(sin(angle), sin(candidate)) ||
+             !approximately_equal(cos(angle), cos(candidate))) {
+    return false;
+  }
+  return true;
+}
+
+bool angle_is_nonidentity_copy(nec_float angle, int order)
+{
+  nec_float normalized = fmod(angle, two_pi());
+  if (normalized < 0.0)
+    normalized += two_pi();
+  const nec_float copy_value = normalized * order / two_pi();
+  const int64_t copy = static_cast<int64_t>(llround(copy_value));
+  if (fabs(copy_value - static_cast<nec_float>(copy)) > 1.0e-8)
+    return false;
+  return copy % order != 0;
+}
+
+bool segment_matches_rotation(
+  const c_geometry& geometry, int64_t source, int64_t target, bool reverse,
+  int order)
+{
+  nec_float target_x1 = reverse ? geometry.x2[target] : geometry.x[target];
+  nec_float target_y1 = reverse ? geometry.y2[target] : geometry.y[target];
+  nec_float target_z1 = reverse ? geometry.z2[target] : geometry.z[target];
+  nec_float target_x2 = reverse ? geometry.x[target] : geometry.x2[target];
+  nec_float target_y2 = reverse ? geometry.y[target] : geometry.y2[target];
+  nec_float target_z2 = reverse ? geometry.z[target] : geometry.z2[target];
+
+  if (!approximately_equal(geometry.z[source], target_z1) ||
+      !approximately_equal(geometry.z2[source], target_z2))
+    return false;
+
+  nec_float angle = 0.0;
+  bool has_angle = false;
+  if (!vector_rotation_angle(
+        geometry.x[source], geometry.y[source], target_x1, target_y1,
+        angle, has_angle) ||
+      !vector_rotation_angle(
+        geometry.x2[source], geometry.y2[source], target_x2, target_y2,
+        angle, has_angle))
+    return false;
+  return !has_angle || angle_is_nonidentity_copy(angle, order);
+}
+
+bool patch_matches_rotation(
+  const c_geometry& geometry, int64_t source, int64_t target, int order)
+{
+  if (!approximately_equal(geometry.pz[source], geometry.pz[target]) ||
+      !approximately_equal(geometry.t1z[source], geometry.t1z[target]) ||
+      !approximately_equal(geometry.t2z[source], geometry.t2z[target]) ||
+      !approximately_equal(geometry.pbi[source], geometry.pbi[target]) ||
+      !approximately_equal(geometry.psalp[source], geometry.psalp[target]))
+    return false;
+
+  nec_float angle = 0.0;
+  bool has_angle = false;
+  if (!vector_rotation_angle(
+        geometry.px[source], geometry.py[source],
+        geometry.px[target], geometry.py[target], angle, has_angle) ||
+      !vector_rotation_angle(
+        geometry.t1x[source], geometry.t1y[source],
+        geometry.t1x[target], geometry.t1y[target], angle, has_angle) ||
+      !vector_rotation_angle(
+        geometry.t2x[source], geometry.t2y[source],
+        geometry.t2x[target], geometry.t2y[target], angle, has_angle))
+    return false;
+  return !has_angle || angle_is_nonidentity_copy(angle, order);
+}
+
+void preflight_reflection(
+  const c_geometry& geometry, uint32_t plane_mask, int tag_increment,
+  bool require_unique_tags)
+{
+  const int section_count = reflection_section_count(plane_mask);
+  const int64_t full_segments = checked_symmetry_product(
+    geometry.n_segments, section_count, "SEGMENT");
+  checked_symmetry_product(geometry.m, section_count, "PATCH");
+  if (geometry.n_segments > 0) {
+    const int64_t patch_tag_slots = checked_symmetry_product(
+      geometry.m, section_count / 2, "PATCH TAG SLOT");
+    checked_symmetry_sum(full_segments, patch_tag_slots);
+  }
+  validate_generated_tags(
+    geometry, section_count, tag_increment, require_unique_tags);
+
+  for (uint32_t plane = nec_reflection_plane_x;
+       plane <= nec_reflection_plane_z; plane <<= 1u) {
+    if ((plane_mask & plane) == 0u)
+      continue;
+    for (int64_t index = 0; index < geometry.n_segments; ++index) {
+      nec_float first = 0.0;
+      nec_float second = 0.0;
+      if (plane == nec_reflection_plane_x) {
+        first = geometry.x[index]; second = geometry.x2[index];
+      } else if (plane == nec_reflection_plane_y) {
+        first = geometry.y[index]; second = geometry.y2[index];
+      } else {
+        first = geometry.z[index]; second = geometry.z2[index];
+      }
+      if ((fabs(first) + fabs(second) <=
+           symmetry_segment_plane_sum_tolerance) ||
+          (first * second < -symmetry_segment_crossing_tolerance)) {
+        nec_exception error("GEOMETRY DATA ERROR--SEGMENT ");
+        error.append(index + 1);
+        error.append(" LIES IN OR CROSSES A PLANE OF SYMMETRY");
+        throw error;
+      }
+    }
+
+    for (int64_t index = 0; index < geometry.m; ++index) {
+      const nec_float center = plane == nec_reflection_plane_x
+        ? geometry.px[index]
+        : (plane == nec_reflection_plane_y
+          ? geometry.py[index] : geometry.pz[index]);
+      if (fabs(center) <= symmetry_patch_plane_tolerance) {
+        nec_exception error("GEOMETRY DATA ERROR--PATCH ");
+        error.append(index + 1);
+        error.append(" LIES IN A PLANE OF SYMMETRY");
+        throw error;
+      }
+    }
+  }
+}
+
+void preflight_rotation(
+  const c_geometry& geometry, int order, int tag_increment,
+  bool require_unique_tags)
+{
+  const int64_t full_segments = checked_symmetry_product(
+    geometry.n_segments, order, "SEGMENT");
+  checked_symmetry_product(geometry.m, order, "PATCH");
+  if (geometry.n_segments > 0)
+    checked_symmetry_sum(full_segments, geometry.m);
+  validate_generated_tags(geometry, order, tag_increment, require_unique_tags);
+
+  for (int64_t source = 0; source < geometry.n_segments; ++source) {
+    for (int64_t target = 0; target < geometry.n_segments; ++target) {
+      if (segment_matches_rotation(
+            geometry, source, target, false, order) ||
+          segment_matches_rotation(
+            geometry, source, target, true, order))
+        throw nec_exception(
+          "GEOMETRY DATA ERROR--ROTATIONAL SYMMETRY DUPLICATES A SEGMENT");
+    }
+  }
+
+  for (int64_t source = 0; source < geometry.m; ++source) {
+    if (hypot(geometry.px[source], geometry.py[source]) <=
+        symmetry_collision_tolerance)
+      throw nec_exception(
+        "GEOMETRY DATA ERROR--ROTATIONAL SYMMETRY DUPLICATES AN AXIS PATCH");
+    for (int64_t target = 0; target < geometry.m; ++target) {
+      if (patch_matches_rotation(
+            geometry, source, target, order))
+        throw nec_exception(
+          "GEOMETRY DATA ERROR--ROTATIONAL SYMMETRY DUPLICATES A PATCH");
+    }
+  }
+}
+
+} // namespace
+
+/* Reflect geometry across coordinate planes or rotate it about the Z axis. */
+/* sym_plane > 0: bitmask of planes (1=X, 2=Y, 4=Z)                   */
 /* sym_plane < 0: rotational symmetry with nop = -sym_plane          */
 void c_geometry::reflect_plane( int sym_plane, int& tag_increment )
 {
   int itagi;
   int64_t k;
-  nec_float e1, e2, xk, yk;
+  nec_float xk, yk;
 
   if ( sym_plane < 0 )
   {
@@ -1107,18 +1393,16 @@ void c_geometry::reflect_plane( int sym_plane, int& tag_increment )
   int copy_mask[8] = { 0 };
   int num_copies = 1;
 
-  for ( int axis_mask = 4; axis_mask > 0; axis_mask >>= 1 )
+  for ( int plane_bit = 4; plane_bit > 0; plane_bit >>= 1 )
   {
-    if ( 0 == (sym_plane & axis_mask) )
+    if ( 0 == (sym_plane & plane_bit) )
       continue;
 
     for ( int copy = 0; copy < num_copies; copy++ )
-      copy_mask[num_copies + copy] = copy_mask[copy] | axis_mask;
+      copy_mask[num_copies + copy] = copy_mask[copy] | plane_bit;
 
     num_copies *= 2;
   }
-
-  tag_increment = itx * num_copies;
 
   /* --- SEGMENTS --- */
   if ( orig_n > 0 )
@@ -1150,44 +1434,6 @@ void c_geometry::reflect_plane( int sym_plane, int& tag_increment )
       {
 	int64_t nx = base + i;
 
-	/* Validate: segment must not lie in the symmetry plane */
-	if ( flip_z )
-	{
-	  e1 = z[i];
-	  e2 = z2[i];
-	  if ( (fabs(e1)+fabs(e2) <= 1.0e-5) || (e1*e2 < -1.0e-6) )
-	  {
-	    nec_exception nex("GEOMETRY DATA ERROR--SEGMENT ");
-	    nex.append(i+1);
-	    nex.append("LIES IN PLANE OF SYMMETRY");
-	    throw nex;
-	  }
-	}
-	if ( flip_y )
-	{
-	  e1 = y[i];
-	  e2 = y2[i];
-	  if ( (fabs(e1)+fabs(e2) <= 1.0e-5) || (e1*e2 < -1.0e-6) )
-	  {
-	    nec_exception nex("GEOMETRY DATA ERROR--SEGMENT ");
-	    nex.append(i+1);
-	    nex.append("LIES IN PLANE OF SYMMETRY");
-	    throw nex;
-	  }
-	}
-	if ( flip_x )
-	{
-	  e1 = x[i];
-	  e2 = x2[i];
-	  if ( (fabs(e1)+fabs(e2) <= 1.0e-5) || (e1*e2 < -1.0e-6) )
-	  {
-	    nec_exception nex("GEOMETRY DATA ERROR--SEGMENT ");
-	    nex.append(i+1);
-	    nex.append("LIES IN PLANE OF SYMMETRY");
-	    throw nex;
-	  }
-	}
-
 	x[nx]  = flip_x ? -x[i]  : x[i];
 	y[nx]  = flip_y ? -y[i]  : y[i];
 	z[nx]  = flip_z ? -z[i]  : z[i];
@@ -1199,7 +1445,8 @@ void c_geometry::reflect_plane( int sym_plane, int& tag_increment )
 	if ( itagi == 0 )
 	  segment_tags[nx] = 0;
 	if ( itagi != 0 )
-	  segment_tags[nx] = itagi + copy * itx;
+	  segment_tags[nx] = static_cast<int>(
+	    static_cast<int64_t>(itagi) + static_cast<int64_t>(copy) * itx);
 
 	segment_radius[nx] = segment_radius[i];
       }
@@ -1241,28 +1488,6 @@ void c_geometry::reflect_plane( int sym_plane, int& tag_increment )
       {
 	int64_t nx = base + i;
 
-	if ( flip_z && fabs(pz[i]) <= 1.0e-10 )
-	{
-	  nec_exception nex("GEOMETRY DATA ERROR--PATCH ");
-	  nex.append(i+1);
-	  nex.append("LIES IN PLANE OF SYMMETRY");
-	  throw nex;
-	}
-	if ( flip_y && fabs(py[i]) <= 1.0e-10 )
-	{
-	  nec_exception nex("GEOMETRY DATA ERROR--PATCH ");
-	  nex.append(i+1);
-	  nex.append("LIES IN PLANE OF SYMMETRY");
-	  throw nex;
-	}
-	if ( flip_x && fabs(px[i]) <= 1.0e-10 )
-	{
-	  nec_exception nex("GEOMETRY DATA ERROR--PATCH ");
-	  nex.append(i+1);
-	  nex.append("LIES IN PLANE OF SYMMETRY");
-	  throw nex;
-	}
-
 	px[nx]   = flip_x ? -px[i]   : px[i];
 	py[nx]   = flip_y ? -py[i]   : py[i];
 	pz[nx]   = flip_z ? -pz[i]   : pz[i];
@@ -1283,37 +1508,111 @@ void c_geometry::reflect_plane( int sym_plane, int& tag_increment )
 
 /*-----------------------------------------------------------------------*/
 
-/* reflects partial structure along x,y, or z axes or rotates */
-/* structure to complete a symmetric structure. */
+/* Reflect a fundamental structure across coordinate planes or rotate it. */
+/* This legacy entry point preserves GX/GR tag semantics. */
 void c_geometry::reflect( int ix, int iy, int iz, int itx, int nop ) {
   int iti;
-
-  np= n_segments;
-  mp= m;
-  m_ipsym=0;
   iti= itx;
 
   if ( ix >= 0) {
-    if ( nop == 0)
-    return;
+    if ( nop == 0) {
+      np= n_segments;
+      mp= m;
+      m_ipsym=0;
+      return;
+    }
 
+    /* Build plane mask: bit 0=X, bit 1=Y, bit 2=Z. */
+    const uint32_t plane_mask =
+      (iz ? nec_reflection_plane_z : 0u) |
+      (iy ? nec_reflection_plane_y : 0u) |
+      (ix ? nec_reflection_plane_x : 0u);
+    if (plane_mask != 0u)
+      preflight_reflection(*this, plane_mask, itx, false);
+
+    np= n_segments;
+    mp= m;
     m_ipsym=1;
-
-    /* Build axis mask: bit 0=X, bit 1=Y, bit 2=Z */
-    int sym_plane = (iz ? 4 : 0) | (iy ? 2 : 0) | (ix ? 1 : 0);
-
     if ( iz != 0 )
       m_ipsym=2;
 
-    if ( sym_plane != 0 )
-      reflect_plane( sym_plane, iti );
+    if ( plane_mask != 0u )
+      reflect_plane( static_cast<int>(plane_mask), iti );
 
     return;
   } /* if ( ix >= 0) */
 
-  /* reproduce structure with rotation to form cylindrical structure */
+  if (nop < 2)
+    throw nec_exception("GEOMETRY SYMMETRY INPUT ERROR--ROTATIONAL ORDER MUST BE AT LEAST TWO");
+  preflight_rotation(*this, nop, itx, false);
+
+  np= n_segments;
+  mp= m;
+  /* Reproduce the fundamental structure about Z to form a cylinder. */
   m_ipsym = -1;
   reflect_plane( -nop, iti );
+}
+
+nec_geometry_completion_result c_geometry::generate_symmetry(
+  const nec_geometry_symmetry& symmetry)
+{
+  nec_geometry_completion_result result;
+  result.symmetry = symmetry;
+  result.fundamental_segment_count = n_segments;
+
+  switch (symmetry.kind) {
+  case nec_geometry_symmetry_kind::none:
+    if (symmetry.reflection_plane_mask != 0u ||
+        symmetry.rotational_order != 1 || symmetry.tag_increment != 0)
+      throw nec_exception(
+        "GEOMETRY SYMMETRY INPUT ERROR--NONE DESCRIPTOR HAS EXTRA FIELDS");
+    result.full_segment_count = n_segments;
+    return result;
+
+  case nec_geometry_symmetry_kind::reflection: {
+    constexpr uint32_t valid_planes = nec_reflection_plane_x |
+      nec_reflection_plane_y | nec_reflection_plane_z;
+    if (symmetry.reflection_plane_mask == 0u ||
+        (symmetry.reflection_plane_mask & ~valid_planes) != 0u ||
+        symmetry.rotational_order != 1 || symmetry.tag_increment <= 0)
+      throw nec_exception(
+        "GEOMETRY SYMMETRY INPUT ERROR--INVALID REFLECTION DESCRIPTOR");
+
+    const int sections = reflection_section_count(
+      symmetry.reflection_plane_mask);
+    preflight_reflection(
+      *this, symmetry.reflection_plane_mask, symmetry.tag_increment, true);
+    np = n_segments;
+    mp = m;
+    m_ipsym = (symmetry.reflection_plane_mask & nec_reflection_plane_z)
+      ? 2 : 1;
+    int tag_increment = symmetry.tag_increment;
+    reflect_plane(static_cast<int>(symmetry.reflection_plane_mask), tag_increment);
+    result.section_count = sections;
+    result.full_segment_count = n_segments;
+    return result;
+  }
+
+  case nec_geometry_symmetry_kind::rotational:
+    if (symmetry.reflection_plane_mask != 0u ||
+        symmetry.rotational_order < 2 || symmetry.tag_increment <= 0)
+      throw nec_exception(
+        "GEOMETRY SYMMETRY INPUT ERROR--INVALID ROTATIONAL DESCRIPTOR");
+    preflight_rotation(
+      *this, symmetry.rotational_order, symmetry.tag_increment, true);
+    np = n_segments;
+    mp = m;
+    m_ipsym = -1;
+    {
+      int tag_increment = symmetry.tag_increment;
+      reflect_plane(-symmetry.rotational_order, tag_increment);
+    }
+    result.section_count = symmetry.rotational_order;
+    result.full_segment_count = n_segments;
+    return result;
+  }
+
+  throw nec_exception("GEOMETRY SYMMETRY INPUT ERROR--UNKNOWN SYMMETRY KIND");
 }
   
 /*-----------------------------------------------------------------------*/

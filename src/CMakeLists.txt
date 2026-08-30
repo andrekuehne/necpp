@@ -36,6 +36,7 @@ set(NECPP_PUBLIC_HEADERS
     nec_context.h
     c_geometry.h
     nec_ground.h
+    nec_geometry_symmetry.h
     nec_radiation_pattern.h
     nec_results.h
     nec_stateful_model.h

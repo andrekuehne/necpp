@@ -1231,7 +1231,7 @@ Every agent updates this table and the detailed WP section before handing off.
 | WP | State | Owner/agent | Evidence/commit | Notes for next agent |
 |---|---|---|---|---|
 | WP-S0 Contract and shared fixtures | complete | Codex | Native `[wp_s0]`: 15 assertions; `necpp_unit`: 1/1; npm: 38/38 + typecheck | Preserve the finalized descriptor values, branded rotational order, Z/Y/X copy order, and golden scatter/gather maps. |
-| WP-S1 Native geometry safety and metadata | not started | — | — | — |
+| WP-S1 Native geometry safety and metadata | complete | Codex | Native `[wp_s1]`: 291 assertions; aggregate: 1,044; 52/52 legacy decks matched; npm: 38/38 | WP-S2 must call `c_geometry::generate_symmetry()` and consume its immutable result instead of reading geometry arrays. |
 | WP-S2 Stateful symmetry and validation | not started | — | — | — |
 | WP-S3 Additive C/WASM ABI | not started | — | — | — |
 | WP-S4 Direct and worker TypeScript API | not started | — | — | — |
@@ -1351,6 +1351,51 @@ DoD:
 
 Handoff focus: WP-S2 consumes native descriptors and must not call private
 geometry arrays directly.
+
+Completion evidence (2026-08-30, Windows/MSVC):
+
+- Baseline before edits:
+  `build-wp0\tests\Release\nec2++_tests.exe "[symmetry]" --reporter compact`
+  passed 47 assertions in four cases.
+- A fresh bounds-checked test build was configured with the available CMake
+  3.31.6 executable and the already-fetched Catch2 source, then
+  `cmake --build build-wps1 --config Release --target nec2++_tests` passed.
+- `build-wps1\tests\Release\nec2++_tests.exe "[wp_s1]" --reporter compact`
+  passed 291 assertions in four cases. Coverage includes exact one-, two-, and
+  three-plane order and metadata; rotational orders 2, 4, and 6; expected
+  preflight failures; malformed descriptors; tag collision/overflow; count
+  overflow; and allocation-size rejection.
+- The bounds-checked aggregate passed 1,044 assertions in 82 cases. Direct
+  WP1/WP2/WP3/WP4 runs passed 54/66/206/59 assertions respectively, and the
+  executable smoke script found `TOTAL RUN TIME` in a real dipole report.
+- The temporary CTest launcher hung on WP1 despite the same Catch binary
+  passing all seven WP1 cases in 0.05 seconds when invoked directly. The direct
+  per-group commands above are the authoritative results; this was a launcher
+  issue rather than a test failure.
+- All 52 `testharness/data/*.nec` decks were run through both the committed
+  pre-WP-S1 Release binary and the WP-S1 Release binary. Exit statuses matched,
+  and `nec2diff` reported zero antenna-input, power-budget, and radiation-input
+  differences for every deck, including all GX/GR cases.
+- `cmake --build build-wps1 --config Release` passed. Existing MSVC narrowing
+  and unknown-GCC-pragma warnings remain; WP-S1 introduced no compiler error.
+- `npm --prefix packages/necpp-wasm test` passed 38/38 Node tests and strict
+  TypeScript typechecking. `git diff --check` passed.
+- No legacy GX/GR field semantics or NEC-manual behavior was deliberately
+  changed. Legacy zero tag increments remain accepted; the strict native
+  descriptor requires a positive increment and unique generated nonzero tags.
+
+Contract decisions for WP-S2 and later:
+
+- The stable descriptor/result types live in the installed
+  `nec_geometry_symmetry.h`; `nec_stateful_model.h` re-exports them by include.
+- `c_geometry::generate_symmetry()` is the strict native handoff. It validates
+  descriptors, sizes, tags, coordinate-plane conflicts, and rotational
+  duplicate elements before changing geometry counts or generated arrays.
+- Legacy `reflect()`/GX/GR uses the same geometry and size preflight while
+  retaining legacy tag-group semantics and exact numerical output.
+- Reflection copies remain ordered by Z, then Y, then X generation passes.
+  Rotation copies remain increasing `2*pi/order` about global Z; `np`, `mp`,
+  and `m_ipsym` continue to be the solver's Fourier metadata.
 
 ### WP-S2 — Stateful symmetry and structural validation
 
