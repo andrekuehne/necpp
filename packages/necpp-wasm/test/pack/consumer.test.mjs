@@ -16,6 +16,7 @@ import {
   installFixture,
   packPackage,
   readInstalledWasm,
+  readInstalledLoader,
   run,
   runAsync,
   serveWasm,
@@ -121,6 +122,17 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
   assert.ok(direct.resistanceOhm > 0);
   assert.match(direct.resolved.replaceAll("\\", "/"), /node_modules\/@necpp-engine\/wasm/);
   assert.doesNotMatch(direct.resolved, /packages[/\\]necpp-wasm[/\\]src[/\\]/);
+
+  const packedLoader = readInstalledLoader(fixture.root);
+  for (const symbol of [
+    "_necpp_wasm_v1_complete_geometry_symmetric",
+    "_necpp_wasm_v1_geometry_symmetry_kind",
+    "_necpp_wasm_v1_geometry_section_count",
+    "_necpp_wasm_v1_geometry_fundamental_segment_count",
+    "_necpp_wasm_v1_geometry_full_segment_count",
+  ]) {
+    assert.ok(packedLoader.includes(symbol), `packed loader is missing ${symbol}`);
+  }
 
   const worker = parseJsonLine(
     run("node", ["worker-dipole.mjs"], {

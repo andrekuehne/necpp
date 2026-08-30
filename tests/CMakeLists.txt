@@ -101,7 +101,7 @@ endif()
 # stress suite on independent timeout budgets. Otherwise a slow numerical
 # fixture can consume the aggregate timeout just before the bounded WP1 loop.
 add_test(NAME necpp_unit
-    COMMAND nec2++_tests "~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]")
+    COMMAND nec2++_tests "~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]")
 add_test(NAME necpp_wp1
     COMMAND nec2++_tests "[wp1]")
 add_test(NAME necpp_wp2
@@ -112,6 +112,8 @@ add_test(NAME necpp_wp4
     COMMAND nec2++_tests "[wp4]")
 add_test(NAME necpp_wp_s2
     COMMAND nec2++_tests "[wp_s2]")
+add_test(NAME necpp_wp_s3
+    COMMAND nec2++_tests "[wp_s3]")
 # Hard cap so a hung test fails fast (and CTest surfaces its output) instead of
 # blocking the CI runner for its full timeout ceiling. WP1 deliberately adds a
 # 1,000-excitation retained-factorization stress case; it completes in a few
@@ -122,6 +124,7 @@ set_tests_properties(necpp_wp2 PROPERTIES TIMEOUT 180)
 set_tests_properties(necpp_wp3 PROPERTIES TIMEOUT 180)
 set_tests_properties(necpp_wp4 PROPERTIES TIMEOUT 180)
 set_tests_properties(necpp_wp_s2 PROPERTIES TIMEOUT 240)
+set_tests_properties(necpp_wp_s3 PROPERTIES TIMEOUT 180)
 
 # Smoke test: run a real simulation through the binary and check it produced
 # the expected output marker.

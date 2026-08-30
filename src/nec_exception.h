@@ -62,6 +62,14 @@ protected:
 	std::stringstream m_message;
 };
 
+/* Configuration failures that must remain distinct from numerical solves at
+ * exception-safe C/WASM boundaries. */
+class nec_geometry_exception : public nec_exception
+{
+public:
+	using nec_exception::nec_exception;
+};
+
 #ifdef _MSC_VER
 /*
 	Visual C++ does not allow macros with variable argument lists. Therefore error messages

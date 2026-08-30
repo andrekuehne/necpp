@@ -139,6 +139,8 @@ struct embedded_buffers : far_field_buffers {
 
 struct necpp_wasm_v1_model {
   nec_stateful_model native;
+  nec_geometry_completion_result geometry_completion;
+  bool geometry_completion_available = false;
   int32_t last_status = NECPP_WASM_V1_OK;
   std::string last_error;
   std::vector<int32_t> port_tags;
@@ -219,6 +221,14 @@ int32_t invoke(
     return NECPP_WASM_V1_OK;
   } catch (const std::bad_alloc& error) {
     return set_error(model, NECPP_WASM_V1_RUNTIME_ERROR, error.what());
+  } catch (const nec_geometry_exception& error) {
+    try {
+      return set_error(
+        model, NECPP_WASM_V1_GEOMETRY_ERROR, error.get_message().c_str());
+    } catch (...) {
+      return set_error(model, NECPP_WASM_V1_GEOMETRY_ERROR,
+        "NEC geometry exception");
+    }
   } catch (const nec_exception& error) {
     try {
       return set_error(model, failure_status, error.get_message().c_str());
@@ -636,6 +646,53 @@ int32_t necpp_wasm_v1_complete_geometry(
   return invoke(model, NECPP_WASM_V1_GEOMETRY_ERROR, [&] {
     model->native.complete_geometry(
       static_cast<nec_ground_connection>(ground_connection));
+    model->geometry_completion = model->native.geometry_completion();
+    model->geometry_completion_available = true;
+    clear_calculated_results(*model);
+  });
+}
+
+int32_t necpp_wasm_v1_complete_geometry_symmetric(
+  necpp_wasm_v1_model* model,
+  int32_t ground_connection,
+  int32_t symmetry_kind,
+  int32_t parameter,
+  int32_t tag_increment)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_state(model, nec_model_state::geometry_building))
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "completeGeometry requires geometry-building state");
+  if (ground_connection < NECPP_WASM_V1_GROUND_CONNECTION_NONE ||
+      ground_connection > NECPP_WASM_V1_GROUND_CONNECTION_ZERO_CURRENT)
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Unknown ground connection");
+  const int32_t valid_planes =
+    NECPP_WASM_V1_REFLECTION_PLANE_X |
+    NECPP_WASM_V1_REFLECTION_PLANE_Y |
+    NECPP_WASM_V1_REFLECTION_PLANE_Z;
+  if (tag_increment <= 0 ||
+      (symmetry_kind == NECPP_WASM_V1_SYMMETRY_REFLECTION &&
+       (parameter <= 0 || (parameter & ~valid_planes) != 0)) ||
+      (symmetry_kind == NECPP_WASM_V1_SYMMETRY_ROTATIONAL && parameter < 2) ||
+      (symmetry_kind != NECPP_WASM_V1_SYMMETRY_REFLECTION &&
+       symmetry_kind != NECPP_WASM_V1_SYMMETRY_ROTATIONAL))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Invalid geometry symmetry descriptor");
+
+  nec_geometry_symmetry symmetry;
+  symmetry.kind = static_cast<nec_geometry_symmetry_kind>(symmetry_kind);
+  symmetry.tag_increment = tag_increment;
+  if (symmetry.kind == nec_geometry_symmetry_kind::reflection)
+    symmetry.reflection_plane_mask = static_cast<uint32_t>(parameter);
+  else
+    symmetry.rotational_order = parameter;
+
+  return invoke(model, NECPP_WASM_V1_GEOMETRY_ERROR, [&] {
+    model->geometry_completion = model->native.complete_geometry(
+      symmetry, static_cast<nec_ground_connection>(ground_connection));
+    model->geometry_completion_available = true;
     clear_calculated_results(*model);
   });
 }
@@ -963,6 +1020,34 @@ const int32_t* necpp_wasm_v1_port_segments(const necpp_wasm_v1_model* model)
 {
   return model == nullptr || model->port_segments.empty()
     ? nullptr : model->port_segments.data();
+}
+
+int32_t necpp_wasm_v1_geometry_symmetry_kind(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->geometry_completion_available
+    ? static_cast<int32_t>(model->geometry_completion.symmetry.kind) : -1;
+}
+
+int32_t necpp_wasm_v1_geometry_section_count(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->geometry_completion_available
+    ? model->geometry_completion.section_count : 0;
+}
+
+int64_t necpp_wasm_v1_geometry_fundamental_segment_count(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->geometry_completion_available
+    ? model->geometry_completion.fundamental_segment_count : 0;
+}
+
+int64_t necpp_wasm_v1_geometry_full_segment_count(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->geometry_completion_available
+    ? model->geometry_completion.full_segment_count : 0;
 }
 
 size_t necpp_wasm_v1_impedance_order(const necpp_wasm_v1_model* model)

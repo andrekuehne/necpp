@@ -20,6 +20,123 @@ static int buffer_is_finite(
   return 0;
 }
 
+static int check_symmetric_completion(
+  int32_t symmetry_kind, int32_t parameter,
+  int32_t expected_sections, int64_t expected_segments,
+  double x, double y)
+{
+  necpp_wasm_v1_model* model = necpp_wasm_v1_model_create();
+  CHECK(model != NULL);
+  CHECK(necpp_wasm_v1_geometry_symmetry_kind(model) == -1);
+  CHECK(necpp_wasm_v1_geometry_section_count(model) == 0);
+  CHECK(necpp_wasm_v1_geometry_fundamental_segment_count(model) == 0);
+  CHECK(necpp_wasm_v1_geometry_full_segment_count(model) == 0);
+  CHECK(necpp_wasm_v1_add_wire(
+    model, 1, 11, x, y, 0.1, x, y, 0.4, 0.001) ==
+    NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_complete_geometry_symmetric(
+    model, NECPP_WASM_V1_GROUND_CONNECTION_NONE,
+    symmetry_kind, parameter, 1) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_geometry_symmetry_kind(model) == symmetry_kind);
+  CHECK(necpp_wasm_v1_geometry_section_count(model) == expected_sections);
+  CHECK(necpp_wasm_v1_geometry_fundamental_segment_count(model) == 11);
+  CHECK(necpp_wasm_v1_geometry_full_segment_count(model) == expected_segments);
+  necpp_wasm_v1_model_delete(model);
+  return 0;
+}
+
+int necpp_wasm_v1_run_c_symmetry_contract_test(void)
+{
+  static const int32_t tags[2] = {1, 2};
+  static const int32_t segments[2] = {6, 6};
+  necpp_wasm_v1_model* model;
+
+  CHECK(NECPP_WASM_V1_SYMMETRY_NONE == 0);
+  CHECK(NECPP_WASM_V1_SYMMETRY_REFLECTION == 1);
+  CHECK(NECPP_WASM_V1_SYMMETRY_ROTATIONAL == 2);
+  CHECK(NECPP_WASM_V1_REFLECTION_PLANE_X == 1);
+  CHECK(NECPP_WASM_V1_REFLECTION_PLANE_Y == 2);
+  CHECK(NECPP_WASM_V1_REFLECTION_PLANE_Z == 4);
+  CHECK(necpp_wasm_v1_geometry_symmetry_kind(NULL) == -1);
+  CHECK(necpp_wasm_v1_geometry_section_count(NULL) == 0);
+  CHECK(necpp_wasm_v1_geometry_fundamental_segment_count(NULL) == 0);
+  CHECK(necpp_wasm_v1_geometry_full_segment_count(NULL) == 0);
+
+  CHECK(check_symmetric_completion(
+    NECPP_WASM_V1_SYMMETRY_REFLECTION,
+    NECPP_WASM_V1_REFLECTION_PLANE_X |
+      NECPP_WASM_V1_REFLECTION_PLANE_Y,
+    4, 44, 0.25, 0.25) == 0);
+  CHECK(check_symmetric_completion(
+    NECPP_WASM_V1_SYMMETRY_ROTATIONAL,
+    4, 4, 44, 0.25, 0.0) == 0);
+
+  model = necpp_wasm_v1_model_create();
+  CHECK(model != NULL);
+  CHECK(necpp_wasm_v1_complete_geometry_symmetric(
+    model, NECPP_WASM_V1_GROUND_CONNECTION_NONE,
+    NECPP_WASM_V1_SYMMETRY_REFLECTION,
+    NECPP_WASM_V1_REFLECTION_PLANE_X, 1) ==
+    NECPP_WASM_V1_STATE_ERROR);
+  CHECK(necpp_wasm_v1_add_wire(
+    model, 1, 11, 0.25, 0.0, 0.1, 0.25, 0.0, 0.4, 0.001) ==
+    NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_complete_geometry_symmetric(
+    model, NECPP_WASM_V1_GROUND_CONNECTION_NONE,
+    99, 4, 1) == NECPP_WASM_V1_INPUT_ERROR);
+  CHECK(necpp_wasm_v1_model_state(model) ==
+    NECPP_WASM_V1_STATE_GEOMETRY_BUILDING);
+  necpp_wasm_v1_model_delete(model);
+
+  model = necpp_wasm_v1_model_create();
+  CHECK(model != NULL);
+  CHECK(necpp_wasm_v1_add_wire(
+    model, 1, 11, 0.0, 0.25, 0.1, 0.0, 0.25, 0.4, 0.001) ==
+    NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_complete_geometry_symmetric(
+    model, NECPP_WASM_V1_GROUND_CONNECTION_NONE,
+    NECPP_WASM_V1_SYMMETRY_REFLECTION,
+    NECPP_WASM_V1_REFLECTION_PLANE_X, 1) ==
+    NECPP_WASM_V1_GEOMETRY_ERROR);
+  CHECK(necpp_wasm_v1_geometry_section_count(model) == 0);
+  CHECK(necpp_wasm_v1_model_state(model) ==
+    NECPP_WASM_V1_STATE_GEOMETRY_BUILDING);
+  necpp_wasm_v1_model_delete(model);
+
+  model = necpp_wasm_v1_model_create();
+  CHECK(model != NULL);
+  CHECK(necpp_wasm_v1_add_wire(
+    model, 1, 11, 0.25, 0.25, 0.1, 0.25, 0.25, 0.4, 0.001) ==
+    NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_complete_geometry_symmetric(
+    model, NECPP_WASM_V1_GROUND_CONNECTION_NONE,
+    NECPP_WASM_V1_SYMMETRY_REFLECTION,
+    NECPP_WASM_V1_REFLECTION_PLANE_X, 1) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_define_ports(model, tags, segments, 2) ==
+    NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_add_load(
+    model, NECPP_WASM_V1_LOAD_IMPEDANCE,
+    1, 6, 6, 10.0, 0.0, 0.0) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_prepare(model, 300.0) ==
+    NECPP_WASM_V1_GEOMETRY_ERROR);
+  CHECK(necpp_wasm_v1_impedance_order(model) == 0);
+  necpp_wasm_v1_model_delete(model);
+
+  model = necpp_wasm_v1_model_create();
+  CHECK(model != NULL);
+  CHECK(necpp_wasm_v1_add_wire(
+    model, 1, 11, 0.25, 0.25, 0.1, 0.25, 0.25, 0.4, 0.001) ==
+    NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_complete_geometry_symmetric(
+    model, NECPP_WASM_V1_GROUND_CONNECTION_INTERPOLATE,
+    NECPP_WASM_V1_SYMMETRY_REFLECTION,
+    NECPP_WASM_V1_REFLECTION_PLANE_Z, 1) ==
+    NECPP_WASM_V1_GEOMETRY_ERROR);
+  necpp_wasm_v1_model_delete(model);
+
+  return 0;
+}
+
 int necpp_wasm_v1_run_c_contract_test(void)
 {
   static const int32_t tags[2] = {1, 2};
@@ -106,6 +223,11 @@ int necpp_wasm_v1_run_c_contract_test(void)
     NECPP_WASM_V1_INPUT_ERROR);
   CHECK(necpp_wasm_v1_complete_geometry(
     model, NECPP_WASM_V1_GROUND_CONNECTION_NONE) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_geometry_symmetry_kind(model) ==
+    NECPP_WASM_V1_SYMMETRY_NONE);
+  CHECK(necpp_wasm_v1_geometry_section_count(model) == 1);
+  CHECK(necpp_wasm_v1_geometry_fundamental_segment_count(model) == 22);
+  CHECK(necpp_wasm_v1_geometry_full_segment_count(model) == 22);
   CHECK(necpp_wasm_v1_model_state(model) ==
     NECPP_WASM_V1_STATE_GEOMETRY_COMPLETE);
   CHECK(necpp_wasm_v1_add_wire(

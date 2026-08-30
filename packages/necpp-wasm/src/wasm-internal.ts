@@ -29,6 +29,13 @@ export interface NecWasmModule {
     radiusM: number,
   ): number;
   _necpp_wasm_v1_complete_geometry(model: number, connection: number): number;
+  _necpp_wasm_v1_complete_geometry_symmetric(
+    model: number,
+    connection: number,
+    symmetryKind: number,
+    parameter: number,
+    tagIncrement: number,
+  ): number;
   _necpp_wasm_v1_define_ports(
     model: number,
     tags: number,
@@ -111,6 +118,11 @@ export interface NecWasmModule {
   _necpp_wasm_v1_embedded_port_count(model: number): number;
   _necpp_wasm_v1_embedded_samples_per_port(model: number): number;
   _necpp_wasm_v1_embedded_normalization(model: number): number;
+
+  _necpp_wasm_v1_geometry_symmetry_kind(model: number): number;
+  _necpp_wasm_v1_geometry_section_count(model: number): number;
+  _necpp_wasm_v1_geometry_fundamental_segment_count(model: number): bigint;
+  _necpp_wasm_v1_geometry_full_segment_count(model: number): bigint;
 
   _necpp_wasm_v1_result_buffer(model: number, kind: number): number;
   _necpp_wasm_v1_result_buffer_length(model: number, kind: number): number;

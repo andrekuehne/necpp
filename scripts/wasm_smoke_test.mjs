@@ -2,6 +2,8 @@ import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
+import { createReferenceArrayFixture } from "../packages/necpp-wasm/test/fixtures/reference-array.mjs";
+
 const modulePath = process.argv[2];
 if (!modulePath) {
   throw new Error("usage: node wasm_smoke_test.mjs <nec2pp.js>");
@@ -94,6 +96,18 @@ check(
 );
 check(typeof module._malloc === "function", "_malloc was not exported");
 check(typeof module._free === "function", "_free was not exported");
+check(
+  typeof module._necpp_wasm_v1_complete_geometry_symmetric === "function",
+  "symmetric completion was not exported",
+);
+for (const getter of [
+  "_necpp_wasm_v1_geometry_symmetry_kind",
+  "_necpp_wasm_v1_geometry_section_count",
+  "_necpp_wasm_v1_geometry_fundamental_segment_count",
+  "_necpp_wasm_v1_geometry_full_segment_count",
+]) {
+  check(typeof module[getter] === "function", `${getter} was not exported`);
+}
 check(module._nec_create_context === undefined, "legacy ABI leaked into module");
 
 const model = module._necpp_wasm_v1_model_create();
@@ -235,6 +249,98 @@ try {
   if (realPointer) module._free(realPointer);
   if (imagPointer) module._free(imagPointer);
   module._necpp_wasm_v1_model_delete(model);
+}
+
+// Build the shared 2 x 2 reference array from its positive-XY quadrant and
+// prove the additive ABI reaches finite retained-matrix and solve results.
+const reference = createReferenceArrayFixture({ side: 2, frequencyMHz: 300 });
+const symmetricModel = module._necpp_wasm_v1_model_create();
+check(symmetricModel !== 0, "symmetric model_create returned null");
+let symmetricTagsPointer = 0;
+let symmetricSegmentsPointer = 0;
+let symmetricRealPointer = 0;
+let symmetricImagPointer = 0;
+try {
+  const wire = reference.reflection.fundamentalWires[0];
+  check(wire !== undefined, "2 x 2 reference fundamental wire is missing");
+  check(
+    module._necpp_wasm_v1_add_wire(
+      symmetricModel, wire.tag, wire.segments,
+      ...wire.start, ...wire.end, wire.radiusM,
+    ) === OK,
+    `symmetric addWire failed: ${modelError(symmetricModel)}`,
+  );
+  check(
+    module._necpp_wasm_v1_complete_geometry_symmetric(
+      symmetricModel, 0, 1, 3, 1,
+    ) === OK,
+    `symmetric completion failed: ${modelError(symmetricModel)}`,
+  );
+  check(
+    module._necpp_wasm_v1_geometry_symmetry_kind(symmetricModel) === 1 &&
+      module._necpp_wasm_v1_geometry_section_count(symmetricModel) === 4 &&
+      module._necpp_wasm_v1_geometry_fundamental_segment_count(symmetricModel) === 11n &&
+      module._necpp_wasm_v1_geometry_full_segment_count(symmetricModel) === 44n,
+    "symmetric completion metadata is incorrect",
+  );
+  symmetricTagsPointer = allocateInt32(new Int32Array([1, 2, 3, 4]));
+  symmetricSegmentsPointer = allocateInt32(new Int32Array([6, 6, 6, 6]));
+  check(
+    module._necpp_wasm_v1_define_ports(
+      symmetricModel, symmetricTagsPointer, symmetricSegmentsPointer, 4,
+    ) === OK,
+    `symmetric definePorts failed: ${modelError(symmetricModel)}`,
+  );
+  check(
+    module._necpp_wasm_v1_set_ground(symmetricModel, 1, 0, 0) === OK,
+    `symmetric setGround failed: ${modelError(symmetricModel)}`,
+  );
+  check(
+    module._necpp_wasm_v1_prepare(symmetricModel, 300) === OK,
+    `symmetric prepare failed: ${modelError(symmetricModel)}`,
+  );
+  check(
+    module._necpp_wasm_v1_compute_impedance(symmetricModel) === OK,
+    `symmetric impedance failed: ${modelError(symmetricModel)}`,
+  );
+  const symmetricImpedance = copyResult(symmetricModel, IMPEDANCE_REAL);
+  check(
+    symmetricImpedance.length === 16 &&
+      symmetricImpedance.every(Number.isFinite),
+    "symmetric 2 x 2 impedance is invalid",
+  );
+  symmetricRealPointer = allocateFloat64(new Float64Array([1, 0, 0, 0]));
+  symmetricImagPointer = allocateFloat64(new Float64Array(4));
+  check(
+    module._necpp_wasm_v1_solve_voltages(
+      symmetricModel, symmetricRealPointer, symmetricImagPointer, 4,
+    ) === OK,
+    `symmetric solve failed: ${modelError(symmetricModel)}`,
+  );
+  check(
+    copyResult(symmetricModel, SOLUTION_CURRENTS_REAL).every(Number.isFinite),
+    "symmetric 2 x 2 currents are invalid",
+  );
+  check(
+    module._necpp_wasm_v1_compute_far_field(
+      symmetricModel,
+      1,
+      90, 1, 0,
+      0, 1, 0,
+    ) === OK,
+    `symmetric far field failed: ${modelError(symmetricModel)}`,
+  );
+  check(
+    copyResult(symmetricModel, FAR_FIELD_E_THETA_REAL).every(Number.isFinite) &&
+      copyResult(symmetricModel, FAR_FIELD_E_PHI_REAL).every(Number.isFinite),
+    "symmetric 2 x 2 far field is invalid",
+  );
+} finally {
+  if (symmetricTagsPointer) module._free(symmetricTagsPointer);
+  if (symmetricSegmentsPointer) module._free(symmetricSegmentsPointer);
+  if (symmetricRealPointer) module._free(symmetricRealPointer);
+  if (symmetricImagPointer) module._free(symmetricImagPointer);
+  module._necpp_wasm_v1_model_delete(symmetricModel);
 }
 
 const deck = module._necpp_wasm_v1_deck_create();

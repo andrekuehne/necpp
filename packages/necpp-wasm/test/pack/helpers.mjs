@@ -339,3 +339,14 @@ export function readInstalledWasm(fixtureRoot) {
     "nec2pp.wasm",
   ));
 }
+
+export function readInstalledLoader(fixtureRoot) {
+  return readFileSync(join(
+    fixtureRoot,
+    "node_modules",
+    "@necpp-engine",
+    "wasm",
+    "dist",
+    "nec2pp.generated.js",
+  ), "utf8");
+}

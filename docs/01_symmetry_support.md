@@ -1233,7 +1233,7 @@ Every agent updates this table and the detailed WP section before handing off.
 | WP-S0 Contract and shared fixtures | complete | Codex | Native `[wp_s0]`: 15 assertions; `necpp_unit`: 1/1; npm: 38/38 + typecheck | Preserve the finalized descriptor values, branded rotational order, Z/Y/X copy order, and golden scatter/gather maps. |
 | WP-S1 Native geometry safety and metadata | complete | Codex | Native `[wp_s1]`: 291 assertions; aggregate: 1,044; 52/52 legacy decks matched; npm: 38/38 | WP-S2 must call `c_geometry::generate_symmetry()` and consume its immutable result instead of reading geometry arrays. |
 | WP-S2 Stateful symmetry and validation | complete | Codex | Native `[wp_s2]`: 10,599 assertions; direct WP1-WP4 regressions and npm 38/38 | WP-S3 should call the symmetric overload, then expose only `geometry_completion()` metadata through additive ABI getters. |
-| WP-S3 Additive C/WASM ABI | not started | — | — | — |
+| WP-S3 Additive C/WASM ABI | complete | Codex | Native `[wp_s3]`: 8 assertions/2 cases plus pure-C contract; CTest 8/8; WASM smoke; npm 38/38; pack 5/5; browser 3/3 | WP-S4 should convert the private WASM `bigint` segment counts to checked safe numbers and derive copy transforms from the validated descriptor. |
 | WP-S4 Direct and worker TypeScript API | not started | — | — | — |
 | WP-S5 Transparent symmetrizer | not started | — | — | — |
 | WP-S6 End-to-end equivalence suite | not started | — | — | — |
@@ -1505,6 +1505,56 @@ DoD:
 - no ABI getter returns a pointer whose lifetime is ambiguous; and
 - ABI version policy is documented: additive v1 symbols do not silently change
   existing signatures or enum values.
+
+Completion evidence (2026-08-30, Windows/MSVC and Emscripten 4.0.7):
+
+- A clean bounds-checked native test executable was rebuilt with the Visual
+  Studio `nec2++_tests.vcxproj` `Rebuild` target. The initial incremental/LTCG
+  binary reproduced the repository's known Windows `SIGILL` behavior in the
+  first isolated WP-S2 lifecycle case; the clean rebuild removed it, and the
+  isolated lifecycle, load, and ground cases plus the full 10,599-assertion
+  `[wp_s2]` partition then passed.
+- `build-wps1\tests\Release\nec2++_tests.exe "[wp_s3]" --reporter compact`
+  passed eight Catch assertions in two cases. Its separately C-compiled
+  contract function returned success after checking valid two-plane reflection,
+  valid order-four rotation, ordinary-completion metadata, null/unavailable
+  getter sentinels, and controlled lifecycle, input, geometry, incomplete-load,
+  and incompatible-ground failures.
+- The full serial CTest run passed 8/8 registered tests, including WP1 through
+  WP4, WP-S2, the new WP-S3 partition, the aggregate native suite, and the
+  command-line smoke test. The full native Release `ALL_BUILD` target also
+  completed; its warnings were the existing conversion and unknown-pragma
+  warnings.
+- `scripts\build_wasm_docker.ps1` rebuilt the module with the pinned
+  `emscripten/emsdk:4.0.7` image. `scripts/wasm_smoke_test.mjs` verified every
+  additive export and built the shared over-ground 2 x 2 reference array from
+  one positive-XY wire; its four-port Z matrix, asymmetric solve, and complex
+  far field were finite.
+- The Docker build's `npm --prefix packages/necpp-wasm run test:wasm` gate
+  passed 38/38 Node tests plus strict typechecking and 5/5 packed-consumer
+  tests. The packed loader assertion names every new symbol. A fresh local
+  tarball also passed the direct, worker, and example browser integration
+  modes. Generated WASM artifacts remain intentionally ignored by source
+  control and were not added to the commit.
+
+Contract decisions for WP-S4 and later:
+
+- ABI version remains `1`. The original completion function, all prior
+  signatures, status values, and enum values are unchanged; symmetry is
+  exposed only through additive v1 symbols.
+- Completion metadata uses scalar getters. Segment counts remain signed
+  64-bit in C and therefore appear as `bigint` at the private Emscripten
+  boundary; WP-S4 must range-check before converting them to public TypeScript
+  `number` values. No new getter returns a borrowed pointer.
+- The ABI stores a plain copy obtained from the stateful
+  `geometry_completion()` accessor. Before successful completion, kind is
+  `-1` and the other scalar getters return zero. Copy transforms are not ABI
+  arrays; WP-S4 derives them deterministically from the descriptor it already
+  validated and supplied.
+- Symmetry configuration failures raised while preparing, including incomplete
+  or unequal load orbits, have a native geometry-exception classification so
+  they map to `NECPP_WASM_V1_GEOMETRY_ERROR` rather than being mislabeled as
+  numerical solver failures.
 
 Handoff focus: WP-S4 should only translate/validate data and must not reproduce
 native electromagnetic logic.

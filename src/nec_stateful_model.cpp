@@ -35,6 +35,15 @@ void fail(const char* operation, const char* reason)
   throw error;
 }
 
+void fail_geometry(const char* operation, const char* reason)
+{
+  nec_geometry_exception error("STATEFUL MODEL ");
+  error.append(operation);
+  error.append(": ");
+  error.append(reason);
+  throw error;
+}
+
 bool finite_value(nec_float value)
 {
   return std::isfinite(value);
@@ -212,7 +221,7 @@ const nec_geometry_completion_result& nec_stateful_model::complete_geometry(
   if (connection != nec_ground_connection::none &&
       symmetry.kind == nec_geometry_symmetry_kind::reflection &&
       (symmetry.reflection_plane_mask & nec_reflection_plane_z) != 0u)
-    fail(
+    fail_geometry(
       "COMPLETE GEOMETRY",
       "Z=0 STRUCTURAL REFLECTION IS INCOMPATIBLE WITH A GROUND CONNECTION");
 
@@ -338,7 +347,7 @@ void nec_stateful_model::validate_symmetry_ground(
         nec_geometry_symmetry_kind::reflection &&
       (m_geometry_completion.symmetry.reflection_plane_mask &
         nec_reflection_plane_z) != 0u)
-    fail(
+    fail_geometry(
       operation,
       "Z=0 STRUCTURAL REFLECTION IS INCOMPATIBLE WITH GROUND");
 }
@@ -356,10 +365,10 @@ void nec_stateful_model::validate_symmetric_load_orbits() const
   if (fundamental_count <= 0 || full_count <= 0 ||
       full_count % m_geometry_completion.section_count != 0 ||
       full_count / m_geometry_completion.section_count != fundamental_count)
-    fail("PREPARE", "SYMMETRY COMPLETION METADATA IS INCONSISTENT");
+    fail_geometry("PREPARE", "SYMMETRY COMPLETION METADATA IS INCONSISTENT");
   if (static_cast<uint64_t>(full_count) >
       static_cast<uint64_t>(std::vector<load_signature>().max_size()))
-    fail("PREPARE", "SYMMETRY LOAD VALIDATION SIZE IS TOO LARGE");
+    fail_geometry("PREPARE", "SYMMETRY LOAD VALIDATION SIZE IS TOO LARGE");
 
   std::vector<std::vector<load_signature>> loads_by_segment(
     static_cast<size_t>(full_count));
@@ -401,7 +410,7 @@ void nec_stateful_model::validate_symmetric_load_orbits() const
       const size_t generated = static_cast<size_t>(
         fundamental + static_cast<int64_t>(copy) * fundamental_count);
       if (loads_by_segment[generated] != expected)
-        fail("PREPARE", "INCOMPLETE OR UNEQUAL SYMMETRY LOAD ORBIT");
+        fail_geometry("PREPARE", "INCOMPLETE OR UNEQUAL SYMMETRY LOAD ORBIT");
     }
   }
 }

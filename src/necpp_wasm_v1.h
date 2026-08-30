@@ -43,6 +43,22 @@ enum necpp_wasm_v1_ground_connection {
   NECPP_WASM_V1_GROUND_CONNECTION_ZERO_CURRENT = 2
 };
 
+/*
+ * Geometry-symmetry values are additive ABI v1 symbols.  Existing v1
+ * function signatures, status values, and enum values remain unchanged.
+ */
+enum necpp_wasm_v1_symmetry_kind {
+  NECPP_WASM_V1_SYMMETRY_NONE = 0,
+  NECPP_WASM_V1_SYMMETRY_REFLECTION = 1,
+  NECPP_WASM_V1_SYMMETRY_ROTATIONAL = 2
+};
+
+enum necpp_wasm_v1_reflection_plane {
+  NECPP_WASM_V1_REFLECTION_PLANE_X = 1,
+  NECPP_WASM_V1_REFLECTION_PLANE_Y = 2,
+  NECPP_WASM_V1_REFLECTION_PLANE_Z = 4
+};
+
 enum necpp_wasm_v1_load_kind {
   NECPP_WASM_V1_LOAD_SERIES_RLC = 0,
   NECPP_WASM_V1_LOAD_PARALLEL_RLC = 1,
@@ -119,6 +135,16 @@ int32_t necpp_wasm_v1_add_wire(
   double radius_m);
 int32_t necpp_wasm_v1_complete_geometry(
   necpp_wasm_v1_model* model, int32_t ground_connection);
+/*
+ * Complete a fundamental section with one final symmetry operation.
+ * parameter is a reflection-plane bit mask or the total rotational order.
+ */
+int32_t necpp_wasm_v1_complete_geometry_symmetric(
+  necpp_wasm_v1_model* model,
+  int32_t ground_connection,
+  int32_t symmetry_kind,
+  int32_t parameter,
+  int32_t tag_increment);
 int32_t necpp_wasm_v1_define_ports(
   necpp_wasm_v1_model* model,
   const int32_t* tags, const int32_t* segments, size_t count);
@@ -154,6 +180,19 @@ int32_t necpp_wasm_v1_compute_embedded_far_fields(
 size_t necpp_wasm_v1_port_count(const necpp_wasm_v1_model* model);
 const int32_t* necpp_wasm_v1_port_tags(const necpp_wasm_v1_model* model);
 const int32_t* necpp_wasm_v1_port_segments(const necpp_wasm_v1_model* model);
+
+/*
+ * Scalar completion metadata has no borrowed-pointer lifetime.  Before a
+ * successful completion, kind is -1 and all other values are zero.
+ */
+int32_t necpp_wasm_v1_geometry_symmetry_kind(
+  const necpp_wasm_v1_model* model);
+int32_t necpp_wasm_v1_geometry_section_count(
+  const necpp_wasm_v1_model* model);
+int64_t necpp_wasm_v1_geometry_fundamental_segment_count(
+  const necpp_wasm_v1_model* model);
+int64_t necpp_wasm_v1_geometry_full_segment_count(
+  const necpp_wasm_v1_model* model);
 
 size_t necpp_wasm_v1_impedance_order(const necpp_wasm_v1_model* model);
 double necpp_wasm_v1_impedance_frequency_mhz(
