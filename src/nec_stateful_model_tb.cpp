@@ -59,6 +59,31 @@ private:
 
 } // namespace
 
+TEST_CASE("WP-S0 native symmetry descriptor has stable defaults and masks",
+          "[symmetry][wp_s0]")
+{
+  const nec_geometry_symmetry symmetry;
+  REQUIRE(symmetry.kind == nec_geometry_symmetry_kind::none);
+  REQUIRE(symmetry.reflection_plane_mask == 0u);
+  REQUIRE(symmetry.rotational_order == 1);
+  REQUIRE(symmetry.tag_increment == 0);
+
+  REQUIRE(static_cast<int>(nec_geometry_symmetry_kind::none) == 0);
+  REQUIRE(static_cast<int>(nec_geometry_symmetry_kind::reflection) == 1);
+  REQUIRE(static_cast<int>(nec_geometry_symmetry_kind::rotational) == 2);
+  REQUIRE(nec_reflection_plane_x == 1u);
+  REQUIRE(nec_reflection_plane_y == 2u);
+  REQUIRE(nec_reflection_plane_z == 4u);
+  REQUIRE((nec_reflection_plane_x | nec_reflection_plane_y
+    | nec_reflection_plane_z) == 7u);
+
+  const nec_geometry_completion_result completion;
+  REQUIRE(completion.section_count == 1);
+  REQUIRE(completion.fundamental_segment_count == 0);
+  REQUIRE(completion.full_segment_count == 0);
+  REQUIRE(completion.symmetry.kind == nec_geometry_symmetry_kind::none);
+}
+
 TEST_CASE("WP1 stateful model constructs and solves without a deck",
           "[wasm_api][wp1][stateful]")
 {

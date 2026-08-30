@@ -90,7 +90,11 @@ function createConfigurableModel(recording) {
     end: [0, 0, 1],
     radiusM: 0.001,
   });
-  model.completeGeometry({ groundConnection: "zero-current" });
+  const completion = model.completeGeometry({
+    groundConnection: "zero-current",
+  });
+  assert.deepEqual(completion, {});
+  assert.ok(Object.isFrozen(completion));
   model.definePorts([{ tag: 1, segment: 2 }]);
   return model;
 }

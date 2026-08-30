@@ -20,6 +20,7 @@ test("array benchmark emits equivalent NEC geometry and excitation cards", () =>
   assert.equal(deck.match(/^EX 0 /gm)?.length, 4);
   assert.match(deck, /^GE 0$/m);
   assert.match(deck, /^FR 0 1 0 0 300 0$/m);
+  assert.match(deck, /^GN 1$/m);
   assert.match(deck, /^XQ$/m);
   assert.match(deck, /^EN$/m);
 });

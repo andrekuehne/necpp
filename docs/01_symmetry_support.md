@@ -216,19 +216,43 @@ load applied identically to every segment. Absolute segment-number loads need
 an explicit orbit mapping; they must not be assumed symmetric from a numeric
 range alone.
 
-## 6. Proposed low-level TypeScript symmetry API
+### 5.4 Failure classification
 
-The API below is the proposed advanced contract for callers that deliberately
+Symmetry failures carry one of the following stable `SymmetryFailureReason`
+values. The ordinary package error code remains the primary error taxonomy;
+the reason refines it and identifies whether the automatic full-model retry is
+permitted.
+
+| Reason | Package error | Representation-eligibility failure | Required behavior |
+|---|---|---:|---|
+| `INVALID_SYMMETRY` | `NEC_INPUT` | no | Reject malformed planes, orders, axes, tag increments, or mutually inconsistent descriptor fields before mutation. |
+| `INCOMPATIBLE_GROUND` | `NEC_GEOMETRY` | yes, only when the unchanged full model is valid | Reject structural `z=0` reflection with ground and other environment/symmetry conflicts; `"auto"` may retry explicit once. |
+| `INCOMPLETE_LOAD_ORBIT` | `NEC_GEOMETRY` | yes, only when the unchanged full loads are valid | Detect at `prepare()` after all loads have been supplied; `"auto"` may retry the full explicit load set once. |
+| `UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM` | `NEC_GEOMETRY` when configured as an error; otherwise planner fallback | yes | Default to an explained explicit plan; `"require"` or `onUnsupported: "error"` throws without entering native symmetry generation. |
+
+Allocation, cancellation, conditioning, solver, and invalid full-geometry
+failures are never representation-eligibility failures and must not be hidden
+by an explicit retry. Every throwing implementation attaches the reason as
+`details.symmetryFailure`; planner fallback diagnostics use the corresponding
+`SymmetrizationReasonCode`.
+
+## 6. Finalized low-level TypeScript symmetry API
+
+The API below is the advanced contract for callers that deliberately
 construct a fundamental section. It is not the representation-independent
 beam-steering application API; that facade is defined in Section 8.1. WP-S0
-may refine names, but later work packages must not independently redesign it.
+finalized these names; later work packages must preserve them.
 
 ```ts
 export type ReflectionPlane = "x=0" | "y=0" | "z=0";
 
+/** Branded integer constructed by rotationalOrder(); range is 2..INT32_MAX. */
+export type RotationalOrder = number & { /* private brand */ };
+export function rotationalOrder(order: number): RotationalOrder;
+
 export interface ReflectionSymmetry {
   readonly kind: "reflection";
-  readonly planes: readonly ReflectionPlane[];
+  readonly planes: readonly [ReflectionPlane, ...ReflectionPlane[]];
   /** Positive offset applied once per generated copy block. */
   readonly tagIncrement: number;
 }
@@ -237,7 +261,7 @@ export interface RotationalSymmetry {
   readonly kind: "rotational";
   readonly axis: "z";
   /** Total number of sections, including the original. */
-  readonly order: number;
+  readonly order: RotationalOrder;
   readonly tagIncrement: number;
 }
 
@@ -291,6 +315,13 @@ Returning a value from the existing `void` method is source-compatible for
 callers that ignore it. The ABI should retain the current non-symmetric
 completion call and add a symmetric completion entry point rather than change
 an existing C signature.
+
+The brand is intentional: TypeScript cannot express "any integer at least two"
+as a structural `number` subtype. `rotationalOrder()` performs the runtime
+integer/range check and makes `order: 1` or an unchecked arbitrary number a
+compile-time error. Reflection planes use a nonempty tuple, so `planes: []` is
+also rejected during type checking. Runtime validation must additionally reject
+duplicate planes and invalid or overflowing tag increments.
 
 The returned copy list is data-only and structured-cloneable. Convenience
 mapping helpers belong in TypeScript rather than the ABI:
@@ -357,6 +388,17 @@ Use 300 MHz as the default executable fixture frequency, but derive every
 dimension from the engine's speed-of-light constant rather than treating one
 metre as exactly one wavelength.
 
+WP-S0 selected a small language-neutral golden table plus one JavaScript
+generator. The executable generator is
+`packages/necpp-wasm/test/fixtures/reference-array.mjs`; both array benchmarks
+and subsequent TypeScript symmetry tests import it. The cross-language golden
+table is `tests/data/symmetry_reference_array_4x4.json`. Native helpers may use
+`em::speed_of_light()` and the formulas above, but must check their 4 x 4
+coordinates and maps against that table rather than introduce independent
+geometry constants. The JavaScript generator derives the same constant from
+the engine's vacuum permittivity and permeability values; it does not use the
+SI exact value `299792458`.
+
 ### 7.1 Explicit baseline construction
 
 The baseline adds all `n*n` wires independently with unique tags and defines
@@ -375,6 +417,23 @@ and the section count is four.
 When fundamental tags are contiguous `1..q`, use `tagIncrement = q`. The four
 tag blocks are then contiguous, but their physical order follows NEC copy
 order, not caller row-major order.
+
+For the golden 4 x 4 case, the positive-quadrant fundamental order is increasing
+Y with X varying fastest: `(lambda/4,lambda/4)`,
+`(3lambda/4,lambda/4)`, `(lambda/4,3lambda/4)`, and
+`(3lambda/4,3lambda/4)`. Native copies are fundamental, Y-reflected,
+X-reflected, then XY-reflected, with tag offsets `0,4,8,12`. The executable
+caller-to-native scatter map is:
+
+```text
+[15,14,6,7, 13,12,4,5, 9,8,0,1, 11,10,2,3]
+```
+
+Its inverse generated-to-caller gather map is:
+
+```text
+[10,11,14,15, 6,7,2,3, 9,8,13,12, 5,4,1,0]
+```
 
 ### 7.3 Odd-sided arrays
 
@@ -495,10 +554,37 @@ or discriminated union. `getDiagnostics()` is the sole supported way for the
 application to observe whether optimization occurred. Ignoring diagnostics
 must be sufficient for correct use.
 
-### 8.2 Proposed planning types
+### 8.2 Finalized planning types
 
 ```ts
 export type ArrayElementId = string | number;
+
+export interface RelativeWireDefinition {
+  readonly id: string;
+  readonly segments: number;
+  readonly startM: CartesianPointM;
+  readonly endM: CartesianPointM;
+  readonly radiusM: number;
+}
+
+export interface RelativePortDefinition {
+  readonly wireId: string;
+  readonly segment: number;
+  readonly name?: string;
+}
+
+export interface RelativeSegmentSelection {
+  readonly wireId: string;
+  readonly firstSegment?: number;
+  readonly lastSegment?: number;
+}
+
+type RetargetLoad<T extends LoadDefinition> =
+  T extends LoadDefinition
+    ? Omit<T, "target"> & { readonly target: RelativeSegmentSelection }
+    : never;
+
+export type RelativeLoadDefinition = RetargetLoad<LoadDefinition>;
 
 export interface PositionedArrayElement {
   readonly id: ArrayElementId;
@@ -522,13 +608,20 @@ export interface FullArrayDescription {
   readonly ground: GroundModel;
 }
 
+export interface CanonicalArrayElement {
+  readonly id: ArrayElementId;
+  readonly positionM: readonly [xM: number, yM: number];
+  readonly patternId: string;
+  readonly rotationDeg: 0;
+}
+
 export interface SymmetrizerOptions {
   /** Required; no implicit geometry tolerance. */
   readonly positionEpsilonM: number;
   readonly center?: "auto" | readonly [xM: number, yM: number];
   readonly allowReflection?: boolean;
   readonly allowRotation?: boolean;
-  readonly preferredRotationOrders?: readonly number[];
+  readonly preferredRotationOrders?: readonly RotationalOrder[];
   readonly onUnsupported?: "explicit-fallback" | "error";
 }
 
@@ -544,12 +637,45 @@ export type SymmetrizationReasonCode =
   | "GROUND_BREAKS_SYMMETRY"
   | "TAG_SPACE_EXHAUSTED";
 
+export interface SymmetrizationReason {
+  readonly code: SymmetrizationReasonCode;
+  readonly message: string;
+  readonly callerElementIndex?: number;
+  readonly patternId?: string;
+}
+
+export interface PositionCanonicalization {
+  readonly callerElementIndex: number;
+  readonly originalPositionM: readonly [xM: number, yM: number];
+  readonly canonicalPositionM: readonly [xM: number, yM: number];
+  readonly adjustmentM: readonly [dxM: number, dyM: number];
+  readonly distanceM: number;
+}
+
+export interface SymmetryCandidateDiagnostics {
+  readonly symmetry: GeometrySymmetry;
+  readonly accepted: boolean;
+  readonly reasons: readonly SymmetrizationReason[];
+}
+
+export interface SymmetrizerDiagnostics {
+  readonly representation: "explicit" | "symmetric";
+  readonly exact: boolean;
+  readonly effectiveCenterM: readonly [xM: number, yM: number];
+  readonly maxPositionAdjustmentM: number;
+  readonly canonicalizations: readonly PositionCanonicalization[];
+  readonly candidates: readonly SymmetryCandidateDiagnostics[];
+  readonly reasons: readonly SymmetrizationReason[];
+}
+
 export interface ArrayElementMapping {
   readonly callerElementIndex: number;
   readonly callerElementId: ArrayElementId;
   readonly fundamentalElementIndex: number;
   readonly copyIndex: number;
   readonly generatedTag: number;
+  /** Parallel to generatedPortIndices. */
+  readonly callerPortIndices: readonly number[];
   readonly generatedPortIndices: readonly number[];
   readonly positionAdjustmentM: readonly [dxM: number, dyM: number];
 }
@@ -576,9 +702,13 @@ export type ArrayBuildPlan =
     };
 ```
 
-Exact names may change in WP-S0, but the result must retain caller IDs, caller
-indices, copy indices, generated tags, port mappings, adjustment vectors,
-accepted/rejected candidates, and reason codes.
+These names and units are final. Caller ports are ordered by caller element,
+then by the referenced pattern's `ports` order. Every returned collection and
+coordinate tuple is caller-owned immutable data; no plan exposes a native
+pointer or borrowed WASM view. Later work may add optional diagnostics but must
+not rename these fields or remove caller IDs, indices, copy indices, generated
+tags, paired port mappings, adjustment vectors, accepted/rejected candidates,
+or reason codes.
 
 ### 8.3 Position matching algorithm
 
@@ -786,25 +916,29 @@ Add a native descriptor equivalent to:
 
 ```cpp
 enum class nec_geometry_symmetry_kind {
-  none,
-  reflection,
-  rotational,
+  none = 0,
+  reflection = 1,
+  rotational = 2,
 };
 
 struct nec_geometry_symmetry {
-  nec_geometry_symmetry_kind kind;
-  unsigned reflection_plane_mask; // X=1, Y=2, Z=4
-  int rotational_order;
-  int tag_increment;
+  nec_geometry_symmetry_kind kind = nec_geometry_symmetry_kind::none;
+  uint32_t reflection_plane_mask = 0; // X=1, Y=2, Z=4
+  int rotational_order = 1;
+  int tag_increment = 0;
 };
 
 struct nec_geometry_completion_result {
   nec_geometry_symmetry symmetry;
-  int section_count;
-  int64_t fundamental_segment_count;
-  int64_t full_segment_count;
+  int section_count = 1;
+  int64_t fundamental_segment_count = 0;
+  int64_t full_segment_count = 0;
 };
 ```
+
+WP-S0 added these definitions to `nec_stateful_model.h`, including the stable
+`nec_reflection_plane_x/y/z` bit values. The behavior overload remains WP-S1
+and WP-S2 work; the data format is no longer provisional.
 
 `nec_stateful_model::complete_geometry()` should accept an optional descriptor,
 validate it while still in geometry-building state, call the existing geometry
@@ -1096,7 +1230,7 @@ Every agent updates this table and the detailed WP section before handing off.
 
 | WP | State | Owner/agent | Evidence/commit | Notes for next agent |
 |---|---|---|---|---|
-| WP-S0 Contract and shared fixtures | not started | — | — | — |
+| WP-S0 Contract and shared fixtures | complete | Codex | Native `[wp_s0]`: 15 assertions; `necpp_unit`: 1/1; npm: 38/38 + typecheck | Preserve the finalized descriptor values, branded rotational order, Z/Y/X copy order, and golden scatter/gather maps. |
 | WP-S1 Native geometry safety and metadata | not started | — | — | — |
 | WP-S2 Stateful symmetry and validation | not started | — | — | — |
 | WP-S3 Additive C/WASM ABI | not started | — | — | — |
@@ -1145,6 +1279,45 @@ DoD:
 
 Handoff focus: WP-S1 should be able to implement native behavior without
 inventing a second metadata format.
+
+Completion evidence (2026-08-30, Windows/MSVC):
+
+- Baseline before edits: `npm --prefix packages/necpp-wasm run typecheck` —
+  passed.
+- `npm --prefix packages/necpp-wasm test` — passed 38/38 Node tests and the
+  strict TypeScript compile-valid/compile-invalid contract suite.
+- `npm --prefix packages/necpp-wasm run build` — emitted declarations and
+  assembled `dist` successfully (WASM 698667 bytes, loader 77177 bytes).
+- The shell did not have `cmake` on `PATH`; the existing build cache identified
+  `C:\Users\andre\AppData\Local\Temp\codex-necpp-cmake\cmake\data\bin\cmake.exe`.
+  Running that executable with `--build build-wp0 --config Release` completed.
+  Existing MSVC conversion/unknown-pragma warnings remained; no new build error
+  occurred.
+- The paired cached `ctest.exe --test-dir build-wp0 -C Release -R necpp_unit
+  --output-on-failure` passed 1/1 tests.
+- `build-wp0\tests\Release\nec2++_tests.exe "[wp_s0]"` passed 15 assertions in
+  one native contract test.
+- `git diff --check` passed; line-ending notices are repository checkout-policy
+  warnings, not whitespace errors.
+
+Contract decisions for WP-S1 and later:
+
+- Native kind values are none/reflection/rotational = 0/1/2; reflection plane
+  mask bits are X/Y/Z = 1/2/4. The descriptor and completion metadata in
+  `nec_stateful_model.h` are the implementation format.
+- TypeScript uses `rotationalOrder()` because structural TypeScript cannot
+  express an arbitrary integer `>= 2`; raw order numbers are deliberately not
+  accepted. Reflection planes are a nonempty tuple.
+- Ordinary direct and worker completion now returns `{}` as a
+  `GeometryCompletionResult`, so callers that ignore the former `void` result
+  remain source-compatible. Passing `symmetry` is intentionally rejected by
+  the WP-S0 runtime stub until the native/ABI/facade work packages implement it.
+- The 4 x 4 JSON table is the cross-language golden. The JavaScript fixture is
+  the single correctness/benchmark generator and uses the engine-derived
+  speed of light, positive-Z over-ground wires, and exact Section 7 dimensions.
+- Reflection copy order is fixed by NEC passes, not caller plane-list order:
+  fundamental, Y, X, XY for the 4 x 4 quadrant. Port/vector scatter is
+  caller-to-native; gather is its native-to-caller inverse.
 
 ### WP-S1 — Native geometry safety and metadata
 

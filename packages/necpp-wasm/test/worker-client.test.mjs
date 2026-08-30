@@ -30,6 +30,7 @@ function createFakeModel(overrides = {}) {
     },
     completeGeometry() {
       state = "geometry-complete";
+      return {};
     },
     definePorts(nextPorts) {
       ports.splice(0, ports.length, ...snapshotPorts(nextPorts));
@@ -213,13 +214,15 @@ test("the worker runtime preserves state across serialized requests", async () =
   }, deps);
   assert.equal(fake.state, "geometry-building");
 
-  await handleWorkerRequest(session, {
+  const completed = await handleWorkerRequest(session, {
     id: 3,
     kind: "invoke",
     method: "completeGeometry",
     args: [],
   }, deps);
   assert.equal(fake.state, "geometry-complete");
+  assert.equal(completed.response.kind, "ok");
+  assert.deepEqual(completed.response.result, {});
   assert.ok(progress.includes("create:start"));
   assert.ok(progress.includes("addWire:complete"));
 });

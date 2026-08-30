@@ -7,6 +7,7 @@ import type {
   EmbeddedFieldNormalization,
   FarFieldRequest,
   FarFieldResult,
+  GeometryCompletionResult,
   GroundModel,
   ImpedanceResult,
   LoadDefinition,
@@ -198,11 +199,19 @@ class WorkerNecModel implements NecWorkerModel {
     return this.#invokeVoid("addWire", [wire]);
   }
 
-  completeGeometry(options?: CompleteGeometryOptions): Promise<void> {
-    return this.#invokeVoid(
+  async completeGeometry(
+    options?: CompleteGeometryOptions,
+  ): Promise<GeometryCompletionResult> {
+    const result = await this.#invoke(
       "completeGeometry",
       options === undefined ? [] : [options],
     );
+    if (typeof result !== "object" || result === null) {
+      throw new NecRuntimeError(
+        "Worker geometry completion result is not an object",
+      );
+    }
+    return result as GeometryCompletionResult;
   }
 
   definePorts(ports: readonly PortDefinition[]): Promise<void> {

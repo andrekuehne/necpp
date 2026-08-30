@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
-const SPEED_OF_LIGHT_M_PER_S = 299_792_458;
+import { createReferenceArrayFixture } from "../test/fixtures/reference-array.mjs";
 
 function requireInteger(value, name, minimum = 1) {
   const parsed = Number(value);
@@ -55,35 +55,7 @@ function parseArguments(argv) {
 }
 
 export function createArrayDefinition({ side, segments, frequencyMHz }) {
-  const wavelengthM = SPEED_OF_LIGHT_M_PER_S / (frequencyMHz * 1e6);
-  const elementHalfLengthM = wavelengthM / 8;
-  const spacingM = wavelengthM / 2;
-  const radiusM = wavelengthM / 1000;
-  const centreSegment = (segments + 1) / 2;
-  const wires = [];
-  for (let y = 0; y < side; y += 1) {
-    for (let x = 0; x < side; x += 1) {
-      const tag = y * side + x + 1;
-      const xM = (x - (side - 1) / 2) * spacingM;
-      const yM = (y - (side - 1) / 2) * spacingM;
-      wires.push({
-        tag,
-        segments,
-        start: [xM, yM, -elementHalfLengthM],
-        end: [xM, yM, elementHalfLengthM],
-        radiusM,
-      });
-    }
-  }
-  return {
-    side,
-    segments,
-    frequencyMHz,
-    wavelengthM,
-    wires,
-    ports: wires.map(({ tag }) => ({ tag, segment: centreSegment })),
-    equations: side * side * segments,
-  };
+  return createReferenceArrayFixture({ side, segments, frequencyMHz });
 }
 
 export function buildEquivalentDeck(definition) {
@@ -104,6 +76,7 @@ export function buildEquivalentDeck(definition) {
   lines.push(
     "GE 0",
     `FR 0 1 0 0 ${definition.frequencyMHz} 0`,
+    "GN 1",
   );
   for (const port of definition.ports) {
     lines.push(`EX 0 ${port.tag} ${port.segment} 0 1 0`);
@@ -179,6 +152,7 @@ async function runStateful(api, definition, retainedSolves) {
     }
     model.completeGeometry();
     model.definePorts(definition.ports);
+    model.setGround(definition.ground);
     const geometryMs = performance.now() - geometryStart;
 
     const prepareStart = performance.now();

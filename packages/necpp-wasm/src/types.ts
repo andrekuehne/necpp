@@ -37,9 +37,100 @@ export interface WireDefinition {
 /** How wire ends on z=0 are treated when geometry is completed. */
 export type GroundConnection = "none" | "interpolate" | "zero-current";
 
+/** A coordinate plane through the global NEC model origin. */
+export type ReflectionPlane = "x=0" | "y=0" | "z=0";
+
+declare const rotationalOrderBrand: unique symbol;
+
+/**
+ * An integer rotational section count greater than or equal to two.
+ * Construct values with {@link rotationalOrder} so the range check is explicit.
+ */
+export type RotationalOrder = number & {
+  readonly [rotationalOrderBrand]: "RotationalOrder";
+};
+
+export interface ReflectionSymmetry {
+  readonly kind: "reflection";
+  /** Nonempty set of generating planes. Order does not affect copy order. */
+  readonly planes: readonly [ReflectionPlane, ...ReflectionPlane[]];
+  /** Positive integer offset applied once per generated copy block. */
+  readonly tagIncrement: number;
+}
+
+export interface RotationalSymmetry {
+  readonly kind: "rotational";
+  /** The first public contract supports only the global Z axis. */
+  readonly axis: "z";
+  /** Total number of sections, including the fundamental section. */
+  readonly order: RotationalOrder;
+  /** Positive integer offset applied once per generated copy block. */
+  readonly tagIncrement: number;
+}
+
+export type GeometrySymmetry = ReflectionSymmetry | RotationalSymmetry;
+
+export interface CartesianSignsTransform {
+  readonly kind: "cartesian-signs";
+  readonly signs: readonly [x: 1 | -1, y: 1 | -1, z: 1 | -1];
+}
+
+export interface RotateZTransform {
+  readonly kind: "rotate-z";
+  readonly angleDeg: number;
+}
+
+export type SymmetryCopyTransform = CartesianSignsTransform | RotateZTransform;
+
+export interface SymmetryCopy {
+  /** Zero-based native copy-block index; zero is the fundamental section. */
+  readonly index: number;
+  readonly tagOffset: number;
+  readonly transform: SymmetryCopyTransform;
+}
+
+export interface SymmetryExpansion {
+  readonly kind: GeometrySymmetry["kind"];
+  readonly sectionCount: number;
+  readonly fundamentalSegmentCount: number;
+  readonly fullSegmentCount: number;
+  /** Native copy-major order. This is not caller spatial order. */
+  readonly copies: readonly SymmetryCopy[];
+}
+
+/** Stable machine-readable classifications attached to symmetry failures. */
+export type SymmetryFailureReason =
+  | "INVALID_SYMMETRY"
+  | "INCOMPATIBLE_GROUND"
+  | "INCOMPLETE_LOAD_ORBIT"
+  | "UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM";
+
+export type SymmetryFailureClassification =
+  | {
+      readonly reason: "INVALID_SYMMETRY";
+      readonly errorCode: "NEC_INPUT";
+      readonly representationEligibilityFailure: false;
+    }
+  | {
+      readonly reason:
+        | "INCOMPATIBLE_GROUND"
+        | "INCOMPLETE_LOAD_ORBIT"
+        | "UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM";
+      readonly errorCode: "NEC_GEOMETRY";
+      /** Automatic builders still verify that the unchanged full model is valid. */
+      readonly representationEligibilityFailure: true;
+    };
+
 export interface CompleteGeometryOptions {
   /** Defaults to `"none"`. A non-none value declares a ground plane at z=0. */
   readonly groundConnection?: GroundConnection;
+  /** Final geometry-generation operation before connection/completion. */
+  readonly symmetry?: GeometrySymmetry;
+}
+
+export interface GeometryCompletionResult {
+  /** Absent for ordinary, non-symmetric geometry completion. */
+  readonly symmetry?: SymmetryExpansion;
 }
 
 /** One-based segment position among all segments carrying `tag`. */
@@ -232,7 +323,7 @@ export interface NecModel {
   readonly state: NecModelState;
 
   addWire(wire: WireDefinition): void;
-  completeGeometry(options?: CompleteGeometryOptions): void;
+  completeGeometry(options?: CompleteGeometryOptions): GeometryCompletionResult;
   definePorts(ports: readonly PortDefinition[]): void;
   addLoad(load: LoadDefinition): void;
   clearLoads(): void;
@@ -287,7 +378,9 @@ export interface NecWorkerModel {
   readonly state: NecModelState;
 
   addWire(wire: WireDefinition): Promise<void>;
-  completeGeometry(options?: CompleteGeometryOptions): Promise<void>;
+  completeGeometry(
+    options?: CompleteGeometryOptions,
+  ): Promise<GeometryCompletionResult>;
   definePorts(ports: readonly PortDefinition[]): Promise<void>;
   addLoad(load: LoadDefinition): Promise<void>;
   clearLoads(): Promise<void>;

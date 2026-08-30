@@ -4,6 +4,8 @@ import {
   createNecWorkerModel,
   engineVersion,
   packageVersion,
+  rotationalOrder,
+  type GeometryCompletionResult,
   type ComplexMatrix,
   type FarFieldResult,
   type NecWorkerProgressEvent,
@@ -25,7 +27,8 @@ async function validWorkerConsumer(): Promise<void> {
     end: [0, 0, 0.25],
     radiusM: 0.001,
   });
-  await model.completeGeometry();
+  const completion: GeometryCompletionResult = await model.completeGeometry();
+  completion.symmetry?.sectionCount;
   await model.definePorts([{ tag: 1, segment: 6, name: "feed" }]);
   await model.prepare({ frequencyMHz: 300 });
 
@@ -74,6 +77,15 @@ async function intentionallyInvalidWorkerConsumer(): Promise<void> {
 
   // @ts-expect-error progress callbacks are not a createNecModel option mix-in on the model.
   model.onProgress;
+
+  await model.completeGeometry({
+    symmetry: {
+      kind: "rotational",
+      axis: "z",
+      order: rotationalOrder(4),
+      tagIncrement: 1,
+    },
+  });
 }
 
 void intentionallyInvalidWorkerConsumer;

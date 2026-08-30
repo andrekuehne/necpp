@@ -10,6 +10,7 @@ export {
 } from "./errors.js";
 
 export { abiVersion, engineVersion, packageVersion } from "./versions.js";
+export { rotationalOrder } from "./symmetry.js";
 
 export type { NecErrorCode, NecErrorOptions } from "./errors.js";
 
@@ -17,6 +18,7 @@ export { createNecWorkerModel } from "./worker-client.js";
 
 export type {
   AngleSweep,
+  CartesianSignsTransform,
   CartesianPointM,
   CompleteGeometryOptions,
   ComplexMatrix,
@@ -32,6 +34,8 @@ export type {
   FarFieldResult,
   FiniteGround,
   FreeSpaceGround,
+  GeometryCompletionResult,
+  GeometrySymmetry,
   GroundConnection,
   GroundModel,
   ImpedanceLoad,
@@ -47,7 +51,17 @@ export type {
   PortDefinition,
   PortSolution,
   PrepareOptions,
+  ReflectionPlane,
+  ReflectionSymmetry,
+  RotationalOrder,
+  RotationalSymmetry,
+  RotateZTransform,
   SegmentSelection,
   SeriesRlcLoad,
+  SymmetryCopy,
+  SymmetryCopyTransform,
+  SymmetryExpansion,
+  SymmetryFailureClassification,
+  SymmetryFailureReason,
   WireDefinition,
 } from "./types.js";

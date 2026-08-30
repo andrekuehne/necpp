@@ -46,8 +46,9 @@ function invokeModel(
     model.addWire(args[0] as WireDefinition);
     return undefined;
   case "completeGeometry":
-    model.completeGeometry(args[0] as CompleteGeometryOptions | undefined);
-    return undefined;
+    return model.completeGeometry(
+      args[0] as CompleteGeometryOptions | undefined,
+    );
   case "definePorts":
     model.definePorts(args[0] as readonly PortDefinition[]);
     return undefined;

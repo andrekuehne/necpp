@@ -5,6 +5,11 @@ stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
 optional Web Worker entry point, and packable npm package are implemented.
 The committed TypeScript surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
 
+The WP-S0 symmetry names, metadata, lifecycle shape, and fixture mappings below
+are finalized as an interface-first contract. Non-symmetric completion already
+returns an empty `GeometryCompletionResult`; native symmetry execution and its
+additive ABI entry point are staged for WP-S1 through WP-S4.
+
 ## Package and runtime boundary
 
 The final npm package name is **`@necpp-engine/wasm`**. The unscoped name
@@ -46,7 +51,8 @@ These conventions apply to every public method and returned value.
 - Phasors use \(e^{+j\omega t}\). An outgoing spherical wave therefore has
   propagation factor \(e^{-jkR}/R\), with
   \(k=2\pi f/c_0\) and the NEC-2 value
-  \(c_0=299{,}800{,}000\ \mathrm{m/s}\).
+  \(c_0=1/\sqrt{(4\pi\,10^{-7})(8.854\,10^{-12})}
+  \approx299{,}795{,}637.69321626\ \mathrm{m/s}\).
 - Geometry, radii, ranges, and all other public distances are in metres.
   Frequency is in MHz at the API boundary.
 - Voltages and currents are complex peak-amplitude phasors, not RMS phasors,
@@ -154,6 +160,10 @@ Additional lifecycle rules:
 
 - Geometry can change only before `completeGeometry()` and completion occurs
   exactly once. At least one valid geometry element is required.
+- `completeGeometry({ symmetry })` makes symmetry generation the final geometry
+  mutation and returns immutable copy/count metadata. No wire, patch, or other
+  geometry primitive may be added after generation. Plane-list order never
+  changes NEC's fixed Z-then-Y-then-X copy order.
 - `definePorts()` replaces the complete port list. It requires a nonempty
   list of unique, valid tag/segment pairs and is deliberately frozen before
   preparation so all later results have stable ordering.
@@ -187,7 +197,7 @@ enumerates every operation/state pair plus both `prepare()` branches.
 | `createNecModel(options?)` | Optional `wasmUrl` or caller-owned WASM bytes | Promise of an `empty` model | `NecRuntimeError` for load/instantiate/version failure; `NecInputError` if both overrides are supplied |
 | `createNecWorkerModel(options?)` | Same loading overrides plus optional `onProgress` | Promise of an `empty` worker model | Same loading failures; `NecRuntimeError` if the worker cannot start or is terminated |
 | `addWire(wire)` | Positive integer tag/count; distinct finite endpoints and positive finite radius, all in m | `void`; copies the definition | `NecInputError` for shape/range errors; `NecGeometryError` for engine geometry limits |
-| `completeGeometry(options?)` | Ground connection: `none` (default), `interpolate`, or `zero-current` | `void` | `NecGeometryError` for intersections, invalid junctions, or a ground-incompatible structure |
+| `completeGeometry(options?)` | Ground connection plus optional finalized reflection/rotation descriptor | `GeometryCompletionResult`; `symmetry` is absent for ordinary completion | `NecInputError` for an invalid descriptor; `NecGeometryError` for intersections, invalid junctions, symmetry/ground conflicts, or a ground-incompatible structure |
 | `definePorts(ports)` | Nonempty ordered tag and one-based segment pairs | `void`; copies and freezes order | `NecPortError` for missing/duplicate ports or non-source-capable segments; `NecInputError` for malformed integers |
 | `addLoad(load)` | Segment target and impedance, RLC, or conductivity values in the units above | `void`; invalidates prepared data | `NecInputError` for invalid values/ranges; `NecGeometryError` when no segment matches |
 | `clearLoads()` | None | `void`; removes every load and invalidates prepared data | No non-state failure |
@@ -219,11 +229,71 @@ message as `message` or `cause`; a raw number or string is never thrown.
 | `NecRuntimeError` | `NEC_RUNTIME` | WASM loading, ABI mismatch, allocation, or other runtime-boundary failure |
 
 Every class derives from `NecError`, whose `code` is stable for programmatic
-handling. Messages and `details` aid diagnostics but are not a compatibility
-surface. Validation failures do not mutate model state. A failed calculation
+handling. Messages and undocumented `details` aid diagnostics but are not a
+compatibility surface; documented discriminants such as
+`details.symmetryFailure` are stable. Validation failures do not mutate model state. A failed calculation
 keeps the last successfully prepared factorization and consumer solution when
 the native layer can prove they are intact; otherwise it rolls back to
 `geometry-complete` and discards prepared data.
+
+### Symmetry failure refinement
+
+Symmetry-specific failures refine the ordinary error code through
+`details.symmetryFailure` and the exported `SymmetryFailureReason` type:
+
+| Reason | Error code | Automatic explicit retry |
+|---|---|---|
+| `INVALID_SYMMETRY` | `NEC_INPUT` | Never |
+| `INCOMPATIBLE_GROUND` | `NEC_GEOMETRY` | Only when the unchanged full model is valid |
+| `INCOMPLETE_LOAD_ORBIT` | `NEC_GEOMETRY` | Only when the unchanged full load set is valid |
+| `UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM` | `NEC_GEOMETRY` when configured to throw | Default behavior is an explained planner fallback; `"require"` may throw |
+
+Allocation, cancellation, conditioning, solver, and invalid full-geometry
+failures are not representation-eligibility failures and are never hidden by a
+retry.
+
+## Geometry symmetry contract (WP-S0)
+
+`CompleteGeometryOptions.symmetry` accepts exactly one of:
+
+- `{ kind: "reflection", planes, tagIncrement }`, where `planes` is a nonempty
+  tuple containing only `"x=0"`, `"y=0"`, and/or `"z=0"`; or
+- `{ kind: "rotational", axis: "z", order, tagIncrement }`, where `order` is
+  produced by `rotationalOrder(number)` and represents the total section count.
+
+`rotationalOrder()` accepts signed-32-bit integers from 2 through 2147483647.
+The brand makes raw unchecked numbers—including literal `1`—compile-invalid.
+The runtime additionally rejects duplicate reflection planes, nonpositive or
+overflowing tag increments, fixed/crossing geometry, duplicate generated tags,
+and incompatible ground.
+
+`GeometryCompletionResult.symmetry`, when present, contains the symmetry kind,
+section count, fundamental/full segment counts, and a structured-cloneable
+copy list. Reflection copies use `cartesian-signs`; rotational copies use
+`rotate-z` with degrees. Copy index zero is always the fundamental section and
+`generatedTag = baseTag + copy.tagOffset`.
+
+For reflections, NEC appends copies in fixed Z, Y, X pass order, independent of
+the order of `planes`. For the 4 x 4 positive-X/positive-Y fixture this yields
+fundamental, Y-reflected, X-reflected, then XY-reflected blocks with offsets
+`0,4,8,12`. Caller row-major order uses X fastest. Its executable maps are:
+
+```text
+scatter caller -> native:
+[15,14,6,7, 13,12,4,5, 9,8,0,1, 11,10,2,3]
+
+gather native -> caller:
+[10,11,14,15, 6,7,2,3, 9,8,13,12, 5,4,1,0]
+```
+
+The shared generator is
+[`reference-array.mjs`](../packages/necpp-wasm/test/fixtures/reference-array.mjs)
+and its language-neutral 4 x 4 golden table is
+[`symmetry_reference_array_4x4.json`](../tests/data/symmetry_reference_array_4x4.json).
+At frequency `f`, it uses the NEC engine's speed-of-light constant, length
+`lambda/3`, Z endpoints `lambda/12` and `5*lambda/12`, spacing `lambda/2`,
+height `lambda/4`, radius `lambda/1000`, 11 segments, and feed segment 6. The
+primary environment is perfect ground with geometry `groundConnection: "none"`.
 
 ## Worker facade
 

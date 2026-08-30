@@ -43,6 +43,49 @@ enum class nec_ground_connection {
   zero_current = 2,
 };
 
+/*! Symmetry generator selected while completing stateful geometry.
+ *
+ * The numeric values are part of the planned additive C/WASM boundary. Keep
+ * them stable when the stateful implementation is added in WP-S1/WP-S2.
+ */
+enum class nec_geometry_symmetry_kind {
+  none = 0,
+  reflection = 1,
+  rotational = 2,
+};
+
+/*! Coordinate-plane bits used by NEC's geometry reflection generator. */
+enum nec_reflection_plane_mask : uint32_t {
+  nec_reflection_plane_x = 1u,
+  nec_reflection_plane_y = 2u,
+  nec_reflection_plane_z = 4u,
+};
+
+/*! Immutable input contract for one final geometry symmetry operation.
+ *
+ * Reflection uses reflection_plane_mask and requires rotational_order == 1.
+ * Rotation uses rotational_order >= 2 about global Z and requires a zero
+ * reflection_plane_mask. tag_increment is a positive offset per copy block.
+ */
+struct nec_geometry_symmetry {
+  nec_geometry_symmetry_kind kind = nec_geometry_symmetry_kind::none;
+  uint32_t reflection_plane_mask = 0u;
+  int rotational_order = 1;
+  int tag_increment = 0;
+};
+
+/*! Geometry-completion metadata; copy transforms derive from the descriptor.
+ *
+ * A non-symmetric completion reports one section. Segment counts use 64-bit
+ * storage so metadata does not narrow the stateful geometry's native counts.
+ */
+struct nec_geometry_completion_result {
+  nec_geometry_symmetry symmetry;
+  int section_count = 1;
+  int64_t fundamental_segment_count = 0;
+  int64_t full_segment_count = 0;
+};
+
 struct nec_port_definition {
   int tag = 0;
   int segment = 0;

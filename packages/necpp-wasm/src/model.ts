@@ -16,6 +16,7 @@ import type {
   EmbeddedFieldNormalization,
   FarFieldRequest,
   FarFieldResult,
+  GeometryCompletionResult,
   GroundModel,
   ImpedanceResult,
   LoadDefinition,
@@ -549,9 +550,17 @@ export class WasmNecModel implements NecModel {
     ));
   }
 
-  completeGeometry(options: CompleteGeometryOptions = {}): void {
+  completeGeometry(
+    options: CompleteGeometryOptions = {},
+  ): GeometryCompletionResult {
     this.#assertOperation("completeGeometry");
     const record = requireRecord(options, "options");
+    if (record.symmetry !== undefined) {
+      throw new NecRuntimeError(
+        "Symmetric geometry completion is reserved by the WP-S0 contract but is not implemented by this runtime yet",
+        { details: { operation: "completeGeometry", symmetry: record.symmetry } },
+      );
+    }
     const connection = record.groundConnection ?? "none";
     const nativeConnection = connection === "none"
       ? 0
@@ -567,6 +576,7 @@ export class WasmNecModel implements NecModel {
         nativeConnection,
       ),
     );
+    return Object.freeze({});
   }
 
   definePorts(ports: readonly PortDefinition[]): void {
