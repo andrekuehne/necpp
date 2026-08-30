@@ -5,10 +5,11 @@ stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
 optional Web Worker entry point, and packable npm package are implemented.
 The committed TypeScript surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
 
-The WP-S0 symmetry names, metadata, lifecycle shape, and fixture mappings below
-are finalized as an interface-first contract. Non-symmetric completion already
-returns an empty `GeometryCompletionResult`; native symmetry execution and its
-additive ABI entry point are staged for WP-S1 through WP-S4.
+The symmetry names, metadata, lifecycle shape, and fixture mappings below are
+implemented by the native engine, additive ABI, direct facade, and worker
+facade. Non-symmetric completion returns an empty, immutable
+`GeometryCompletionResult`; symmetric completion returns immutable copy and
+segment-count metadata in both execution modes.
 
 ## Package and runtime boundary
 
@@ -252,7 +253,7 @@ Allocation, cancellation, conditioning, solver, and invalid full-geometry
 failures are not representation-eligibility failures and are never hidden by a
 retry.
 
-## Geometry symmetry contract (WP-S0)
+## Geometry symmetry contract
 
 `CompleteGeometryOptions.symmetry` accepts exactly one of:
 
@@ -294,6 +295,11 @@ At frequency `f`, it uses the NEC engine's speed-of-light constant, length
 `lambda/3`, Z endpoints `lambda/12` and `5*lambda/12`, spacing `lambda/2`,
 height `lambda/4`, radius `lambda/1000`, 11 segments, and feed segment 6. The
 primary environment is perfect ground with geometry `groundConnection: "none"`.
+
+The npm-rendered package README contains an executable manual 4 x 4 quadrant
+example. Direct and worker callers pass the same descriptor; only the worker's
+method call is awaited. Returned metadata is deeply frozen after direct
+construction or worker structured-clone revival.
 
 ## Worker facade
 

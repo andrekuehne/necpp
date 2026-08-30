@@ -56,6 +56,75 @@ try {
 
 This complete example is executed from the packed npm tarball in CI.
 
+## Manual symmetry from one quadrant
+
+When the geometry is known to be symmetric, build only its fundamental section
+and make symmetry the final geometry operation. This 300 MHz reference model
+creates a 4 x 4 array from the four positive-X/positive-Y dipoles:
+
+```ts
+import { createNecModel } from "@necpp-engine/wasm";
+
+const frequencyMHz = 300;
+const epsilon0 = 8.854e-12;
+const mu0 = 4 * Math.PI * 1e-7;
+const wavelengthM = (1 / Math.sqrt(epsilon0 * mu0)) / (frequencyMHz * 1e6);
+const side = 4;
+const half = side / 2;
+const fundamentalCount = half * half;
+const model = await createNecModel();
+
+try {
+  for (let y = half; y < side; y += 1) {
+    for (let x = half; x < side; x += 1) {
+      const tag = (y - half) * half + (x - half) + 1;
+      const xM = (x - (side - 1) / 2) * wavelengthM / 2;
+      const yM = (y - (side - 1) / 2) * wavelengthM / 2;
+      model.addWire({
+        tag,
+        segments: 11,
+        start: [xM, yM, wavelengthM / 12],
+        end: [xM, yM, 5 * wavelengthM / 12],
+        radiusM: wavelengthM / 1000,
+      });
+    }
+  }
+
+  const completion = model.completeGeometry({
+    groundConnection: "none",
+    symmetry: {
+      kind: "reflection",
+      planes: ["x=0", "y=0"],
+      tagIncrement: fundamentalCount,
+    },
+  });
+  model.definePorts(Array.from(
+    { length: side * side },
+    (_, index) => ({ tag: index + 1, segment: 6 }),
+  ));
+  model.setGround({ kind: "perfect" });
+  model.prepare({ frequencyMHz });
+
+  console.log(completion.symmetry);
+  console.log(model.computeImpedanceMatrix().impedance);
+} finally {
+  model.dispose();
+}
+```
+
+The four copy blocks are the fundamental section, Y reflection, X reflection,
+then XY reflection. Their tag offsets are `0`, `4`, `8`, and `12`; this native
+copy-major order is not XY row-major order. `completion.symmetry` reports the
+section count, fundamental/full segment counts, transforms, and offsets. It is
+deeply immutable and has the same shape when returned by the worker API. Use
+`rotationalOrder(n)` for N-fold rotation about global Z.
+
+Plane reflection rejects wires that lie in or cross a generating plane.
+Structural `z=0` reflection is incompatible with ground, while the vertical
+planes used above remain valid over homogeneous horizontal ground. Geometry
+cannot be added after symmetric completion, and structural loads must cover
+complete symmetry orbits before `prepare()`.
+
 ## Numerical conventions
 
 - Coordinates, wire radius, and field radius are metres. Public frequencies

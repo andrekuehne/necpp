@@ -1234,7 +1234,7 @@ Every agent updates this table and the detailed WP section before handing off.
 | WP-S1 Native geometry safety and metadata | complete | Codex | Native `[wp_s1]`: 291 assertions; aggregate: 1,044; 52/52 legacy decks matched; npm: 38/38 | WP-S2 must call `c_geometry::generate_symmetry()` and consume its immutable result instead of reading geometry arrays. |
 | WP-S2 Stateful symmetry and validation | complete | Codex | Native `[wp_s2]`: 10,599 assertions; direct WP1-WP4 regressions and npm 38/38 | WP-S3 should call the symmetric overload, then expose only `geometry_completion()` metadata through additive ABI getters. |
 | WP-S3 Additive C/WASM ABI | complete | Codex | Native `[wp_s3]`: 8 assertions/2 cases plus pure-C contract; CTest 8/8; WASM smoke; npm 38/38; pack 5/5; browser 3/3 | WP-S4 should convert the private WASM `bigint` segment counts to checked safe numbers and derive copy transforms from the validated descriptor. |
-| WP-S4 Direct and worker TypeScript API | not started | — | — | — |
+| WP-S4 Direct and worker TypeScript API | complete | Codex | npm/WASM: 46/46; pack: 5/5; browser: 3/3; native ABI: 8 assertions | WP-S5 may use only the exported descriptors, immutable completion metadata, typed failure details, and direct/worker methods; private ABI `bigint` values never escape. |
 | WP-S5 Transparent symmetrizer | not started | — | — | — |
 | WP-S6 End-to-end equivalence suite | not started | — | — | — |
 | WP-S7 Benchmarks and performance gates | not started | — | — | — |
@@ -1590,6 +1590,49 @@ DoD:
 
 Handoff focus: WP-S5 may depend only on public TypeScript types/methods, not the
 private WASM module.
+
+Completion evidence (2026-08-30, Windows, Node 24.14.1, TypeScript 5.8.3,
+Chromium through Playwright, and the WP-S3 Emscripten artifact):
+
+- `npm --prefix packages/necpp-wasm run test:wasm` passed 46/46 Node tests,
+  strict declaration/type tests, and 5/5 packed-consumer tests. The mapping
+  tests cover every reflection bit, both symmetry kinds, every native argument,
+  fixed Z/Y/X copy order, rotational angles, deep freezing, invalid/duplicate
+  descriptors, tag overflow, incompatible ground, and checked `bigint` segment
+  counts.
+- The real-WASM R1 direct/worker test built the shared over-ground 4 x 4 model
+  from its positive quadrant. Completion metadata agreed exactly; gathered
+  complex Z and an asymmetrically excited complex far-field grid agreed within
+  `1e-12`. An incomplete load orbit retained `NEC_GEOMETRY` plus
+  `INCOMPLETE_LOAD_ORBIT` through worker serialization.
+- Packed direct and worker Node consumers both completed a two-plane reflection
+  and observed four sections. Every npm README TypeScript example compiled
+  against emitted declarations, while the unchanged ordinary direct/worker
+  examples continued to run while ignoring completion metadata.
+- `npm --prefix packages/necpp-wasm run test:browser -- direct`, `worker`, and
+  `example` passed against the tested tarball. Direct and worker browser modes
+  exercised two-plane reflection; existing progress, serialization,
+  termination, and cancellation tests remained deterministic.
+- `build-wps1\tests\Release\nec2++_tests.exe "[wp_s3]" --reporter compact`
+  passed 8 assertions in 2 cases. A full CTest rerun was not required for this
+  TypeScript-only WP and the standalone `ctest` command was unavailable in the
+  active PowerShell PATH; WP-S3's recorded 8/8 CTest evidence remains the
+  native baseline.
+
+Contract decisions for WP-S5 and later:
+
+- Runtime validation occurs before the additive completion call. Reflection
+  plane-list order never changes native Z/Y/X copy order, and generated tag
+  arithmetic is checked with `bigint` before it can overflow signed 32-bit
+  tags.
+- Native signed-64-bit segment counts are accepted only when they convert to
+  safe public JavaScript integers. Direct metadata and worker-revived metadata
+  are deeply frozen, structured-cloneable snapshots containing no native
+  pointers or private module values.
+- Structural `z=0` reflection/ground conflicts report
+  `INCOMPATIBLE_GROUND`; prepare-time asymmetric loads report
+  `INCOMPLETE_LOAD_ORBIT`. Invalid descriptors report `INVALID_SYMMETRY`
+  without mutating geometry.
 
 ### WP-S5 — Transparent symmetrizer
 

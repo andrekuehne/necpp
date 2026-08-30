@@ -119,6 +119,7 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
   assert.equal(direct.packageVersion, packageJson.version);
   assert.equal(direct.engineVersion, "2.3.4");
   assert.equal(direct.abiVersion, 1);
+  assert.equal(direct.sectionCount, 4);
   assert.ok(direct.resistanceOhm > 0);
   assert.match(direct.resolved.replaceAll("\\", "/"), /node_modules\/@necpp-engine\/wasm/);
   assert.doesNotMatch(direct.resolved, /packages[/\\]necpp-wasm[/\\]src[/\\]/);
@@ -141,6 +142,7 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
     }).stdout,
   );
   assert.equal(worker.packageVersion, packageJson.version);
+  assert.equal(worker.sectionCount, 4);
   assert.ok(Math.abs(worker.resistanceOhm - direct.resistanceOhm) < 1e-9);
 });
 

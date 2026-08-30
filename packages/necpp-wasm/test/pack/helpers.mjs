@@ -194,12 +194,18 @@ try {
   model.addWire({
     tag: 1,
     segments: 11,
-    start: [0, 0, -0.25],
-    end: [0, 0, 0.25],
+    start: [0.25, 0.25, -0.25],
+    end: [0.25, 0.25, 0.25],
     radiusM: 0.001,
   });
-  model.completeGeometry();
-  model.definePorts([{ tag: 1, segment: 6 }]);
+  const completion = model.completeGeometry({
+    symmetry: {
+      kind: "reflection",
+      planes: ["x=0", "y=0"],
+      tagIncrement: 1,
+    },
+  });
+  model.definePorts([1, 2, 3, 4].map((tag) => ({ tag, segment: 6 })));
   model.prepare({ frequencyMHz: 300 });
   const matrices = model.computeImpedanceMatrix();
   if (!(matrices.impedance.real[0] > 0)) {
@@ -209,6 +215,7 @@ try {
     abiVersion,
     engineVersion,
     packageVersion,
+    sectionCount: completion.symmetry?.sectionCount,
     resistanceOhm: matrices.impedance.real[0],
     resolved,
   }));
@@ -234,12 +241,18 @@ try {
   await model.addWire({
     tag: 1,
     segments: 11,
-    start: [0, 0, -0.25],
-    end: [0, 0, 0.25],
+    start: [0.25, 0.25, -0.25],
+    end: [0.25, 0.25, 0.25],
     radiusM: 0.001,
   });
-  await model.completeGeometry();
-  await model.definePorts([{ tag: 1, segment: 6 }]);
+  const completion = await model.completeGeometry({
+    symmetry: {
+      kind: "reflection",
+      planes: ["x=0", "y=0"],
+      tagIncrement: 1,
+    },
+  });
+  await model.definePorts([1, 2, 3, 4].map((tag) => ({ tag, segment: 6 })));
   await model.prepare({ frequencyMHz: 300 });
   const matrices = await model.computeImpedanceMatrix();
   if (!(matrices.impedance.real[0] > 0)) {
@@ -249,6 +262,7 @@ try {
     abiVersion,
     engineVersion,
     packageVersion,
+    sectionCount: completion.symmetry?.sectionCount,
     resistanceOhm: matrices.impedance.real[0],
     resolved,
   }));

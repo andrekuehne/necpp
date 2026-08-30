@@ -166,9 +166,10 @@ try {
     const frequencyMHz = 300;
     const wavelengthM = 299792458 / (frequencyMHz * 1e6);
     const ports = [];
-    for (let y = 0; y < side; y += 1) {
-      for (let x = 0; x < side; x += 1) {
-        const tag = y * side + x + 1;
+    const half = side / 2;
+    for (let y = half; y < side; y += 1) {
+      for (let x = half; x < side; x += 1) {
+        const tag = (y - half) * half + (x - half) + 1;
         const xM = (x - (side - 1) / 2) * wavelengthM / 2;
         const yM = (y - (side - 1) / 2) * wavelengthM / 2;
         ${awaitPrefix}model.addWire({
@@ -178,10 +179,18 @@ try {
           end: [xM, yM, wavelengthM / 8],
           radiusM: wavelengthM / 1000,
         });
-        ports.push({ tag, segment: (segments + 1) / 2 });
       }
     }
-    ${awaitPrefix}model.completeGeometry();
+    const completion = ${awaitPrefix}model.completeGeometry({
+      symmetry: {
+        kind: "reflection",
+        planes: ["x=0", "y=0"],
+        tagIncrement: half * half,
+      },
+    });
+    for (let tag = 1; tag <= side * side; tag += 1) {
+      ports.push({ tag, segment: (segments + 1) / 2 });
+    }
     ${awaitPrefix}model.definePorts(ports);
     ${awaitPrefix}model.prepare({ frequencyMHz });
     const matrices = ${awaitPrefix}model.computeImpedanceMatrix();
@@ -202,6 +211,7 @@ try {
       fieldSamples: field.eThetaReal.length,
       fieldFinite: [...field.eThetaReal, ...field.eThetaImag,
         ...field.ePhiReal, ...field.ePhiImag].every(Number.isFinite),
+      sectionCount: completion.symmetry?.sectionCount,
       mode: ${JSON.stringify(mode)},
     };
   } finally {
@@ -263,6 +273,7 @@ try {
     assert.ok(result.resistanceOhm > 0);
     assert.equal(result.fieldSamples, 3);
     assert.equal(result.fieldFinite, true);
+    assert.equal(result.sectionCount, 4);
   }
   assert.ok(wasmResponses.length >= 1, "the browser must request the emitted WASM asset");
   assert.ok(

@@ -26,6 +26,7 @@ import {
   reviveEmbeddedFarFieldResult,
   reviveError,
   reviveFarFieldResult,
+  reviveGeometryCompletionResult,
   reviveImpedanceResult,
   revivePortSolution,
   serializeCreateOptions,
@@ -206,12 +207,7 @@ class WorkerNecModel implements NecWorkerModel {
       "completeGeometry",
       options === undefined ? [] : [options],
     );
-    if (typeof result !== "object" || result === null) {
-      throw new NecRuntimeError(
-        "Worker geometry completion result is not an object",
-      );
-    }
-    return result as GeometryCompletionResult;
+    return reviveGeometryCompletionResult(result);
   }
 
   definePorts(ports: readonly PortDefinition[]): Promise<void> {
