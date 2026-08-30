@@ -1232,7 +1232,7 @@ Every agent updates this table and the detailed WP section before handing off.
 |---|---|---|---|---|
 | WP-S0 Contract and shared fixtures | complete | Codex | Native `[wp_s0]`: 15 assertions; `necpp_unit`: 1/1; npm: 38/38 + typecheck | Preserve the finalized descriptor values, branded rotational order, Z/Y/X copy order, and golden scatter/gather maps. |
 | WP-S1 Native geometry safety and metadata | complete | Codex | Native `[wp_s1]`: 291 assertions; aggregate: 1,044; 52/52 legacy decks matched; npm: 38/38 | WP-S2 must call `c_geometry::generate_symmetry()` and consume its immutable result instead of reading geometry arrays. |
-| WP-S2 Stateful symmetry and validation | not started | — | — | — |
+| WP-S2 Stateful symmetry and validation | complete | Codex | Native `[wp_s2]`: 10,599 assertions; direct WP1-WP4 regressions and npm 38/38 | WP-S3 should call the symmetric overload, then expose only `geometry_completion()` metadata through additive ABI getters. |
 | WP-S3 Additive C/WASM ABI | not started | — | — | — |
 | WP-S4 Direct and worker TypeScript API | not started | — | — | — |
 | WP-S5 Transparent symmetrizer | not started | — | — | — |
@@ -1427,6 +1427,56 @@ DoD:
 - factorization generation and consumer-solution restoration retain existing
   behavior; and
 - no formatted report parsing appears in a stateful correctness test.
+
+Completion evidence (2026-08-30, Windows/MSVC):
+
+- A clean bounds-checked test target was rebuilt with
+  `cmake --build build-wps1 --config Release --target nec2++_tests
+  --clean-first`; the build passed with only the repository's existing MSVC
+  conversion and unknown-pragma warnings.
+- `build-wps1\tests\Release\nec2++_tests.exe "[wp_s2]" --reporter
+  compact` passed 10,599 assertions in five cases. The suite compares gathered
+  binary64 Z/Y matrices, asymmetric current solves, all port quantities, and
+  complex far fields for R1, R2, R4, T1, T2, and G1. It also covers immutable
+  metadata, retry after descriptor preflight failure, post-completion mutation,
+  incomplete/unequal/complete/all-segment loads, and ground compatibility.
+- The pre-existing stateful partitions passed from the clean binary when run
+  directly: WP1 non-stress 49 assertions plus its isolated 1,000-solve stress
+  case 5 assertions; WP2 66; WP3 206; and WP4 59. Keeping the WP1 stress case
+  in a separate process avoids the Windows CTest accumulated-context launcher
+  stall already recorded by WP-S1.
+- The focused CTest regression command selecting `necpp_unit`, `necpp_wp_s2`,
+  and `necpp_smoke_hertzian_dipole` passed 3/3. Attempts to run every older
+  stateful partition in one CTest invocation reproduced the existing Windows
+  launcher instability (one accumulated WP1 timeout and, on a later run, a WP2
+  process fault); the same Catch cases passed from the clean binary as listed
+  above, so no numerical or assertion failure was skipped silently.
+- After the clean target, prebuilding `necpp_static` and running
+  `cmake --build build-wps1 --config Release` completed the full native build.
+  This ordering avoids the existing clean MSVC shared/static import-library
+  filename race; incremental full builds also pass.
+- `npm --prefix packages/necpp-wasm test` passed all 38 Node tests and strict
+  TypeScript typechecking.
+
+Contract decisions for WP-S3 and later:
+
+- The source-compatible `void complete_geometry(connection)` overload remains.
+  The new descriptor overload returns a stable const reference, and
+  `geometry_completion()` is the sole read-only stateful metadata accessor.
+- Symmetric completion calls WP-S1's strict `generate_symmetry()` before the
+  ordinary geometry completion path. Expected descriptor and ground-connection
+  failures therefore leave the model in geometry-building state and retryable.
+- Load definitions are retained and validated at `prepare()` as exact multisets
+  on corresponding generated segment orbits. Complete per-copy definitions and
+  an all-segment scalar load pass; missing or unequal copy definitions fail
+  before factorization or matrix publication.
+- Structural `z=0` reflection rejects a non-none ground connection and every
+  non-free-space ground model. X/Y reflections and Z-axis rotations retain
+  perfect and homogeneous finite-ground support.
+- Port definitions, requested source order, and simultaneous complex weights
+  are not treated as structural symmetry. The native solver continues to
+  preserve arbitrary port order and asymmetric excitations through its retained
+  factorization path.
 
 Handoff focus: WP-S3 gets a complete native API with stable result ownership.
 

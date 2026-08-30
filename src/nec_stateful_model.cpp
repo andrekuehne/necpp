@@ -21,6 +21,7 @@
 #include <limits>
 #include <set>
 #include <string>
+#include <tuple>
 #include <utility>
 
 namespace {
@@ -196,13 +197,41 @@ void nec_stateful_model::add_wire(const nec_wire_definition& wire)
 
 void nec_stateful_model::complete_geometry(nec_ground_connection connection)
 {
+  static_cast<void>(complete_geometry(nec_geometry_symmetry{}, connection));
+}
+
+const nec_geometry_completion_result& nec_stateful_model::complete_geometry(
+  const nec_geometry_symmetry& symmetry,
+  nec_ground_connection connection)
+{
   require_state(nec_model_state::geometry_building, "COMPLETE GEOMETRY");
   const int flag = static_cast<int>(connection);
   if (flag < 0 || flag > 2)
     fail("COMPLETE GEOMETRY", "UNKNOWN GROUND CONNECTION MODE");
+
+  if (connection != nec_ground_connection::none &&
+      symmetry.kind == nec_geometry_symmetry_kind::reflection &&
+      (symmetry.reflection_plane_mask & nec_reflection_plane_z) != 0u)
+    fail(
+      "COMPLETE GEOMETRY",
+      "Z=0 STRUCTURAL REFLECTION IS INCOMPATIBLE WITH A GROUND CONNECTION");
+
+  const nec_geometry_completion_result completion =
+    m_context->get_geometry()->generate_symmetry(symmetry);
   m_context->geometry_complete(flag);
+  m_geometry_completion = completion;
   m_state = nec_model_state::geometry_complete;
   m_configuration_dirty = true;
+  return m_geometry_completion;
+}
+
+const nec_geometry_completion_result&
+nec_stateful_model::geometry_completion() const
+{
+  if (m_state == nec_model_state::empty ||
+      m_state == nec_model_state::geometry_building)
+    fail("GEOMETRY COMPLETION", "GEOMETRY IS NOT COMPLETE");
+  return m_geometry_completion;
 }
 
 void nec_stateful_model::define_ports(
@@ -280,10 +309,16 @@ void nec_stateful_model::add_load(const nec_load_definition& load)
       ? load.first_segment
       : load.last_segment;
 
-  m_context->ld_card(
-    load_kind, load.tag,
-    load.first_segment, last_segment,
-    load.value1, load.value2, load.value3);
+  m_loads.push_back(load);
+  try {
+    m_context->ld_card(
+      load_kind, load.tag,
+      load.first_segment, last_segment,
+      load.value1, load.value2, load.value3);
+  } catch (...) {
+    m_loads.pop_back();
+    throw;
+  }
   invalidate_factorization();
 }
 
@@ -291,12 +326,90 @@ void nec_stateful_model::clear_loads()
 {
   require_configurable("CLEAR LOADS");
   m_context->stateful_clear_loads();
+  m_loads.clear();
   invalidate_factorization();
+}
+
+void nec_stateful_model::validate_symmetry_ground(
+  const nec_ground_definition& ground, const char* operation) const
+{
+  if (ground.kind != nec_ground_kind::free_space &&
+      m_geometry_completion.symmetry.kind ==
+        nec_geometry_symmetry_kind::reflection &&
+      (m_geometry_completion.symmetry.reflection_plane_mask &
+        nec_reflection_plane_z) != 0u)
+    fail(
+      operation,
+      "Z=0 STRUCTURAL REFLECTION IS INCOMPATIBLE WITH GROUND");
+}
+
+void nec_stateful_model::validate_symmetric_load_orbits() const
+{
+  if (m_geometry_completion.section_count <= 1 || m_loads.empty())
+    return;
+
+  const int64_t fundamental_count =
+    m_geometry_completion.fundamental_segment_count;
+  const int64_t full_count = m_geometry_completion.full_segment_count;
+  using load_signature =
+    std::tuple<int, nec_float, nec_float, nec_float>;
+  if (fundamental_count <= 0 || full_count <= 0 ||
+      full_count % m_geometry_completion.section_count != 0 ||
+      full_count / m_geometry_completion.section_count != fundamental_count)
+    fail("PREPARE", "SYMMETRY COMPLETION METADATA IS INCONSISTENT");
+  if (static_cast<uint64_t>(full_count) >
+      static_cast<uint64_t>(std::vector<load_signature>().max_size()))
+    fail("PREPARE", "SYMMETRY LOAD VALIDATION SIZE IS TOO LARGE");
+
+  std::vector<std::vector<load_signature>> loads_by_segment(
+    static_cast<size_t>(full_count));
+  const c_geometry* geometry = m_context->get_geometry();
+
+  for (const nec_load_definition& load : m_loads) {
+    const load_signature signature{
+      static_cast<int>(load.kind), load.value1, load.value2, load.value3};
+    const int64_t first = load.first_segment == 0 ? 1 : load.first_segment;
+    const int64_t last = load.last_segment == 0
+      ? (load.first_segment == 0 ? full_count : first)
+      : load.last_segment;
+    int64_t tag_occurrence = 0;
+
+    for (int64_t index = 0; index < full_count; ++index) {
+      bool selected = false;
+      if (load.tag == 0) {
+        const int64_t absolute_segment = index + 1;
+        selected = absolute_segment >= first && absolute_segment <= last;
+      } else if (geometry->segment_tags[index] == load.tag) {
+        ++tag_occurrence;
+        selected = load.first_segment == 0 ||
+          (tag_occurrence >= first && tag_occurrence <= last);
+      }
+      if (selected)
+        loads_by_segment[static_cast<size_t>(index)].push_back(signature);
+    }
+  }
+
+  for (std::vector<load_signature>& segment_loads : loads_by_segment)
+    std::sort(segment_loads.begin(), segment_loads.end());
+
+  for (int64_t fundamental = 0;
+       fundamental < fundamental_count; ++fundamental) {
+    const std::vector<load_signature>& expected =
+      loads_by_segment[static_cast<size_t>(fundamental)];
+    for (int copy = 1;
+         copy < m_geometry_completion.section_count; ++copy) {
+      const size_t generated = static_cast<size_t>(
+        fundamental + static_cast<int64_t>(copy) * fundamental_count);
+      if (loads_by_segment[generated] != expected)
+        fail("PREPARE", "INCOMPLETE OR UNEQUAL SYMMETRY LOAD ORBIT");
+    }
+  }
 }
 
 void nec_stateful_model::set_ground(const nec_ground_definition& ground)
 {
   require_configurable("SET GROUND");
+  validate_symmetry_ground(ground, "SET GROUND");
 
   int ground_type = -1;
   switch (ground.kind) {
@@ -327,6 +440,7 @@ void nec_stateful_model::set_ground(const nec_ground_definition& ground)
     ground_type, 0,
     ground.relative_permittivity, ground.conductivity_s_per_m,
     0.0, 0.0, 0.0, 0.0);
+  m_ground = ground;
   invalidate_factorization();
 }
 
@@ -337,6 +451,9 @@ void nec_stateful_model::prepare(nec_float frequency_mhz)
     fail("PREPARE", "PORTS HAVE NOT BEEN DEFINED");
   if (!finite_value(frequency_mhz) || !(frequency_mhz > 0.0))
     fail("PREPARE", "FREQUENCY MUST BE POSITIVE AND FINITE");
+
+  validate_symmetry_ground(m_ground, "PREPARE");
+  validate_symmetric_load_orbits();
 
   if (!m_configuration_dirty && m_frequency_mhz == frequency_mhz)
     return;
