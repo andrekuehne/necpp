@@ -1,11 +1,12 @@
 import {
   NecError,
+  createNecArraySolver,
   packageVersion,
   type ComplexMatrix,
   type FarFieldResult,
+  type FullArrayDescription,
   type PortSolution,
 } from "@necpp-engine/wasm";
-import { createNecWorkerModel } from "@necpp-engine/wasm/worker";
 
 import "./style.css";
 
@@ -15,6 +16,9 @@ interface ExampleResult {
   readonly portCount: number;
   readonly fieldSamples: number;
   readonly finite: boolean;
+  readonly representation: "explicit" | "symmetric";
+  readonly maxPositionAdjustmentM: number;
+  readonly reasonCodes: readonly string[];
   readonly wasmResponsesExpected: true;
 }
 
@@ -161,28 +165,43 @@ function renderPlot(field: FarFieldResult): void {
 }
 
 async function run(): Promise<ExampleResult> {
-  const model = await createNecWorkerModel({
-    onProgress: ({ operation, phase }) => {
-      status.textContent = `${phase === "start" ? "Running" : "Completed"} ${operation}…`;
+  // This is always the caller's complete array. The solver decides whether to
+  // construct it explicitly or reduce it internally, without changing the
+  // prepare/matrix/solve/field calls below.
+  const description = {
+    elements: elementPositionsM.map((xM, index) => ({
+      id: `element-${index + 1}`,
+      positionM: [xM, 0] as const,
+      patternId: "dipole",
+    })),
+    patterns: [{
+      id: "dipole",
+      kind: "straight-wire-pattern",
+      wires: [{
+        id: "radiator",
+        segments: 11,
+        startM: [0, 0, -0.25],
+        endM: [0, 0, 0.25],
+        radiusM: 0.001,
+      }],
+      ports: [{ wireId: "radiator", segment: 6 }],
+    }],
+    ground: { kind: "free-space" },
+  } satisfies FullArrayDescription;
+  const model = await createNecArraySolver(description, {
+    symmetry: "auto",
+    symmetrizer: {
+      positionEpsilonM: 0,
+      allowRotation: false,
     },
   });
 
   try {
-    for (const [index, xM] of elementPositionsM.entries()) {
-      await model.addWire({
-        tag: index + 1,
-        segments: 11,
-        start: [xM, 0, -0.25],
-        end: [xM, 0, 0.25],
-        radiusM: 0.001,
-      });
-    }
-    await model.completeGeometry();
-    await model.definePorts(elementPositionsM.map((_, index) => ({
-      tag: index + 1,
-      segment: 6,
-      name: `Element ${index + 1}`,
-    })));
+    const initialDiagnostics = model.getDiagnostics();
+    status.textContent = initialDiagnostics.representation === "symmetric"
+      ? `Accepted ${initialDiagnostics.symmetry?.sectionCount}-section symmetry; preparing…`
+      : `Using explicit geometry: ${initialDiagnostics.planner.reasons
+        .map(({ code }) => code).join(", ")}; preparing…`;
     await model.prepare({ frequencyMHz: 300 });
 
     const matrices = await model.computeImpedanceMatrix();
@@ -211,12 +230,16 @@ async function run(): Promise<ExampleResult> {
       ...field.ePhiReal,
       ...field.ePhiImag,
     ].every(Number.isFinite);
+    const diagnostics = model.getDiagnostics();
     return {
       ready: true,
       packageVersion,
       portCount: solution.ports.length,
       fieldSamples: field.eThetaReal.length,
       finite,
+      representation: diagnostics.representation,
+      maxPositionAdjustmentM: diagnostics.planner.maxPositionAdjustmentM,
+      reasonCodes: diagnostics.planner.reasons.map(({ code }) => code),
       wasmResponsesExpected: true,
     };
   } finally {
@@ -225,8 +248,12 @@ async function run(): Promise<ExampleResult> {
 }
 
 try {
-  window.__NECPP_EXAMPLE_RESULT__ = await run();
-  status.textContent = `Ready · @necpp-engine/wasm ${packageVersion}`;
+  const result = await run();
+  window.__NECPP_EXAMPLE_RESULT__ = result;
+  const decision = result.representation === "symmetric"
+    ? "symmetry accepted"
+    : `explicit fallback (${result.reasonCodes.join(", ")})`;
+  status.textContent = `Ready · ${decision} · max adjustment ${result.maxPositionAdjustmentM} m · @necpp-engine/wasm ${packageVersion}`;
   status.classList.add("ready");
 } catch (error: unknown) {
   const message = error instanceof NecError

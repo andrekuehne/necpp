@@ -37,9 +37,100 @@ export interface WireDefinition {
 /** How wire ends on z=0 are treated when geometry is completed. */
 export type GroundConnection = "none" | "interpolate" | "zero-current";
 
+/** A coordinate plane through the global NEC model origin. */
+export type ReflectionPlane = "x=0" | "y=0" | "z=0";
+
+declare const rotationalOrderBrand: unique symbol;
+
+/**
+ * An integer rotational section count greater than or equal to two.
+ * Construct values with {@link rotationalOrder} so the range check is explicit.
+ */
+export type RotationalOrder = number & {
+  readonly [rotationalOrderBrand]: "RotationalOrder";
+};
+
+export interface ReflectionSymmetry {
+  readonly kind: "reflection";
+  /** Nonempty set of generating planes. Order does not affect copy order. */
+  readonly planes: readonly [ReflectionPlane, ...ReflectionPlane[]];
+  /** Positive integer offset applied once per generated copy block. */
+  readonly tagIncrement: number;
+}
+
+export interface RotationalSymmetry {
+  readonly kind: "rotational";
+  /** The first public contract supports only the global Z axis. */
+  readonly axis: "z";
+  /** Total number of sections, including the fundamental section. */
+  readonly order: RotationalOrder;
+  /** Positive integer offset applied once per generated copy block. */
+  readonly tagIncrement: number;
+}
+
+export type GeometrySymmetry = ReflectionSymmetry | RotationalSymmetry;
+
+export interface CartesianSignsTransform {
+  readonly kind: "cartesian-signs";
+  readonly signs: readonly [x: 1 | -1, y: 1 | -1, z: 1 | -1];
+}
+
+export interface RotateZTransform {
+  readonly kind: "rotate-z";
+  readonly angleDeg: number;
+}
+
+export type SymmetryCopyTransform = CartesianSignsTransform | RotateZTransform;
+
+export interface SymmetryCopy {
+  /** Zero-based native copy-block index; zero is the fundamental section. */
+  readonly index: number;
+  readonly tagOffset: number;
+  readonly transform: SymmetryCopyTransform;
+}
+
+export interface SymmetryExpansion {
+  readonly kind: GeometrySymmetry["kind"];
+  readonly sectionCount: number;
+  readonly fundamentalSegmentCount: number;
+  readonly fullSegmentCount: number;
+  /** Native copy-major order. This is not caller spatial order. */
+  readonly copies: readonly SymmetryCopy[];
+}
+
+/** Stable machine-readable classifications attached to symmetry failures. */
+export type SymmetryFailureReason =
+  | "INVALID_SYMMETRY"
+  | "INCOMPATIBLE_GROUND"
+  | "INCOMPLETE_LOAD_ORBIT"
+  | "UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM";
+
+export type SymmetryFailureClassification =
+  | {
+      readonly reason: "INVALID_SYMMETRY";
+      readonly errorCode: "NEC_INPUT";
+      readonly representationEligibilityFailure: false;
+    }
+  | {
+      readonly reason:
+        | "INCOMPATIBLE_GROUND"
+        | "INCOMPLETE_LOAD_ORBIT"
+        | "UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM";
+      readonly errorCode: "NEC_GEOMETRY";
+      /** Automatic builders still verify that the unchanged full model is valid. */
+      readonly representationEligibilityFailure: true;
+    };
+
 export interface CompleteGeometryOptions {
   /** Defaults to `"none"`. A non-none value declares a ground plane at z=0. */
   readonly groundConnection?: GroundConnection;
+  /** Final geometry-generation operation before connection/completion. */
+  readonly symmetry?: GeometrySymmetry;
+}
+
+export interface GeometryCompletionResult {
+  /** Absent for ordinary, non-symmetric geometry completion. */
+  readonly symmetry?: SymmetryExpansion;
 }
 
 /** One-based segment position among all segments carrying `tag`. */
@@ -232,7 +323,7 @@ export interface NecModel {
   readonly state: NecModelState;
 
   addWire(wire: WireDefinition): void;
-  completeGeometry(options?: CompleteGeometryOptions): void;
+  completeGeometry(options?: CompleteGeometryOptions): GeometryCompletionResult;
   definePorts(ports: readonly PortDefinition[]): void;
   addLoad(load: LoadDefinition): void;
   clearLoads(): void;
@@ -287,7 +378,9 @@ export interface NecWorkerModel {
   readonly state: NecModelState;
 
   addWire(wire: WireDefinition): Promise<void>;
-  completeGeometry(options?: CompleteGeometryOptions): Promise<void>;
+  completeGeometry(
+    options?: CompleteGeometryOptions,
+  ): Promise<GeometryCompletionResult>;
   definePorts(ports: readonly PortDefinition[]): Promise<void>;
   addLoad(load: LoadDefinition): Promise<void>;
   clearLoads(): Promise<void>;
@@ -310,4 +403,177 @@ export interface NecWorkerModel {
   terminate(): void;
   /** Register a progress listener. Returns an unsubscribe function. */
   subscribeProgress(listener: NecWorkerProgressListener): () => void;
+}
+
+/** Stable caller identity for an element in a full array description. */
+export type ArrayElementId = string | number;
+
+/** A straight wire expressed in element-local metres. */
+export interface RelativeWireDefinition {
+  readonly id: string;
+  readonly segments: number;
+  readonly startM: CartesianPointM;
+  readonly endM: CartesianPointM;
+  readonly radiusM: number;
+}
+
+/** A port targeting a one-based segment of an element-local wire. */
+export interface RelativePortDefinition {
+  readonly wireId: string;
+  readonly segment: number;
+  readonly name?: string;
+}
+
+export interface RelativeSegmentSelection {
+  readonly wireId: string;
+  readonly firstSegment?: number;
+  readonly lastSegment?: number;
+}
+
+type RetargetLoad<T extends LoadDefinition> = T extends LoadDefinition
+  ? Omit<T, "target"> & { readonly target: RelativeSegmentSelection }
+  : never;
+
+export type RelativeLoadDefinition = RetargetLoad<LoadDefinition>;
+
+export interface PositionedArrayElement {
+  readonly id: ArrayElementId;
+  readonly positionM: readonly [xM: number, yM: number];
+  readonly patternId: string;
+  /** The first release accepts only zero or omitted rotation. */
+  readonly rotationDeg?: number;
+}
+
+export interface ElementWirePattern {
+  readonly id: string;
+  readonly kind: "straight-wire-pattern";
+  readonly wires: readonly RelativeWireDefinition[];
+  readonly ports: readonly RelativePortDefinition[];
+  readonly loads?: readonly RelativeLoadDefinition[];
+}
+
+export interface FullArrayDescription {
+  readonly elements: readonly PositionedArrayElement[];
+  readonly patterns: readonly ElementWirePattern[];
+  readonly ground: GroundModel;
+}
+
+export interface CanonicalArrayElement {
+  readonly id: ArrayElementId;
+  readonly positionM: readonly [xM: number, yM: number];
+  readonly patternId: string;
+  readonly rotationDeg: 0;
+}
+
+export interface SymmetrizerOptions {
+  /** Required; the planner never chooses an implicit geometry tolerance. */
+  readonly positionEpsilonM: number;
+  readonly center?: "auto" | readonly [xM: number, yM: number];
+  readonly allowReflection?: boolean;
+  readonly allowRotation?: boolean;
+  readonly preferredRotationOrders?: readonly RotationalOrder[];
+  readonly onUnsupported?: "explicit-fallback" | "error";
+}
+
+export type SymmetrizationReasonCode =
+  | "NO_NONTRIVIAL_SYMMETRY"
+  | "FIXED_ELEMENT_ON_REFLECTION_PLANE"
+  | "FIXED_ELEMENT_ON_ROTATION_AXIS"
+  | "POSITION_OUTSIDE_EPSILON"
+  | "AMBIGUOUS_POSITION_MATCH"
+  | "PATTERN_MISMATCH"
+  | "UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM"
+  | "UNSYMMETRIC_LOAD"
+  | "GROUND_BREAKS_SYMMETRY"
+  | "TAG_SPACE_EXHAUSTED";
+
+export interface SymmetrizationReason {
+  readonly code: SymmetrizationReasonCode;
+  readonly message: string;
+  readonly callerElementIndex?: number;
+  readonly patternId?: string;
+}
+
+export interface PositionCanonicalization {
+  readonly callerElementIndex: number;
+  readonly originalPositionM: readonly [xM: number, yM: number];
+  readonly canonicalPositionM: readonly [xM: number, yM: number];
+  readonly adjustmentM: readonly [dxM: number, dyM: number];
+  readonly distanceM: number;
+}
+
+export interface SymmetryCandidateDiagnostics {
+  readonly symmetry: GeometrySymmetry;
+  readonly accepted: boolean;
+  readonly reasons: readonly SymmetrizationReason[];
+}
+
+export interface SymmetrizerDiagnostics {
+  readonly representation: "explicit" | "symmetric";
+  readonly exact: boolean;
+  readonly effectiveCenterM: readonly [xM: number, yM: number];
+  readonly maxPositionAdjustmentM: number;
+  readonly canonicalizations: readonly PositionCanonicalization[];
+  readonly candidates: readonly SymmetryCandidateDiagnostics[];
+  readonly reasons: readonly SymmetrizationReason[];
+}
+
+export interface ArrayElementMapping {
+  readonly callerElementIndex: number;
+  readonly callerElementId: ArrayElementId;
+  readonly fundamentalElementIndex: number;
+  readonly copyIndex: number;
+  readonly generatedTag: number;
+  readonly callerPortIndices: readonly number[];
+  readonly generatedPortIndices: readonly number[];
+  readonly positionAdjustmentM: readonly [dxM: number, dyM: number];
+}
+
+export type ArrayBuildPlan =
+  | {
+      readonly kind: "symmetric";
+      readonly centerM: readonly [xM: number, yM: number];
+      readonly symmetry: GeometrySymmetry;
+      readonly expansion: Omit<
+        SymmetryExpansion,
+        "fundamentalSegmentCount" | "fullSegmentCount"
+      >;
+      readonly fundamentalElements: readonly CanonicalArrayElement[];
+      readonly mappings: readonly ArrayElementMapping[];
+      readonly maxPositionAdjustmentM: number;
+      readonly diagnostics: SymmetrizerDiagnostics;
+    }
+  | {
+      readonly kind: "explicit";
+      readonly elements: readonly CanonicalArrayElement[];
+      readonly reasons: readonly SymmetrizationReason[];
+      readonly diagnostics: SymmetrizerDiagnostics;
+    };
+
+export interface CreateArraySolverOptions {
+  /** Defaults to `"auto"`. */
+  readonly symmetry?: "auto" | "off" | "require";
+  readonly symmetrizer?: SymmetrizerOptions;
+}
+
+export interface ArraySolverDiagnostics {
+  readonly representation: "explicit" | "symmetric";
+  readonly planner: SymmetrizerDiagnostics;
+  readonly symmetry?: SymmetryExpansion;
+}
+
+/** Representation-independent, worker-backed array solver. */
+export interface NecArraySolver {
+  readonly state: NecModelState;
+  prepare(options: PrepareOptions): Promise<void>;
+  computeImpedanceMatrix(): Promise<ImpedanceResult>;
+  solveVoltages(voltages: ComplexVector): Promise<PortSolution>;
+  solveCurrents(currents: ComplexVector): Promise<PortSolution>;
+  computeFarField(request: FarFieldRequest): Promise<FarFieldResult>;
+  computeEmbeddedFarFields(
+    request: FarFieldRequest,
+    normalization?: EmbeddedFieldNormalization,
+  ): Promise<EmbeddedFarFieldResult>;
+  dispose(): Promise<void>;
+  getDiagnostics(): ArraySolverDiagnostics;
 }

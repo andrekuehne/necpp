@@ -7,6 +7,7 @@ import type {
   EmbeddedFieldNormalization,
   FarFieldRequest,
   FarFieldResult,
+  GeometryCompletionResult,
   GroundModel,
   ImpedanceResult,
   LoadDefinition,
@@ -25,6 +26,7 @@ import {
   reviveEmbeddedFarFieldResult,
   reviveError,
   reviveFarFieldResult,
+  reviveGeometryCompletionResult,
   reviveImpedanceResult,
   revivePortSolution,
   serializeCreateOptions,
@@ -198,11 +200,14 @@ class WorkerNecModel implements NecWorkerModel {
     return this.#invokeVoid("addWire", [wire]);
   }
 
-  completeGeometry(options?: CompleteGeometryOptions): Promise<void> {
-    return this.#invokeVoid(
+  async completeGeometry(
+    options?: CompleteGeometryOptions,
+  ): Promise<GeometryCompletionResult> {
+    const result = await this.#invoke(
       "completeGeometry",
       options === undefined ? [] : [options],
     );
+    return reviveGeometryCompletionResult(result);
   }
 
   definePorts(ports: readonly PortDefinition[]): Promise<void> {

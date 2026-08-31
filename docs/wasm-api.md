@@ -1,9 +1,15 @@
 # `@necpp-engine/wasm` API and numerical contract
 
-Status: normative specification, updated through WP9 on 2026-08-28. The
+Status: normative specification, updated through symmetry WP-S8 on 2026-08-30. The
 stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
 optional Web Worker entry point, and packable npm package are implemented.
 The committed TypeScript surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
+
+The symmetry names, metadata, lifecycle shape, and fixture mappings below are
+implemented by the native engine, additive ABI, direct facade, and worker
+facade. Non-symmetric completion returns an empty, immutable
+`GeometryCompletionResult`; symmetric completion returns immutable copy and
+segment-count metadata in both execution modes.
 
 ## Package and runtime boundary
 
@@ -14,7 +20,8 @@ while the scoped name identifies this repository and leaves room for future
 npm scope, but the API name will not change if the package is initially
 distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
-The initial public TypeScript API release is `0.1.0`.
+The symmetry release package identity is `0.2.0`; it embeds NEC2++ `2.4.0`
+while preserving WASM ABI version `1`.
 
 The packed package exports three version identifiers that can be imported
 without constructing a model:
@@ -46,7 +53,8 @@ These conventions apply to every public method and returned value.
 - Phasors use \(e^{+j\omega t}\). An outgoing spherical wave therefore has
   propagation factor \(e^{-jkR}/R\), with
   \(k=2\pi f/c_0\) and the NEC-2 value
-  \(c_0=299{,}800{,}000\ \mathrm{m/s}\).
+  \(c_0=1/\sqrt{(4\pi\,10^{-7})(8.854\,10^{-12})}
+  \approx299{,}795{,}637.69321626\ \mathrm{m/s}\).
 - Geometry, radii, ranges, and all other public distances are in metres.
   Frequency is in MHz at the API boundary.
 - Voltages and currents are complex peak-amplitude phasors, not RMS phasors,
@@ -154,6 +162,10 @@ Additional lifecycle rules:
 
 - Geometry can change only before `completeGeometry()` and completion occurs
   exactly once. At least one valid geometry element is required.
+- `completeGeometry({ symmetry })` makes symmetry generation the final geometry
+  mutation and returns immutable copy/count metadata. No wire, patch, or other
+  geometry primitive may be added after generation. Plane-list order never
+  changes NEC's fixed Z-then-Y-then-X copy order.
 - `definePorts()` replaces the complete port list. It requires a nonempty
   list of unique, valid tag/segment pairs and is deliberately frozen before
   preparation so all later results have stable ordering.
@@ -186,8 +198,9 @@ enumerates every operation/state pair plus both `prepare()` branches.
 |---|---|---|---|
 | `createNecModel(options?)` | Optional `wasmUrl` or caller-owned WASM bytes | Promise of an `empty` model | `NecRuntimeError` for load/instantiate/version failure; `NecInputError` if both overrides are supplied |
 | `createNecWorkerModel(options?)` | Same loading overrides plus optional `onProgress` | Promise of an `empty` worker model | Same loading failures; `NecRuntimeError` if the worker cannot start or is terminated |
+| `createNecArraySolver(description, options?)` | Complete positioned-element description plus `"auto"`, `"off"`, or `"require"` policy | Promise of one worker-backed, representation-independent array solver | Input/planner errors below; ordinary native failures retain their normal taxonomy |
 | `addWire(wire)` | Positive integer tag/count; distinct finite endpoints and positive finite radius, all in m | `void`; copies the definition | `NecInputError` for shape/range errors; `NecGeometryError` for engine geometry limits |
-| `completeGeometry(options?)` | Ground connection: `none` (default), `interpolate`, or `zero-current` | `void` | `NecGeometryError` for intersections, invalid junctions, or a ground-incompatible structure |
+| `completeGeometry(options?)` | Ground connection plus optional finalized reflection/rotation descriptor | `GeometryCompletionResult`; `symmetry` is absent for ordinary completion | `NecInputError` for an invalid descriptor; `NecGeometryError` for intersections, invalid junctions, symmetry/ground conflicts, or a ground-incompatible structure |
 | `definePorts(ports)` | Nonempty ordered tag and one-based segment pairs | `void`; copies and freezes order | `NecPortError` for missing/duplicate ports or non-source-capable segments; `NecInputError` for malformed integers |
 | `addLoad(load)` | Segment target and impedance, RLC, or conductivity values in the units above | `void`; invalidates prepared data | `NecInputError` for invalid values/ranges; `NecGeometryError` when no segment matches |
 | `clearLoads()` | None | `void`; removes every load and invalidates prepared data | No non-state failure |
@@ -219,11 +232,254 @@ message as `message` or `cause`; a raw number or string is never thrown.
 | `NecRuntimeError` | `NEC_RUNTIME` | WASM loading, ABI mismatch, allocation, or other runtime-boundary failure |
 
 Every class derives from `NecError`, whose `code` is stable for programmatic
-handling. Messages and `details` aid diagnostics but are not a compatibility
-surface. Validation failures do not mutate model state. A failed calculation
+handling. Messages and undocumented `details` aid diagnostics but are not a
+compatibility surface; documented discriminants such as
+`details.symmetryFailure` are stable. Validation failures do not mutate model state. A failed calculation
 keeps the last successfully prepared factorization and consumer solution when
 the native layer can prove they are intact; otherwise it rolls back to
 `geometry-complete` and discards prepared data.
+
+### Symmetry failure refinement
+
+Symmetry-specific failures refine the ordinary error code through
+`details.symmetryFailure` and the exported `SymmetryFailureReason` type:
+
+| Reason | Error code | Automatic explicit retry |
+|---|---|---|
+| `INVALID_SYMMETRY` | `NEC_INPUT` | Never |
+| `INCOMPATIBLE_GROUND` | `NEC_GEOMETRY` | Only when the unchanged full model is valid |
+| `INCOMPLETE_LOAD_ORBIT` | `NEC_GEOMETRY` | Only when the unchanged full load set is valid |
+| `UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM` | `NEC_GEOMETRY` when configured to throw | Default behavior is an explained planner fallback; `"require"` may throw |
+
+Allocation, cancellation, conditioning, solver, and invalid full-geometry
+failures are not representation-eligibility failures and are never hidden by a
+retry.
+
+## Geometry symmetry contract
+
+`CompleteGeometryOptions.symmetry` accepts exactly one of:
+
+- `{ kind: "reflection", planes, tagIncrement }`, where `planes` is a nonempty
+  tuple containing only `"x=0"`, `"y=0"`, and/or `"z=0"`; or
+- `{ kind: "rotational", axis: "z", order, tagIncrement }`, where `order` is
+  produced by `rotationalOrder(number)` and represents the total section count.
+
+`rotationalOrder()` accepts signed-32-bit integers from 2 through 2147483647.
+The brand makes raw unchecked numbers—including literal `1`—compile-invalid.
+The runtime additionally rejects duplicate reflection planes, nonpositive or
+overflowing tag increments, fixed/crossing geometry, duplicate generated tags,
+and incompatible ground.
+
+`GeometryCompletionResult.symmetry`, when present, contains the symmetry kind,
+section count, fundamental/full segment counts, and a structured-cloneable
+copy list. Reflection copies use `cartesian-signs`; rotational copies use
+`rotate-z` with degrees. Copy index zero is always the fundamental section and
+`generatedTag = baseTag + copy.tagOffset`.
+
+For reflections, NEC appends copies in fixed Z, Y, X pass order, independent of
+the order of `planes`. For the 4 x 4 positive-X/positive-Y fixture this yields
+fundamental, Y-reflected, X-reflected, then XY-reflected blocks with offsets
+`0,4,8,12`. Caller row-major order uses X fastest. Its executable maps are:
+
+```text
+scatter caller -> native:
+[15,14,6,7, 13,12,4,5, 9,8,0,1, 11,10,2,3]
+
+gather native -> caller:
+[10,11,14,15, 6,7,2,3, 9,8,13,12, 5,4,1,0]
+```
+
+The shared generator is
+[`reference-array.mjs`](../packages/necpp-wasm/test/fixtures/reference-array.mjs)
+and its language-neutral 4 x 4 golden table is
+[`symmetry_reference_array_4x4.json`](../tests/data/symmetry_reference_array_4x4.json).
+At frequency `f`, it uses the NEC engine's speed-of-light constant, length
+`lambda/3`, Z endpoints `lambda/12` and `5*lambda/12`, spacing `lambda/2`,
+height `lambda/4`, radius `lambda/1000`, 11 segments, and feed segment 6. The
+primary environment is perfect ground with geometry `groundConnection: "none"`.
+
+The npm-rendered package README contains an executable manual 4 x 4 quadrant
+example. Direct and worker callers pass the same descriptor; only the worker's
+method call is awaited. Returned metadata is deeply frozen after direct
+construction or worker structured-clone revival.
+
+## Transparent symmetric array solver
+
+`createNecArraySolver()` is the application-level boundary for callers that
+already have the complete positioned array. Detection is a pure TypeScript
+planning step; `NecModel`, native geometry, and matrix preparation never infer
+symmetry from floating-point geometry. The factory accepts:
+
+```ts
+interface FullArrayDescription {
+  readonly elements: readonly {
+    readonly id: string | number;
+    readonly positionM: readonly [xM: number, yM: number];
+    readonly patternId: string;
+    readonly rotationDeg?: number;
+  }[];
+  readonly patterns: readonly ElementWirePattern[];
+  readonly ground: GroundModel;
+}
+
+interface CreateArraySolverOptions {
+  readonly symmetry?: "auto" | "off" | "require";
+  readonly symmetrizer?: {
+    readonly positionEpsilonM: number;
+    readonly center?: "auto" | readonly [xM: number, yM: number];
+    readonly allowReflection?: boolean;
+    readonly allowRotation?: boolean;
+    readonly preferredRotationOrders?: readonly RotationalOrder[];
+    readonly onUnsupported?: "explicit-fallback" | "error";
+  };
+}
+```
+
+The mode defaults to `"auto"`, but automatic analysis deliberately has no
+default epsilon: omitting `symmetrizer.positionEpsilonM` is `NEC_INPUT`.
+`"off"` builds the exact full description and ignores planner options.
+`"require"` analyzes normally and raises `NecGeometryError` with the planner
+reasons if it cannot prove an eligible nontrivial symmetry. `"auto"` returns
+the same facade after deterministic explicit fallback. It retries an already
+selected symmetric build at most once, and only for the representation
+eligibility refinements `INCOMPATIBLE_GROUND`, `INCOMPLETE_LOAD_ORBIT`, or
+`UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM`. Allocation, cancellation,
+conditioning, solver, and invalid full-geometry failures are never hidden.
+
+The returned `NecArraySolver` is worker-backed and asynchronous:
+
+```ts
+interface NecArraySolver {
+  readonly state: NecModelState;
+  prepare(options: PrepareOptions): Promise<void>;
+  computeImpedanceMatrix(): Promise<ImpedanceResult>;
+  solveVoltages(value: ComplexVector): Promise<PortSolution>;
+  solveCurrents(value: ComplexVector): Promise<PortSolution>;
+  computeFarField(request: FarFieldRequest): Promise<FarFieldResult>;
+  computeEmbeddedFarFields(
+    request: FarFieldRequest,
+    normalization?: EmbeddedFieldNormalization,
+  ): Promise<EmbeddedFarFieldResult>;
+  getDiagnostics(): ArraySolverDiagnostics;
+  dispose(): Promise<void>;
+}
+```
+
+Its lifecycle from creation is `geometry-complete -> prepared -> solved`; the
+factory owns construction, port definition, structural-load expansion, ground
+selection, and any eligible explicit retry. Disposal is deterministic and
+idempotent. All input arrays are borrowed during their operation and all
+returned arrays are caller-owned, exactly as for the low-level direct and
+worker models.
+
+### Representation-independent order and transforms
+
+Elements and the ports contributed by each pattern retain the order of
+`description.elements`, then `pattern.ports`. The facade scatters caller
+excitations into native copy-major order and gathers both dimensions of Z/Y,
+all achieved/requested port vectors and powers, and the outer embedded-field
+basis dimension back into caller order. Ordinary results intentionally contain
+no fundamental count, generated tag, copy index, or symmetry variant.
+
+An accepted reflection candidate canonicalizes centered positions with sign
+transforms. An accepted rotational candidate uses
+
+```text
+angle(copyIndex) = copyIndex * 2*pi/order, copyIndex = 0..order-1
+```
+
+and the native rotation center remains global Z through `(0,0)`. The planner
+may translate a homogeneous-ground/free-space description by an effective XY
+center before construction. Translation does not change Z, Y, port quantities,
+or powers. Because fields are referenced to the caller's original origin, the
+facade restores every combined and embedded complex field sample with
+
+```text
+E_caller(u) = E_centered(u) * exp(+j*k*u dot center)
+u           = (sin(theta) cos(phi), sin(theta) sin(phi), cos(theta))
+```
+
+which is the required correction under the package's `e^(+j omega t)` and
+outgoing `e^(-jkR)` convention.
+
+### Planner acceptance and diagnostics
+
+All element IDs must be unique and every element must reference a known
+pattern. Candidate matching is one-to-one: every transformed position must
+have exactly one same-pattern counterpart within the caller's epsilon, every
+orbit must contain the full section count, and no element may be fixed on a
+generating plane or rotation axis. Exact matching is the special
+`positionEpsilonM: 0` case; it does not use rounded keys or an implicit
+tolerance. Candidate selection is deterministic across caller permutations.
+
+For positive epsilon, an accepted orbit is replaced by exact group-related
+coordinates. Every replacement is disclosed as a `PositionCanonicalization`
+with caller index, original/canonical coordinates, XY adjustment vector, and
+Euclidean distance. `maxPositionAdjustmentM` is the maximum of those distances
+and `exact` is false whenever any nonzero adjustment occurs. Canonicalization
+must remain one-to-one; a collision or ambiguous match falls back rather than
+silently merging elements.
+
+`getDiagnostics()` returns:
+
+```ts
+interface ArraySolverDiagnostics {
+  readonly representation: "explicit" | "symmetric";
+  readonly planner: {
+    readonly representation: "explicit" | "symmetric";
+    readonly exact: boolean;
+    readonly effectiveCenterM: readonly [number, number];
+    readonly maxPositionAdjustmentM: number;
+    readonly canonicalizations: readonly PositionCanonicalization[];
+    readonly candidates: readonly SymmetryCandidateDiagnostics[];
+    readonly reasons: readonly SymmetrizationReason[];
+  };
+  readonly symmetry?: SymmetryExpansion;
+}
+```
+
+The data is immutable and structured-cloneable. Candidate records include the
+descriptor tested, acceptance flag, and reasons. Fallback reasons have stable
+codes:
+
+| Code | Meaning |
+|---|---|
+| `NO_NONTRIVIAL_SYMMETRY` | No supported candidate produced more than one section |
+| `FIXED_ELEMENT_ON_REFLECTION_PLANE` | A reflection would duplicate an element on its generating plane |
+| `FIXED_ELEMENT_ON_ROTATION_AXIS` | A rotation would duplicate an element on global Z |
+| `POSITION_OUTSIDE_EPSILON` | A required counterpart is farther away than the explicit tolerance |
+| `AMBIGUOUS_POSITION_MATCH` | A transformed point has zero or multiple admissible one-to-one matches |
+| `PATTERN_MISMATCH` | The geometric counterpart uses a different reusable element pattern |
+| `UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM` | Pattern geometry/orientation cannot enter the first-release symmetry path |
+| `UNSYMMETRIC_LOAD` | Structural loads do not form equal complete orbits |
+| `GROUND_BREAKS_SYMMETRY` | The radiating environment is not invariant under the candidate |
+| `TAG_SPACE_EXHAUSTED` | Generated positive tags would exceed the native signed-32-bit range |
+
+### Supported pattern and environment matrix
+
+| Feature | Explicit model | Transparent reflection | Transparent rotation |
+|---|---:|---:|---:|
+| Straight Z wire(s), local X=Y=0 | Yes | Yes | Yes |
+| Zero/omitted element rotation | Yes | Required | Required |
+| Arbitrary current/voltage weights | Yes | Yes | Yes |
+| Pattern-relative equal load orbit | Yes | Yes, expanded atomically | Yes, expanded atomically |
+| Free space | Yes | X/Y/Z planes | Global-Z rotation |
+| Homogeneous perfect/finite horizontal ground | Yes | X/Y planes only | Global-Z rotation |
+| Odd centered square with fixed elements | Yes | Fallback | Fallback |
+| Tilted/off-axis wire, rotated pattern, helix, arc, or patch | Yes where low-level geometry supports it | Fallback/error | Fallback/error |
+
+The structural geometry, material/load distribution, and radiating environment
+must be invariant. Sources, requested port currents or voltages, and
+non-radiating networks do not need to be symmetric. The planner accepts neither
+general dihedral composition nor explicit `GM`-style copies as a substitute for
+one supported group.
+
+The helix/transform prohibition is intentional. Future acceptance requires an
+explicit contract and executable mapping for handedness under reflection,
+endpoint direction, segment-number reversal, current/voltage port polarity,
+local orientation under rotation, and the gather mapping for every exposed
+quantity. Until all of those agree, such patterns stay explicit or fail under
+the caller's requested policy.
 
 ## Worker facade
 
@@ -239,17 +495,17 @@ Input arrays remain caller-owned.
 outstanding operations with `NecRuntimeError`, and leaves the model
 `disposed`. `dispose()` destroys the native handle first, then terminates.
 The direct `createNecModel()` entry point is unchanged for Node, tests, and
-small models. Browser integration of this subpath after bundling is a WP7/WP8
-packaging concern; the worker client constructs
+small models. Browser integration tests exercise direct, worker, and
+transparent example paths from the inspected release tarball. The worker client constructs
 
 ```ts
 new Worker(new URL("./worker-entry.js", import.meta.url), { type: "module" })
 ```
 
 so bundlers can rewrite the worker URL without extra consumer configuration.
-WP7 packs this subpath. Direct mode needs no bundler config. Vite apps that
+Direct mode needs no bundler config. Vite apps that
 import the worker set `worker: { format: "es" }` because the package ships a
-module worker. Browser CI for the worker subpath is WP8.
+module worker.
 
 ## Canonical test models
 
@@ -280,8 +536,11 @@ scale-aware relative error
        {\max(1,\lVert a\rVert_2,\lVert b\rVert_2)}.
 \]
 
-The normal limit is `1e-7`. Algebraic identities using results from the same
-factorization (for example \(ZY\approx I\)) also use `1e-7`. Exact metadata,
+The normal limit is `1e-7`. Full explicit versus manual/automatic symmetric
+representations use stricter `1e-8` relative-L2 and scaled-maximum gates for
+complete complex Z/Y, requested and achieved port quantities, powers, and
+complex fields. Algebraic identities using results from the same
+factorization (for example \(ZY\approx I\)) use `1e-7`. Exact metadata,
 array sizes/order, generations, state transitions, zero-excitation output,
 and ownership behavior have zero tolerance.
 

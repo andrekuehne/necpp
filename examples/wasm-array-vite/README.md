@@ -1,15 +1,19 @@
 # Four-element array Vite example
 
 This is a downstream application for `@necpp-engine/wasm`, not a monorepo
-source import. It creates four parallel half-wave dipoles in a package-supplied
-Web Worker, computes the complex 4 x 4 impedance matrix, applies progressive
-complex current weights, shows achieved port quantities, and plots the
-combined azimuth far-field cut at 1 m.
+source import. It supplies the complete list of four parallel half-wave
+dipoles to the representation-independent array solver. The transparent
+planner recognizes the exact reflection, builds a reduced model in a
+package-supplied Web Worker, and reports its decision and maximum coordinate
+adjustment. The application then uses the same matrix, solve, and field calls
+that it would use after an explicit fallback: it computes the complex 4 x 4
+impedance matrix, applies progressive complex current weights, shows achieved
+port quantities, and plots the combined azimuth far-field cut at 1 m.
 
 ## Run with the published package
 
 From this directory, run `npm install`, then
-`npm install @necpp-engine/wasm@0.1.1`, followed by `npm run dev`. Open the URL
+`npm install @necpp-engine/wasm@0.2.0`, followed by `npm run dev`. Open the URL
 printed by Vite. Use `npm run build` and `npm run preview` to inspect the
 production bundle.
 

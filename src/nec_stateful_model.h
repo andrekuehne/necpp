@@ -9,6 +9,7 @@
 #pragma once
 
 #include "common.h"
+#include "nec_geometry_symmetry.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -196,8 +197,18 @@ public:
   nec_model_state state() const { return m_state; }
 
   void add_wire(const nec_wire_definition& wire);
+
+  /*! Complete ordinary geometry while preserving the pre-symmetry API. */
   void complete_geometry(
     nec_ground_connection connection = nec_ground_connection::none);
+
+  /*! Generate the final symmetry copies, complete geometry, and retain metadata. */
+  const nec_geometry_completion_result& complete_geometry(
+    const nec_geometry_symmetry& symmetry,
+    nec_ground_connection connection = nec_ground_connection::none);
+
+  /*! Read immutable metadata for successfully completed geometry. */
+  const nec_geometry_completion_result& geometry_completion() const;
   void define_ports(const std::vector<nec_port_definition>& ports);
 
   void add_load(const nec_load_definition& load);
@@ -253,6 +264,9 @@ private:
   void require_configurable(const char* operation) const;
   void invalidate_factorization();
   void validate_load_target(const nec_load_definition& load) const;
+  void validate_symmetric_load_orbits() const;
+  void validate_symmetry_ground(
+    const nec_ground_definition& ground, const char* operation) const;
   void clear_matrix_cache();
   void clear_consumer_solution();
   void execute_voltage_solve(
@@ -272,7 +286,9 @@ private:
 
   std::unique_ptr<nec_context> m_context;
   nec_model_state m_state = nec_model_state::empty;
+  nec_geometry_completion_result m_geometry_completion;
   std::vector<nec_port_definition> m_ports;
+  std::vector<nec_load_definition> m_loads;
   std::vector<int> m_absolute_port_segments;
   std::vector<nec_complex> m_port_currents;
   nec_complex_matrix m_admittance_matrix;
@@ -280,6 +296,7 @@ private:
   nec_port_solution m_last_port_solution;
   nec_far_field_result m_far_field_result;
   nec_embedded_far_field_result m_embedded_far_field_result;
+  nec_ground_definition m_ground;
   nec_float m_frequency_mhz = 0.0;
   uint64_t m_factorization_generation = 0;
   uint64_t m_solve_generation = 0;

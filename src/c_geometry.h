@@ -17,6 +17,7 @@
 */
 #pragma once
 #include "math_util.h"
+#include "nec_geometry_symmetry.h"
 #include <vector>
 #include <iostream>
 #include <istream>
@@ -92,11 +93,11 @@ public:
   void move( nec_float rox, nec_float roy, nec_float roz, nec_float xs,
                   nec_float ys, nec_float zs, int its, int nrpt, int itgi );
 
-  /*! \brief Reflects partial structure along x,y, or z axes.
+  /*! \brief Reflects a fundamental structure across coordinate planes.
           
-    \param ix If ix = 1 then the structure is reflected along X axis. 
-    \param iy If iy = 1 then the structure is reflected along Y axis.
-    \param iz If iz = 1 then the structure is reflected along Z axis.
+    \param ix If ix = 1 then reflect across the x=0 plane.
+    \param iy If iy = 1 then reflect across the y=0 plane.
+    \param iz If iz = 1 then reflect across the z=0 plane.
     \param itx The tag number increment.    
   */
   void reflect(int ix, int iy, int iz, int itx)  {
@@ -115,6 +116,16 @@ public:
   }
 
   void reflect( int ix, int iy, int iz, int itx, int nop );
+
+  /*! \brief Validate and generate symmetry for a stateful native caller.
+   *
+   * Unlike the legacy GX/GR helpers, this entry point requires the strict
+   * descriptor contract, unique generated nonzero tags, and collision-free
+   * fundamental geometry. All expected validation happens before the
+   * geometry counts or generated arrays are changed.
+   */
+  nec_geometry_completion_result generate_symmetry(
+    const nec_geometry_symmetry& symmetry);
 
   /*! \brief Scale all dimensions of a structure by a constant.*/
   void scale( nec_float xw1);

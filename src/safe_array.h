@@ -17,8 +17,10 @@
 */
 #pragma once
 
+#include <algorithm>
 #include <iostream>
 #include <cstring>
+#include <limits>
 #include <sstream>
 #include <stdint.h>
 #include <Eigen/Dense>
@@ -74,6 +76,16 @@ public:
   int64_t cols() const    { return _cols; }
   int64_t capacity() const { return _own_data ? _capacity : _len; }
 
+  /*! Largest logical length whose 1.5x growth allocation is representable. */
+  static int64_t maximum_size() {
+    const uint64_t index_limit =
+      static_cast<uint64_t>((std::numeric_limits<Eigen::Index>::max)());
+    const uint64_t byte_limit =
+      static_cast<uint64_t>((std::numeric_limits<size_t>::max)()) / sizeof(T);
+    const uint64_t capacity_limit = std::min(index_limit, byte_limit);
+    return static_cast<int64_t>((capacity_limit / 3u) * 2u);
+  }
+
   void resize(int64_t n_rows, int64_t n_cols) {
     _rows = n_rows;
     _cols = n_cols;
@@ -93,13 +105,18 @@ public:
     if (!_own_data)
       throw nec_exception("attempt to resize data we do not own");
 #endif
+    if (new_length < 0)
+      throw nec_exception("safe_array: negative resize requested");
+    if (new_length > maximum_size())
+      throw nec_exception("safe_array: requested size is too large");
     if (new_length > _capacity) {
-      _capacity = new_length + new_length / 2;  // 1.5x growth
+      const int64_t new_capacity = new_length + new_length / 2;
       try {
-        Vector new_storage(_capacity);
+        Vector new_storage(new_capacity);
         if (_len > 0)
           new_storage.head(_len) = _storage.head(_len);
         _storage.swap(new_storage);
+        _capacity = new_capacity;
       } catch (const std::bad_alloc&) {
         throw nec_exception("Error: Out of Memory ");
       }

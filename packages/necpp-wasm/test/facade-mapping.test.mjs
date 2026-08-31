@@ -20,6 +20,10 @@ function createRecordingModule() {
   let nextStatus = 0;
   let allocation = 256;
   let deleted = false;
+  let symmetryKind = -1;
+  let sectionCount = 0;
+  let fundamentalSegmentCount = 0n;
+  let fullSegmentCount = 0n;
   HEAPU8.set(new TextEncoder().encode("controlled native failure\0"), 8);
 
   const complete = (name, args, nextState) => {
@@ -53,7 +57,38 @@ function createRecordingModule() {
         return complete("addWire", args, 1);
       },
       _necpp_wasm_v1_complete_geometry(...args) {
-        return complete("completeGeometry", args, 2);
+        const status = complete("completeGeometry", args, 2);
+        if (status === 0) {
+          symmetryKind = 0;
+          sectionCount = 1;
+          fundamentalSegmentCount = 3n;
+          fullSegmentCount = 3n;
+        }
+        return status;
+      },
+      _necpp_wasm_v1_complete_geometry_symmetric(...args) {
+        const status = complete("completeGeometrySymmetric", args, 2);
+        if (status === 0) {
+          symmetryKind = args[2];
+          sectionCount = args[2] === 1
+            ? 2 ** [1, 2, 4].filter((bit) => (args[3] & bit) !== 0).length
+            : args[3];
+          fundamentalSegmentCount = 3n;
+          fullSegmentCount = 3n * BigInt(sectionCount);
+        }
+        return status;
+      },
+      _necpp_wasm_v1_geometry_symmetry_kind() {
+        return symmetryKind;
+      },
+      _necpp_wasm_v1_geometry_section_count() {
+        return sectionCount;
+      },
+      _necpp_wasm_v1_geometry_fundamental_segment_count() {
+        return fundamentalSegmentCount;
+      },
+      _necpp_wasm_v1_geometry_full_segment_count() {
+        return fullSegmentCount;
       },
       _necpp_wasm_v1_define_ports(...args) {
         return complete("definePorts", args);
@@ -81,6 +116,18 @@ function createRecordingModule() {
   };
 }
 
+function symmetryModel(recording) {
+  const model = new WasmNecModel(recording.module, 1);
+  model.addWire({
+    tag: 1,
+    segments: 3,
+    start: [0.25, 0.5, 0.75],
+    end: [0.25, 0.5, 1.25],
+    radiusM: 0.001,
+  });
+  return model;
+}
+
 function createConfigurableModel(recording) {
   const model = new WasmNecModel(recording.module, 1);
   model.addWire({
@@ -90,7 +137,11 @@ function createConfigurableModel(recording) {
     end: [0, 0, 1],
     radiusM: 0.001,
   });
-  model.completeGeometry({ groundConnection: "zero-current" });
+  const completion = model.completeGeometry({
+    groundConnection: "zero-current",
+  });
+  assert.deepEqual(completion, {});
+  assert.ok(Object.isFrozen(completion));
   model.definePorts([{ tag: 1, segment: 2 }]);
   return model;
 }
@@ -237,4 +288,150 @@ test("every stable native status becomes its public typed error", () => {
     );
   }
   model.dispose();
+});
+
+test("reflection and rotation map every ABI argument and return frozen copy metadata", () => {
+  const reflectionRecording = createRecordingModule();
+  const reflectionModel = symmetryModel(reflectionRecording);
+  const reflection = reflectionModel.completeGeometry({
+    groundConnection: "none",
+    symmetry: {
+      kind: "reflection",
+      planes: ["x=0", "z=0", "y=0"],
+      tagIncrement: 2,
+    },
+  });
+  assert.deepEqual(
+    reflectionRecording.calls.find(([name]) => name === "completeGeometrySymmetric"),
+    ["completeGeometrySymmetric", 1, 0, 1, 7, 2],
+  );
+  assert.deepEqual(reflection, {
+    symmetry: {
+      kind: "reflection",
+      sectionCount: 8,
+      fundamentalSegmentCount: 3,
+      fullSegmentCount: 24,
+      copies: [
+        { index: 0, tagOffset: 0, transform: { kind: "cartesian-signs", signs: [1, 1, 1] } },
+        { index: 1, tagOffset: 2, transform: { kind: "cartesian-signs", signs: [1, 1, -1] } },
+        { index: 2, tagOffset: 4, transform: { kind: "cartesian-signs", signs: [1, -1, 1] } },
+        { index: 3, tagOffset: 6, transform: { kind: "cartesian-signs", signs: [1, -1, -1] } },
+        { index: 4, tagOffset: 8, transform: { kind: "cartesian-signs", signs: [-1, 1, 1] } },
+        { index: 5, tagOffset: 10, transform: { kind: "cartesian-signs", signs: [-1, 1, -1] } },
+        { index: 6, tagOffset: 12, transform: { kind: "cartesian-signs", signs: [-1, -1, 1] } },
+        { index: 7, tagOffset: 14, transform: { kind: "cartesian-signs", signs: [-1, -1, -1] } },
+      ],
+    },
+  });
+  assert.ok(Object.isFrozen(reflection));
+  assert.ok(Object.isFrozen(reflection.symmetry));
+  assert.ok(Object.isFrozen(reflection.symmetry.copies));
+  assert.ok(Object.isFrozen(reflection.symmetry.copies[0].transform));
+  assert.ok(Object.isFrozen(reflection.symmetry.copies[0].transform.signs));
+
+  const rotationRecording = createRecordingModule();
+  const rotationModel = symmetryModel(rotationRecording);
+  const rotation = rotationModel.completeGeometry({
+    groundConnection: "interpolate",
+    symmetry: {
+      kind: "rotational",
+      axis: "z",
+      order: 4,
+      tagIncrement: 3,
+    },
+  });
+  assert.deepEqual(
+    rotationRecording.calls.find(([name]) => name === "completeGeometrySymmetric"),
+    ["completeGeometrySymmetric", 1, 1, 2, 4, 3],
+  );
+  assert.deepEqual(
+    rotation.symmetry.copies.map((copy) => copy.transform),
+    [
+      { kind: "rotate-z", angleDeg: 0 },
+      { kind: "rotate-z", angleDeg: 90 },
+      { kind: "rotate-z", angleDeg: 180 },
+      { kind: "rotate-z", angleDeg: 270 },
+    ],
+  );
+});
+
+test("invalid symmetry descriptors fail before native mutation with typed details", () => {
+  const invalid = [
+    { kind: "reflection", planes: [], tagIncrement: 1 },
+    { kind: "reflection", planes: ["x=0", "x=0"], tagIncrement: 1 },
+    { kind: "reflection", planes: ["x=y"], tagIncrement: 1 },
+    { kind: "reflection", planes: ["x=0"], tagIncrement: 0 },
+    { kind: "reflection", planes: ["x=0"], tagIncrement: Number.MAX_SAFE_INTEGER },
+    { kind: "reflection", planes: ["x=0"], tagIncrement: 2_147_483_647 },
+    { kind: "rotational", axis: "x", order: 4, tagIncrement: 1 },
+    { kind: "rotational", axis: "z", order: 1, tagIncrement: 1 },
+    { kind: "rotational", axis: "z", order: 2.5, tagIncrement: 1 },
+    { kind: "rotational", axis: "z", order: Number.MAX_SAFE_INTEGER, tagIncrement: 1 },
+    { kind: "reflection", planes: ["x=0"], order: 2, tagIncrement: 1 },
+    { kind: "rotational", axis: "z", order: 2, planes: ["x=0"], tagIncrement: 1 },
+  ];
+  for (const symmetry of invalid) {
+    const recording = createRecordingModule();
+    const model = symmetryModel(recording);
+    assert.throws(
+      () => model.completeGeometry({ symmetry }),
+      (error) => error instanceof NecInputError
+        && error.code === "NEC_INPUT"
+        && error.details?.symmetryFailure === "INVALID_SYMMETRY",
+    );
+    assert.equal(model.state, "geometry-building");
+    assert.equal(
+      recording.calls.some(([name]) => name === "completeGeometrySymmetric"),
+      false,
+    );
+  }
+});
+
+test("z reflection rejects ground without mutating geometry", () => {
+  const recording = createRecordingModule();
+  const model = symmetryModel(recording);
+  assert.throws(
+    () => model.completeGeometry({
+      groundConnection: "zero-current",
+      symmetry: { kind: "reflection", planes: ["z=0"], tagIncrement: 1 },
+    }),
+    (error) => error instanceof NecGeometryError
+      && error.details?.symmetryFailure === "INCOMPATIBLE_GROUND",
+  );
+  assert.equal(model.state, "geometry-building");
+});
+
+test("signed 64-bit segment counts never narrow to unsafe public numbers", () => {
+  const recording = createRecordingModule();
+  recording.module._necpp_wasm_v1_geometry_fundamental_segment_count = () =>
+    BigInt(Number.MAX_SAFE_INTEGER) + 1n;
+  recording.module._necpp_wasm_v1_geometry_full_segment_count = () =>
+    2n * (BigInt(Number.MAX_SAFE_INTEGER) + 1n);
+  const model = symmetryModel(recording);
+  assert.throws(
+    () => model.completeGeometry({
+      symmetry: { kind: "reflection", planes: ["x=0"], tagIncrement: 1 },
+    }),
+    (error) => error instanceof NecRuntimeError
+      && error.message.includes("safe integer range"),
+  );
+});
+
+test("z-reflected completion rejects a later non-free-space ground", () => {
+  const recording = createRecordingModule();
+  const model = symmetryModel(recording);
+  model.completeGeometry({
+    symmetry: { kind: "reflection", planes: ["z=0"], tagIncrement: 1 },
+  });
+  assert.throws(
+    () => model.setGround({ kind: "perfect" }),
+    (error) => error instanceof NecGeometryError
+      && error.details?.symmetryFailure === "INCOMPATIBLE_GROUND",
+  );
+  assert.equal(
+    recording.calls.some(([name]) => name === "setGround"),
+    false,
+  );
+  model.setGround({ kind: "free-space" });
+  assert.equal(recording.calls.at(-1)[0], "setGround");
 });

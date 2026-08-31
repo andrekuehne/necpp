@@ -15,6 +15,7 @@ import type {
   CreateNecWorkerModelOptions,
   EmbeddedFarFieldResult,
   FarFieldResult,
+  GeometryCompletionResult,
   ImpedanceResult,
   NecModelState,
   NecWorkerOperation,
@@ -225,6 +226,135 @@ export function snapshotPorts(
       ? { tag: port.tag, segment: port.segment }
       : { tag: port.tag, segment: port.segment, name: port.name },
   )));
+}
+
+function safeNonnegativeInteger(value: unknown, name: string): number {
+  if (
+    typeof value !== "number"
+    || !Number.isSafeInteger(value)
+    || value < 0
+  ) {
+    throw new NecRuntimeError(`Worker result ${name} is not a safe integer`);
+  }
+  return value;
+}
+
+/** Validate, copy, and deeply freeze structured-cloned completion metadata. */
+export function reviveGeometryCompletionResult(
+  value: unknown,
+): GeometryCompletionResult {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new NecRuntimeError("Worker geometry completion result is not an object");
+  }
+  const record = value as { readonly symmetry?: unknown };
+  if (record.symmetry === undefined) {
+    return Object.freeze({});
+  }
+  if (
+    typeof record.symmetry !== "object"
+    || record.symmetry === null
+    || Array.isArray(record.symmetry)
+  ) {
+    throw new NecRuntimeError("Worker symmetry metadata is not an object");
+  }
+  const symmetry = record.symmetry as {
+    readonly kind?: unknown;
+    readonly sectionCount?: unknown;
+    readonly fundamentalSegmentCount?: unknown;
+    readonly fullSegmentCount?: unknown;
+    readonly copies?: unknown;
+  };
+  if (symmetry.kind !== "reflection" && symmetry.kind !== "rotational") {
+    throw new NecRuntimeError("Worker symmetry metadata has an unknown kind");
+  }
+  const sectionCount = safeNonnegativeInteger(
+    symmetry.sectionCount,
+    "symmetry.sectionCount",
+  );
+  const fundamentalSegmentCount = safeNonnegativeInteger(
+    symmetry.fundamentalSegmentCount,
+    "symmetry.fundamentalSegmentCount",
+  );
+  const fullSegmentCount = safeNonnegativeInteger(
+    symmetry.fullSegmentCount,
+    "symmetry.fullSegmentCount",
+  );
+  if (
+    sectionCount < 2
+    || BigInt(fullSegmentCount)
+      !== BigInt(fundamentalSegmentCount) * BigInt(sectionCount)
+    || !Array.isArray(symmetry.copies)
+    || symmetry.copies.length !== sectionCount
+  ) {
+    throw new NecRuntimeError("Worker symmetry metadata has inconsistent counts");
+  }
+  const copies = symmetry.copies.map((value, position) => {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new NecRuntimeError(`Worker symmetry copy ${position} is invalid`);
+    }
+    const copy = value as {
+      readonly index?: unknown;
+      readonly tagOffset?: unknown;
+      readonly transform?: unknown;
+    };
+    const index = safeNonnegativeInteger(
+      copy.index,
+      `symmetry.copies[${position}].index`,
+    );
+    const tagOffset = safeNonnegativeInteger(
+      copy.tagOffset,
+      `symmetry.copies[${position}].tagOffset`,
+    );
+    if (index !== position || typeof copy.transform !== "object" || copy.transform === null) {
+      throw new NecRuntimeError(`Worker symmetry copy ${position} is inconsistent`);
+    }
+    const transform = copy.transform as {
+      readonly kind?: unknown;
+      readonly signs?: unknown;
+      readonly angleDeg?: unknown;
+    };
+    if (symmetry.kind === "reflection") {
+      if (
+        transform.kind !== "cartesian-signs"
+        || !Array.isArray(transform.signs)
+        || transform.signs.length !== 3
+        || !transform.signs.every((sign) => sign === 1 || sign === -1)
+      ) {
+        throw new NecRuntimeError(`Worker reflection copy ${position} is invalid`);
+      }
+      const signs = Object.freeze([
+        transform.signs[0],
+        transform.signs[1],
+        transform.signs[2],
+      ] as [1 | -1, 1 | -1, 1 | -1]);
+      return Object.freeze({
+        index,
+        tagOffset,
+        transform: Object.freeze({ kind: "cartesian-signs" as const, signs }),
+      });
+    }
+    if (transform.kind !== "rotate-z" || typeof transform.angleDeg !== "number"
+      || !Number.isFinite(transform.angleDeg)) {
+      throw new NecRuntimeError(`Worker rotational copy ${position} is invalid`);
+    }
+    return Object.freeze({
+      index,
+      tagOffset,
+      transform: Object.freeze({
+        kind: "rotate-z" as const,
+        angleDeg: transform.angleDeg,
+      }),
+    });
+  });
+  return Object.freeze({
+    symmetry: Object.freeze({
+      kind: symmetry.kind,
+      sectionCount,
+      fundamentalSegmentCount,
+      fullSegmentCount,
+      copies: Object.freeze(copies),
+    }),
+  });
 }
 
 function copyFloat64(value: unknown, name: string): Float64Array {

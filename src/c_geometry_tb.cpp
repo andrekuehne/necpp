@@ -6,6 +6,7 @@
 #include "libnecpp.h"
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 void HANDLE_NEC(long x) { 
   int __tmp = (x);  
@@ -272,4 +273,247 @@ TEST_CASE( "GX three-plane symmetry produces correct impedance", "[symmetry]") {
     REQUIRE( zi == Catch::Approx(-470.5).margin(1.0) );
 
     nec_delete(nec);
+}
+
+namespace {
+
+nec_geometry_symmetry reflection_symmetry(uint32_t planes, int tag_increment = 100)
+{
+    nec_geometry_symmetry symmetry;
+    symmetry.kind = nec_geometry_symmetry_kind::reflection;
+    symmetry.reflection_plane_mask = planes;
+    symmetry.tag_increment = tag_increment;
+    return symmetry;
+}
+
+nec_geometry_symmetry rotational_symmetry(int order, int tag_increment = 100)
+{
+    nec_geometry_symmetry symmetry;
+    symmetry.kind = nec_geometry_symmetry_kind::rotational;
+    symmetry.rotational_order = order;
+    symmetry.tag_increment = tag_increment;
+    return symmetry;
+}
+
+void add_symmetry_fixture(c_geometry& geometry)
+{
+    geometry.wire(10, 1, 1.0, 2.0, 3.0, 1.5, 2.5, 3.5,
+                  0.001, 1.0, 1.0);
+    geometry.patch(0, 0, 4.0, 5.0, 6.0, 0.0, 0.0, 0.25,
+                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+}
+
+} // namespace
+
+TEST_CASE("WP-S1 coordinate-plane symmetry has exact native order and metadata",
+          "[symmetry][wp_s1]")
+{
+    struct reflection_case {
+        uint32_t planes;
+        int expected_ipsym;
+        int expected_masks[8];
+        int section_count;
+    };
+    const reflection_case cases[] = {
+        {nec_reflection_plane_x, 1, {0, 1}, 2},
+        {nec_reflection_plane_x | nec_reflection_plane_y,
+         1, {0, 2, 1, 3}, 4},
+        {nec_reflection_plane_x | nec_reflection_plane_y |
+           nec_reflection_plane_z,
+         2, {0, 4, 2, 6, 1, 5, 3, 7}, 8},
+    };
+
+    for (const reflection_case& test : cases) {
+        CAPTURE(test.planes);
+        c_geometry geometry;
+        add_symmetry_fixture(geometry);
+
+        const nec_geometry_completion_result result = geometry.generate_symmetry(
+            reflection_symmetry(test.planes));
+
+        REQUIRE(result.symmetry.kind == nec_geometry_symmetry_kind::reflection);
+        REQUIRE(result.section_count == test.section_count);
+        REQUIRE(result.fundamental_segment_count == 1);
+        REQUIRE(result.full_segment_count == test.section_count);
+        REQUIRE(geometry.n_segments == test.section_count);
+        REQUIRE(geometry.m == test.section_count);
+        REQUIRE(geometry.np == 1);
+        REQUIRE(geometry.mp == 1);
+        REQUIRE(geometry.m_ipsym == test.expected_ipsym);
+
+        for (int copy = 0; copy < test.section_count; ++copy) {
+            const int mask = test.expected_masks[copy];
+            CAPTURE(copy, mask);
+            REQUIRE(geometry.x[copy] == ((mask & 1) ? -1.0 : 1.0));
+            REQUIRE(geometry.y[copy] == ((mask & 2) ? -2.0 : 2.0));
+            REQUIRE(geometry.z[copy] == ((mask & 4) ? -3.0 : 3.0));
+            REQUIRE(geometry.x2[copy] == ((mask & 1) ? -1.5 : 1.5));
+            REQUIRE(geometry.y2[copy] == ((mask & 2) ? -2.5 : 2.5));
+            REQUIRE(geometry.z2[copy] == ((mask & 4) ? -3.5 : 3.5));
+            REQUIRE(geometry.segment_tags[copy] == 10 + copy * 100);
+            REQUIRE(geometry.px[copy] == ((mask & 1) ? -4.0 : 4.0));
+            REQUIRE(geometry.py[copy] == ((mask & 2) ? -5.0 : 5.0));
+            REQUIRE(geometry.pz[copy] == ((mask & 4) ? -6.0 : 6.0));
+        }
+    }
+}
+
+TEST_CASE("WP-S1 rotational symmetry has exact order, tags, and Fourier count",
+          "[symmetry][wp_s1]")
+{
+    for (const int order : {2, 4, 6}) {
+        CAPTURE(order);
+        c_geometry geometry;
+        geometry.wire(10, 1, 1.0, 0.0, 0.1, 1.0, 0.0, 0.2,
+                      0.001, 1.0, 1.0);
+
+        const nec_geometry_completion_result result = geometry.generate_symmetry(
+            rotational_symmetry(order));
+
+        REQUIRE(result.section_count == order);
+        REQUIRE(result.fundamental_segment_count == 1);
+        REQUIRE(result.full_segment_count == order);
+        REQUIRE(geometry.n_segments == order);
+        REQUIRE(geometry.np == 1);
+        REQUIRE(geometry.mp == 0);
+        REQUIRE(geometry.m_ipsym == -1);
+        REQUIRE((geometry.n_segments + geometry.m) /
+                (geometry.np + geometry.mp) == order);
+        for (int copy = 0; copy < order; ++copy) {
+            const double angle = 2.0 * pi() * copy / order;
+            CAPTURE(copy);
+            REQUIRE(geometry.x[copy] == Catch::Approx(std::cos(angle)).margin(1e-12));
+            REQUIRE(geometry.y[copy] == Catch::Approx(std::sin(angle)).margin(1e-12));
+            REQUIRE(geometry.z[copy] == 0.1);
+            REQUIRE(geometry.z2[copy] == 0.2);
+            REQUIRE(geometry.segment_tags[copy] == 10 + copy * 100);
+        }
+    }
+}
+
+TEST_CASE("WP-S1 expected symmetry failures do not mutate generated geometry",
+          "[symmetry][wp_s1]")
+{
+    SECTION("segment crossing a reflection plane") {
+        c_geometry geometry;
+        geometry.wire(1, 1, -1.0, 1.0, 1.0, 1.0, 1.0, 2.0,
+                      0.001, 1.0, 1.0);
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(reflection_symmetry(nec_reflection_plane_x)),
+            nec_exception);
+        REQUIRE(geometry.n_segments == 1);
+        REQUIRE(geometry.x.size() == 1);
+        REQUIRE(geometry.segment_tags.size() == 1);
+        REQUIRE(geometry.np == 1);
+        REQUIRE(geometry.m_ipsym == 0);
+    }
+
+    SECTION("patch centered in a reflection plane") {
+        c_geometry geometry;
+        geometry.patch(0, 0, 0.0, 2.0, 3.0, 0.0, 0.0, 0.25,
+                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(reflection_symmetry(nec_reflection_plane_x)),
+            nec_exception);
+        REQUIRE(geometry.m == 1);
+        REQUIRE(geometry.px.size() == 1);
+        REQUIRE(geometry.mp == 1);
+        REQUIRE(geometry.m_ipsym == 0);
+    }
+
+    SECTION("fixed rotational-axis segment") {
+        c_geometry geometry;
+        geometry.wire(1, 1, 0.0, 0.0, 0.1, 0.0, 0.0, 0.2,
+                      0.001, 1.0, 1.0);
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(rotational_symmetry(6)), nec_exception);
+        REQUIRE(geometry.n_segments == 1);
+        REQUIRE(geometry.x.size() == 1);
+        REQUIRE(geometry.np == 1);
+        REQUIRE(geometry.m_ipsym == 0);
+    }
+
+    SECTION("already duplicated rotational segment") {
+        c_geometry geometry;
+        geometry.wire(1, 1, 1.0, 0.0, 0.1, 1.0, 0.0, 0.2,
+                      0.001, 1.0, 1.0);
+        geometry.wire(2, 1, -1.0, 0.0, 0.1, -1.0, 0.0, 0.2,
+                      0.001, 1.0, 1.0);
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(rotational_symmetry(2, 10)), nec_exception);
+        REQUIRE(geometry.n_segments == 2);
+        REQUIRE(geometry.x.size() == 2);
+        REQUIRE(geometry.np == 2);
+        REQUIRE(geometry.m_ipsym == 0);
+    }
+}
+
+TEST_CASE("WP-S1 symmetry validates tag and size arithmetic before allocation",
+          "[symmetry][wp_s1]")
+{
+    SECTION("malformed descriptors") {
+        c_geometry geometry;
+        geometry.wire(1, 1, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0,
+                      0.001, 1.0, 1.0);
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(reflection_symmetry(8u)), nec_exception);
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(rotational_symmetry(1)), nec_exception);
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(
+                reflection_symmetry(nec_reflection_plane_x, 0)),
+            nec_exception);
+        REQUIRE(geometry.n_segments == 1);
+        REQUIRE(geometry.x.size() == 1);
+        REQUIRE(geometry.np == 1);
+        REQUIRE(geometry.m_ipsym == 0);
+    }
+
+    SECTION("generated tag collision") {
+        c_geometry geometry;
+        geometry.wire(1, 1, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0,
+                      0.001, 1.0, 1.0);
+        geometry.wire(2, 1, 2.0, 1.0, 1.0, 2.0, 1.0, 2.0,
+                      0.001, 1.0, 1.0);
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(
+                reflection_symmetry(nec_reflection_plane_x, 1)),
+            nec_exception);
+        REQUIRE(geometry.n_segments == 2);
+        REQUIRE(geometry.segment_tags.size() == 2);
+    }
+
+    SECTION("generated tag overflow") {
+        c_geometry geometry;
+        geometry.wire((std::numeric_limits<int>::max)(), 1,
+                      1.0, 1.0, 1.0, 1.0, 1.0, 2.0,
+                      0.001, 1.0, 1.0);
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(
+                reflection_symmetry(nec_reflection_plane_x, 1)),
+            nec_exception);
+        REQUIRE(geometry.n_segments == 1);
+        REQUIRE(geometry.segment_tags[0] == (std::numeric_limits<int>::max)());
+    }
+
+    SECTION("count multiplication overflow") {
+        c_geometry geometry;
+        geometry.n_segments = (std::numeric_limits<int64_t>::max)() / 2 + 1;
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(reflection_symmetry(nec_reflection_plane_x)),
+            nec_exception);
+        REQUIRE(geometry.n_segments ==
+                (std::numeric_limits<int64_t>::max)() / 2 + 1);
+        REQUIRE(geometry.np == 0);
+    }
+
+    SECTION("safe-array allocation size overflow") {
+        c_geometry geometry;
+        geometry.n_segments = real_array::maximum_size() / 2 + 1;
+        REQUIRE_THROWS_AS(
+            geometry.generate_symmetry(reflection_symmetry(nec_reflection_plane_x)),
+            nec_exception);
+        REQUIRE(geometry.n_segments == real_array::maximum_size() / 2 + 1);
+        REQUIRE(geometry.np == 0);
+    }
 }

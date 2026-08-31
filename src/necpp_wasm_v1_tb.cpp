@@ -8,11 +8,21 @@
 #include <vector>
 
 extern "C" int necpp_wasm_v1_run_c_contract_test(void);
+extern "C" int necpp_wasm_v1_run_c_symmetry_contract_test(void);
 
 TEST_CASE("WP4 versioned ABI is consumable from C", "[wp4][wasm_abi]")
 {
   const int failed_line = necpp_wasm_v1_run_c_contract_test();
   INFO("C ABI contract check failed at necpp_wasm_v1_c_tb.c line "
+       << failed_line);
+  REQUIRE(failed_line == 0);
+}
+
+TEST_CASE("WP-S3 additive symmetry ABI is consumable from pure C",
+          "[wp_s3][wasm_abi][symmetry]")
+{
+  const int failed_line = necpp_wasm_v1_run_c_symmetry_contract_test();
+  INFO("C symmetry ABI contract check failed at necpp_wasm_v1_c_tb.c line "
        << failed_line);
   REQUIRE(failed_line == 0);
 }
@@ -56,6 +66,44 @@ void require_complex_buffer_matches(
 }
 
 } // namespace
+
+TEST_CASE("WP-S3 ABI completion metadata matches the stateful model",
+          "[wp_s3][wasm_abi][symmetry]")
+{
+  nec_geometry_symmetry symmetry;
+  symmetry.kind = nec_geometry_symmetry_kind::reflection;
+  symmetry.reflection_plane_mask =
+    nec_reflection_plane_x | nec_reflection_plane_y;
+  symmetry.tag_increment = 1;
+
+  nec_stateful_model native;
+  native.add_wire({1, 11, 0.25, 0.25, 0.1, 0.25, 0.25, 0.4, 0.001});
+  const nec_geometry_completion_result& expected =
+    native.complete_geometry(symmetry);
+
+  std::unique_ptr<necpp_wasm_v1_model, decltype(&necpp_wasm_v1_model_delete)>
+    abi(necpp_wasm_v1_model_create(), &necpp_wasm_v1_model_delete);
+  REQUIRE(abi != nullptr);
+  REQUIRE(necpp_wasm_v1_add_wire(
+    abi.get(), 1, 11,
+    0.25, 0.25, 0.1,
+    0.25, 0.25, 0.4,
+    0.001) == NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_complete_geometry_symmetric(
+    abi.get(), NECPP_WASM_V1_GROUND_CONNECTION_NONE,
+    NECPP_WASM_V1_SYMMETRY_REFLECTION,
+    NECPP_WASM_V1_REFLECTION_PLANE_X |
+      NECPP_WASM_V1_REFLECTION_PLANE_Y,
+    1) == NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_geometry_symmetry_kind(abi.get()) ==
+          static_cast<int32_t>(expected.symmetry.kind));
+  REQUIRE(necpp_wasm_v1_geometry_section_count(abi.get()) ==
+          expected.section_count);
+  REQUIRE(necpp_wasm_v1_geometry_fundamental_segment_count(abi.get()) ==
+          expected.fundamental_segment_count);
+  REQUIRE(necpp_wasm_v1_geometry_full_segment_count(abi.get()) ==
+          expected.full_segment_count);
+}
 
 TEST_CASE("WP4 bulk ABI buffers reproduce native results",
           "[wp4][wasm_abi][numerical_contract]")

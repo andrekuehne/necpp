@@ -10,6 +10,18 @@ export {
 } from "./errors.js";
 
 export { abiVersion, engineVersion, packageVersion } from "./versions.js";
+export { rotationalOrder } from "./symmetry.js";
+export { analyzeArraySymmetry, createExplicitArrayBuildPlan } from "./array-symmetry.js";
+export {
+  applyArrayBuildPlan,
+  createNecArraySolver,
+  gatherComplexMatrix,
+  gatherComplexVector,
+  gatherEmbeddedBasis,
+  rephaseFarField,
+  scatterComplexVector,
+} from "./array-solver.js";
+export type { AppliedArrayBuildPlan } from "./array-solver.js";
 
 export type { NecErrorCode, NecErrorOptions } from "./errors.js";
 
@@ -17,26 +29,38 @@ export { createNecWorkerModel } from "./worker-client.js";
 
 export type {
   AngleSweep,
+  ArrayBuildPlan,
+  ArrayElementId,
+  ArrayElementMapping,
+  ArraySolverDiagnostics,
+  CartesianSignsTransform,
   CartesianPointM,
+  CanonicalArrayElement,
   CompleteGeometryOptions,
   ComplexMatrix,
   ComplexVector,
   ConductivityLoad,
+  CreateArraySolverOptions,
   CreateNecModelOptions,
   CreateNecWorkerModelOptions,
   DistributedParallelRlcLoad,
   DistributedSeriesRlcLoad,
   EmbeddedFarFieldResult,
   EmbeddedFieldNormalization,
+  ElementWirePattern,
   FarFieldRequest,
   FarFieldResult,
   FiniteGround,
   FreeSpaceGround,
+  FullArrayDescription,
+  GeometryCompletionResult,
+  GeometrySymmetry,
   GroundConnection,
   GroundModel,
   ImpedanceLoad,
   ImpedanceResult,
   LoadDefinition,
+  NecArraySolver,
   NecModelState,
   NecWorkerModel,
   NecWorkerOperation,
@@ -46,8 +70,29 @@ export type {
   PerfectGround,
   PortDefinition,
   PortSolution,
+  PositionCanonicalization,
+  PositionedArrayElement,
   PrepareOptions,
+  ReflectionPlane,
+  ReflectionSymmetry,
+  RelativeLoadDefinition,
+  RelativePortDefinition,
+  RelativeSegmentSelection,
+  RelativeWireDefinition,
+  RotationalOrder,
+  RotationalSymmetry,
+  RotateZTransform,
   SegmentSelection,
   SeriesRlcLoad,
+  SymmetryCopy,
+  SymmetryCopyTransform,
+  SymmetryExpansion,
+  SymmetryFailureClassification,
+  SymmetryFailureReason,
+  SymmetrizationReason,
+  SymmetrizationReasonCode,
+  SymmetrizerDiagnostics,
+  SymmetrizerOptions,
+  SymmetryCandidateDiagnostics,
   WireDefinition,
 } from "./types.js";

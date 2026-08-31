@@ -30,6 +30,7 @@ function createFakeModel(overrides = {}) {
     },
     completeGeometry() {
       state = "geometry-complete";
+      return {};
     },
     definePorts(nextPorts) {
       ports.splice(0, ports.length, ...snapshotPorts(nextPorts));
@@ -213,15 +214,59 @@ test("the worker runtime preserves state across serialized requests", async () =
   }, deps);
   assert.equal(fake.state, "geometry-building");
 
-  await handleWorkerRequest(session, {
+  const completed = await handleWorkerRequest(session, {
     id: 3,
     kind: "invoke",
     method: "completeGeometry",
     args: [],
   }, deps);
   assert.equal(fake.state, "geometry-complete");
+  assert.equal(completed.response.kind, "ok");
+  assert.deepEqual(completed.response.result, {});
   assert.ok(progress.includes("create:start"));
   assert.ok(progress.includes("addWire:complete"));
+});
+
+test("worker completion preserves progress and revives immutable symmetry metadata", async () => {
+  const progress = [];
+  const fake = createFakeModel({
+    completeGeometry() {
+      return {
+        symmetry: {
+          kind: "reflection",
+          sectionCount: 4,
+          fundamentalSegmentCount: 11,
+          fullSegmentCount: 44,
+          copies: [
+            { index: 0, tagOffset: 0, transform: { kind: "cartesian-signs", signs: [1, 1, 1] } },
+            { index: 1, tagOffset: 1, transform: { kind: "cartesian-signs", signs: [1, -1, 1] } },
+            { index: 2, tagOffset: 2, transform: { kind: "cartesian-signs", signs: [-1, 1, 1] } },
+            { index: 3, tagOffset: 3, transform: { kind: "cartesian-signs", signs: [-1, -1, 1] } },
+          ],
+        },
+      };
+    },
+  });
+  const model = await createNecWorkerModelFromHost(
+    createLoopbackHost(async () => fake),
+    { onProgress: (event) => progress.push(`${event.operation}:${event.phase}`) },
+  );
+  await model.addWire(dipoleWire);
+  const completion = await model.completeGeometry({
+    symmetry: {
+      kind: "reflection",
+      planes: ["x=0", "y=0"],
+      tagIncrement: 1,
+    },
+  });
+  assert.equal(completion.symmetry.sectionCount, 4);
+  assert.ok(Object.isFrozen(completion));
+  assert.ok(Object.isFrozen(completion.symmetry));
+  assert.ok(Object.isFrozen(completion.symmetry.copies));
+  assert.ok(Object.isFrozen(completion.symmetry.copies[0].transform.signs));
+  assert.ok(progress.includes("completeGeometry:start"));
+  assert.ok(progress.includes("completeGeometry:complete"));
+  await model.dispose();
 });
 
 test("worker client serializes operations, reports progress, and transfers fields", async () => {

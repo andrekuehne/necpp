@@ -8,6 +8,11 @@ import {
   NecStateError,
 } from "./errors.js";
 import { transitionModelState, type ModelOperation } from "./state-machine.js";
+import {
+  createSymmetryExpansion,
+  validateGeometrySymmetry,
+  type ValidatedGeometrySymmetry,
+} from "./symmetry.js";
 import type {
   ComplexMatrix,
   ComplexVector,
@@ -16,6 +21,7 @@ import type {
   EmbeddedFieldNormalization,
   FarFieldRequest,
   FarFieldResult,
+  GeometryCompletionResult,
   GroundModel,
   ImpedanceResult,
   LoadDefinition,
@@ -245,6 +251,25 @@ function snapshotPorts(ports: readonly PortDefinition[]): readonly PortDefinitio
   )));
 }
 
+function incompatibleGroundError(message: string): never {
+  throw new NecGeometryError(message, {
+    details: { symmetryFailure: "INCOMPATIBLE_GROUND" },
+  });
+}
+
+function checkedNativeSegmentCount(value: bigint, name: string): number {
+  if (
+    typeof value !== "bigint"
+    || value < 0n
+    || value > BigInt(Number.MAX_SAFE_INTEGER)
+  ) {
+    throw new NecRuntimeError(`Native ${name} is outside the safe integer range`, {
+      details: { name, value },
+    });
+  }
+  return Number(value);
+}
+
 function nativeState(value: number): Exclude<NecModelState, "disposed"> {
   switch (value) {
   case 0:
@@ -267,6 +292,8 @@ export class WasmNecModel implements NecModel {
   #handle: number;
   #state: NecModelState = "empty";
   #ports: readonly PortDefinition[] = Object.freeze([]);
+  #maximumWireTag = 0;
+  #geometrySymmetry: ValidatedGeometrySymmetry | undefined;
 
   constructor(module: NecWasmModule, handle: number) {
     this.#moduleStorage = module;
@@ -351,9 +378,15 @@ export class WasmNecModel implements NecModel {
     }
   }
 
-  #statusError(status: number, operation: ModelOperation): never {
+  #statusError(
+    status: number,
+    operation: ModelOperation,
+    symmetryFailure?: "INCOMPATIBLE_GROUND" | "INCOMPLETE_LOAD_ORBIT",
+  ): never {
     const message = this.#lastError() || `${operation} failed with native status ${status}`;
-    const details = { operation, nativeStatus: status };
+    const details = symmetryFailure === undefined || status !== STATUS_GEOMETRY
+      ? { operation, nativeStatus: status }
+      : { operation, nativeStatus: status, symmetryFailure };
     switch (status) {
     case STATUS_STATE:
       throw new NecStateError(operation, this.#state, message);
@@ -377,7 +410,11 @@ export class WasmNecModel implements NecModel {
     }
   }
 
-  #invokeStatus(operation: ModelOperation, call: () => number): void {
+  #invokeStatus(
+    operation: ModelOperation,
+    call: () => number,
+    symmetryFailure?: "INCOMPATIBLE_GROUND" | "INCOMPLETE_LOAD_ORBIT",
+  ): void {
     let status: number;
     try {
       status = call();
@@ -397,8 +434,68 @@ export class WasmNecModel implements NecModel {
       });
     }
     if (status !== STATUS_OK) {
-      this.#statusError(status, operation);
+      this.#statusError(status, operation, symmetryFailure);
     }
+  }
+
+  #completionResult(
+    symmetry: ValidatedGeometrySymmetry | undefined,
+  ): GeometryCompletionResult {
+    return this.#readResult("completeGeometry", () => {
+      const nativeKind = this.#module._necpp_wasm_v1_geometry_symmetry_kind(
+        this.#handle,
+      );
+      const sectionCount = this.#module._necpp_wasm_v1_geometry_section_count(
+        this.#handle,
+      );
+      const fundamentalRaw =
+        this.#module._necpp_wasm_v1_geometry_fundamental_segment_count(
+          this.#handle,
+        );
+      const fullRaw = this.#module._necpp_wasm_v1_geometry_full_segment_count(
+        this.#handle,
+      );
+      const fundamentalSegmentCount = checkedNativeSegmentCount(
+        fundamentalRaw,
+        "fundamental segment count",
+      );
+      const fullSegmentCount = checkedNativeSegmentCount(
+        fullRaw,
+        "full segment count",
+      );
+      const expectedKind = symmetry?.nativeKind ?? 0;
+      const expectedSections = symmetry?.sectionCount ?? 1;
+      if (
+        nativeKind !== expectedKind
+        || sectionCount !== expectedSections
+        || !Number.isSafeInteger(sectionCount)
+        || fullRaw !== fundamentalRaw * BigInt(sectionCount)
+      ) {
+        throw new NecRuntimeError(
+          "Native geometry completion metadata is inconsistent",
+          {
+            details: {
+              nativeKind,
+              expectedKind,
+              sectionCount,
+              expectedSections,
+              fundamentalSegmentCount,
+              fullSegmentCount,
+            },
+          },
+        );
+      }
+      if (symmetry === undefined) {
+        return Object.freeze({});
+      }
+      return Object.freeze({
+        symmetry: createSymmetryExpansion(
+          symmetry,
+          fundamentalSegmentCount,
+          fullSegmentCount,
+        ),
+      });
+    });
   }
 
   #readResult<T>(operation: ModelOperation, read: () => T): T {
@@ -547,9 +644,12 @@ export class WasmNecModel implements NecModel {
       end[2],
       radiusM,
     ));
+    this.#maximumWireTag = Math.max(this.#maximumWireTag, tag);
   }
 
-  completeGeometry(options: CompleteGeometryOptions = {}): void {
+  completeGeometry(
+    options: CompleteGeometryOptions = {},
+  ): GeometryCompletionResult {
     this.#assertOperation("completeGeometry");
     const record = requireRecord(options, "options");
     const connection = record.groundConnection ?? "none";
@@ -560,13 +660,37 @@ export class WasmNecModel implements NecModel {
         : connection === "zero-current"
           ? 2
           : inputError("Unknown ground connection", { connection });
-    this.#invokeStatus(
-      "completeGeometry",
-      () => this.#module._necpp_wasm_v1_complete_geometry(
-        this.#handle,
-        nativeConnection,
-      ),
-    );
+    const symmetry = record.symmetry === undefined
+      ? undefined
+      : validateGeometrySymmetry(record.symmetry, this.#maximumWireTag);
+    if (symmetry?.reflectsZ === true && nativeConnection !== 0) {
+      incompatibleGroundError(
+        "Structural reflection through z=0 is incompatible with ground connection",
+      );
+    }
+    if (symmetry === undefined) {
+      this.#invokeStatus(
+        "completeGeometry",
+        () => this.#module._necpp_wasm_v1_complete_geometry(
+          this.#handle,
+          nativeConnection,
+        ),
+      );
+    } else {
+      this.#invokeStatus(
+        "completeGeometry",
+        () => this.#module._necpp_wasm_v1_complete_geometry_symmetric(
+          this.#handle,
+          nativeConnection,
+          symmetry.nativeKind,
+          symmetry.parameter,
+          symmetry.tagIncrement,
+        ),
+      );
+    }
+    const result = this.#completionResult(symmetry);
+    this.#geometrySymmetry = symmetry;
+    return result;
   }
 
   definePorts(ports: readonly PortDefinition[]): void {
@@ -704,12 +828,17 @@ export class WasmNecModel implements NecModel {
     default:
       return inputError("Unknown ground kind", { kind: record.kind });
     }
+    if (kind !== 0 && this.#geometrySymmetry?.reflectsZ === true) {
+      incompatibleGroundError(
+        "Structural reflection through z=0 is incompatible with ground",
+      );
+    }
     this.#invokeStatus("setGround", () => this.#module._necpp_wasm_v1_set_ground(
       this.#handle,
       kind,
       relativePermittivity,
       conductivitySPerM,
-    ));
+    ), this.#geometrySymmetry === undefined ? undefined : "INCOMPATIBLE_GROUND");
   }
 
   prepare(options: PrepareOptions): void {
@@ -722,6 +851,7 @@ export class WasmNecModel implements NecModel {
     this.#invokeStatus(
       "prepare",
       () => this.#module._necpp_wasm_v1_prepare(this.#handle, frequencyMHz),
+      this.#geometrySymmetry === undefined ? undefined : "INCOMPLETE_LOAD_ORBIT",
     );
   }
 
@@ -987,6 +1117,8 @@ export class WasmNecModel implements NecModel {
     this.#moduleStorage = undefined;
     this.#state = "disposed";
     this.#ports = Object.freeze([]);
+    this.#geometrySymmetry = undefined;
+    this.#maximumWireTag = 0;
     try {
       module?._necpp_wasm_v1_model_delete(handle);
     } catch {
