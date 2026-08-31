@@ -23,6 +23,8 @@
 #include "nec_ground.h"
 #include "c_plot_card.h"
 
+#include <cstdint>
+
 
 
 /** \brief The types of polarization that gain normalization should be done with
@@ -44,6 +46,18 @@ enum polarization_sense {
 };
 
 class nec_context;
+
+struct nec_radiation_pattern_diagnostics
+{
+  bool enabled = false;
+  nec_float raw_accumulation_ms = 0.0;
+  nec_float derived_work_ms = 0.0;
+  nec_float analyze_total_ms = 0.0;
+  uint64_t evaluated_directions = 0;
+  uint64_t segment_count = 0;
+  uint64_t ground_image_count = 0;
+  uint64_t segment_direction_contributions = 0;
+};
 
 class nec_radiation_pattern : public nec_base_result
 {
@@ -69,6 +83,9 @@ public:
   }
           
   void analyze(nec_context* in_context);
+  const nec_radiation_pattern_diagnostics& diagnostics() const {
+    return m_diagnostics;
+  }
   
   void write_gain_normalization()  {
     if (_ifar != 1) {
@@ -458,6 +475,8 @@ private:
   nec_float get_gain_normalization_factor(nec_float gnor);
   
   void write_normalized_gain(ostream& os);
+
+  nec_radiation_pattern_diagnostics m_diagnostics;
   
   nec_ground m_ground;
   c_plot_card m_plot_card;

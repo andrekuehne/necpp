@@ -13,6 +13,12 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = Resolve-Path (Join-Path $ScriptDir "..")
 $BuildDir = "build-wasm"
 $WasmImage = "emscripten/emsdk:4.0.7"
+$EnablePerformanceDiagnostics = if ($env:NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS) {
+    $env:NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+} else { "OFF" }
+$EnableWasmSimd = if ($env:NECPP_ENABLE_WASM_SIMD) {
+    $env:NECPP_ENABLE_WASM_SIMD
+} else { "OFF" }
 
 Set-Location $ProjectDir
 
@@ -38,6 +44,8 @@ Write-Host "=== Building WASM via Emscripten Docker image: $WasmImage ==="
 
 docker run --rm `
     -e "BUILD_DIR=$BuildDir" `
+    -e "ENABLE_PERFORMANCE_DIAGNOSTICS=$EnablePerformanceDiagnostics" `
+    -e "ENABLE_WASM_SIMD=$EnableWasmSimd" `
     -v "${ProjectDir}:/src" `
     -w /src `
     $WasmImage `

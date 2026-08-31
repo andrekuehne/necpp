@@ -1,0 +1,853 @@
+{
+  "type": "far-field-summary",
+  "schemaVersion": 1,
+  "measuredAt": "2026-08-31T21:24:02.627Z",
+  "command": "\"C:\\\\nvm4w\\\\nodejs\\\\node.exe\" \"C:\\\\Users\\\\andre\\\\VSCode_Projects\\\\necpp\\\\packages\\\\necpp-wasm\\\\bench\\\\far-field-benchmark.mjs\" \"--output-directory\" \"bench/results/far-field-wp0-final/scalar-sampled\" \"--module-directory\" \"bench/results/far-field-wp0-final/artifacts/scalar-sampled\" \"--rounds\" \"5\" \"--warmups\" \"1\" \"--backends\" \"direct,worker\" \"--grids\" \"primary,secondary\" \"--extract-matrix\" \"true\" \"--variant\" \"release-scalar-sampled-instrumented\" \"--build-flags\" \"-O3 -DNDEBUG -flto -fexceptions; diagnostics=ON/256; simd=OFF\"",
+  "configuration": {
+    "rounds": 5,
+    "warmups": 1,
+    "backends": [
+      "direct",
+      "worker"
+    ],
+    "grids": [
+      "primary",
+      "secondary"
+    ],
+    "extractMatrix": true,
+    "variant": "release-scalar-sampled-instrumented",
+    "buildFlags": "-O3 -DNDEBUG -flto -fexceptions; diagnostics=ON/256; simd=OFF",
+    "requireDiagnostics": true,
+    "moduleDirectory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp0-final\\artifacts\\scalar-sampled"
+  },
+  "fixture": {
+    "schemaVersion": 1,
+    "fixtureId": "pav-ng-8x8-x-dipole-v1",
+    "geometry": {
+      "side": 8,
+      "elements": 64,
+      "segmentsPerElement": 11,
+      "totalSegments": 704,
+      "frequencyMHz": 10000,
+      "wavelengthM": 0.0299792458,
+      "spacingM": 0.0149896229,
+      "lengthM": 0.014090245525999998,
+      "radiusM": 0.0000299792458,
+      "heightM": 0.00749481145,
+      "feedSegment": 6,
+      "orientation": "x-directed",
+      "ground": "infinite-perfect",
+      "groundConnection": "none"
+    },
+    "grids": {
+      "primary": {
+        "id": "primary-256-display",
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 181,
+          "stepDeg": 0.5
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 360,
+          "stepDeg": 1
+        }
+      },
+      "secondary": {
+        "id": "consumer-derived-32x32-display",
+        "derivation": {
+          "display": {
+            "n1": 32,
+            "n2": 32
+          },
+          "apertureLambda": 5.419747468305833,
+          "kD": 34.05327766148297,
+          "requestedStepDeg": 1.3214586991401025
+        },
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 69,
+          "stepDeg": 1.3235294117647058
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 272,
+          "stepDeg": 1.3235294117647058
+        }
+      }
+    },
+    "steering": [
+      {
+        "id": "broadside",
+        "u": 0,
+        "v": 0,
+        "requestedChecksum": {
+          "sha256": "ca38cc89646b9cd9290a769f54e81852a1d9aa70f2286792f741dc4937f59925",
+          "sumReal": 64,
+          "sumImag": 0,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "positive-u",
+        "u": 0.25,
+        "v": 0,
+        "requestedChecksum": {
+          "sha256": "0350938ee155954c87bdb12cebfebc2584d2d8f126d174a4bfbb865004e93bde",
+          "sumReal": 1.6653345369377348e-15,
+          "sumImag": 1.6653345369377348e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-u",
+        "u": -0.25,
+        "v": 0,
+        "requestedChecksum": {
+          "sha256": "dc4761c06459325fe0d767b919ab48fd4188159c8250a477423713d1d187019b",
+          "sumReal": 1.6653345369377348e-15,
+          "sumImag": -1.6653345369377348e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "positive-v",
+        "u": 0,
+        "v": 0.25,
+        "requestedChecksum": {
+          "sha256": "548a90579c2debd93c149335a50ddafee5b6c5709be47dac71de74f2f4372a9b",
+          "sumReal": -1.1102230246251565e-15,
+          "sumImag": -5.551115123125783e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-v",
+        "u": 0,
+        "v": -0.25,
+        "requestedChecksum": {
+          "sha256": "0a4860216b64f9ea5e0ae4cc536d7974b23f434be26202d1c2db4e999b038fcd",
+          "sumReal": -1.1102230246251565e-15,
+          "sumImag": 5.551115123125783e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "positive-diagonal",
+        "u": 0.25,
+        "v": 0.25,
+        "requestedChecksum": {
+          "sha256": "4c15a06a16d52b87943cff35ac91f42bc5e2376bc80f9a0c616fcdc53189758a",
+          "sumReal": -5.551115123125783e-16,
+          "sumImag": 2.220446049250313e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-u-diagonal",
+        "u": -0.25,
+        "v": 0.25,
+        "requestedChecksum": {
+          "sha256": "dae86a165706198ccbbfbfa588021ef84b57d54b8eba8e4f2338a136e96ff9d4",
+          "sumReal": -1.3322676295501878e-15,
+          "sumImag": 0,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-v-diagonal",
+        "u": 0.25,
+        "v": -0.25,
+        "requestedChecksum": {
+          "sha256": "0eb276cb1ff560fec88abaa043cd094ecc4a042d233489e5be1374ea48c60a6d",
+          "sumReal": -1.3322676295501878e-15,
+          "sumImag": 0,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-diagonal",
+        "u": -0.25,
+        "v": -0.25,
+        "requestedChecksum": {
+          "sha256": "c328737b01c99d826f4a341dda5bd8bf88781580af27a7c2d214cbf46a86dbf0",
+          "sumReal": -5.551115123125783e-16,
+          "sumImag": -2.220446049250313e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "near-edge",
+        "u": 0.65,
+        "v": 0.35,
+        "requestedChecksum": {
+          "sha256": "602906112f63c81e6b4c7f9459a03c7f8fa60ffdde6d779b12b805190d1ceb0d",
+          "sumReal": -2.030307237113455,
+          "sumImag": -4.440892098500626e-16,
+          "l2Norm": 8
+        }
+      }
+    ]
+  },
+  "rawNdjson": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp0-final\\scalar-sampled\\far-field-wp0-raw.ndjson",
+  "checksumParity": {
+    "compared": 10,
+    "failures": []
+  },
+  "cases": {
+    "release-scalar-sampled-instrumented:direct:primary": {
+      "caseCount": 5,
+      "steeringStatesPerCase": 10,
+      "samplesPerField": 65160,
+      "resultBytes": 2089448,
+      "initial": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 2.8455000000000155,
+          "median": 2.99879999999996,
+          "maximum": 4.562400000000025,
+          "p90": 4.562400000000025
+        },
+        "fieldMs": {
+          "count": 5,
+          "minimum": 4060.0874,
+          "median": 4736.808800000001,
+          "maximum": 5677.6923,
+          "p90": 5677.6923
+        },
+        "solveAndFieldMs": {
+          "count": 5,
+          "minimum": 4063.0861999999997,
+          "median": 4741.3712000000005,
+          "maximum": 5680.5378,
+          "p90": 5680.5378
+        }
+      },
+      "repeated": {
+        "solveMs": {
+          "count": 45,
+          "minimum": 1.4653000000034808,
+          "median": 2.580900000000838,
+          "maximum": 6.55710000000181,
+          "p90": 4.3716999999996915
+        },
+        "fieldMs": {
+          "count": 45,
+          "minimum": 4045.4568999999974,
+          "median": 4834.979200000002,
+          "maximum": 8219.598999999998,
+          "p90": 8042.942800000004
+        },
+        "solveAndFieldMs": {
+          "count": 45,
+          "minimum": 4046.922200000001,
+          "median": 4837.3369999999995,
+          "maximum": 8222.146999999997,
+          "p90": 8045.589600000007
+        },
+        "phasesMs": {
+          "validation": {
+            "count": 45,
+            "minimum": 0.007900000000518048,
+            "median": 0.015800000001036096,
+            "maximum": 0.036400000000867294,
+            "p90": 0.024400000000241562
+          },
+          "rawAccumulation": {
+            "count": 45,
+            "minimum": 3631.939,
+            "median": 4359.7701,
+            "maximum": 7354.9555,
+            "p90": 7216.5565
+          },
+          "derivedRpWork": {
+            "count": 45,
+            "minimum": 404.9203,
+            "median": 489.1184,
+            "maximum": 886.2152000000001,
+            "p90": 825.7736000000006
+          },
+          "nativeResultCopy": {
+            "count": 45,
+            "minimum": 0.1222,
+            "median": 0.1738,
+            "maximum": 0.6872,
+            "p90": 0.2813
+          },
+          "abiResultCopy": {
+            "count": 45,
+            "minimum": 0.3849,
+            "median": 0.4829,
+            "maximum": 1.0652,
+            "p90": 0.8088
+          },
+          "typescriptExtraction": {
+            "count": 45,
+            "minimum": 0.46750000000065484,
+            "median": 0.6730000000025029,
+            "maximum": 1.4966000000022177,
+            "p90": 0.936200000000099
+          },
+          "facadeResidual": {
+            "count": 45,
+            "minimum": 0.02050000000235741,
+            "median": 0.027800000003480818,
+            "maximum": 0.06600000000071304,
+            "p90": 0.04469999999855645
+          }
+        }
+      },
+      "lifecycle": {
+        "createMs": {
+          "count": 5,
+          "minimum": 5.558700000000002,
+          "median": 7.239600000000003,
+          "maximum": 7.6066,
+          "p90": 7.6066
+        },
+        "prepareMs": {
+          "count": 5,
+          "minimum": 308.2003,
+          "median": 315.1893,
+          "maximum": 360.19849999999997,
+          "p90": 360.19849999999997
+        },
+        "matrixMs": {
+          "count": 5,
+          "minimum": 127.92269999999996,
+          "median": 145.72180000000003,
+          "maximum": 164.5229,
+          "p90": 164.5229
+        },
+        "secondGridFieldMs": {
+          "count": 5,
+          "minimum": 1168.5353999999934,
+          "median": 2247.5616999999984,
+          "maximum": 2342.9619000000093,
+          "p90": 2342.9619000000093
+        },
+        "disposeMs": {
+          "count": 5,
+          "minimum": 0.33030000000144355,
+          "median": 0.4245999999984633,
+          "maximum": 0.47049999999580905,
+          "p90": 0.47049999999580905
+        },
+        "totalMs": {
+          "count": 5,
+          "minimum": 42419.7724,
+          "median": 50657.399399999995,
+          "maximum": 80690.90550000001,
+          "p90": 80690.90550000001
+        }
+      },
+      "memory": {
+        "peakRssBytes": {
+          "count": 5,
+          "minimum": 140476416,
+          "median": 141643776,
+          "maximum": 141729792,
+          "p90": 141729792
+        },
+        "peakObservedRssDeltaBytes": {
+          "count": 5,
+          "minimum": 81174528,
+          "median": 81952768,
+          "maximum": 82157568,
+          "p90": 82157568
+        }
+      }
+    },
+    "release-scalar-sampled-instrumented:worker:primary": {
+      "caseCount": 5,
+      "steeringStatesPerCase": 10,
+      "samplesPerField": 65160,
+      "resultBytes": 2089448,
+      "initial": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 2.891200000000026,
+          "median": 3.453300000000013,
+          "maximum": 4.156100000000038,
+          "p90": 4.156100000000038
+        },
+        "fieldMs": {
+          "count": 5,
+          "minimum": 4155.138000000001,
+          "median": 5322.6214,
+          "maximum": 6428.907,
+          "p90": 6428.907
+        },
+        "solveAndFieldMs": {
+          "count": 5,
+          "minimum": 4158.364600000001,
+          "median": 5325.5126,
+          "maximum": 6433.0631,
+          "p90": 6433.0631
+        }
+      },
+      "repeated": {
+        "solveMs": {
+          "count": 45,
+          "minimum": 2.217900000003283,
+          "median": 3.317300000002433,
+          "maximum": 7.7686999999987165,
+          "p90": 5.52270000000135
+        },
+        "fieldMs": {
+          "count": 45,
+          "minimum": 4090.3624999999993,
+          "median": 6015.8287000000055,
+          "maximum": 9205.2512,
+          "p90": 8241.7929
+        },
+        "solveAndFieldMs": {
+          "count": 45,
+          "minimum": 4092.9898999999987,
+          "median": 6019.797000000006,
+          "maximum": 9210.836000000001,
+          "p90": 8244.766
+        },
+        "phasesMs": {
+          "validation": {
+            "count": 45,
+            "minimum": 0.010000000000218279,
+            "median": 0.023600000000442378,
+            "maximum": 0.05099999999947613,
+            "p90": 0.03269999999611173
+          },
+          "rawAccumulation": {
+            "count": 45,
+            "minimum": 3665.9323,
+            "median": 5598.0068,
+            "maximum": 8138.302,
+            "p90": 7472.5556
+          },
+          "derivedRpWork": {
+            "count": 45,
+            "minimum": 396.44760000000014,
+            "median": 607.1461,
+            "maximum": 1066.3571000000006,
+            "p90": 857.566200000001
+          },
+          "nativeResultCopy": {
+            "count": 45,
+            "minimum": 0.1259,
+            "median": 0.1933,
+            "maximum": 0.5302,
+            "p90": 0.2819
+          },
+          "abiResultCopy": {
+            "count": 45,
+            "minimum": 0.3803,
+            "median": 0.5508,
+            "maximum": 1.0035,
+            "p90": 0.7502
+          },
+          "typescriptExtraction": {
+            "count": 45,
+            "minimum": 0.45969999999942956,
+            "median": 0.7016999999977998,
+            "maximum": 1.072599999999511,
+            "p90": 0.9164999999993597
+          },
+          "facadeResidual": {
+            "count": 45,
+            "minimum": 0.9727999999959138,
+            "median": 1.2310000000070431,
+            "maximum": 5.569799999997485,
+            "p90": 1.6759999999994761
+          }
+        }
+      },
+      "lifecycle": {
+        "createMs": {
+          "count": 5,
+          "minimum": 57.821099999999994,
+          "median": 62.05050000000001,
+          "maximum": 89.39929999999998,
+          "p90": 89.39929999999998
+        },
+        "prepareMs": {
+          "count": 5,
+          "minimum": 288.4663,
+          "median": 314.5826,
+          "maximum": 458.44259999999997,
+          "p90": 458.44259999999997
+        },
+        "matrixMs": {
+          "count": 5,
+          "minimum": 119.47070000000002,
+          "median": 142.356,
+          "maximum": 191.71820000000002,
+          "p90": 191.71820000000002
+        },
+        "secondGridFieldMs": {
+          "count": 5,
+          "minimum": 1186.1777000000002,
+          "median": 1484.4897000000055,
+          "maximum": 2268.7600999999995,
+          "p90": 2268.7600999999995
+        },
+        "disposeMs": {
+          "count": 5,
+          "minimum": 0.8695000000006985,
+          "median": 1.0161000000007334,
+          "maximum": 1.6337000000057742,
+          "p90": 1.6337000000057742
+        },
+        "totalMs": {
+          "count": 5,
+          "minimum": 51746.9821,
+          "median": 62900.384300000005,
+          "maximum": 80065.0211,
+          "p90": 80065.0211
+        }
+      },
+      "memory": {
+        "peakRssBytes": {
+          "count": 5,
+          "minimum": 161161216,
+          "median": 173568000,
+          "maximum": 174833664,
+          "p90": 174833664
+        },
+        "peakObservedRssDeltaBytes": {
+          "count": 5,
+          "minimum": 101543936,
+          "median": 113963008,
+          "maximum": 115507200,
+          "p90": 115507200
+        }
+      }
+    },
+    "release-scalar-sampled-instrumented:direct:secondary": {
+      "caseCount": 5,
+      "steeringStatesPerCase": 10,
+      "samplesPerField": 18768,
+      "resultBytes": 603304,
+      "initial": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 2.284599999999955,
+          "median": 3.1182999999999765,
+          "maximum": 3.9389000000001033,
+          "p90": 3.9389000000001033
+        },
+        "fieldMs": {
+          "count": 5,
+          "minimum": 1122.1229,
+          "median": 1180.2996,
+          "maximum": 1499.1326999999997,
+          "p90": 1499.1326999999997
+        },
+        "solveAndFieldMs": {
+          "count": 5,
+          "minimum": 1124.4104000000002,
+          "median": 1183.4179,
+          "maximum": 1503.0715999999998,
+          "p90": 1503.0715999999998
+        }
+      },
+      "repeated": {
+        "solveMs": {
+          "count": 45,
+          "minimum": 1.4324999999998909,
+          "median": 1.8237000000008265,
+          "maximum": 4.545600000000377,
+          "p90": 3.213300000000345
+        },
+        "fieldMs": {
+          "count": 45,
+          "minimum": 1103.2545000000002,
+          "median": 1329.4861,
+          "maximum": 2378.2006,
+          "p90": 2299.129000000001
+        },
+        "solveAndFieldMs": {
+          "count": 45,
+          "minimum": 1104.8667,
+          "median": 1331.2050000000008,
+          "maximum": 2380.8863999999994,
+          "p90": 2301.9258999999984
+        },
+        "phasesMs": {
+          "validation": {
+            "count": 45,
+            "minimum": 0.007100000000718865,
+            "median": 0.0117999999984022,
+            "maximum": 0.02959999999984575,
+            "p90": 0.019900000000234286
+          },
+          "rawAccumulation": {
+            "count": 45,
+            "minimum": 991.7273,
+            "median": 1172.6664,
+            "maximum": 2139.8861,
+            "p90": 2063.1748
+          },
+          "derivedRpWork": {
+            "count": 45,
+            "minimum": 110.13839999999979,
+            "median": 130.40499999999983,
+            "maximum": 257.8376000000001,
+            "p90": 235.26670000000001
+          },
+          "nativeResultCopy": {
+            "count": 45,
+            "minimum": 0.0397,
+            "median": 0.0614,
+            "maximum": 0.1689,
+            "p90": 0.1166
+          },
+          "abiResultCopy": {
+            "count": 45,
+            "minimum": 0.1112,
+            "median": 0.1524,
+            "maximum": 0.2514,
+            "p90": 0.2203
+          },
+          "typescriptExtraction": {
+            "count": 45,
+            "minimum": 0.1960999999996602,
+            "median": 0.2885999999998603,
+            "maximum": 0.6988999999994121,
+            "p90": 0.4252999999998792
+          },
+          "facadeResidual": {
+            "count": 45,
+            "minimum": 0.018399999999928696,
+            "median": 0.027700000000550062,
+            "maximum": 0.057499999998981366,
+            "p90": 0.046000000000276486
+          }
+        }
+      },
+      "lifecycle": {
+        "createMs": {
+          "count": 5,
+          "minimum": 5.8541000000000025,
+          "median": 5.9238,
+          "maximum": 8.514000000000003,
+          "p90": 8.514000000000003
+        },
+        "prepareMs": {
+          "count": 5,
+          "minimum": 281.1923,
+          "median": 327.3666,
+          "maximum": 395.8605,
+          "p90": 395.8605
+        },
+        "matrixMs": {
+          "count": 5,
+          "minimum": 120.44369999999998,
+          "median": 140.9688,
+          "maximum": 163.29059999999998,
+          "p90": 163.29059999999998
+        },
+        "secondGridFieldMs": {
+          "count": 5,
+          "minimum": 4088.4723000000013,
+          "median": 4867.062600000001,
+          "maximum": 8269.045699999999,
+          "p90": 8269.045699999999
+        },
+        "disposeMs": {
+          "count": 5,
+          "minimum": 0.3155000000006112,
+          "median": 0.3548000000009779,
+          "maximum": 0.5265999999974156,
+          "p90": 0.5265999999974156
+        },
+        "totalMs": {
+          "count": 5,
+          "minimum": 16616.436500000003,
+          "median": 19488.977199999998,
+          "maximum": 29324.731799999998,
+          "p90": 29324.731799999998
+        }
+      },
+      "memory": {
+        "peakRssBytes": {
+          "count": 5,
+          "minimum": 117936128,
+          "median": 118259712,
+          "maximum": 122593280,
+          "p90": 122593280
+        },
+        "peakObservedRssDeltaBytes": {
+          "count": 5,
+          "minimum": 58421248,
+          "median": 58777600,
+          "maximum": 62906368,
+          "p90": 62906368
+        }
+      }
+    },
+    "release-scalar-sampled-instrumented:worker:secondary": {
+      "caseCount": 5,
+      "steeringStatesPerCase": 10,
+      "samplesPerField": 18768,
+      "resultBytes": 603304,
+      "initial": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 3.4183000000000447,
+          "median": 4.146099999999933,
+          "maximum": 4.678899999999999,
+          "p90": 4.678899999999999
+        },
+        "fieldMs": {
+          "count": 5,
+          "minimum": 1152.1954,
+          "median": 1197.9495000000002,
+          "maximum": 1384.7576,
+          "p90": 1384.7576
+        },
+        "solveAndFieldMs": {
+          "count": 5,
+          "minimum": 1156.4735,
+          "median": 1201.3678000000002,
+          "maximum": 1389.4364999999998,
+          "p90": 1389.4364999999998
+        }
+      },
+      "repeated": {
+        "solveMs": {
+          "count": 45,
+          "minimum": 1.7264000000004671,
+          "median": 3.076100000000224,
+          "maximum": 5.452900000000227,
+          "p90": 4.345800000000963
+        },
+        "fieldMs": {
+          "count": 45,
+          "minimum": 1136.5802999999999,
+          "median": 1257.998300000001,
+          "maximum": 2610.8248000000003,
+          "p90": 2327.5401999999995
+        },
+        "solveAndFieldMs": {
+          "count": 45,
+          "minimum": 1138.6577,
+          "median": 1260.4454000000005,
+          "maximum": 2614.3697,
+          "p90": 2332.9930999999997
+        },
+        "phasesMs": {
+          "validation": {
+            "count": 45,
+            "minimum": 0.00959999999986394,
+            "median": 0.01860000000033324,
+            "maximum": 0.04490000000009786,
+            "p90": 0.030099999999947613
+          },
+          "rawAccumulation": {
+            "count": 45,
+            "minimum": 1024.4951,
+            "median": 1134.8817,
+            "maximum": 2367.8161,
+            "p90": 2099.1241
+          },
+          "derivedRpWork": {
+            "count": 45,
+            "minimum": 110.82939999999978,
+            "median": 124.79370000000014,
+            "maximum": 251.14509999999996,
+            "p90": 232.8120999999996
+          },
+          "nativeResultCopy": {
+            "count": 45,
+            "minimum": 0.0392,
+            "median": 0.0636,
+            "maximum": 0.2689,
+            "p90": 0.1197
+          },
+          "abiResultCopy": {
+            "count": 45,
+            "minimum": 0.1117,
+            "median": 0.1399,
+            "maximum": 0.3297,
+            "p90": 0.2293
+          },
+          "typescriptExtraction": {
+            "count": 45,
+            "minimum": 0.16610000000036962,
+            "median": 0.27109999999993306,
+            "maximum": 0.5388000000002648,
+            "p90": 0.46569999999974243
+          },
+          "facadeResidual": {
+            "count": 45,
+            "minimum": 0.4787000000005719,
+            "median": 0.7986999999993714,
+            "maximum": 1.3716000000003987,
+            "p90": 0.9861999999957334
+          }
+        }
+      },
+      "lifecycle": {
+        "createMs": {
+          "count": 5,
+          "minimum": 58.9216,
+          "median": 76.8274,
+          "maximum": 81.0419,
+          "p90": 81.0419
+        },
+        "prepareMs": {
+          "count": 5,
+          "minimum": 313.1725,
+          "median": 319.3386,
+          "maximum": 358.54560000000004,
+          "p90": 358.54560000000004
+        },
+        "matrixMs": {
+          "count": 5,
+          "minimum": 121.70820000000003,
+          "median": 139.8988,
+          "maximum": 161.73740000000004,
+          "p90": 161.73740000000004
+        },
+        "secondGridFieldMs": {
+          "count": 5,
+          "minimum": 4069.674799999999,
+          "median": 4916.6286,
+          "maximum": 7910.9005,
+          "p90": 7910.9005
+        },
+        "disposeMs": {
+          "count": 5,
+          "minimum": 0.7615000000005239,
+          "median": 1.0125999999982014,
+          "maximum": 1.5124999999970896,
+          "p90": 1.5124999999970896
+        },
+        "totalMs": {
+          "count": 5,
+          "minimum": 16515.3475,
+          "median": 20171.3197,
+          "maximum": 29180.3314,
+          "p90": 29180.3314
+        }
+      },
+      "memory": {
+        "peakRssBytes": {
+          "count": 5,
+          "minimum": 144330752,
+          "median": 145211392,
+          "maximum": 146264064,
+          "p90": 146264064
+        },
+        "peakObservedRssDeltaBytes": {
+          "count": 5,
+          "minimum": 84729856,
+          "median": 85803008,
+          "maximum": 86753280,
+          "p90": 86753280
+        }
+      }
+    }
+  }
+}

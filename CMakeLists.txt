@@ -45,6 +45,8 @@ option(NECPP_BUILD_DOCS     "Build the Doxygen documentation"              OFF)
 option(BUILD_SHARED_LIBS    "Also build a shared libnecpp in addition to the static one" ON)
 option(NECPP_ENABLE_LTO     "Enable link-time optimization (IPO) when supported" ON)
 option(NECPP_NATIVE_ARCH    "Optimize for the build machine's CPU (-march=native). Not for distributable binaries." OFF)
+option(NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+       "Enable calibrated far-field phase timing probes" OFF)
 
 # Emscripten's stack cannot grow with the heap.  Eigen's optimized, blocked LU
 # kernels exceed the SDK's small default stack on otherwise modest systems, so

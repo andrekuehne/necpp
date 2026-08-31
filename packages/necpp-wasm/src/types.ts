@@ -285,6 +285,30 @@ export interface FarFieldRequest {
   readonly phi: AngleSweep;
 }
 
+export interface FarFieldDiagnostics {
+  readonly instrumentationEnabled: boolean;
+  readonly validationMs: number;
+  readonly wasmCallMs: number;
+  readonly typescriptExtractionMs: number;
+  readonly packageTotalMs: number;
+  readonly native: {
+    readonly validationAllocationMs: number;
+    readonly resultReplacementMs: number;
+    readonly rawAccumulationMs: number;
+    readonly derivedRpWorkMs: number;
+    readonly resultCopyMs: number;
+    readonly totalMs: number;
+    readonly abiResultCopyMs: number;
+    readonly nativeAbiTotalMs: number;
+  };
+  readonly counts: {
+    readonly evaluatedDirections: number;
+    readonly segments: number;
+    readonly groundImages: number;
+    readonly segmentDirectionContributions: number;
+  };
+}
+
 export interface FarFieldResult {
   readonly radiusM: number;
   readonly frequencyMHz: number;
@@ -295,6 +319,8 @@ export interface FarFieldResult {
   readonly eThetaImag: Float64Array;
   readonly ePhiReal: Float64Array;
   readonly ePhiImag: Float64Array;
+  /** Present on ordinary fields produced by diagnostic-capable artifacts. */
+  readonly diagnostics?: FarFieldDiagnostics;
 }
 
 export type EmbeddedFieldNormalization =

@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "pav-ng-8x8-x-dipole-v1",
+  "geometry": {
+    "side": 8,
+    "elements": 64,
+    "segmentsPerElement": 11,
+    "totalSegments": 704,
+    "frequencyMHz": 10000,
+    "wavelengthM": 0.0299792458,
+    "spacingM": 0.0149896229,
+    "lengthM": 0.014090245525999998,
+    "radiusM": 0.0000299792458,
+    "heightM": 0.00749481145,
+    "feedSegment": 6,
+    "orientation": "x-directed",
+    "ground": "infinite-perfect",
+    "groundConnection": "none"
+  },
+  "grids": {
+    "primary": {
+      "id": "primary-256-display",
+      "radiusM": 1,
+      "theta": {
+        "startDeg": 0,
+        "count": 181,
+        "stepDeg": 0.5
+      },
+      "phi": {
+        "startDeg": 0,
+        "count": 360,
+        "stepDeg": 1
+      }
+    },
+    "secondary": {
+      "id": "consumer-derived-32x32-display",
+      "derivation": {
+        "display": {
+          "n1": 32,
+          "n2": 32
+        },
+        "apertureLambda": 5.419747468305833,
+        "kD": 34.05327766148297,
+        "requestedStepDeg": 1.3214586991401025
+      },
+      "radiusM": 1,
+      "theta": {
+        "startDeg": 0,
+        "count": 69,
+        "stepDeg": 1.3235294117647058
+      },
+      "phi": {
+        "startDeg": 0,
+        "count": 272,
+        "stepDeg": 1.3235294117647058
+      }
+    }
+  },
+  "steering": [
+    {
+      "id": "broadside",
+      "u": 0,
+      "v": 0,
+      "requestedChecksum": {
+        "sha256": "ca38cc89646b9cd9290a769f54e81852a1d9aa70f2286792f741dc4937f59925",
+        "sumReal": 64,
+        "sumImag": 0,
+        "l2Norm": 8
+      }
+    },
+    {
+      "id": "positive-u",
+      "u": 0.25,
+      "v": 0,
+      "requestedChecksum": {
+        "sha256": "0350938ee155954c87bdb12cebfebc2584d2d8f126d174a4bfbb865004e93bde",
+        "sumReal": 1.6653345369377348e-15,
+        "sumImag": 1.6653345369377348e-16,
+        "l2Norm": 8
+      }
+    },
+    {
+      "id": "negative-u",
+      "u": -0.25,
+      "v": 0,
+      "requestedChecksum": {
+        "sha256": "dc4761c06459325fe0d767b919ab48fd4188159c8250a477423713d1d187019b",
+        "sumReal": 1.6653345369377348e-15,
+        "sumImag": -1.6653345369377348e-16,
+        "l2Norm": 8
+      }
+    },
+    {
+      "id": "positive-v",
+      "u": 0,
+      "v": 0.25,
+      "requestedChecksum": {
+        "sha256": "548a90579c2debd93c149335a50ddafee5b6c5709be47dac71de74f2f4372a9b",
+        "sumReal": -1.1102230246251565e-15,
+        "sumImag": -5.551115123125783e-16,
+        "l2Norm": 8
+      }
+    },
+    {
+      "id": "negative-v",
+      "u": 0,
+      "v": -0.25,
+      "requestedChecksum": {
+        "sha256": "0a4860216b64f9ea5e0ae4cc536d7974b23f434be26202d1c2db4e999b038fcd",
+        "sumReal": -1.1102230246251565e-15,
+        "sumImag": 5.551115123125783e-16,
+        "l2Norm": 8
+      }
+    },
+    {
+      "id": "positive-diagonal",
+      "u": 0.25,
+      "v": 0.25,
+      "requestedChecksum": {
+        "sha256": "4c15a06a16d52b87943cff35ac91f42bc5e2376bc80f9a0c616fcdc53189758a",
+        "sumReal": -5.551115123125783e-16,
+        "sumImag": 2.220446049250313e-16,
+        "l2Norm": 8
+      }
+    },
+    {
+      "id": "negative-u-diagonal",
+      "u": -0.25,
+      "v": 0.25,
+      "requestedChecksum": {
+        "sha256": "dae86a165706198ccbbfbfa588021ef84b57d54b8eba8e4f2338a136e96ff9d4",
+        "sumReal": -1.3322676295501878e-15,
+        "sumImag": 0,
+        "l2Norm": 8
+      }
+    },
+    {
+      "id": "negative-v-diagonal",
+      "u": 0.25,
+      "v": -0.25,
+      "requestedChecksum": {
+        "sha256": "0eb276cb1ff560fec88abaa043cd094ecc4a042d233489e5be1374ea48c60a6d",
+        "sumReal": -1.3322676295501878e-15,
+        "sumImag": 0,
+        "l2Norm": 8
+      }
+    },
+    {
+      "id": "negative-diagonal",
+      "u": -0.25,
+      "v": -0.25,
+      "requestedChecksum": {
+        "sha256": "c328737b01c99d826f4a341dda5bd8bf88781580af27a7c2d214cbf46a86dbf0",
+        "sumReal": -5.551115123125783e-16,
+        "sumImag": -2.220446049250313e-16,
+        "l2Norm": 8
+      }
+    },
+    {
+      "id": "near-edge",
+      "u": 0.65,
+      "v": 0.35,
+      "requestedChecksum": {
+        "sha256": "602906112f63c81e6b4c7f9459a03c7f8fa60ffdde6d779b12b805190d1ceb0d",
+        "sumReal": -2.030307237113455,
+        "sumImag": -4.440892098500626e-16,
+        "l2Norm": 8
+      }
+    }
+  ]
+}

@@ -85,6 +85,22 @@ enum necpp_wasm_v1_embedded_normalization {
   NECPP_WASM_V1_UNIT_CURRENT = 1
 };
 
+enum necpp_wasm_v1_far_field_diagnostic_kind {
+  NECPP_WASM_V1_FF_DIAGNOSTICS_ENABLED = 0,
+  NECPP_WASM_V1_FF_VALIDATION_ALLOCATION_MS = 1,
+  NECPP_WASM_V1_FF_RESULT_REPLACEMENT_MS = 2,
+  NECPP_WASM_V1_FF_RAW_ACCUMULATION_MS = 3,
+  NECPP_WASM_V1_FF_DERIVED_RP_WORK_MS = 4,
+  NECPP_WASM_V1_FF_NATIVE_RESULT_COPY_MS = 5,
+  NECPP_WASM_V1_FF_NATIVE_TOTAL_MS = 6,
+  NECPP_WASM_V1_FF_ABI_RESULT_COPY_MS = 7,
+  NECPP_WASM_V1_FF_NATIVE_ABI_TOTAL_MS = 8,
+  NECPP_WASM_V1_FF_EVALUATED_DIRECTIONS = 9,
+  NECPP_WASM_V1_FF_SEGMENT_COUNT = 10,
+  NECPP_WASM_V1_FF_GROUND_IMAGE_COUNT = 11,
+  NECPP_WASM_V1_FF_SEGMENT_DIRECTION_CONTRIBUTIONS = 12
+};
+
 /*
  * Borrowed double buffers returned by necpp_wasm_v1_result_buffer().  A
  * successful operation replacing a result of the same category may invalidate
@@ -226,6 +242,8 @@ size_t necpp_wasm_v1_far_field_theta_count(
   const necpp_wasm_v1_model* model);
 size_t necpp_wasm_v1_far_field_phi_count(
   const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_far_field_diagnostic(
+  const necpp_wasm_v1_model* model, int32_t kind);
 
 double necpp_wasm_v1_embedded_radius_m(const necpp_wasm_v1_model* model);
 double necpp_wasm_v1_embedded_frequency_mhz(

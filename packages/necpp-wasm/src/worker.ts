@@ -49,6 +49,7 @@ export type {
   EmbeddedFieldNormalization,
   ElementWirePattern,
   FarFieldRequest,
+  FarFieldDiagnostics,
   FarFieldResult,
   FiniteGround,
   FreeSpaceGround,

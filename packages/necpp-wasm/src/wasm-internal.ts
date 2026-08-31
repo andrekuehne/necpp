@@ -114,6 +114,7 @@ export interface NecWasmModule {
   _necpp_wasm_v1_far_field_frequency_mhz(model: number): number;
   _necpp_wasm_v1_far_field_theta_count(model: number): number;
   _necpp_wasm_v1_far_field_phi_count(model: number): number;
+  _necpp_wasm_v1_far_field_diagnostic?(model: number, kind: number): number;
 
   _necpp_wasm_v1_embedded_radius_m(model: number): number;
   _necpp_wasm_v1_embedded_frequency_mhz(model: number): number;

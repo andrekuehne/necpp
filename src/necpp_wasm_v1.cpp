@@ -13,6 +13,7 @@
 #include "nec_stateful_model.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <complex>
 #include <exception>
@@ -115,6 +116,9 @@ struct far_field_buffers {
   split_complex_buffer e_phi;
   double radius_m = 0.0;
   double frequency_mhz = 0.0;
+  nec_far_field_phase_diagnostics diagnostics;
+  double abi_result_copy_ms = 0.0;
+  double native_abi_total_ms = 0.0;
   bool available = false;
 
   void clear()
@@ -125,6 +129,9 @@ struct far_field_buffers {
     e_phi.clear();
     radius_m = 0.0;
     frequency_mhz = 0.0;
+    diagnostics = nec_far_field_phase_diagnostics();
+    abi_result_copy_ms = 0.0;
+    native_abi_total_ms = 0.0;
     available = false;
   }
 };
@@ -347,6 +354,7 @@ void sync_far_field(
   next.e_phi.assign(result.e_phi);
   next.radius_m = result.radius_m;
   next.frequency_mhz = result.frequency_mhz;
+  next.diagnostics = result.diagnostics;
   next.available = true;
   model.far_field = std::move(next);
 }
@@ -951,13 +959,27 @@ int32_t necpp_wasm_v1_compute_far_field(
     return fail(model, NECPP_WASM_V1_INPUT_ERROR,
       "Invalid far-field grid");
   bool native_succeeded = false;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  const auto native_abi_started = std::chrono::steady_clock::now();
+#endif
   const int32_t status = invoke(model, NECPP_WASM_V1_SOLVER_ERROR, [&] {
     const nec_far_field_result& result = model->native.compute_far_field(
       make_grid(
         radius_m, theta_start_deg, theta_count, theta_step_deg,
         phi_start_deg, phi_count, phi_step_deg));
     native_succeeded = true;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+    const auto abi_copy_started = std::chrono::steady_clock::now();
+#endif
     sync_far_field(*model, result);
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+    model->far_field.abi_result_copy_ms =
+      std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - abi_copy_started).count();
+    model->far_field.native_abi_total_ms =
+      std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - native_abi_started).count();
+#endif
   });
   if (status != NECPP_WASM_V1_OK && native_succeeded)
     model->far_field.clear();
@@ -1175,6 +1197,45 @@ size_t necpp_wasm_v1_far_field_phi_count(
 {
   return model != nullptr && model->far_field.available
     ? model->far_field.phi_deg.size() : 0;
+}
+
+double necpp_wasm_v1_far_field_diagnostic(
+  const necpp_wasm_v1_model* model, int32_t kind)
+{
+  if (model == nullptr || !model->far_field.available)
+    return 0.0;
+  const far_field_buffers& field = model->far_field;
+  const nec_far_field_phase_diagnostics& diagnostics = field.diagnostics;
+  switch (kind) {
+  case NECPP_WASM_V1_FF_DIAGNOSTICS_ENABLED:
+    return diagnostics.enabled ? 1.0 : 0.0;
+  case NECPP_WASM_V1_FF_VALIDATION_ALLOCATION_MS:
+    return diagnostics.validation_allocation_ms;
+  case NECPP_WASM_V1_FF_RESULT_REPLACEMENT_MS:
+    return diagnostics.result_replacement_ms;
+  case NECPP_WASM_V1_FF_RAW_ACCUMULATION_MS:
+    return diagnostics.raw_accumulation_ms;
+  case NECPP_WASM_V1_FF_DERIVED_RP_WORK_MS:
+    return diagnostics.derived_rp_work_ms;
+  case NECPP_WASM_V1_FF_NATIVE_RESULT_COPY_MS:
+    return diagnostics.native_result_copy_ms;
+  case NECPP_WASM_V1_FF_NATIVE_TOTAL_MS:
+    return diagnostics.native_total_ms;
+  case NECPP_WASM_V1_FF_ABI_RESULT_COPY_MS:
+    return field.abi_result_copy_ms;
+  case NECPP_WASM_V1_FF_NATIVE_ABI_TOTAL_MS:
+    return field.native_abi_total_ms;
+  case NECPP_WASM_V1_FF_EVALUATED_DIRECTIONS:
+    return static_cast<double>(diagnostics.evaluated_directions);
+  case NECPP_WASM_V1_FF_SEGMENT_COUNT:
+    return static_cast<double>(diagnostics.segment_count);
+  case NECPP_WASM_V1_FF_GROUND_IMAGE_COUNT:
+    return static_cast<double>(diagnostics.ground_image_count);
+  case NECPP_WASM_V1_FF_SEGMENT_DIRECTION_CONTRIBUTIONS:
+    return static_cast<double>(diagnostics.segment_direction_contributions);
+  default:
+    return 0.0;
+  }
 }
 
 double necpp_wasm_v1_embedded_radius_m(const necpp_wasm_v1_model* model)

@@ -92,6 +92,20 @@ struct nec_far_field_grid {
   nec_float phi_step_deg = 0.0;
 };
 
+struct nec_far_field_phase_diagnostics {
+  bool enabled = false;
+  nec_float validation_allocation_ms = 0.0;
+  nec_float result_replacement_ms = 0.0;
+  nec_float raw_accumulation_ms = 0.0;
+  nec_float derived_rp_work_ms = 0.0;
+  nec_float native_result_copy_ms = 0.0;
+  nec_float native_total_ms = 0.0;
+  uint64_t evaluated_directions = 0;
+  uint64_t segment_count = 0;
+  uint64_t ground_image_count = 0;
+  uint64_t segment_direction_contributions = 0;
+};
+
 /*! Copied complex far fields in theta-fast angular order.
  *
  * Sample index is phi_index * theta_deg.size() + theta_index. Fields are
@@ -104,6 +118,7 @@ struct nec_far_field_result {
   std::vector<nec_float> phi_deg;
   std::vector<nec_complex> e_theta;
   std::vector<nec_complex> e_phi;
+  nec_far_field_phase_diagnostics diagnostics;
 
   size_t sample_count() const { return e_theta.size(); }
 

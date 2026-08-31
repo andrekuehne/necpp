@@ -1,5 +1,65 @@
 # WASM array benchmarks
 
+## Far-field WP0 baseline
+
+`far-field-benchmark.mjs` is the versioned baseline harness for
+`docs/far-field-performance-upgrade-plan.md`. It is separate from the symmetry
+benchmark below because it freezes the visualizer's production case rather
+than the symmetry reference model:
+
+- 8 x 8 X-directed dipoles at 10 GHz, lambda/2 spacing, 0.47-lambda length,
+  0.001-lambda radius, and 0.25-lambda height;
+- 11 segments per element and centre feed at segment 6;
+- infinite perfect ground with no structural symmetry substitution;
+- asserted `UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM` explicit fallback;
+- ten deterministic broadside, axis, diagonal, and near-edge steering states;
+- the 181 x 360 primary field and the source field derived by the consumer's
+  32 x 32 display policy (currently 69 x 272).
+
+Build an instrumentation-enabled WASM package, preserve its `dist` directory,
+then run one untimed warm-up and five measured fresh processes for every
+direct/worker and primary/secondary combination:
+
+```powershell
+$env:NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS = "ON"
+$env:NECPP_ENABLE_WASM_SIMD = "OFF"
+.\scripts\build_wasm_docker.ps1
+npm --prefix packages/necpp-wasm run build
+npm --prefix packages/necpp-wasm run bench:far-field -- `
+  --output-directory bench/results/far-field-wp0-scalar `
+  --module-directory C:\path\to\preserved\scalar-dist `
+  --variant release-scalar-sampled-instrumented `
+  --build-flags "-O3 -DNDEBUG -flto -fexceptions; diagnostics=ON/256; simd=OFF"
+```
+
+The output directory receives the frozen fixture manifest, raw NDJSON cases,
+and a JSON summary with minimum, median, maximum, and p90 timings. Every raw
+case records the engine revision, exact artifact hashes and build flags,
+Node/V8/OS/CPU identity, RSS samples, CPU time, result bytes, representation
+diagnostics, generations, requested/achieved-current checksums, field
+checksums, and representative complex samples. The runner fails if any of the
+ten updates changes the factorization generation, skips field extraction,
+selects a symmetric representation, or differs across direct and worker
+checksums.
+
+Use `--module-directory`, `--variant`, and `--build-flags` to run an otherwise
+identical `-msimd128` artifact into a second output directory. Benchmark
+variants must be run serially. `--rounds 1 --warmups 0 --backends direct
+--grids secondary` is available as a short harness smoke test; it is not WP0
+evidence.
+
+The diagnostics build attributes raw-kernel work (sampled once per 256
+directions), legacy RP-derived work, native and ABI copies, TypeScript
+extraction, package residuals, and operation counts. `bench:far-field-overhead`
+performs balanced scalar instrumentation/release pairs;
+`bench:far-field-simd` performs balanced scalar/SIMD pairs; and
+`bench:consumer-trace` records a Chrome performance trace around the sibling
+consumer's already-built benchmark. See [FAR_FIELD_WP0_RESULTS.md](FAR_FIELD_WP0_RESULTS.md)
+and `bench/evidence/far-field-wp0/` for the accepted commands, findings, and raw
+artifacts.
+
+## Symmetry reference benchmark
+
 The reference-array benchmark compares three stateful representations of the
 same full caller description:
 

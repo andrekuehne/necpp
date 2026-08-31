@@ -5,6 +5,8 @@ set -euo pipefail
 
 : "${BUILD_DIR:=build-wasm}"
 : "${WASM_OUT_DIR:=wasm}"
+: "${ENABLE_PERFORMANCE_DIAGNOSTICS:=OFF}"
+: "${ENABLE_WASM_SIMD:=OFF}"
 
 # Build on the container filesystem. Windows bind mounts (/mnt/c/...) reject
 # writes from a non-root container user, which breaks emscripten link steps.
@@ -17,6 +19,9 @@ rm -f "$WASM_OUT_DIR/nec2pp.d.ts"
 rm -rf "$CONTAINER_BUILD_DIR"
 
 CXX_FLAGS="-O3 -DNDEBUG -flto -fexceptions"
+if [[ "$ENABLE_WASM_SIMD" == "ON" ]]; then
+    CXX_FLAGS="$CXX_FLAGS -msimd128"
+fi
 LINK_FLAGS="-O3 -flto \
 -sMODULARIZE=1 \
 -sEXPORT_ES6=1 \
@@ -27,11 +32,15 @@ LINK_FLAGS="-O3 -flto \
 -sALLOW_MEMORY_GROWTH=1 \
 -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAPF64 \
 -sDISABLE_EXCEPTION_CATCHING=0"
+if [[ "$ENABLE_WASM_SIMD" == "ON" ]]; then
+    LINK_FLAGS="$LINK_FLAGS -msimd128"
+fi
 
 emcmake cmake -B "$CONTAINER_BUILD_DIR" -S . \
     -DCMAKE_BUILD_TYPE=Release \
     -DNECPP_BUILD_WASM=ON \
     -DNECPP_BUILD_TESTS=OFF \
+    -DNECPP_ENABLE_PERFORMANCE_DIAGNOSTICS="$ENABLE_PERFORMANCE_DIAGNOSTICS" \
     -DBUILD_SHARED_LIBS=OFF \
     "-DCMAKE_CXX_FLAGS_RELEASE=$CXX_FLAGS" \
     "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=$LINK_FLAGS"

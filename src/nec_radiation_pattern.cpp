@@ -21,6 +21,8 @@
 #include "c_geometry.h"
 #include "nec_exception.h"
 
+#include <chrono>
+
 namespace {
 constexpr int RP_POWER_AVERAGE_ONLY = 2;
 }
@@ -215,6 +217,19 @@ void nec_radiation_pattern::analyze(nec_context* m_context)
 {
   if (m_analysis_done)
     return;
+
+  m_diagnostics = nec_radiation_pattern_diagnostics();
+  m_diagnostics.segment_count = static_cast<uint64_t>(
+    m_context->get_geometry()->n_segments);
+  m_diagnostics.ground_image_count = static_cast<uint64_t>(
+    std::max(1, m_ground.ksymp));
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  m_diagnostics.enabled = true;
+  const auto analysis_started = std::chrono::steady_clock::now();
+  std::chrono::steady_clock::duration raw_duration{};
+  uint64_t raw_timing_samples = 0;
+  constexpr uint64_t raw_timing_stride = 256;
+#endif
     
   int pol_sense_index;
   nec_float exrm=0., exra=0., prad, gcon, gcop;
@@ -267,6 +282,8 @@ void nec_radiation_pattern::analyze(nec_context* m_context)
       thet += delta_theta;
       if ( m_ground.present() && (thet > 90.01) && (_ifar != 1) )
         continue;
+
+      ++m_diagnostics.evaluated_directions;
     
       nec_float tha = degrees_to_rad(thet);
       
@@ -282,7 +299,20 @@ void nec_radiation_pattern::analyze(nec_context* m_context)
         _e_phi(kth, kph) = eph;
         _e_r(kth, kph) = erd;
       } else {
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+        const bool time_raw =
+          (m_diagnostics.evaluated_directions - 1) % raw_timing_stride == 0;
+        const auto raw_started = time_raw
+          ? std::chrono::steady_clock::now()
+          : std::chrono::steady_clock::time_point();
+#endif
         m_context->ffld(tha, pha, &eth, &eph, _wavelength);
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+        if (time_raw) {
+          raw_duration += std::chrono::steady_clock::now() - raw_started;
+          ++raw_timing_samples;
+        }
+#endif
     
         nec_float ethm2= norm(eth);
         nec_float ethm= sqrt(ethm2);
@@ -451,6 +481,28 @@ void nec_radiation_pattern::analyze(nec_context* m_context)
   }
 
   _maximum_gain = _gain.maxCoeff();
+  m_diagnostics.segment_direction_contributions =
+    m_diagnostics.evaluated_directions
+    * m_diagnostics.segment_count
+    * m_diagnostics.ground_image_count;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  const auto analysis_duration =
+    std::chrono::steady_clock::now() - analysis_started;
+  m_diagnostics.analyze_total_ms =
+    std::chrono::duration<nec_float, std::milli>(analysis_duration).count();
+  const nec_float sampled_raw_ms =
+    std::chrono::duration<nec_float, std::milli>(raw_duration).count();
+  m_diagnostics.raw_accumulation_ms = raw_timing_samples == 0
+    ? nec_float(0.0)
+    : std::min(
+        m_diagnostics.analyze_total_ms,
+        sampled_raw_ms
+          * static_cast<nec_float>(m_diagnostics.evaluated_directions)
+          / static_cast<nec_float>(raw_timing_samples));
+  m_diagnostics.derived_work_ms = std::max(
+    nec_float(0.0),
+    m_diagnostics.analyze_total_ms - m_diagnostics.raw_accumulation_ms);
+#endif
   m_analysis_done = true;
 }
 

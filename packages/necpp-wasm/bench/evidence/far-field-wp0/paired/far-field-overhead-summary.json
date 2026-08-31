@@ -1,0 +1,84 @@
+{
+  "type": "far-field-instrumentation-overhead",
+  "schemaVersion": 1,
+  "measuredAt": "2026-08-31T21:28:42.003Z",
+  "configuration": {
+    "rounds": 6,
+    "warmups": 1,
+    "backend": "direct",
+    "grid": "primary",
+    "steeringStatesPerCase": 1,
+    "reuseGrid": false,
+    "instrumentedDirectory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp0-final\\artifacts\\scalar-sampled",
+    "uninstrumentedDirectory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp0-final\\artifacts\\scalar-uninstrumented"
+  },
+  "outputParity": {
+    "compared": 6,
+    "failures": []
+  },
+  "fieldMs": {
+    "instrumented": {
+      "count": 6,
+      "minimum": 4132.9951,
+      "median": 4226.083699999999,
+      "maximum": 4904.096600000001,
+      "p90": 4904.096600000001
+    },
+    "uninstrumented": {
+      "count": 6,
+      "minimum": 4121.480700000002,
+      "median": 4229.548500000001,
+      "maximum": 4276.304400000001,
+      "p90": 4276.304400000001
+    }
+  },
+  "pairedDeltaPercent": {
+    "median": -0.023281768551525195,
+    "minimum": -1.613533405152423,
+    "maximum": 18.50315390028141
+  },
+  "pairs": [
+    {
+      "round": 0,
+      "first": "instrumented",
+      "instrumentedFieldMs": 4132.9951,
+      "uninstrumentedFieldMs": 4121.480700000002,
+      "deltaPercent": 0.27937532256303577
+    },
+    {
+      "round": 1,
+      "first": "uninstrumented",
+      "instrumentedFieldMs": 4904.096600000001,
+      "uninstrumentedFieldMs": 4138.368000000002,
+      "deltaPercent": 18.50315390028141
+    },
+    {
+      "round": 2,
+      "first": "instrumented",
+      "instrumentedFieldMs": 4207.304799999998,
+      "uninstrumentedFieldMs": 4276.304400000001,
+      "deltaPercent": -1.613533405152423
+    },
+    {
+      "round": 3,
+      "first": "uninstrumented",
+      "instrumentedFieldMs": 4294.665000000001,
+      "uninstrumentedFieldMs": 4245.078199999996,
+      "deltaPercent": 1.1681009786817187
+    },
+    {
+      "round": 4,
+      "first": "instrumented",
+      "instrumentedFieldMs": 4244.8626,
+      "uninstrumentedFieldMs": 4258.743500000004,
+      "deltaPercent": -0.32593885966608616
+    },
+    {
+      "round": 5,
+      "first": "uninstrumented",
+      "instrumentedFieldMs": 4195.720099999991,
+      "uninstrumentedFieldMs": 4214.018800000005,
+      "deltaPercent": -0.43423394314268116
+    }
+  ]
+}

@@ -1002,7 +1002,13 @@ export class WasmNecModel implements NecModel {
     return this.#readResult("solveCurrents", () => this.#solution("current"));
   }
 
-  #farFieldResult(grid: ValidatedGrid): FarFieldResult {
+  #farFieldResult(
+    grid: ValidatedGrid,
+    validationMs: number,
+    wasmCallMs: number,
+    packageStarted: number,
+  ): FarFieldResult {
+    const extractionStarted = performance.now();
     const thetaCount =
       this.#module._necpp_wasm_v1_far_field_theta_count(this.#handle);
     const phiCount =
@@ -1014,7 +1020,7 @@ export class WasmNecModel implements NecModel {
     ) {
       throw new NecRuntimeError("The native far-field result has invalid dimensions");
     }
-    return {
+    const result: FarFieldResult = {
       radiusM: this.#module._necpp_wasm_v1_far_field_radius_m(this.#handle),
       frequencyMHz:
         this.#module._necpp_wasm_v1_far_field_frequency_mhz(this.#handle),
@@ -1031,11 +1037,44 @@ export class WasmNecModel implements NecModel {
       ePhiReal: this.#copyBuffer(BUFFER.farFieldEPhiReal, grid.sampleCount),
       ePhiImag: this.#copyBuffer(BUFFER.farFieldEPhiImag, grid.sampleCount),
     };
+    const diagnostic = this.#module._necpp_wasm_v1_far_field_diagnostic;
+    if (diagnostic === undefined) return result;
+    const value = (kind: number): number => diagnostic(this.#handle, kind);
+    const typescriptExtractionMs = performance.now() - extractionStarted;
+    return {
+      ...result,
+      diagnostics: Object.freeze({
+        instrumentationEnabled: value(0) === 1,
+        validationMs,
+        wasmCallMs,
+        typescriptExtractionMs,
+        packageTotalMs: performance.now() - packageStarted,
+        native: Object.freeze({
+          validationAllocationMs: value(1),
+          resultReplacementMs: value(2),
+          rawAccumulationMs: value(3),
+          derivedRpWorkMs: value(4),
+          resultCopyMs: value(5),
+          totalMs: value(6),
+          abiResultCopyMs: value(7),
+          nativeAbiTotalMs: value(8),
+        }),
+        counts: Object.freeze({
+          evaluatedDirections: value(9),
+          segments: value(10),
+          groundImages: value(11),
+          segmentDirectionContributions: value(12),
+        }),
+      }),
+    };
   }
 
   computeFarField(request: FarFieldRequest): FarFieldResult {
+    const packageStarted = performance.now();
     this.#assertOperation("computeFarField");
     const grid = validateGrid(request);
+    const validationMs = performance.now() - packageStarted;
+    const wasmCallStarted = performance.now();
     this.#invokeStatus(
       "computeFarField",
       () => this.#module._necpp_wasm_v1_compute_far_field(
@@ -1049,9 +1088,10 @@ export class WasmNecModel implements NecModel {
         grid.phiStepDeg,
       ),
     );
+    const wasmCallMs = performance.now() - wasmCallStarted;
     return this.#readResult(
       "computeFarField",
-      () => this.#farFieldResult(grid),
+      () => this.#farFieldResult(grid, validationMs, wasmCallMs, packageStarted),
     );
   }
 

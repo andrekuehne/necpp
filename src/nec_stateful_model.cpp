@@ -16,6 +16,7 @@
 #include "nec_results.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <exception>
 #include <limits>
@@ -741,6 +742,10 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
   const nec_far_field_grid& grid,
   const std::vector<nec_complex>& currents)
 {
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  const auto total_started = std::chrono::steady_clock::now();
+  auto phase_started = total_started;
+#endif
   const size_t sample_count =
     checked_field_sample_count(grid, "COMPUTE FAR FIELD");
   nec_far_field_result copied;
@@ -750,13 +755,35 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
     grid, copied.theta_deg, copied.phi_deg, "COMPUTE FAR FIELD");
   copied.e_theta.assign(sample_count, nec_complex(0.0, 0.0));
   copied.e_phi.assign(sample_count, nec_complex(0.0, 0.0));
+  copied.diagnostics.segment_count = static_cast<uint64_t>(
+    m_geometry_completion.full_segment_count);
+  copied.diagnostics.ground_image_count =
+    m_ground.kind == nec_ground_kind::free_space ? 1u : 2u;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  copied.diagnostics.enabled = true;
+  copied.diagnostics.validation_allocation_ms =
+    std::chrono::duration<nec_float, std::milli>(
+      std::chrono::steady_clock::now() - phase_started).count();
+  phase_started = std::chrono::steady_clock::now();
+#endif
 
   m_context->stateful_clear_results(RESULT_RADIATION_PATTERN);
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  copied.diagnostics.result_replacement_ms =
+    std::chrono::duration<nec_float, std::milli>(
+      std::chrono::steady_clock::now() - phase_started).count();
+#endif
   const bool zero_excitation = std::all_of(
     currents.begin(), currents.end(),
     [](nec_complex current) { return current == nec_complex(0.0, 0.0); });
-  if (zero_excitation)
+  if (zero_excitation) {
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+    copied.diagnostics.native_total_ms =
+      std::chrono::duration<nec_float, std::milli>(
+        std::chrono::steady_clock::now() - total_started).count();
+#endif
     return copied;
+  }
 
   m_context->rp_card(
     0, grid.theta_count, grid.phi_count,
@@ -774,6 +801,22 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
       static_cast<size_t>(e_phi.size()) != sample_count)
     fail("COMPUTE FAR FIELD", "ENGINE RETURNED THE WRONG FIELD SAMPLE COUNT");
 
+  const nec_radiation_pattern_diagnostics& rp_diagnostics =
+    result->diagnostics();
+  copied.diagnostics.raw_accumulation_ms =
+    rp_diagnostics.raw_accumulation_ms;
+  copied.diagnostics.derived_rp_work_ms =
+    rp_diagnostics.derived_work_ms;
+  copied.diagnostics.evaluated_directions =
+    rp_diagnostics.evaluated_directions;
+  copied.diagnostics.segment_count = rp_diagnostics.segment_count;
+  copied.diagnostics.ground_image_count = rp_diagnostics.ground_image_count;
+  copied.diagnostics.segment_direction_contributions =
+    rp_diagnostics.segment_direction_contributions;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  phase_started = std::chrono::steady_clock::now();
+#endif
+
   for (size_t index = 0; index < sample_count; ++index) {
     copied.e_theta[index] = e_theta[static_cast<int64_t>(index)];
     copied.e_phi[index] = e_phi[static_cast<int64_t>(index)];
@@ -783,6 +826,21 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
         !finite_value(copied.e_phi[index].imag()))
       fail("COMPUTE FAR FIELD", "ENGINE RETURNED A NONFINITE FIELD VALUE");
   }
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  copied.diagnostics.native_result_copy_ms =
+    std::chrono::duration<nec_float, std::milli>(
+      std::chrono::steady_clock::now() - phase_started).count();
+  copied.diagnostics.native_total_ms =
+    std::chrono::duration<nec_float, std::milli>(
+      std::chrono::steady_clock::now() - total_started).count();
+  copied.diagnostics.derived_rp_work_ms = std::max(
+    nec_float(0.0),
+    copied.diagnostics.native_total_ms
+      - copied.diagnostics.validation_allocation_ms
+      - copied.diagnostics.result_replacement_ms
+      - copied.diagnostics.raw_accumulation_ms
+      - copied.diagnostics.native_result_copy_ms);
+#endif
   return copied;
 }
 

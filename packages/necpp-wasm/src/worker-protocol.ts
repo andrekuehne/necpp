@@ -457,7 +457,7 @@ export function reviveImpedanceResult(value: unknown): ImpedanceResult {
 
 export function reviveFarFieldResult(value: unknown): FarFieldResult {
   const record = value as FarFieldResult;
-  return {
+  const result: FarFieldResult = {
     radiusM: record.radiusM,
     frequencyMHz: record.frequencyMHz,
     thetaDeg: copyFloat64(record.thetaDeg, "thetaDeg"),
@@ -466,6 +466,66 @@ export function reviveFarFieldResult(value: unknown): FarFieldResult {
     eThetaImag: copyFloat64(record.eThetaImag, "eThetaImag"),
     ePhiReal: copyFloat64(record.ePhiReal, "ePhiReal"),
     ePhiImag: copyFloat64(record.ePhiImag, "ePhiImag"),
+  };
+  if (record.diagnostics === undefined) return result;
+  const finite = (number: unknown, name: string): number =>
+    finiteWorkerNumber(number, `diagnostics.${name}`);
+  const diagnostics = record.diagnostics;
+  return {
+    ...result,
+    diagnostics: Object.freeze({
+      instrumentationEnabled: diagnostics.instrumentationEnabled === true,
+      validationMs: finite(diagnostics.validationMs, "validationMs"),
+      wasmCallMs: finite(diagnostics.wasmCallMs, "wasmCallMs"),
+      typescriptExtractionMs: finite(
+        diagnostics.typescriptExtractionMs,
+        "typescriptExtractionMs",
+      ),
+      packageTotalMs: finite(diagnostics.packageTotalMs, "packageTotalMs"),
+      native: Object.freeze({
+        validationAllocationMs: finite(
+          diagnostics.native?.validationAllocationMs,
+          "native.validationAllocationMs",
+        ),
+        resultReplacementMs: finite(
+          diagnostics.native?.resultReplacementMs,
+          "native.resultReplacementMs",
+        ),
+        rawAccumulationMs: finite(
+          diagnostics.native?.rawAccumulationMs,
+          "native.rawAccumulationMs",
+        ),
+        derivedRpWorkMs: finite(
+          diagnostics.native?.derivedRpWorkMs,
+          "native.derivedRpWorkMs",
+        ),
+        resultCopyMs: finite(diagnostics.native?.resultCopyMs, "native.resultCopyMs"),
+        totalMs: finite(diagnostics.native?.totalMs, "native.totalMs"),
+        abiResultCopyMs: finite(
+          diagnostics.native?.abiResultCopyMs,
+          "native.abiResultCopyMs",
+        ),
+        nativeAbiTotalMs: finite(
+          diagnostics.native?.nativeAbiTotalMs,
+          "native.nativeAbiTotalMs",
+        ),
+      }),
+      counts: Object.freeze({
+        evaluatedDirections: finite(
+          diagnostics.counts?.evaluatedDirections,
+          "counts.evaluatedDirections",
+        ),
+        segments: finite(diagnostics.counts?.segments, "counts.segments"),
+        groundImages: finite(
+          diagnostics.counts?.groundImages,
+          "counts.groundImages",
+        ),
+        segmentDirectionContributions: finite(
+          diagnostics.counts?.segmentDirectionContributions,
+          "counts.segmentDirectionContributions",
+        ),
+      }),
+    }),
   };
 }
 
