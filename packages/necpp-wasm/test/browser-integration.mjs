@@ -194,7 +194,7 @@ try {
     ${awaitPrefix}model.definePorts(ports);
     ${awaitPrefix}model.prepare({ frequencyMHz });
     const matrices = ${awaitPrefix}model.computeImpedanceMatrix();
-    ${awaitPrefix}model.solveVoltages({
+    const solution = ${awaitPrefix}model.solveVoltages({
       real: new Float64Array(ports.length).fill(1),
       imag: new Float64Array(ports.length),
     });
@@ -211,6 +211,7 @@ try {
       fieldSamples: field.eThetaReal.length,
       fieldFinite: [...field.eThetaReal, ...field.eThetaImag,
         ...field.ePhiReal, ...field.ePhiImag].every(Number.isFinite),
+      powerBudget: solution.powerBudget,
       sectionCount: completion.symmetry?.sectionCount,
       mode: ${JSON.stringify(mode)},
     };
@@ -272,10 +273,14 @@ try {
   } else {
     assert.equal(result.mode, mode);
     assert.equal(result.abiVersion, 1);
-    assert.equal(result.engineVersion, "2.4.0");
+    assert.equal(result.engineVersion, "2.5.0");
     assert.ok(result.resistanceOhm > 0);
     assert.equal(result.fieldSamples, 3);
     assert.equal(result.fieldFinite, true);
+    assert.ok(result.powerBudget.inputPowerW > 0);
+    assert.ok(Math.abs(
+      result.powerBudget.inputPowerW - result.powerBudget.radiatedPowerW,
+    ) < 1e-10);
     assert.equal(result.sectionCount, 4);
   }
   assert.ok(wasmResponses.length >= 1, "the browser must request the emitted WASM asset");

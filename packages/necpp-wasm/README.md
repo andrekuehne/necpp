@@ -400,6 +400,43 @@ The initial environment is free space with no loads. Call `addLoad()`,
 `prepare()`. Changing ground or loads later is allowed, but invalidates the
 factorization and returns the model to `geometry-complete`.
 
+### Ground-connected wires
+
+`groundConnection` controls the NEC `GE` connection rule; it does not install
+a ground model. The default `"none"` is `GE 0`. `"interpolate"` is `GE +1`,
+the normal rooted-monopole connection that interpolates current to the image
+below the plane. `"zero-current"` is `GE -1` and leaves the current expansion
+unchanged, so a wire end touching `z=0` is a zero-current end.
+
+```ts
+import type { FullArrayDescription } from "@necpp-engine/wasm";
+
+const rooted: FullArrayDescription = {
+  elements: [{ id: "monopole", positionM: [0, 0], patternId: "vertical" }],
+  patterns: [{
+    id: "vertical",
+    kind: "straight-wire-pattern",
+    wires: [{
+      id: "radiator",
+      segments: 11,
+      startM: [0, 0, 0],
+      endM: [0, 0, 0.25],
+      radiusM: 0.001,
+    }],
+    ports: [{ wireId: "radiator", segment: 2 }],
+  }],
+  ground: { kind: "perfect" },
+  groundConnection: "interpolate",
+};
+```
+
+A non-none connection requires perfect or finite ground when `prepare()`
+runs and cannot be combined with structural reflection through `z=0`.
+Segments may end at the plane but may not extend below or lie in it. NEC-2
+cannot accurately model a ground stake through finite ground; a driven base
+connection there can make impedance strongly dependent on source-segment
+length. Reconstruct an array solver to change `groundConnection`.
+
 ## Z and Y matrices
 
 `computeImpedanceMatrix()` factors the electromagnetic interaction matrix once
@@ -461,12 +498,59 @@ when array weights change. An exactly zero achieved current produces
 dividing by zero. Time-average input power is
 `0.5 * Re(V * conjugate(I))` watts.
 
+Every successful solve also returns a frozen aggregate native balance:
+
+```ts
+import type { PortSolution } from "@necpp-engine/wasm";
+
+declare const currentDriven: PortSolution;
+
+const {
+  inputPowerW,
+  radiatedPowerW,
+  structureLossW,
+  networkLossW,
+  efficiencyPercent,
+} = currentDriven.powerBudget;
+```
+
+`inputPowerW` agrees numerically with the sum of simultaneous per-port
+`powersW`, including mutual-coupling contributions. NEC defines
+`radiatedPowerW = inputPowerW - structureLossW - networkLossW`;
+`efficiencyPercent` is `null` only for exact zero input. This is the native
+total balance, not power in a selected polarization. Finite lossy ground has
+no separately reported ground-loss term, so do not treat this value as an
+upper-hemisphere flux identity without separate validation.
+
 ## Complex far fields and beamforming
 
 `computeFarField()` uses the most recent public solve. At the default 1 m,
 `eTheta*` and `ePhi*` are split real/imaginary V/m arrays. At another range,
 the field follows `e^(-jkR) / R` while retaining the same angular far-field
 approximation.
+
+Normal steering uses one simultaneous solve followed by the native combined
+field path. Multiple display or integration grids reuse that solved state:
+
+```ts
+import type {
+  ComplexVector,
+  FarFieldRequest,
+  NecModel,
+} from "@necpp-engine/wasm";
+
+declare const model: NecModel;
+declare const currents: ComplexVector;
+declare const displayRequest: FarFieldRequest;
+declare const integrationRequest: FarFieldRequest;
+
+await model.prepare({ frequencyMHz: 300 });
+const solution = model.solveCurrents(currents);
+const displayField = model.computeFarField(displayRequest);
+const integrationField = model.computeFarField(integrationRequest);
+```
+
+Do not superpose embedded fields in JavaScript for this normal path.
 
 `computeEmbeddedFarFields()` returns one complex basis pattern per port.
 Unit-current normalization makes array beamforming a direct weighted sum. The
@@ -598,7 +682,7 @@ appropriate CORS header.
 import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel({
-  wasmUrl: new URL("https://cdn.example.test/necpp/0.2.0/nec2pp.wasm"),
+  wasmUrl: new URL("https://cdn.example.test/necpp/0.3.0/nec2pp.wasm"),
 });
 model.dispose();
 ```

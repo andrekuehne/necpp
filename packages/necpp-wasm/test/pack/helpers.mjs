@@ -173,6 +173,7 @@ export function installFixture(root, extraPackages = []) {
 
 export const dipoleScript = `import {
   abiVersion,
+  createNecArraySolver,
   createNecModel,
   engineVersion,
   packageVersion,
@@ -211,12 +212,54 @@ try {
   if (!(matrices.impedance.real[0] > 0)) {
     throw new Error("expected a positive feed resistance");
   }
+  const solution = model.solveVoltages({
+    real: new Float64Array(4).fill(1),
+    imag: new Float64Array(4),
+  });
+  const field = model.computeFarField({
+    theta: { startDeg: 90, count: 1, stepDeg: 0 },
+    phi: { startDeg: 0, count: 1, stepDeg: 0 },
+  });
+  const rootedInputPowers = {};
+  for (const groundConnection of ["interpolate", "zero-current"]) {
+    const rooted = await createNecArraySolver({
+      elements: [{ id: "m0", positionM: [0, 0], patternId: "monopole" }],
+      patterns: [{
+        id: "monopole",
+        kind: "straight-wire-pattern",
+        wires: [{
+          id: "wire",
+          segments: 11,
+          startM: [0, 0, 0],
+          endM: [0, 0, 0.25],
+          radiusM: 0.001,
+        }],
+        ports: [{ wireId: "wire", segment: 2 }],
+      }],
+      ground: { kind: "perfect" },
+      groundConnection,
+    }, { symmetry: "off" });
+    try {
+      await rooted.prepare({ frequencyMHz: 300 });
+      const rootedSolution = await rooted.solveVoltages({
+        real: Float64Array.of(1),
+        imag: Float64Array.of(0),
+      });
+      rootedInputPowers[groundConnection] =
+        rootedSolution.powerBudget.inputPowerW;
+    } finally {
+      await rooted.dispose();
+    }
+  }
   process.stdout.write(JSON.stringify({
     abiVersion,
     engineVersion,
     packageVersion,
     sectionCount: completion.symmetry?.sectionCount,
     resistanceOhm: matrices.impedance.real[0],
+    powerBudget: solution.powerBudget,
+    combinedFieldSamples: field.eThetaReal.length,
+    rootedInputPowers,
     resolved,
   }));
 } finally {
@@ -258,12 +301,22 @@ try {
   if (!(matrices.impedance.real[0] > 0)) {
     throw new Error("expected a positive feed resistance");
   }
+  const solution = await model.solveVoltages({
+    real: new Float64Array(4).fill(1),
+    imag: new Float64Array(4),
+  });
+  const field = await model.computeFarField({
+    theta: { startDeg: 90, count: 1, stepDeg: 0 },
+    phi: { startDeg: 0, count: 1, stepDeg: 0 },
+  });
   process.stdout.write(JSON.stringify({
     abiVersion,
     engineVersion,
     packageVersion,
     sectionCount: completion.symmetry?.sectionCount,
     resistanceOhm: matrices.impedance.real[0],
+    powerBudget: solution.powerBudget,
+    combinedFieldSamples: field.eThetaReal.length,
     resolved,
   }));
 } finally {

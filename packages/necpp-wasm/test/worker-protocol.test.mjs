@@ -10,9 +10,26 @@ import {
 import {
   collectTransferables,
   reviveError,
+  revivePortSolution,
   serializeCreateOptions,
   serializeError,
 } from "../.test-build/src/worker-protocol.js";
+
+function portSolution(powerBudget) {
+  return {
+    drive: "voltage",
+    frequencyMHz: 300,
+    ports: [{ tag: 1, segment: 6 }],
+    requested: { real: Float64Array.of(1), imag: Float64Array.of(0) },
+    voltages: { real: Float64Array.of(1), imag: Float64Array.of(0) },
+    currents: { real: Float64Array.of(0.01), imag: Float64Array.of(0) },
+    activeImpedances: { real: Float64Array.of(100), imag: Float64Array.of(0) },
+    powersW: Float64Array.of(0.005),
+    powerBudget,
+    factorizationGeneration: 1,
+    solveGeneration: 1,
+  };
+}
 
 test("collectTransferables gathers unique typed-array buffers", () => {
   const real = new Float64Array([1, 2, 3]);
@@ -52,6 +69,45 @@ test("transferred result buffers are detached rather than duplicated", async () 
   assert.equal(copy.eThetaImag[0], -1.25);
   assert.equal(field.eThetaReal.buffer.byteLength, 0);
   assert.equal(field.eThetaImag.buffer.byteLength, 0);
+});
+
+test("worker port solutions validate and freeze the complete power budget", () => {
+  const budget = {
+    inputPowerW: 0.005,
+    radiatedPowerW: 0.004,
+    structureLossW: 0.001,
+    networkLossW: 0,
+    efficiencyPercent: 80,
+  };
+  const revived = revivePortSolution(portSolution(budget));
+  assert.deepEqual(revived.powerBudget, budget);
+  assert.equal(Object.isFrozen(revived.powerBudget), true);
+
+  for (const field of [
+    "inputPowerW",
+    "radiatedPowerW",
+    "structureLossW",
+    "networkLossW",
+  ]) {
+    assert.throws(
+      () => revivePortSolution(portSolution({ ...budget, [field]: Number.NaN })),
+      NecRuntimeError,
+    );
+  }
+  assert.throws(
+    () => revivePortSolution(portSolution({ ...budget, efficiencyPercent: Infinity })),
+    NecRuntimeError,
+  );
+  assert.equal(
+    revivePortSolution(portSolution({
+      inputPowerW: 0,
+      radiatedPowerW: 0,
+      structureLossW: 0,
+      networkLossW: 0,
+      efficiencyPercent: null,
+    })).powerBudget.efficiencyPercent,
+    null,
+  );
 });
 
 test("typed errors round-trip through the worker protocol", () => {

@@ -364,8 +364,38 @@ function copyFloat64(value: unknown, name: string): Float64Array {
   return value as Float64Array;
 }
 
+function finiteWorkerNumber(value: unknown, name: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new NecRuntimeError(`Worker result ${name} is not finite`);
+  }
+  return value;
+}
+
 export function revivePortSolution(value: unknown): PortSolution {
   const record = value as PortSolution;
+  const inputPowerW = finiteWorkerNumber(
+    record.powerBudget?.inputPowerW,
+    "powerBudget.inputPowerW",
+  );
+  const radiatedPowerW = finiteWorkerNumber(
+    record.powerBudget?.radiatedPowerW,
+    "powerBudget.radiatedPowerW",
+  );
+  const structureLossW = finiteWorkerNumber(
+    record.powerBudget?.structureLossW,
+    "powerBudget.structureLossW",
+  );
+  const networkLossW = finiteWorkerNumber(
+    record.powerBudget?.networkLossW,
+    "powerBudget.networkLossW",
+  );
+  const efficiencyPercent = record.powerBudget?.efficiencyPercent;
+  if (efficiencyPercent !== null
+    && (typeof efficiencyPercent !== "number" || !Number.isFinite(efficiencyPercent))) {
+    throw new NecRuntimeError(
+      "Worker result powerBudget.efficiencyPercent is neither finite nor null",
+    );
+  }
   return {
     drive: record.drive,
     frequencyMHz: record.frequencyMHz,
@@ -387,6 +417,13 @@ export function revivePortSolution(value: unknown): PortSolution {
       imag: copyFloat64(record.activeImpedances.imag, "activeImpedances.imag"),
     },
     powersW: copyFloat64(record.powersW, "powersW"),
+    powerBudget: Object.freeze({
+      inputPowerW,
+      radiatedPowerW,
+      structureLossW,
+      networkLossW,
+      efficiencyPercent,
+    }),
     factorizationGeneration: record.factorizationGeneration,
     solveGeneration: record.solveGeneration,
   };

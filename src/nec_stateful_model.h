@@ -10,6 +10,7 @@
 
 #include "common.h"
 #include "nec_geometry_symmetry.h"
+#include "nec_power_budget.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -173,6 +174,7 @@ struct nec_port_solution {
   std::vector<nec_complex> currents;
   std::vector<nec_complex> active_impedances;
   std::vector<nec_float> powers_w;
+  nec_power_budget power_budget;
   nec_float frequency_mhz = 0.0;
   uint64_t factorization_generation = 0;
   uint64_t solve_generation = 0;
@@ -297,6 +299,7 @@ private:
   nec_far_field_result m_far_field_result;
   nec_embedded_far_field_result m_embedded_far_field_result;
   nec_ground_definition m_ground;
+  nec_ground_connection m_ground_connection = nec_ground_connection::none;
   nec_float m_frequency_mhz = 0.0;
   uint64_t m_factorization_generation = 0;
   uint64_t m_solve_generation = 0;

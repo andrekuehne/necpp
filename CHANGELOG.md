@@ -1,3 +1,23 @@
+## 0.3.0 - 2026-08-31
+
+### Added
+
+* **Native simultaneous-solve power budgets:** every direct, worker, and array
+  `PortSolution` now includes immutable input, radiated, structure-loss, and
+  network-loss watts plus nullable efficiency. The additive ABI-v1 accessors
+  copy NEC's native balance at solve completion so later internal work cannot
+  overwrite the public result.
+* **Array ground-connection support:** `FullArrayDescription.groundConnection`
+  reaches both explicit and symmetric geometry builders and defaults to
+  `"none"`.
+
+### Bug Fixes
+
+* **`"zero-current"` now maps to signed NEC `GE -1`:** the stable public ABI
+  value remains `2`, while native geometry receives `-1`. Both signed ground
+  modes now reject below-plane and in-plane segments, and a non-none
+  connection without a ground model fails during preparation.
+
 ## 0.2.0 - 2026-08-30
 
 ### Added

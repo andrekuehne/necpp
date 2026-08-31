@@ -383,6 +383,16 @@ void nec_context::stateful_solve_voltage_sources(
   processing_state = PROCESSING_NEAR_FIELD;
 }
 
+nec_power_budget nec_context::stateful_power_budget() const
+{
+  return {
+    input_power,
+    input_power - structure_power_loss - network_power_loss,
+    structure_power_loss,
+    network_power_loss,
+  };
+}
+
 void nec_context::stateful_clear_loads()
 {
   nload = 0;
@@ -1546,8 +1556,8 @@ void nec_context::print_power_budget(void)
 {
   if ( (m_excitation_type == EXCITATION_VOLTAGE) || (m_excitation_type == EXCITATION_VOLTAGE_DISC) )
   {
-    nec_float  radiated_power = input_power- network_power_loss - structure_power_loss;
-    nec_float  efficiency = 100.0 * radiated_power/input_power;
+    const nec_power_budget budget = stateful_power_budget();
+    nec_float  efficiency = 100.0 * budget.radiated_power_w/budget.input_power_w;
 
     m_output.endl(3);
     m_output.nec_printf(
@@ -1563,7 +1573,8 @@ void nec_context::print_power_budget(void)
         "NETWORK LOSS  = %11.4E Watts\n"
         "                               "
         "EFFICIENCY    = %7.2f Percent",
-        input_power, radiated_power, structure_power_loss, network_power_loss, efficiency );
+        budget.input_power_w, budget.radiated_power_w,
+        budget.structure_loss_w, budget.network_loss_w, efficiency );
   } /* if ( (m_excitation_type == EXCITATION_VOLTAGE) || (m_excitation_type == EXCITATION_VOLTAGE_DISC) ) */
 }
 

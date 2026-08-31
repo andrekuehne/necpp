@@ -907,6 +907,27 @@ export class WasmNecModel implements NecModel {
       real: this.#copyBuffer(realKind, count),
       imag: this.#copyBuffer(imagKind, count),
     });
+    const inputPowerW =
+      this.#module._necpp_wasm_v1_solution_input_power_w(this.#handle);
+    const radiatedPowerW =
+      this.#module._necpp_wasm_v1_solution_radiated_power_w(this.#handle);
+    const structureLossW =
+      this.#module._necpp_wasm_v1_solution_structure_loss_w(this.#handle);
+    const networkLossW =
+      this.#module._necpp_wasm_v1_solution_network_loss_w(this.#handle);
+    if (![inputPowerW, radiatedPowerW, structureLossW, networkLossW]
+      .every(Number.isFinite)) {
+      throw new NecRuntimeError("The native port solution has a nonfinite power budget");
+    }
+    const powerBudget = Object.freeze({
+      inputPowerW,
+      radiatedPowerW,
+      structureLossW,
+      networkLossW,
+      efficiencyPercent: inputPowerW === 0
+        ? null
+        : 100 * radiatedPowerW / inputPowerW,
+    });
     return {
       drive,
       frequencyMHz:
@@ -929,6 +950,7 @@ export class WasmNecModel implements NecModel {
         BUFFER.solutionActiveImpedancesImag,
       ),
       powersW: this.#copyBuffer(BUFFER.solutionPowersW, count),
+      powerBudget,
       factorizationGeneration:
         this.#module._necpp_wasm_v1_solution_factorization_generation(
           this.#handle,

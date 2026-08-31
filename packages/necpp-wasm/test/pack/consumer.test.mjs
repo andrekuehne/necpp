@@ -124,10 +124,18 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
     stdio: ["ignore", "pipe", "inherit"],
   }).stdout);
   assert.equal(direct.packageVersion, packageJson.version);
-  assert.equal(direct.engineVersion, "2.4.0");
+  assert.equal(direct.engineVersion, "2.5.0");
   assert.equal(direct.abiVersion, 1);
   assert.equal(direct.sectionCount, 4);
   assert.ok(direct.resistanceOhm > 0);
+  assert.ok(direct.powerBudget.inputPowerW > 0);
+  assert.equal(direct.combinedFieldSamples, 1);
+  assert.ok(direct.rootedInputPowers.interpolate > 0);
+  assert.ok(direct.rootedInputPowers["zero-current"] > 0);
+  assert.notEqual(
+    direct.rootedInputPowers.interpolate,
+    direct.rootedInputPowers["zero-current"],
+  );
   assert.match(direct.resolved.replaceAll("\\", "/"), /node_modules\/@necpp-engine\/wasm/);
   assert.doesNotMatch(direct.resolved, /packages[/\\]necpp-wasm[/\\]src[/\\]/);
 
@@ -138,6 +146,10 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
     "_necpp_wasm_v1_geometry_section_count",
     "_necpp_wasm_v1_geometry_fundamental_segment_count",
     "_necpp_wasm_v1_geometry_full_segment_count",
+    "_necpp_wasm_v1_solution_input_power_w",
+    "_necpp_wasm_v1_solution_radiated_power_w",
+    "_necpp_wasm_v1_solution_structure_loss_w",
+    "_necpp_wasm_v1_solution_network_loss_w",
   ]) {
     assert.ok(packedLoader.includes(symbol), `packed loader is missing ${symbol}`);
   }
@@ -151,6 +163,8 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
   assert.equal(worker.packageVersion, packageJson.version);
   assert.equal(worker.sectionCount, 4);
   assert.ok(Math.abs(worker.resistanceOhm - direct.resistanceOhm) < 1e-9);
+  assert.deepEqual(worker.powerBudget, direct.powerBudget);
+  assert.equal(worker.combinedFieldSamples, 1);
 
   for (const [name, mode] of [
     ["manual-direct.mjs", "direct"],

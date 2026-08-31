@@ -253,6 +253,73 @@ TEST_CASE("WP2 zero-current drive reports the documented NaN active impedance",
   REQUIRE(model.retained_result_count() == 1);
 }
 
+TEST_CASE("WP2 simultaneous solves retain NEC native power budgets",
+          "[wasm_api][wp2][power]")
+{
+  SECTION("lossless coupled ports close the native balance") {
+    nec_stateful_model model;
+    build_dipoles(model, 2);
+    const nec_port_solution first = model.solve_port_voltages_detailed({
+      nec_complex(0.73, -0.19),
+      nec_complex(-0.28, 0.41),
+    });
+    const nec_float port_sum = first.powers_w[0] + first.powers_w[1];
+    REQUIRE(std::isfinite(first.power_budget.input_power_w));
+    REQUIRE(std::isfinite(first.power_budget.radiated_power_w));
+    REQUIRE(first.power_budget.input_power_w ==
+      Catch::Approx(port_sum).epsilon(1.0e-12));
+    REQUIRE(first.power_budget.structure_loss_w ==
+      Catch::Approx(0.0).margin(1.0e-15));
+    REQUIRE(first.power_budget.network_loss_w ==
+      Catch::Approx(0.0).margin(1.0e-15));
+    REQUIRE(first.power_budget.radiated_power_w ==
+      Catch::Approx(first.power_budget.input_power_w).epsilon(1.0e-12));
+
+    const nec_power_budget retained = first.power_budget;
+    const nec_port_solution& second = model.solve_port_voltages_detailed({
+      nec_complex(1.0, 0.0),
+      nec_complex(0.0, 1.0),
+    });
+    REQUIRE(second.solve_generation == 2);
+    REQUIRE(first.power_budget.input_power_w == retained.input_power_w);
+    REQUIRE(first.power_budget.radiated_power_w == retained.radiated_power_w);
+  }
+
+  SECTION("a dissipative load produces positive structure loss") {
+    nec_stateful_model model;
+    model.add_wire(dipole_wire(1, 0.0));
+    model.complete_geometry();
+    model.define_ports({{1, kFeedSegment}});
+    model.add_load({
+      nec_load_kind::impedance, 1, kFeedSegment, kFeedSegment,
+      25.0, 0.0, 0.0,
+    });
+    model.prepare(kFrequencyMHz);
+    const nec_port_solution& solution =
+      model.solve_port_voltages_detailed({nec_complex(1.0, 0.0)});
+    REQUIRE(solution.power_budget.structure_loss_w > 0.0);
+    REQUIRE(solution.power_budget.network_loss_w ==
+      Catch::Approx(0.0).margin(1.0e-15));
+    REQUIRE(solution.power_budget.input_power_w == Catch::Approx(
+      solution.power_budget.radiated_power_w +
+      solution.power_budget.structure_loss_w +
+      solution.power_budget.network_loss_w).epsilon(1.0e-12));
+    REQUIRE(solution.power_budget.radiated_power_w <
+      solution.power_budget.input_power_w);
+  }
+
+  SECTION("zero excitation has an exact zero budget") {
+    nec_stateful_model model;
+    build_dipoles(model, 1);
+    const nec_port_solution& solution =
+      model.solve_port_currents({nec_complex(0.0, 0.0)});
+    REQUIRE(solution.power_budget.input_power_w == 0.0);
+    REQUIRE(solution.power_budget.radiated_power_w == 0.0);
+    REQUIRE(solution.power_budget.structure_loss_w == 0.0);
+    REQUIRE(solution.power_budget.network_loss_w == 0.0);
+  }
+}
+
 TEST_CASE("WP2 singular and badly conditioned matrices fail diagnostically",
           "[wasm_api][wp2][conditioning]")
 {

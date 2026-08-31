@@ -84,6 +84,10 @@ TEST_CASE("WP-S3 ABI completion metadata matches the stateful model",
   std::unique_ptr<necpp_wasm_v1_model, decltype(&necpp_wasm_v1_model_delete)>
     abi(necpp_wasm_v1_model_create(), &necpp_wasm_v1_model_delete);
   REQUIRE(abi != nullptr);
+  REQUIRE(necpp_wasm_v1_solution_input_power_w(abi.get()) == 0.0);
+  REQUIRE(necpp_wasm_v1_solution_radiated_power_w(abi.get()) == 0.0);
+  REQUIRE(necpp_wasm_v1_solution_structure_loss_w(abi.get()) == 0.0);
+  REQUIRE(necpp_wasm_v1_solution_network_loss_w(abi.get()) == 0.0);
   REQUIRE(necpp_wasm_v1_add_wire(
     abi.get(), 1, 11,
     0.25, 0.25, 0.1,
@@ -156,6 +160,14 @@ TEST_CASE("WP4 bulk ABI buffers reproduce native results",
   const double voltage_imag[] = {0.0};
   REQUIRE(necpp_wasm_v1_solve_voltages(
     abi.get(), voltage_real, voltage_imag, 1) == NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_solution_input_power_w(abi.get()) == Catch::Approx(
+    native_solution.power_budget.input_power_w).epsilon(1.0e-12));
+  REQUIRE(necpp_wasm_v1_solution_radiated_power_w(abi.get()) == Catch::Approx(
+    native_solution.power_budget.radiated_power_w).epsilon(1.0e-12));
+  REQUIRE(necpp_wasm_v1_solution_structure_loss_w(abi.get()) == Catch::Approx(
+    native_solution.power_budget.structure_loss_w).margin(1.0e-15));
+  REQUIRE(necpp_wasm_v1_solution_network_loss_w(abi.get()) == Catch::Approx(
+    native_solution.power_budget.network_loss_w).margin(1.0e-15));
   require_complex_buffer_matches(
     abi.get(),
     NECPP_WASM_V1_SOLUTION_CURRENTS_REAL,

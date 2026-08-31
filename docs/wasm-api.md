@@ -1,6 +1,7 @@
 # `@necpp-engine/wasm` API and numerical contract
 
-Status: normative specification, updated through symmetry WP-S8 on 2026-08-30. The
+Status: normative specification, updated through power/ground support on
+2026-08-31. The
 stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
 optional Web Worker entry point, and packable npm package are implemented.
 The committed TypeScript surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
@@ -20,7 +21,7 @@ while the scoped name identifies this repository and leaves room for future
 npm scope, but the API name will not change if the package is initially
 distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
-The symmetry release package identity is `0.2.0`; it embeds NEC2++ `2.4.0`
+The power/ground release package identity is `0.3.0`; it embeds NEC2++ `2.5.0`
 while preserving WASM ABI version `1`.
 
 The packed package exports three version identifiers that can be imported
@@ -81,6 +82,29 @@ These conventions apply to every public method and returned value.
   zero-based.
 - All computations use IEEE-754 binary64 values. Inputs must be finite except
   where a result explicitly permits NaN active impedance for zero current.
+
+Every `PortSolution` includes both caller-order `powersW` and an aggregate
+native balance:
+
+```ts
+interface PowerBudget {
+  readonly inputPowerW: number;
+  readonly radiatedPowerW: number;
+  readonly structureLossW: number;
+  readonly networkLossW: number;
+  readonly efficiencyPercent: number | null;
+}
+```
+
+`inputPowerW` agrees with the sum of the simultaneous per-port powers within
+numerical tolerance. Individual ports may be negative in a coupled active
+array. NEC defines `radiatedPowerW = inputPowerW - structureLossW -
+networkLossW`; efficiency is `null` only when captured input is exactly zero.
+The object is frozen and remains tied to the surrounding `solveGeneration`
+after later solves and worker transfer. Native radiated power is not an
+angular quadrature or polarization-resolved measurement. In particular, the
+NEC balance has no separate finite-ground-loss field, so upper-hemisphere
+flux equality is not asserted for finite lossy ground.
 
 The phase, range, and angle definitions follow the NEC-2 Part 3
 [RP card](https://www.nec2.org/part_3/cards/rp.html); voltage-source fields and
@@ -166,6 +190,12 @@ Additional lifecycle rules:
   mutation and returns immutable copy/count metadata. No wire, patch, or other
   geometry primitive may be added after generation. Plane-list order never
   changes NEC's fixed Z-then-Y-then-X copy order.
+- `groundConnection` defaults to `"none"` (`GE 0`). `"interpolate"` maps to
+  `GE +1` and interpolates a touching wire end to its image; `"zero-current"`
+  maps to signed `GE -1` and leaves the expansion unmodified. Either non-none
+  mode requires perfect or finite ground by `prepare()`, rejects wires below
+  or lying in `z=0`, and is incompatible with structural reflection through
+  `z=0`. The connection flag does not install ground.
 - `definePorts()` replaces the complete port list. It requires a nonempty
   list of unique, valid tag/segment pairs and is deliberately frozen before
   preparation so all later results have stable ordering.
@@ -320,6 +350,7 @@ interface FullArrayDescription {
   }[];
   readonly patterns: readonly ElementWirePattern[];
   readonly ground: GroundModel;
+  readonly groundConnection?: "none" | "interpolate" | "zero-current";
 }
 
 interface CreateArraySolverOptions {
@@ -345,6 +376,14 @@ selected symmetric build at most once, and only for the representation
 eligibility refinements `INCOMPATIBLE_GROUND`, `INCOMPLETE_LOAD_ORBIT`, or
 `UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM`. Allocation, cancellation,
 conditioning, solver, and invalid full-geometry failures are never hidden.
+
+The omitted array `groundConnection` default is `"none"`. Explicit and
+symmetric builders pass the same validated value to geometry completion. A
+non-none value with `ground.kind === "free-space"` fails with `NecInputError`
+before worker construction. A connection to finite ground is not an accurate
+ground-stake model in NEC-2 and can make impedance strongly dependent on the
+source-segment length; changing the connection requires reconstructing the
+solver.
 
 The returned `NecArraySolver` is worker-backed and asynchronous:
 
@@ -380,6 +419,7 @@ excitations into native copy-major order and gathers both dimensions of Z/Y,
 all achieved/requested port vectors and powers, and the outer embedded-field
 basis dimension back into caller order. Ordinary results intentionally contain
 no fundamental count, generated tag, copy index, or symmetry variant.
+The aggregate `powerBudget` has no port order and passes through unchanged.
 
 An accepted reflection candidate canonicalizes centered positions with sign
 transforms. An accepted rotational candidate uses

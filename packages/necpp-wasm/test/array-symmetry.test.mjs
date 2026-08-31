@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   NecGeometryError,
+  NecInputError,
   analyzeArraySymmetry,
   applyArrayBuildPlan,
   gatherComplexMatrix,
@@ -107,6 +108,61 @@ test("a one-element full description remains a valid explicit fallback", () => {
   const plan = analyzeArraySymmetry(single, { positionEpsilonM: 0 });
   assert.equal(plan.kind, "explicit");
   assert.equal(plan.elements.length, 1);
+});
+
+test("array ground connections validate early and reach both builders", async () => {
+  const { description } = arrayDescription({ side: 2 });
+  assert.throws(
+    () => analyzeArraySymmetry({
+      ...description,
+      ground: { kind: "free-space" },
+      groundConnection: "interpolate",
+    }, { positionEpsilonM: 0 }),
+    NecInputError,
+  );
+  assert.throws(
+    () => analyzeArraySymmetry({
+      ...description,
+      groundConnection: "unknown",
+    }, { positionEpsilonM: 0 }),
+    NecInputError,
+  );
+
+  for (const [groundConnection, ground] of [
+    ["interpolate", { kind: "perfect" }],
+    ["zero-current", {
+      kind: "finite",
+      method: "reflection-coefficient",
+      relativePermittivity: 13,
+      conductivitySPerM: 0.005,
+    }],
+  ]) {
+    const candidate = { ...description, ground, groundConnection };
+    const plans = [
+      analyzeArraySymmetry(candidate, { positionEpsilonM: 0 }),
+      analyzeArraySymmetry({
+        ...candidate,
+        elements: [candidate.elements[0]],
+      }, { positionEpsilonM: 0 }),
+    ];
+    for (const plan of plans) {
+      const completions = [];
+      const grounds = [];
+      const model = {
+        addWire() {},
+        completeGeometry(options) { completions.push(options); return {}; },
+        definePorts() {},
+        addLoad() {},
+        setGround(value) { grounds.push(value); },
+      };
+      const appliedDescription = plan.kind === "explicit" && plan.elements.length === 1
+        ? { ...candidate, elements: [candidate.elements[0]] }
+        : candidate;
+      await applyArrayBuildPlan(model, appliedDescription, plan);
+      assert.equal(completions[0].groundConnection, groundConnection);
+      assert.deepEqual(grounds[0], ground);
+    }
+  }
 });
 
 test("input permutations retain canonical geometry and ID-based native mappings", () => {
