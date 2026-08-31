@@ -63,6 +63,30 @@ nec_float relative_error(
     std::max({nec_float(1.0), std::sqrt(first_squared), std::sqrt(second_squared)});
 }
 
+nec_float integrate_far_field_power(const nec_far_field_result& field)
+{
+  REQUIRE(field.theta_deg.size() >= 2);
+  REQUIRE(field.phi_deg.size() >= 2);
+  const nec_float delta_theta = degrees_to_rad(
+    field.theta_deg[1] - field.theta_deg[0]);
+  const nec_float delta_phi = degrees_to_rad(
+    field.phi_deg[1] - field.phi_deg[0]);
+  nec_float angular_field_sum = 0.0;
+  for (size_t phi = 0; phi < field.phi_deg.size(); ++phi) {
+    for (size_t theta = 0; theta < field.theta_deg.size(); ++theta) {
+      const nec_float theta_mid = degrees_to_rad(field.theta_deg[theta]);
+      const nec_float ring_weight = delta_phi * (
+        std::cos(theta_mid - delta_theta / 2.0) -
+        std::cos(theta_mid + delta_theta / 2.0));
+      angular_field_sum += ring_weight * (
+        std::norm(field.e_theta_at(theta, phi)) +
+        std::norm(field.e_phi_at(theta, phi)));
+    }
+  }
+  return field.radius_m * field.radius_m * angular_field_sum /
+    (2.0 * em::impedance());
+}
+
 std::vector<nec_complex> superpose(
   const std::vector<nec_complex>& embedded,
   size_t samples_per_port,
@@ -277,4 +301,105 @@ TEST_CASE("WP3 ground-skipped angles have deterministic zero field entries",
   REQUIRE(std::abs(field.e_theta_at(0, 0)) > 1.0e-12);
   REQUIRE(field.e_theta_at(1, 0) == nec_complex(0.0, 0.0));
   REQUIRE(field.e_phi_at(1, 0) == nec_complex(0.0, 0.0));
+}
+
+TEST_CASE("WP3 native power budgets agree with converged field flux",
+          "[wasm_api][wp3][power][far_field]")
+{
+  SECTION("a coupled lossless free-space solve closes over the full sphere") {
+    nec_stateful_model model;
+    build_dipoles(model, 2);
+    const nec_port_solution solution = model.solve_port_voltages_detailed({
+      nec_complex(0.73, -0.19),
+      nec_complex(-0.28, 0.41),
+    });
+    const nec_far_field_result& field = model.compute_far_field({
+      1.0,
+      0.5, 180, 1.0,
+      0.0, 360, 1.0,
+    });
+    // The one-degree quadrature is converged; NEC's discretized source
+    // balance and RP field agree within 0.4% for this coupled fixture.
+    REQUIRE(integrate_far_field_power(field) == Catch::Approx(
+      solution.power_budget.radiated_power_w).epsilon(4.0e-3));
+  }
+
+  SECTION("a perfect-ground monopole closes over the upper hemisphere") {
+    nec_stateful_model model;
+    model.add_wire({
+      1, kSegments,
+      0.0, 0.0, 0.0,
+      0.0, 0.0, 0.25,
+      0.001,
+    });
+    model.complete_geometry(nec_ground_connection::interpolate);
+    model.define_ports({{1, 2}});
+    model.set_ground({nec_ground_kind::perfect, 0.0, 0.0});
+    model.prepare(kFrequencyMHz);
+    const nec_port_solution solution = model.solve_port_voltages_detailed({
+      nec_complex(1.0, 0.0),
+    });
+    const nec_far_field_result& field = model.compute_far_field({
+      1.0,
+      0.5, 90, 1.0,
+      0.0, 180, 2.0,
+    });
+    REQUIRE(integrate_far_field_power(field) == Catch::Approx(
+      solution.power_budget.radiated_power_w).epsilon(2.0e-3));
+  }
+}
+
+TEST_CASE("WP3 signed ground connections retain distinct NEC GE semantics",
+          "[wasm_api][wp3][ground][connection]")
+{
+  const auto rooted_impedance = [](nec_ground_connection connection) {
+    nec_stateful_model model;
+    model.add_wire({
+      1, kSegments,
+      0.0, 0.0, 0.0,
+      0.0, 0.0, 0.25,
+      0.001,
+    });
+    model.complete_geometry(connection);
+    model.define_ports({{1, 2}});
+    model.set_ground({nec_ground_kind::perfect, 0.0, 0.0});
+    model.prepare(kFrequencyMHz);
+    return model.solve_port_voltages_detailed({nec_complex(1.0, 0.0)})
+      .active_impedances[0];
+  };
+
+  const nec_complex interpolated =
+    rooted_impedance(nec_ground_connection::interpolate);
+  const nec_complex zero_current =
+    rooted_impedance(nec_ground_connection::zero_current);
+  REQUIRE(std::abs(interpolated - zero_current) > 1.0e-6);
+
+  nec_stateful_model missing_ground;
+  missing_ground.add_wire({
+    1, kSegments, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.001,
+  });
+  missing_ground.complete_geometry(nec_ground_connection::zero_current);
+  missing_ground.define_ports({{1, 2}});
+  REQUIRE_THROWS_AS(missing_ground.prepare(kFrequencyMHz), nec_exception);
+}
+
+TEST_CASE("WP3 both signed ground modes reject invalid ground-plane geometry",
+          "[wasm_api][wp3][ground][validation]")
+{
+  for (const nec_ground_connection connection : {
+         nec_ground_connection::interpolate,
+         nec_ground_connection::zero_current,
+       }) {
+    nec_stateful_model below;
+    below.add_wire({
+      1, 3, 0.0, 0.0, -0.1, 0.0, 0.0, 0.2, 0.001,
+    });
+    REQUIRE_THROWS_AS(below.complete_geometry(connection), nec_exception);
+
+    nec_stateful_model in_plane;
+    in_plane.add_wire({
+      1, 3, -0.1, 0.0, 0.0, 0.1, 0.0, 0.0, 0.001,
+    });
+    REQUIRE_THROWS_AS(in_plane.complete_geometry(connection), nec_exception);
+  }
 }

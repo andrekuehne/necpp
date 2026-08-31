@@ -54,8 +54,8 @@ function addDipole(model) {
 }
 
 test("package, engine, and ABI versions are exported", () => {
-  assert.equal(packageVersion, "0.2.0");
-  assert.equal(engineVersion, "2.4.0");
+  assert.equal(packageVersion, "0.3.0");
+  assert.equal(engineVersion, "2.5.0");
   assert.equal(abiVersion, 1);
 });
 
@@ -111,6 +111,14 @@ test("the facade performs a complete stateful solve with owned results", {
   assert.equal(model.state, "solved");
   assert.equal(first.drive, "voltage");
   assert.equal(first.ports[0].name, "feed");
+  assert.equal(Object.isFrozen(first.powerBudget), true);
+  assert.ok(Number.isFinite(first.powerBudget.inputPowerW));
+  assert.ok(Math.abs(first.powerBudget.inputPowerW - first.powersW[0]) <= 1e-12);
+  assert.equal(first.powerBudget.structureLossW, 0);
+  assert.equal(first.powerBudget.networkLossW, 0);
+  assert.ok(Math.abs(
+    first.powerBudget.inputPowerW - first.powerBudget.radiatedPowerW,
+  ) <= 1e-12);
   const retainedCurrent = [
     first.currents.real[0],
     first.currents.imag[0],
@@ -162,6 +170,18 @@ test("the facade performs a complete stateful solve with owned results", {
   }, { kind: "unit-current", valueA: 1 });
   assert.equal(currentEmbedded.normalization.kind, "unit-current");
   assert.equal(currentEmbedded.eThetaReal.length, 1);
+
+  const zero = model.solveCurrents({
+    real: new Float64Array([0]),
+    imag: new Float64Array([0]),
+  });
+  assert.deepEqual(zero.powerBudget, {
+    inputPowerW: 0,
+    radiatedPowerW: 0,
+    structureLossW: 0,
+    networkLossW: 0,
+    efficiencyPercent: null,
+  });
 
   assert.throws(
     () => model.solveVoltages({

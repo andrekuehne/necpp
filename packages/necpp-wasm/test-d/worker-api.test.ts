@@ -45,6 +45,8 @@ async function validWorkerConsumer(): Promise<void> {
 
   matrices.real[0];
   solution.currents.imag[0];
+  solution.powerBudget.inputPowerW satisfies number;
+  solution.powerBudget.efficiencyPercent satisfies number | null;
   field.eThetaReal[0];
   events[0]?.operation;
 

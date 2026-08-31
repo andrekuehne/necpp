@@ -105,6 +105,10 @@ export interface NecWasmModule {
   _necpp_wasm_v1_solution_frequency_mhz(model: number): number;
   _necpp_wasm_v1_solution_factorization_generation(model: number): number;
   _necpp_wasm_v1_solution_generation(model: number): number;
+  _necpp_wasm_v1_solution_input_power_w(model: number): number;
+  _necpp_wasm_v1_solution_radiated_power_w(model: number): number;
+  _necpp_wasm_v1_solution_structure_loss_w(model: number): number;
+  _necpp_wasm_v1_solution_network_loss_w(model: number): number;
 
   _necpp_wasm_v1_far_field_radius_m(model: number): number;
   _necpp_wasm_v1_far_field_frequency_mhz(model: number): number;

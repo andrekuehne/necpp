@@ -81,6 +81,10 @@ struct solution_buffers {
   std::vector<double> powers_w;
   int32_t drive = NECPP_WASM_V1_DRIVE_VOLTAGE;
   double frequency_mhz = 0.0;
+  double input_power_w = 0.0;
+  double radiated_power_w = 0.0;
+  double structure_loss_w = 0.0;
+  double network_loss_w = 0.0;
   uint64_t factorization_generation = 0;
   uint64_t solve_generation = 0;
   bool available = false;
@@ -94,6 +98,10 @@ struct solution_buffers {
     powers_w.clear();
     drive = NECPP_WASM_V1_DRIVE_VOLTAGE;
     frequency_mhz = 0.0;
+    input_power_w = 0.0;
+    radiated_power_w = 0.0;
+    structure_loss_w = 0.0;
+    network_loss_w = 0.0;
     factorization_generation = 0;
     solve_generation = 0;
     available = false;
@@ -319,6 +327,10 @@ void sync_solution(
     ? NECPP_WASM_V1_DRIVE_CURRENT
     : NECPP_WASM_V1_DRIVE_VOLTAGE;
   next.frequency_mhz = result.frequency_mhz;
+  next.input_power_w = result.power_budget.input_power_w;
+  next.radiated_power_w = result.power_budget.radiated_power_w;
+  next.structure_loss_w = result.power_budget.structure_loss_w;
+  next.network_loss_w = result.power_budget.network_loss_w;
   next.factorization_generation = result.factorization_generation;
   next.solve_generation = result.solve_generation;
   next.available = true;
@@ -1108,6 +1120,34 @@ double necpp_wasm_v1_solution_generation(
 {
   return model != nullptr && model->solution.available
     ? static_cast<double>(model->solution.solve_generation) : 0.0;
+}
+
+double necpp_wasm_v1_solution_input_power_w(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->solution.available
+    ? model->solution.input_power_w : 0.0;
+}
+
+double necpp_wasm_v1_solution_radiated_power_w(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->solution.available
+    ? model->solution.radiated_power_w : 0.0;
+}
+
+double necpp_wasm_v1_solution_structure_loss_w(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->solution.available
+    ? model->solution.structure_loss_w : 0.0;
+}
+
+double necpp_wasm_v1_solution_network_loss_w(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->solution.available
+    ? model->solution.network_loss_w : 0.0;
 }
 
 double necpp_wasm_v1_far_field_radius_m(const necpp_wasm_v1_model* model)

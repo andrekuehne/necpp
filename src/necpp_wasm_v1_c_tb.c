@@ -277,6 +277,10 @@ int necpp_wasm_v1_run_c_contract_test(void)
   CHECK(buffer_is_finite(model, NECPP_WASM_V1_ADMITTANCE_IMAG, 4) == 0);
   CHECK(necpp_wasm_v1_result_buffer(model, 999) == NULL);
   CHECK(necpp_wasm_v1_result_buffer_length(model, 999) == 0);
+  CHECK(necpp_wasm_v1_solution_input_power_w(model) == 0.0);
+  CHECK(necpp_wasm_v1_solution_radiated_power_w(model) == 0.0);
+  CHECK(necpp_wasm_v1_solution_structure_loss_w(model) == 0.0);
+  CHECK(necpp_wasm_v1_solution_network_loss_w(model) == 0.0);
 
   CHECK(necpp_wasm_v1_solve_voltages(model, NULL, NULL, 2) ==
     NECPP_WASM_V1_INPUT_ERROR);
@@ -288,6 +292,14 @@ int necpp_wasm_v1_run_c_contract_test(void)
   CHECK(necpp_wasm_v1_solution_frequency_mhz(model) == 300.0);
   CHECK(necpp_wasm_v1_solution_factorization_generation(model) == 1.0);
   CHECK(necpp_wasm_v1_solution_generation(model) == 1.0);
+  CHECK(isfinite(necpp_wasm_v1_solution_input_power_w(model)));
+  CHECK(isfinite(necpp_wasm_v1_solution_radiated_power_w(model)));
+  CHECK(isfinite(necpp_wasm_v1_solution_structure_loss_w(model)));
+  CHECK(isfinite(necpp_wasm_v1_solution_network_loss_w(model)));
+  CHECK(fabs(necpp_wasm_v1_solution_input_power_w(model) -
+    (necpp_wasm_v1_solution_radiated_power_w(model) +
+     necpp_wasm_v1_solution_structure_loss_w(model) +
+     necpp_wasm_v1_solution_network_loss_w(model))) < 1.0e-12);
   for (index = NECPP_WASM_V1_SOLUTION_REQUESTED_REAL;
        index <= NECPP_WASM_V1_SOLUTION_POWERS_W; ++index)
     CHECK(buffer_is_finite(model, index, 2) == 0);

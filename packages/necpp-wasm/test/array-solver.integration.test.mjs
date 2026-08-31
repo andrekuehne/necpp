@@ -49,6 +49,29 @@ function relativeError(left, right) {
   return Math.sqrt(delta) / Math.max(1, Math.sqrt(scale));
 }
 
+function assertPowerBudgetClose(left, right, tolerance = 1e-10) {
+  for (const field of [
+    "inputPowerW",
+    "radiatedPowerW",
+    "structureLossW",
+    "networkLossW",
+  ]) {
+    const scale = Math.max(1, Math.abs(left[field]), Math.abs(right[field]));
+    assert.ok(
+      Math.abs(left[field] - right[field]) <= tolerance * scale,
+      `power budget ${field}`,
+    );
+  }
+  if (left.efficiencyPercent === null || right.efficiencyPercent === null) {
+    assert.equal(left.efficiencyPercent, right.efficiencyPercent);
+  } else {
+    assert.ok(
+      Math.abs(left.efficiencyPercent - right.efficiencyPercent) <= tolerance,
+      "power budget efficiencyPercent",
+    );
+  }
+}
+
 async function exerciseUnbranched(description, fixture, symmetry) {
   const solver = await createNecArraySolver(description, symmetry === "off"
     ? { symmetry }
@@ -113,12 +136,44 @@ test("one unbranched facade exposes identical ordinary result shapes", {
     );
   }
   assert.deepEqual(explicit.solution.ports, symmetric.solution.ports);
+  assertPowerBudgetClose(explicit.solution.powerBudget, symmetric.solution.powerBudget);
+  assert.ok(Math.abs(
+    explicit.solution.powerBudget.inputPowerW
+      - explicit.solution.powersW.reduce((sum, value) => sum + value, 0),
+  ) <= 1e-10);
   assert.deepEqual(explicit.embedded.ports, symmetric.embedded.ports);
   assert.deepEqual(symmetric.solution.ports.map((port) => port.tag), [1, 2, 3, 4]);
   for (const result of [symmetric.matrices, symmetric.solution, symmetric.field, symmetric.embedded]) {
     assert.equal("generatedTag" in result, false);
     assert.equal("copyIndex" in result, false);
     assert.equal("symmetry" in result, false);
+  }
+});
+
+test("rooted arrays preserve both signed connections through explicit and symmetric builds", {
+  skip: !hasWasm && "WASM artifacts have not been built",
+}, async () => {
+  const { description, fixture } = arrayDescription();
+  for (const groundConnection of ["interpolate", "zero-current"]) {
+    const rooted = structuredClone(description);
+    rooted.groundConnection = groundConnection;
+    rooted.patterns[0].wires[0].startM[2] = 0;
+    rooted.patterns[0].ports[0].segment = 2;
+    const explicit = await exerciseUnbranched(rooted, fixture, "off");
+    const symmetric = await exerciseUnbranched(rooted, fixture, "auto");
+    assertPowerBudgetClose(explicit.solution.powerBudget, symmetric.solution.powerBudget);
+    assert.ok(relativeError(
+      explicit.matrices.impedance.real,
+      symmetric.matrices.impedance.real,
+    ) <= 1e-8);
+    assert.ok(relativeError(
+      explicit.solution.currents.real,
+      symmetric.solution.currents.real,
+    ) <= 1e-8);
+    assert.ok(relativeError(
+      explicit.field.eThetaReal,
+      symmetric.field.eThetaReal,
+    ) <= 1e-8);
   }
 });
 

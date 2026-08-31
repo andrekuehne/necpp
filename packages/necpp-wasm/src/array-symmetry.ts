@@ -94,12 +94,26 @@ function reason(
 }
 
 function validateGround(description: FullArrayDescription): void {
+  const connection = description.groundConnection ?? "none";
+  if (connection !== "none"
+    && connection !== "interpolate"
+    && connection !== "zero-current") {
+    inputError("description.groundConnection is unknown", { connection });
+  }
   const ground = description.ground as unknown;
   if (typeof ground !== "object" || ground === null || Array.isArray(ground)) {
     inputError("description.ground must be an object");
   }
   const record = ground as Readonly<Record<string, unknown>>;
-  if (record.kind === "free-space" || record.kind === "perfect") {
+  if (record.kind === "free-space") {
+    if (connection !== "none") {
+      inputError("A non-none groundConnection requires a ground model", {
+        connection,
+      });
+    }
+    return;
+  }
+  if (record.kind === "perfect") {
     return;
   }
   if (record.kind !== "finite") {

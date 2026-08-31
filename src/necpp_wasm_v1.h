@@ -210,6 +210,14 @@ double necpp_wasm_v1_solution_factorization_generation(
   const necpp_wasm_v1_model* model);
 double necpp_wasm_v1_solution_generation(
   const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_solution_input_power_w(
+  const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_solution_radiated_power_w(
+  const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_solution_structure_loss_w(
+  const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_solution_network_loss_w(
+  const necpp_wasm_v1_model* model);
 
 double necpp_wasm_v1_far_field_radius_m(const necpp_wasm_v1_model* model);
 double necpp_wasm_v1_far_field_frequency_mhz(

@@ -16,6 +16,7 @@ import {
   type FarFieldResult,
   type FullArrayDescription,
   type PortSolution,
+  type PowerBudget,
 } from "../src/index.js";
 
 const typedArrayDescription: FullArrayDescription = {
@@ -36,6 +37,7 @@ const typedArrayDescription: FullArrayDescription = {
     ports: [{ wireId: "wire", segment: 6 }],
   }],
   ground: { kind: "perfect" },
+  groundConnection: "zero-current",
 };
 
 analyzeArraySymmetry(typedArrayDescription, { positionEpsilonM: 0 });
@@ -109,6 +111,8 @@ async function validConsumer(): Promise<void> {
 
   matrices.real[0];
   solution.currents.imag[0];
+  const budget: PowerBudget = solution.powerBudget;
+  budget.efficiencyPercent satisfies number | null;
   field.eThetaReal[0];
   model.dispose();
 

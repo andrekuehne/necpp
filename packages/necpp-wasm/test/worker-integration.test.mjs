@@ -104,8 +104,10 @@ test("worker Z matrices and fields match direct-mode results", {
       real: new Float64Array([1]),
       imag: new Float64Array([0]),
     };
-    direct.solveVoltages(voltages);
-    await worker.solveVoltages(voltages);
+    const directSolution = direct.solveVoltages(voltages);
+    const workerSolution = await worker.solveVoltages(voltages);
+    assert.deepEqual(workerSolution.powerBudget, directSolution.powerBudget);
+    assert.equal(Object.isFrozen(workerSolution.powerBudget), true);
 
     const directField = direct.computeFarField(farFieldRequest);
     const workerField = await worker.computeFarField(farFieldRequest);

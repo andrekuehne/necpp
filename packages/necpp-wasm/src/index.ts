@@ -70,6 +70,7 @@ export type {
   PerfectGround,
   PortDefinition,
   PortSolution,
+  PowerBudget,
   PositionCanonicalization,
   PositionedArrayElement,
   PrepareOptions,

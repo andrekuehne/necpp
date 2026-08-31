@@ -214,9 +214,20 @@ const nec_geometry_completion_result& nec_stateful_model::complete_geometry(
   nec_ground_connection connection)
 {
   require_state(nec_model_state::geometry_building, "COMPLETE GEOMETRY");
-  const int flag = static_cast<int>(connection);
-  if (flag < 0 || flag > 2)
+  int flag = 0;
+  switch (connection) {
+  case nec_ground_connection::none:
+    flag = 0;
+    break;
+  case nec_ground_connection::interpolate:
+    flag = 1;
+    break;
+  case nec_ground_connection::zero_current:
+    flag = -1;
+    break;
+  default:
     fail("COMPLETE GEOMETRY", "UNKNOWN GROUND CONNECTION MODE");
+  }
 
   if (connection != nec_ground_connection::none &&
       symmetry.kind == nec_geometry_symmetry_kind::reflection &&
@@ -229,6 +240,7 @@ const nec_geometry_completion_result& nec_stateful_model::complete_geometry(
     m_context->get_geometry()->generate_symmetry(symmetry);
   m_context->geometry_complete(flag);
   m_geometry_completion = completion;
+  m_ground_connection = connection;
   m_state = nec_model_state::geometry_complete;
   m_configuration_dirty = true;
   return m_geometry_completion;
@@ -460,6 +472,10 @@ void nec_stateful_model::prepare(nec_float frequency_mhz)
     fail("PREPARE", "PORTS HAVE NOT BEEN DEFINED");
   if (!finite_value(frequency_mhz) || !(frequency_mhz > 0.0))
     fail("PREPARE", "FREQUENCY MUST BE POSITIVE AND FINITE");
+  if (m_ground_connection != nec_ground_connection::none &&
+      m_ground.kind == nec_ground_kind::free_space)
+    fail_geometry(
+      "PREPARE", "A GROUND CONNECTION REQUIRES A GROUND MODEL");
 
   validate_symmetry_ground(m_ground, "PREPARE");
   validate_symmetric_load_orbits();
@@ -521,6 +537,7 @@ const nec_port_solution& nec_stateful_model::finish_consumer_solve(
   solution.requested = requested;
   solution.voltages = std::move(achieved_voltages);
   solution.currents = std::move(achieved_currents);
+  solution.power_budget = m_context->stateful_power_budget();
   solution.active_impedances.reserve(m_ports.size());
   solution.powers_w.reserve(m_ports.size());
 

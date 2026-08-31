@@ -2060,7 +2060,7 @@ void c_geometry::build_connections( int ignd )
 
       /* determine connection data for end 1 of segment. */
       bool segment_on_ground = false;
-      if ( ignd > 0) {
+      if ( ignd != 0) {
         if ( zi1 <= -slen) {
           nec_exception nex("GEOMETRY DATA ERROR--SEGMENT ");
           nex.append(iz);
@@ -2068,12 +2068,12 @@ void c_geometry::build_connections( int ignd )
           throw nex;
         }
       
-        if ( zi1 <= slen) {
+        if ( ignd > 0 && zi1 <= slen) {
           icon1[i]= iz;
           z[i]=0.;
           segment_on_ground = true;  
         } /* if ( zi1 <= slen) */
-      } /* if ( ignd > 0) */
+      } /* if ( ignd != 0) */
     
       if ( false == segment_on_ground ) {
         int ic= i;
@@ -2105,7 +2105,7 @@ void c_geometry::build_connections( int ignd )
       } /* if ( ! jump ) */
     
       /* determine connection data for end 2 of segment. */
-      if ( (ignd > 0) || segment_on_ground ) {
+      if ( ignd != 0 ) {
         if ( zi2 <= -slen) {
           nec_exception nex("GEOMETRY DATA ERROR--SEGMENT ");
           nex.append(iz);
@@ -2113,7 +2113,7 @@ void c_geometry::build_connections( int ignd )
           throw nex;
         }
       
-        if ( zi2 <= slen) {
+        if ( ignd > 0 && zi2 <= slen) {
           if ( icon1[i] == iz ) {
             nec_exception nex("GEOMETRY DATA ERROR--SEGMENT ");
             nex.append(iz);
@@ -2125,7 +2125,13 @@ void c_geometry::build_connections( int ignd )
           z2[i]=0.;
           continue;
         } /* if ( zi2 <= slen) */  
-      } /* if ( ignd > 0) */
+        if ( ignd < 0 && zi1 == 0.0 && zi2 == 0.0 ) {
+          nec_exception nex("GEOMETRY DATA ERROR--SEGMENT ");
+          nex.append(iz);
+          nex.append("LIES IN GROUND PLANE");
+          throw nex;
+        }
+      } /* if ( ignd != 0) */
     
       // re-initialize these vectors!
       v1 = nec_3vector(x[i], y[i], z[i]);

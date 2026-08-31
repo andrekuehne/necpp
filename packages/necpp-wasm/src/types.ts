@@ -239,6 +239,19 @@ export interface ImpedanceResult {
   readonly factorizationGeneration: number;
 }
 
+export interface PowerBudget {
+  /** Total time-average power supplied by all voltage sources. */
+  readonly inputPowerW: number;
+  /** Native NEC balance: inputPowerW - structureLossW - networkLossW. */
+  readonly radiatedPowerW: number;
+  /** Ohmic/dissipative power in structure loads and wire conductivity. */
+  readonly structureLossW: number;
+  /** Net power absorbed by non-radiating networks and transmission lines. */
+  readonly networkLossW: number;
+  /** 100 * radiatedPowerW / inputPowerW; null for exact zero input. */
+  readonly efficiencyPercent: number | null;
+}
+
 export interface PortSolution {
   readonly drive: "voltage" | "current";
   readonly frequencyMHz: number;
@@ -253,6 +266,8 @@ export interface PortSolution {
   readonly activeImpedances: ComplexVector;
   /** Time-average input power: 0.5 * Re(V * conjugate(I)), in watts. */
   readonly powersW: Float64Array;
+  /** Aggregate native NEC power balance for this simultaneous solution. */
+  readonly powerBudget: PowerBudget;
   readonly factorizationGeneration: number;
   readonly solveGeneration: number;
 }
@@ -456,6 +471,8 @@ export interface FullArrayDescription {
   readonly elements: readonly PositionedArrayElement[];
   readonly patterns: readonly ElementWirePattern[];
   readonly ground: GroundModel;
+  /** Defaults to `"none"`; corresponds to NEC GE 0, +1, or -1. */
+  readonly groundConnection?: GroundConnection;
 }
 
 export interface CanonicalArrayElement {

@@ -319,6 +319,18 @@ function compareSolutions(candidate, baseline, tolerance, label) {
   assertComplexClose(candidate.activeImpedances, baseline.activeImpedances, tolerance,
     `${label} active impedances`);
   assertRealClose(candidate.powersW, baseline.powersW, tolerance, `${label} powers`);
+  for (const field of [
+    "inputPowerW",
+    "radiatedPowerW",
+    "structureLossW",
+    "networkLossW",
+    "efficiencyPercent",
+  ]) {
+    assert.ok(
+      Math.abs(candidate.powerBudget[field] - baseline.powerBudget[field]) <= tolerance,
+      `${label} power budget ${field}`,
+    );
+  }
 }
 
 function fieldComponents(field) {

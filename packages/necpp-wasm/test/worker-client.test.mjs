@@ -85,6 +85,13 @@ function createFakeModel(overrides = {}) {
           imag: new Float64Array([42.5]),
         },
         powersW: new Float64Array([0.005]),
+        powerBudget: Object.freeze({
+          inputPowerW: 0.005,
+          radiatedPowerW: 0.004,
+          structureLossW: 0.001,
+          networkLossW: 0,
+          efficiencyPercent: 80,
+        }),
         factorizationGeneration: 1,
         solveGeneration: 1,
       };
@@ -287,6 +294,14 @@ test("worker client serializes operations, reports progress, and transfers field
   const solution = await model.solveVoltages(voltages);
   assert.equal(voltages.real.buffer.byteLength, 8);
   assert.equal(solution.ports[0].name, "feed");
+  assert.deepEqual(solution.powerBudget, {
+    inputPowerW: 0.005,
+    radiatedPowerW: 0.004,
+    structureLossW: 0.001,
+    networkLossW: 0,
+    efficiencyPercent: 80,
+  });
+  assert.equal(Object.isFrozen(solution.powerBudget), true);
   assert.throws(() => {
     solution.ports[0].name = "mutated";
   }, TypeError);

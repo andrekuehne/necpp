@@ -158,7 +158,9 @@ async function applyExplicit(
       description.elements[index]!.rotationDeg ?? 0,
     );
   }
-  const completion = await invoke(model.completeGeometry({ groundConnection: "none" }));
+  const completion = await invoke(model.completeGeometry({
+    groundConnection: description.groundConnection ?? "none",
+  }));
   await invoke(model.definePorts(caller.ports));
   for (const allocation of caller.allocations) {
     for (const load of allocation.pattern.loads ?? []) {
@@ -196,7 +198,7 @@ async function applySymmetric(
     await addElementWires(model, pattern, element.positionM, wireTags);
   }
   const completion = await invoke(model.completeGeometry({
-    groundConnection: "none",
+    groundConnection: description.groundConnection ?? "none",
     symmetry: plan.symmetry,
   }));
   const nativePorts: PortDefinition[] = [];
@@ -509,6 +511,7 @@ class WorkerNecArraySolver implements NecArraySolver {
       currents: gatherComplexVector(result.currents, scatter),
       activeImpedances: gatherComplexVector(result.activeImpedances, scatter),
       powersW,
+      powerBudget: result.powerBudget,
       factorizationGeneration: result.factorizationGeneration,
       solveGeneration: result.solveGeneration,
     };

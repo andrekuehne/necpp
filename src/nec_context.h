@@ -31,6 +31,7 @@
 #include "nec_structure_currents.h"
 #include "nec_output.h"
 #include "nec_ground.h"
+#include "nec_power_budget.h"
 #include "c_plot_card.h"
 
 class c_geometry;
@@ -105,6 +106,9 @@ public:
   void stateful_solve_voltage_sources(
     const std::vector<int>& absolute_segments,
     const std::vector<nec_complex>& voltages);
+
+  /*! Copy the latest NEC source/loss balance before another solve mutates it. */
+  nec_power_budget stateful_power_budget() const;
 
   /*! Clear load cards without relying on LD card sequencing state. */
   void stateful_clear_loads();
