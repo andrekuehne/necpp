@@ -275,6 +275,10 @@ class WorkerNecModel implements NecWorkerModel {
     );
   }
 
+  cancelFarField(): void {
+    this.#cancelField();
+  }
+
   async dispose(): Promise<void> {
     this.#cancelField();
     if (this.#terminated || this.#state === "disposed") {

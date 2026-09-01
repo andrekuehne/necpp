@@ -469,6 +469,11 @@ export interface NecWorkerModel {
     request: FarFieldRequest,
     normalization?: EmbeddedFieldNormalization,
   ): Promise<EmbeddedFarFieldResult>;
+  /**
+   * Stop assigning tiles for the active pooled far-field request. This is a
+   * no-op when no pooled field is active and does not dispose the model.
+   */
+  cancelFarField(): void;
   /** Idempotent. Disposes the native model, then releases the worker thread. */
   dispose(): Promise<void>;
   /**
@@ -664,6 +669,11 @@ export interface NecArraySolver {
     request: FarFieldRequest,
     normalization?: EmbeddedFieldNormalization,
   ): Promise<EmbeddedFarFieldResult>;
+  /**
+   * Cancel the active pooled field between bounded tiles. The active field
+   * promise rejects with `NecRuntimeError` and `details.reason = "superseded"`.
+   */
+  cancelFarField(): void;
   dispose(): Promise<void>;
   getDiagnostics(): ArraySolverDiagnostics;
 }

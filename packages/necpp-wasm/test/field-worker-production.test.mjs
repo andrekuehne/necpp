@@ -173,7 +173,7 @@ test("unsupported ground and missing evaluator assets fall back explicitly", asy
   }
 });
 
-test("a newer production request cancels bounded stale tiles", async () => {
+test("the public cancellation entry point stops bounded stale tiles", async () => {
   const cancellationDescription = {
     ...perfectDescription,
     patterns: [{
@@ -202,8 +202,9 @@ test("a newer production request cancels bounded stale tiles", async () => {
         && error.details?.reason === "superseded",
     );
     await new Promise((resolve) => setTimeout(resolve, 40));
-    const newest = solver.computeFarField(request);
+    solver.cancelFarField();
     await staleRejection;
+    const newest = solver.computeFarField(request);
     const field = await newest;
     assert.equal(field.fieldBackend.backend, "worker-pool");
     assert.equal(field.fieldBackend.cancelledJobs, 1);

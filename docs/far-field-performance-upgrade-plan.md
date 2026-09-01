@@ -1,6 +1,6 @@
 # NEC far-field performance upgrade plan
 
-**Status:** implementation in progress; WP0 through WP5 complete, WP6 next
+**Status:** implementation in progress; WP0 through WP5 complete, WP6 implemented with consumer full-suite certification pending
 **Created:** 2026-08-31
 **Primary engine baseline:** `necpp` commit `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
 **Primary consumer baseline:** `PhasedArrayVisualizer-NG` commit `adf617081e8b53d08729cce57e2a1f7a3bed561c`
@@ -1111,18 +1111,58 @@ rather than an isolated kernel result.
 
 ### WP6 handover - fill before marking complete
 
-- **Status:** not started
-- **Implementer / date:**
-- **Consumer commit(s) / package version:**
-- **Integration changes:**
-- **Postprocessing changes and attribution:**
-- **Before/after raw artifacts:**
-- **End-to-end median/p90:**
-- **Rapid-steering cancellation results:**
-- **Main-thread/memory/disposal results:**
-- **UI/documentation changes:**
-- **Deviations:**
-- **Remaining risks / next recommended WP:**
+- **Status:** implemented and performance gates passed; not marked complete
+  until the unrelated dirty consumer configuration work restores its full
+  regression suite
+- **Implementer / date:** Codex / 2026-09-01
+- **Consumer commit(s) / package version:** consumer integration commit
+  `35df28d6a08723c75da9931510968c2a92621384`, based on
+  `cfba3bab4d6aa7090015bfab634faeb2a0e52635`; testable sibling package is the
+  unreleased `0.3.0` development line after WP5
+- **Integration changes:** consumer solver creation now requests
+  `fieldWorkers: "auto"`; a new public idempotent `cancelFarField()` package
+  entry point lets the visualizer cancel immediately when its outer scheduler
+  coalesces a generation instead of waiting to issue the next solve; package
+  backend/tile/timing/memory diagnostics flow through the engine and UI
+- **Postprocessing changes and attribution:** the previous `mappingPost` bucket
+  is split into mapper copy, target setup, map, fill, polarized-power
+  integration, metrics, and commit. Existing field/map/view identities still
+  skip unchanged stages; no speculative postprocessing rewrite was justified
+  because final postprocessing is only 0.83% of the primary median.
+- **Before/after raw artifacts:** WP0 browser baseline is
+  `packages/necpp-wasm/bench/evidence/far-field-wp0/consumer/consumer-browser-run.json`;
+  WP6 schema-v2 browser evidence is
+  `PhasedArrayVisualizer-NG/docs/nec-far-field-wp6-results.json`, summarized by
+  `PhasedArrayVisualizer-NG/docs/nec-far-field-wp6.md`
+- **End-to-end median/p90:** unchanged primary repeated steering is
+  1006.3/1057.5 ms versus the 3616.5 ms WP0 median, a 3.59x median improvement;
+  32 x 32 is 307.9 ms versus 1052.4 ms, a 3.42x improvement rather than a
+  regression
+- **Rapid-steering cancellation results:** nine rapid edits complete in
+  1061.7 ms; the package reports one cancelled stale job and 126 cancelled
+  unissued tiles, with in-flight stale work bounded by four workers; only the
+  final near-edge generation commits
+- **Main-thread/memory/disposal results:** primary sampled JS heap peaks at
+  35,524,001 bytes; two long tasks total 109 ms with a 55 ms maximum; four
+  evaluator workers retain 73,216 bytes of snapshot each and return a
+  2,089,448-byte field. Consumer mode replacement terminates the outer worker;
+  package lifecycle tests cover every nested evaluator and pass.
+- **UI/documentation changes:** NEC diagnostics show selected backend,
+  requested/active worker count, fallback, tile/cancellation counts,
+  result/snapshot memory, package phases, and split consumer phases. Consumer
+  behavior/evidence is documented in `docs/nec-far-field-wp6.md`.
+- **Deviations:** the dependency is a sibling `file:` pin until WP7 publishes
+  the WP4+ package. The existing WP0 browser record has one repeated state, so
+  the before median remains its accepted value while the WP6 evidence uses the
+  frozen nine repeated states after broadside. Focused WP6 tests, production
+  build/audit, package suite, 20-test Chromium browser suite, and Chromium
+  benchmark pass; the full consumer unit run has 388 passes and 16 failures
+  caused by unrelated pre-existing centralized-config edits in the dirty
+  consumer checkout.
+- **Remaining risks / next recommended WP:** restore/certify the complete
+  consumer suite after the config work settles, publish and pin the final
+  package instead of the sibling path, then run WP7's second-browser/host,
+  packed deployment, and release audit matrix.
 
 ## WP7 - Release hardening, evidence archive, and final handover
 

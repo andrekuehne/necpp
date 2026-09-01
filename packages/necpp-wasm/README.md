@@ -114,6 +114,11 @@ tiles. A newer solve or field request supersedes an active pooled field between
 512-sample tiles; the stale promise rejects with `NecRuntimeError` and
 `details.reason === "superseded"`. Explicit disposal terminates every evaluator.
 
+Schedulers that coalesce interaction updates before issuing the next solve can
+call `solver.cancelFarField()` as soon as a newer generation is known. It is a
+safe no-op without an active pooled field, retains prepared state and the last
+completed result, and bounds obsolete work to tiles that are already running.
+
 ### Full NxN input with automatic selection
 
 This runnable 4 x 4 example supplies all 16 XY positions in row-major order.
@@ -731,7 +736,7 @@ appropriate CORS header.
 import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel({
-  wasmUrl: new URL("https://cdn.example.test/necpp/0.3.0/nec2pp.wasm"),
+  wasmUrl: new URL("https://cdn.example.test/necpp/0.4.0/nec2pp.wasm"),
 });
 model.dispose();
 ```

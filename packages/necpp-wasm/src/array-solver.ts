@@ -572,6 +572,10 @@ class WorkerNecArraySolver implements NecArraySolver {
     return { ...gathered, ...rephaseArrays(gathered, center, scatter.length) };
   }
 
+  cancelFarField(): void {
+    this.#model.cancelFarField();
+  }
+
   dispose(): Promise<void> {
     return this.#model.dispose();
   }
