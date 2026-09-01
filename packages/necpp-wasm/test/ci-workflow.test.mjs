@@ -54,6 +54,12 @@ test("WP8 workflow parses and contains every required release gate", () => {
   assert.equal(workflow.jobs["browser-firefox"].needs, "package");
   assert.equal(workflow.jobs.release.needs, "artifact-report");
 
+  const packageConsumerRuns = workflow.jobs["package-consumer"].steps
+    .map((step) => step.run ?? "")
+    .join("\n");
+  assert.match(packageConsumerRuns, /test "\$actual" = "\$PLAYWRIGHT_VERSION"/);
+  assert.match(packageConsumerRuns, /playwright install --with-deps chromium/);
+
   const finalGates = new Set(workflow.jobs["artifact-report"].needs);
   for (const job of [
     "native",
