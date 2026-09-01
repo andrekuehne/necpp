@@ -4,6 +4,12 @@ import test from "node:test";
 import { analyzeArraySymmetry } from "../.test-build/src/index.js";
 import { timingStats } from "../bench/far-field-benchmark.mjs";
 import {
+  amortizedTotals,
+  breakEvenSteeringCount,
+  embeddedBasisBytes,
+  superposeEmbedded,
+} from "../bench/far-field-wp5-amortization.mjs";
+import {
   PRIMARY_FIELD_GRID,
   SPEED_OF_LIGHT_M_PER_S,
   STEERING_POINTS,
@@ -93,4 +99,36 @@ test("far-field WP0 timing summaries retain dispersion", () => {
     p90: 16,
   });
   assert.equal(timingStats([Number.NaN]), null);
+});
+
+test("far-field WP5 amortization math and basis layout are deterministic", () => {
+  assert.equal(embeddedBasisBytes(4, 181 * 360), 8_340_480);
+  assert.equal(embeddedBasisBytes(16, 181 * 360), 33_361_920);
+  assert.equal(embeddedBasisBytes(64, 181 * 360), 133_447_680);
+  assert.equal(breakEvenSteeringCount(100, 30, 5), 4);
+  assert.equal(breakEvenSteeringCount(100, 5, 5), null);
+  assert.deepEqual(amortizedTotals(100, 30, 5)[4], {
+    directMs: 120,
+    cachedMs: 120,
+    cachedToDirectRatio: 1,
+  });
+});
+
+test("far-field WP5 combines a port-major unit-current basis", () => {
+  const embedded = {
+    ports: [{}, {}],
+    samplesPerPort: 2,
+    eThetaReal: new Float64Array([1, 2, 3, 4]),
+    eThetaImag: new Float64Array([0, 1, -1, 0]),
+    ePhiReal: new Float64Array([5, 6, 7, 8]),
+    ePhiImag: new Float64Array([1, 0, 0, -1]),
+  };
+  const result = superposeEmbedded(embedded, {
+    real: new Float64Array([2, -1]),
+    imag: new Float64Array([1, 0.5]),
+  });
+  assert.deepEqual([...result.eThetaReal], [-0.5, -1]);
+  assert.deepEqual([...result.eThetaImag], [3.5, 6]);
+  assert.deepEqual([...result.ePhiReal], [2, 4.5]);
+  assert.deepEqual([...result.ePhiImag], [10.5, 11]);
 });

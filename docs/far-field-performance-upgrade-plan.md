@@ -1,6 +1,6 @@
 # NEC far-field performance upgrade plan
 
-**Status:** implementation in progress; WP0 through WP4 complete, WP5 next
+**Status:** implementation in progress; WP0 through WP5 complete, WP6 next
 **Created:** 2026-08-31
 **Primary engine baseline:** `necpp` commit `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
 **Primary consumer baseline:** `PhasedArrayVisualizer-NG` commit `adf617081e8b53d08729cce57e2a1f7a3bed561c`
@@ -1008,18 +1008,53 @@ an optimization.
 
 ### WP5 handover - fill before marking complete
 
-- **Status:** not started
-- **Implementer / date:**
-- **Commits:**
-- **Amortization artifact:**
-- **Break-even table:**
-- **Resident/peak memory table:**
-- **Direct versus embedded correctness:**
-- **Decision by port/grid case:**
-- **API/cache policy if shipped:**
-- **Rejected designs:**
-- **Deviations:**
-- **Remaining risks / next recommended WP:**
+- **Status:** complete; no production cache shipped; handed to WP6
+- **Implementer / date:** Codex / 2026-09-01
+- **Commits:** commit containing this handover; package remains the unreleased
+  `0.3.0` development version
+- **Amortization artifact:** versioned raw JSON at
+  `packages/necpp-wasm/bench/evidence/far-field-wp5/node/far-field-wp5-amortization.json`
+  and curated findings at
+  `packages/necpp-wasm/bench/FAR_FIELD_WP5_RESULTS.md`; reproduce with
+  `npm run build && npm run bench:far-field-wp5` from the package directory
+- **Break-even table:** resident primary/secondary break-even steering counts
+  are 18/17 for 4 ports, 59/55 for 16 ports, and 216/211 for 64 ports. The
+  64-port primary/secondary basis warm-ups are 224,623.57/67,033.27 ms, versus
+  1,066.89/326.23 ms direct solve-plus-field medians.
+- **Resident/peak memory table:** exact primary public bases are
+  7.95/31.82/127.27 MiB for 4/16/64 ports; minimum native-plus-public retention
+  is 15.91/63.63/254.53 MiB. The sequential reference process observed a
+  783.60 MiB absolute peak and 629.40 MiB case delta for 64-port primary.
+- **Direct versus embedded correctness:** maximum direct-versus-unit-current
+  superposition scaled differences are `5.16e-11` E-theta and `6.20e-11`
+  E-phi; transferred and benchmark-resident combinations are bitwise equal.
+  Lifecycle restoration, caller order, derived peak/integrated magnitude, and
+  native power closure pass all six cases and all artifact gates are true.
+- **Decision by port/grid case:** no case is enabled by default or opt-in for
+  normal steering. Four ports is deferred only as a possible future explicit
+  batch API after 18/17 states; 16 ports likewise after 59/55 states and only
+  after parallel basis generation; 64 ports is never under the current
+  implementation because it breaks even only after 216/211 states and has an
+  unacceptable warm-up/memory profile.
+- **API/cache policy if shipped:** none; the existing explicit public
+  transferred-basis method is unchanged. The report freezes the required future
+  identity/invalidation, budget, progress, cancellation, release, rejection,
+  and direct-fallback policy if a batch-only cache is reconsidered.
+- **Rejected designs:** a benchmark-local worker-resident basis accepted compact
+  weights and transferred only combined fields, but moving the basis cost less
+  than 1 ms and did not address serial private basis solves, native duplication,
+  or break-even. Production prototype code was not added.
+- **Deviations:** horizon totals and exact integer break-even use a linear model
+  from five measured steering-state medians and one measured basis warm-up,
+  rather than executing all 256 fields per case. WP4 cannot evaluate private
+  embedded basis solves without a new native immutable-snapshot/batch contract;
+  adding it for a rejected cache was not justified. Consumer mapper/metric
+  integration remains WP6 scope; source-field peak and integrated-magnitude
+  proxies pass here.
+- **Remaining risks / next recommended WP:** WP6 should integrate the WP4 direct
+  pool and cancellation diagnostics. A future long-sweep API may revisit 4/16
+  ports only after native parallel embedded generation and an explicit caller
+  memory budget exist.
 
 ## WP6 - Visualizer integration, postprocessing optimization, and interaction scheduling
 
