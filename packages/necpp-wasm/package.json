@@ -55,6 +55,7 @@
     "bench:array": "node bench/array-benchmark.mjs",
     "bench:far-field": "node bench/far-field-benchmark.mjs",
     "bench:far-field-overhead": "node bench/far-field-overhead.mjs",
+    "bench:far-field-candidates": "node bench/far-field-candidate-matrix.mjs",
     "bench:far-field-simd": "node bench/far-field-simd-compare.mjs",
     "bench:consumer-trace": "node bench/consumer-browser-trace.mjs",
     "build": "node scripts/build-dist.mjs",

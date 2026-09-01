@@ -51,6 +51,16 @@ struct split_complex_buffer {
     real = std::move(next_real);
     imag = std::move(next_imag);
   }
+
+  void assign_reusing(const std::vector<nec_complex>& values)
+  {
+    real.resize(values.size());
+    imag.resize(values.size());
+    for (size_t index = 0; index < values.size(); ++index) {
+      real[index] = values[index].real();
+      imag[index] = values[index].imag();
+    }
+  }
 };
 
 struct impedance_buffers {
@@ -347,6 +357,17 @@ void sync_solution(
 void sync_far_field(
   necpp_wasm_v1_model& model, const nec_far_field_result& result)
 {
+#ifdef NECPP_FAR_FIELD_REUSE_OUTPUTS
+  far_field_buffers& next = model.far_field;
+  next.theta_deg.assign(result.theta_deg.begin(), result.theta_deg.end());
+  next.phi_deg.assign(result.phi_deg.begin(), result.phi_deg.end());
+  next.e_theta.assign_reusing(result.e_theta);
+  next.e_phi.assign_reusing(result.e_phi);
+  next.radius_m = result.radius_m;
+  next.frequency_mhz = result.frequency_mhz;
+  next.diagnostics = result.diagnostics;
+  next.available = true;
+#else
   far_field_buffers next;
   next.theta_deg.assign(result.theta_deg.begin(), result.theta_deg.end());
   next.phi_deg.assign(result.phi_deg.begin(), result.phi_deg.end());
@@ -357,6 +378,7 @@ void sync_far_field(
   next.diagnostics = result.diagnostics;
   next.available = true;
   model.far_field = std::move(next);
+#endif
 }
 
 void sync_embedded(
@@ -1233,6 +1255,12 @@ double necpp_wasm_v1_far_field_diagnostic(
     return static_cast<double>(diagnostics.ground_image_count);
   case NECPP_WASM_V1_FF_SEGMENT_DIRECTION_CONTRIBUTIONS:
     return static_cast<double>(diagnostics.segment_direction_contributions);
+  case NECPP_WASM_V1_FF_OUTPUT_BUFFER_ALLOCATIONS:
+    return static_cast<double>(diagnostics.output_buffer_allocations);
+  case NECPP_WASM_V1_FF_INTERMEDIATE_BUFFER_ALLOCATIONS:
+    return static_cast<double>(diagnostics.intermediate_buffer_allocations);
+  case NECPP_WASM_V1_FF_COMPLEX_SAMPLE_COPIES:
+    return static_cast<double>(diagnostics.complex_sample_copies);
   default:
     return 0.0;
   }

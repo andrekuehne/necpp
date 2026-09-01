@@ -295,9 +295,10 @@ private:
     std::vector<nec_complex>& achieved_currents);
   void restore_after_internal_solves(
     bool had_solution, const nec_port_solution& saved_solution);
-  nec_far_field_result calculate_far_field(
+  void calculate_far_field(
     const nec_far_field_grid& grid,
-    const std::vector<nec_complex>& currents);
+    const std::vector<nec_complex>& currents,
+    nec_far_field_result& output);
   const nec_port_solution& finish_consumer_solve(
     nec_port_drive drive,
     const std::vector<nec_complex>& requested,
@@ -315,7 +316,9 @@ private:
   nec_impedance_result m_impedance_result;
   nec_port_solution m_last_port_solution;
   nec_far_field_result m_far_field_result;
+  nec_far_field_result m_far_field_scratch_result;
   nec_embedded_far_field_result m_embedded_far_field_result;
+  std::vector<nec_float> m_far_field_segment_half_lengths;
   nec_ground_definition m_ground;
   nec_ground_connection m_ground_connection = nec_ground_connection::none;
   nec_float m_frequency_mhz = 0.0;

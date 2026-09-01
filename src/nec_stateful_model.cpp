@@ -165,6 +165,7 @@ void nec_stateful_model::invalidate_factorization()
   m_frequency_mhz = 0.0;
   clear_matrix_cache();
   clear_consumer_solution();
+  m_far_field_segment_half_lengths.clear();
   m_context->stateful_clear_results();
   m_state = nec_model_state::geometry_complete;
 }
@@ -489,12 +490,24 @@ void nec_stateful_model::prepare(nec_float frequency_mhz)
   // the context matrix may already have been overwritten.  The geometry and
   // environment remain reusable for a later prepare attempt.
   m_context->stateful_clear_results();
+  m_far_field_segment_half_lengths.clear();
   m_configuration_dirty = true;
   m_frequency_mhz = 0.0;
   clear_matrix_cache();
   clear_consumer_solution();
   m_state = nec_model_state::geometry_complete;
   m_context->stateful_prepare_frequency(frequency_mhz);
+#ifdef NECPP_FAR_FIELD_CACHE_SEGMENTS
+  const real_array& segment_lengths =
+    m_context->get_geometry()->segment_length;
+  m_far_field_segment_half_lengths.resize(
+    static_cast<size_t>(segment_lengths.size()));
+  for (size_t index = 0;
+       index < m_far_field_segment_half_lengths.size(); ++index) {
+    m_far_field_segment_half_lengths[index] =
+      pi() * segment_lengths[static_cast<int64_t>(index)];
+  }
+#endif
   m_frequency_mhz = frequency_mhz;
   ++m_factorization_generation;
   m_configuration_dirty = false;
@@ -739,9 +752,10 @@ const nec_port_solution& nec_stateful_model::last_port_solution() const
   return m_last_port_solution;
 }
 
-nec_far_field_result nec_stateful_model::calculate_far_field(
+void nec_stateful_model::calculate_far_field(
   const nec_far_field_grid& grid,
-  const std::vector<nec_complex>& currents)
+  const std::vector<nec_complex>& currents,
+  nec_far_field_result& copied)
 {
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
   const auto total_started = std::chrono::steady_clock::now();
@@ -749,7 +763,12 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
 #endif
   const size_t sample_count =
     checked_field_sample_count(grid, "COMPUTE FAR FIELD");
-  nec_far_field_result copied;
+  const uint64_t output_buffer_allocations =
+    (copied.theta_deg.capacity() < static_cast<size_t>(grid.theta_count) ? 1u : 0u) +
+    (copied.phi_deg.capacity() < static_cast<size_t>(grid.phi_count) ? 1u : 0u) +
+    (copied.e_theta.capacity() < sample_count ? 1u : 0u) +
+    (copied.e_phi.capacity() < sample_count ? 1u : 0u);
+  copied.diagnostics = {};
   copied.radius_m = grid.radius_m;
   copied.frequency_mhz = m_frequency_mhz;
   populate_field_axes(
@@ -758,7 +777,7 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
   copied.e_phi.assign(sample_count, nec_complex(0.0, 0.0));
   // theta, phi, E-theta, and E-phi are the only backing allocations.  The
   // raw path writes samples in place and never creates an RP field matrix.
-  copied.diagnostics.output_buffer_allocations = 4;
+  copied.diagnostics.output_buffer_allocations = output_buffer_allocations;
   copied.diagnostics.segment_count = static_cast<uint64_t>(
     m_geometry_completion.full_segment_count);
   copied.diagnostics.ground_image_count =
@@ -785,26 +804,64 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
       std::chrono::duration<nec_float, std::milli>(
         std::chrono::steady_clock::now() - total_started).count();
 #endif
-    return copied;
+    return;
   }
 
   const nec_float wavelength = em::get_wavelength(m_frequency_mhz * 1.0e6);
-  const nec_far_field_evaluation_input input =
+  nec_far_field_evaluation_input input =
     m_context->far_field_evaluation_input(wavelength, 0);
+#ifdef NECPP_FAR_FIELD_CACHE_SEGMENTS
+  input.segment_half_lengths = &m_far_field_segment_half_lengths;
+#endif
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
   std::chrono::steady_clock::duration raw_duration{};
   uint64_t raw_timing_samples = 0;
   constexpr uint64_t raw_timing_stride = 256;
 #endif
+#ifdef NECPP_FAR_FIELD_CACHE_DIRECTIONS
+  // Use the last E-theta row as bounded direction scratch.  Earlier phi rows
+  // are evaluated first, so each cached pair remains live until the final row
+  // reads and replaces it with its field sample.  This avoids a fifth backing
+  // allocation while retaining theta-fast output order.
+  const size_t direction_cache_offset =
+    static_cast<size_t>(grid.phi_count - 1) *
+    static_cast<size_t>(grid.theta_count);
+  nec_float cached_theta_deg =
+    grid.theta_start_deg - grid.theta_step_deg;
+  for (int theta_index = 0;
+       theta_index < grid.theta_count; ++theta_index) {
+    cached_theta_deg += grid.theta_step_deg;
+    const nec_float theta_rad = degrees_to_rad(cached_theta_deg);
+    copied.e_theta[
+      direction_cache_offset + static_cast<size_t>(theta_index)] = {
+        std::sin(theta_rad),
+        std::cos(theta_rad),
+      };
+  }
+#endif
+
   nec_float phi_deg = grid.phi_start_deg - grid.phi_step_deg;
   for (int phi_index = 0; phi_index < grid.phi_count; ++phi_index) {
     phi_deg += grid.phi_step_deg;
     const nec_float phi_rad = degrees_to_rad(phi_deg);
+#ifdef NECPP_FAR_FIELD_CACHE_DIRECTIONS
+    const nec_float sin_phi = std::sin(phi_rad);
+    const nec_float cos_phi = std::cos(phi_rad);
+#endif
     nec_float theta_deg = grid.theta_start_deg - grid.theta_step_deg;
     for (int theta_index = 0; theta_index < grid.theta_count; ++theta_index) {
       theta_deg += grid.theta_step_deg;
-      if (input.ground.present() && theta_deg > 90.01)
+      if (input.ground.present() && theta_deg > 90.01) {
+#ifdef NECPP_FAR_FIELD_CACHE_DIRECTIONS
+        if (phi_index == grid.phi_count - 1) {
+          const size_t skipped_index =
+            direction_cache_offset + static_cast<size_t>(theta_index);
+          copied.e_theta[skipped_index] = cplx_00();
+          copied.e_phi[skipped_index] = cplx_00();
+        }
+#endif
         continue;
+      }
       ++copied.diagnostics.evaluated_directions;
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
       const bool time_raw =
@@ -814,8 +871,23 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
         ? std::chrono::steady_clock::now()
         : std::chrono::steady_clock::time_point();
 #endif
+#ifdef NECPP_FAR_FIELD_CACHE_DIRECTIONS
+      const nec_complex cached_direction = copied.e_theta[
+        direction_cache_offset + static_cast<size_t>(theta_index)];
+      const nec_far_field_sample raw = [&] {
+        return nec_evaluate_far_field_sample(
+          input, {
+            cached_direction.real(),
+            cached_direction.imag(),
+            0.0,
+            sin_phi,
+            cos_phi,
+          });
+      }();
+#else
       const nec_far_field_sample raw = nec_evaluate_far_field_sample(
         input, degrees_to_rad(theta_deg), phi_rad);
+#endif
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
       if (time_raw) {
         raw_duration += std::chrono::steady_clock::now() - raw_started;
@@ -855,15 +927,27 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
           static_cast<nec_float>(copied.diagnostics.evaluated_directions) /
           static_cast<nec_float>(raw_timing_samples));
 #endif
-  return copied;
 }
 
 const nec_far_field_result& nec_stateful_model::compute_far_field(
   const nec_far_field_grid& grid)
 {
   require_state(nec_model_state::solved, "COMPUTE FAR FIELD");
-  nec_far_field_result result = calculate_far_field(grid, m_port_currents);
+#ifdef NECPP_FAR_FIELD_REUSE_OUTPUTS
+  std::swap(m_far_field_result, m_far_field_scratch_result);
+  try {
+    calculate_far_field(
+      grid, m_port_currents, m_far_field_scratch_result);
+  } catch (...) {
+    std::swap(m_far_field_result, m_far_field_scratch_result);
+    throw;
+  }
+  std::swap(m_far_field_result, m_far_field_scratch_result);
+#else
+  nec_far_field_result result;
+  calculate_far_field(grid, m_port_currents, result);
   m_far_field_result = std::move(result);
+#endif
   return m_far_field_result;
 }
 
@@ -914,6 +998,7 @@ nec_stateful_model::compute_embedded_far_fields(
       m_ports.size(), nec_complex(0.0, 0.0));
     std::vector<nec_complex> achieved_voltages;
     std::vector<nec_complex> achieved_currents;
+    nec_far_field_result basis;
     for (size_t port_index = 0; port_index < m_ports.size(); ++port_index) {
       std::fill(
         basis_voltages.begin(), basis_voltages.end(),
@@ -927,8 +1012,7 @@ nec_stateful_model::compute_embedded_far_fields(
 
       execute_voltage_solve(
         basis_voltages, achieved_voltages, achieved_currents);
-      const nec_far_field_result basis =
-        calculate_far_field(grid, achieved_currents);
+      calculate_far_field(grid, achieved_currents, basis);
       const size_t offset = port_index * samples_per_port;
       std::copy(
         basis.e_theta.begin(), basis.e_theta.end(),

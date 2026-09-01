@@ -306,6 +306,9 @@ export interface FarFieldDiagnostics {
     readonly segments: number;
     readonly groundImages: number;
     readonly segmentDirectionContributions: number;
+    readonly outputBufferAllocations: number;
+    readonly intermediateBufferAllocations: number;
+    readonly complexSampleCopies: number;
   };
 }
 

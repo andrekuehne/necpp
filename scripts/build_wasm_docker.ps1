@@ -19,6 +19,9 @@ $EnablePerformanceDiagnostics = if ($env:NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS) {
 $EnableWasmSimd = if ($env:NECPP_ENABLE_WASM_SIMD) {
     $env:NECPP_ENABLE_WASM_SIMD
 } else { "OFF" }
+$FarFieldOptimizations = if ($env:NECPP_FAR_FIELD_OPTIMIZATIONS) {
+    $env:NECPP_FAR_FIELD_OPTIMIZATIONS
+} else { "SELECTED" }
 
 Set-Location $ProjectDir
 
@@ -46,6 +49,7 @@ docker run --rm `
     -e "BUILD_DIR=$BuildDir" `
     -e "ENABLE_PERFORMANCE_DIAGNOSTICS=$EnablePerformanceDiagnostics" `
     -e "ENABLE_WASM_SIMD=$EnableWasmSimd" `
+    -e "FAR_FIELD_OPTIMIZATIONS=$FarFieldOptimizations" `
     -v "${ProjectDir}:/src" `
     -w /src `
     $WasmImage `

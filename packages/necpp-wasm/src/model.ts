@@ -1064,6 +1064,9 @@ export class WasmNecModel implements NecModel {
           segments: value(10),
           groundImages: value(11),
           segmentDirectionContributions: value(12),
+          outputBufferAllocations: value(13),
+          intermediateBufferAllocations: value(14),
+          complexSampleCopies: value(15),
         }),
       }),
     };

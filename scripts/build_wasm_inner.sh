@@ -7,6 +7,7 @@ set -euo pipefail
 : "${WASM_OUT_DIR:=wasm}"
 : "${ENABLE_PERFORMANCE_DIAGNOSTICS:=OFF}"
 : "${ENABLE_WASM_SIMD:=OFF}"
+: "${FAR_FIELD_OPTIMIZATIONS:=SELECTED}"
 
 # Build on the container filesystem. Windows bind mounts (/mnt/c/...) reject
 # writes from a non-root container user, which breaks emscripten link steps.
@@ -41,6 +42,7 @@ emcmake cmake -B "$CONTAINER_BUILD_DIR" -S . \
     -DNECPP_BUILD_WASM=ON \
     -DNECPP_BUILD_TESTS=OFF \
     -DNECPP_ENABLE_PERFORMANCE_DIAGNOSTICS="$ENABLE_PERFORMANCE_DIAGNOSTICS" \
+    -DNECPP_FAR_FIELD_OPTIMIZATIONS="$FAR_FIELD_OPTIMIZATIONS" \
     -DBUILD_SHARED_LIBS=OFF \
     "-DCMAKE_CXX_FLAGS_RELEASE=$CXX_FLAGS" \
     "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=$LINK_FLAGS"

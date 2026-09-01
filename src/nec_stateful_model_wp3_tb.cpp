@@ -286,6 +286,15 @@ TEST_CASE("WP3 raw fields allocate only final buffers and preserve results on fa
   REQUIRE(field.e_phi == expected_phi);
   REQUIRE(model.retained_result_count() == 1);
   REQUIRE(model.state() == nec_model_state::solved);
+
+  const nec_far_field_result& repeated = model.compute_far_field(kFieldGrid);
+  REQUIRE(repeated.e_theta == expected_theta);
+  REQUIRE(repeated.e_phi == expected_phi);
+#ifdef NECPP_FAR_FIELD_REUSE_OUTPUTS
+  REQUIRE(repeated.diagnostics.output_buffer_allocations == 0);
+#else
+  REQUIRE(repeated.diagnostics.output_buffer_allocations == 4);
+#endif
 }
 
 TEST_CASE("WP3 center-fed dipole fields have axial nulls and mirror symmetry",

@@ -11,6 +11,8 @@
 #include "common.h"
 #include "math_util.h"
 
+#include <vector>
+
 class c_geometry;
 class nec_ground;
 
@@ -31,6 +33,19 @@ struct nec_far_field_evaluation_input {
   const complex_array& current_vector;
   const int ifar;
   const nec_float wavelength;
+  // Optional stateful-model cache.  The legacy RP path leaves this null and
+  // retains its historical calculation; repeated stateful fields populate it
+  // once per prepared geometry/frequency instead of once per contribution.
+  const std::vector<nec_float>* segment_half_lengths = nullptr;
+};
+
+/*! Trigonometric direction terms shared by all segments in one sample. */
+struct nec_far_field_direction {
+  nec_float sin_theta;
+  nec_float cos_theta;
+  nec_float tan_theta;
+  nec_float sin_phi;
+  nec_float cos_phi;
 };
 
 struct nec_far_field_sample {
@@ -43,6 +58,11 @@ nec_far_field_sample nec_evaluate_far_field_sample(
   const nec_far_field_evaluation_input& input,
   nec_float theta_rad,
   nec_float phi_rad);
+
+/*! Evaluate from caller-hoisted angular trigonometry. */
+nec_far_field_sample nec_evaluate_far_field_sample(
+  const nec_far_field_evaluation_input& input,
+  const nec_far_field_direction& direction);
 
 /*! Apply the legacy RP wavelength and exp(-j k R) / R transformation. */
 nec_far_field_sample nec_scale_far_field_sample(

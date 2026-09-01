@@ -167,3 +167,24 @@ RSS as an exact WASM heap measurement.
 
 See [RESULTS.md](RESULTS.md) for the curated WP-S7 reference run and the older
 stateful-versus-deck historical measurements.
+
+## Far-field WP2 candidate matrix
+
+`far-field-candidate-matrix.mjs` compares independently built WP2 artifacts on
+both frozen far-field grids. Each measurement runs in a fresh process, variant
+order is balanced, and the run fails unless every candidate field hash is
+bitwise-identical to WP1. Pass a comma-separated `NAME=PATH` artifact list that
+includes `WP1`:
+
+```powershell
+npm --prefix packages/necpp-wasm run bench:far-field-candidates -- `
+  --variants "WP1=C:\path\WP1,SELECTED=C:\path\SELECTED" `
+  --output-directory packages/necpp-wasm/bench/results/far-field-wp2 `
+  --rounds 3 --steering-limit 2
+```
+
+`inspect-far-field-wasm.mjs` consumes generated Emscripten JS plus `wasm2wat`
+output. It maps the public far-field ABI export to the minified WASM function
+and reports SIMD operations reachable through its call graph. See
+[FAR_FIELD_WP2_RESULTS.md](FAR_FIELD_WP2_RESULTS.md) and
+`bench/evidence/far-field-wp2/` for the accepted WP2 decision and evidence.

@@ -157,6 +157,9 @@ test("the facade performs a complete stateful solve with owned results", {
   assert.equal(field.diagnostics.counts.segments, 11);
   assert.equal(field.diagnostics.counts.groundImages, 1);
   assert.equal(field.diagnostics.counts.segmentDirectionContributions, 66);
+  assert.equal(field.diagnostics.counts.outputBufferAllocations, 4);
+  assert.equal(field.diagnostics.counts.intermediateBufferAllocations, 0);
+  assert.equal(field.diagnostics.counts.complexSampleCopies, 0);
   if (field.diagnostics.instrumentationEnabled) {
     assert.ok(field.diagnostics.native.rawAccumulationMs >= 0);
     assert.ok(field.diagnostics.native.derivedRpWorkMs >= 0);

@@ -1,0 +1,238 @@
+{
+  "type": "far-field-wp2-candidate-matrix",
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-01T07:53:19.645Z",
+  "configuration": {
+    "rounds": 3,
+    "warmups": 1,
+    "steeringLimit": 2,
+    "grids": [
+      "primary",
+      "secondary"
+    ],
+    "variants": [
+      {
+        "name": "WP1",
+        "directory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp2\\artifacts\\WP1"
+      },
+      {
+        "name": "SELECTED",
+        "directory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp2\\artifacts\\SELECTED"
+      },
+      {
+        "name": "SELECTED_SIMD",
+        "directory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp2\\artifacts\\SELECTED_SIMD"
+      }
+    ]
+  },
+  "outputParity": {
+    "compared": 36,
+    "failures": []
+  },
+  "cases": {
+    "WP1:primary": {
+      "repeatedFieldMs": {
+        "count": 3,
+        "minimum": 3551.1693999999998,
+        "median": 3565.988,
+        "maximum": 3586.8477,
+        "p90": 3586.8477
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 3,
+        "minimum": 3550.191,
+        "median": 3565.0164,
+        "maximum": 3585.8453,
+        "p90": 3585.8453
+      },
+      "fieldSpeedupOverWp1": 1,
+      "rawSpeedupOverWp1": 1,
+      "repeatedOutputBufferAllocations": {
+        "count": 3,
+        "minimum": 4,
+        "median": 4,
+        "maximum": 4,
+        "p90": 4
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 6.038900000000005,
+        "median": 6.2745999999999995,
+        "maximum": 6.8248999999999995,
+        "p90": 6.8248999999999995
+      },
+      "wasmBytes": 736454,
+      "wasmSha256": "e1ccf4fe04987680bcfdd7a8b71c79ce8056dbe058edcfb80de926ba0a483536"
+    },
+    "SELECTED:primary": {
+      "repeatedFieldMs": {
+        "count": 3,
+        "minimum": 3487.5271999999995,
+        "median": 3516.2120999999997,
+        "maximum": 3534.4665,
+        "p90": 3534.4665
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 3,
+        "minimum": 3486.589,
+        "median": 3515.2544,
+        "maximum": 3533.5514,
+        "p90": 3533.5514
+      },
+      "fieldSpeedupOverWp1": 1.0141561141889024,
+      "rawSpeedupOverWp1": 1.014156016702518,
+      "repeatedOutputBufferAllocations": {
+        "count": 3,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.8538,
+        "median": 6.577600000000004,
+        "maximum": 8.312899999999999,
+        "p90": 8.312899999999999
+      },
+      "wasmBytes": 737227,
+      "wasmSha256": "ac5e1f92446754a7c22a62bdefed43422ff99aa34164b595077457d0fa4e6453"
+    },
+    "SELECTED_SIMD:primary": {
+      "repeatedFieldMs": {
+        "count": 3,
+        "minimum": 3467.7932,
+        "median": 3525.1121,
+        "maximum": 3541.4071000000004,
+        "p90": 3541.4071000000004
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 3,
+        "minimum": 3466.8552,
+        "median": 3524.1727,
+        "maximum": 3540.4775,
+        "p90": 3540.4775
+      },
+      "fieldSpeedupOverWp1": 1.0115956312424788,
+      "rawSpeedupOverWp1": 1.011589585266352,
+      "repeatedOutputBufferAllocations": {
+        "count": 3,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.864699999999999,
+        "median": 6.0471,
+        "maximum": 6.220800000000004,
+        "p90": 6.220800000000004
+      },
+      "wasmBytes": 739905,
+      "wasmSha256": "8f4a5ef9006e22240db0436e9a2b91d4bd83e528b0dbbdc956df91f0b5396733"
+    },
+    "WP1:secondary": {
+      "repeatedFieldMs": {
+        "count": 3,
+        "minimum": 981.7977000000001,
+        "median": 989.6386000000002,
+        "maximum": 1027.5502999999999,
+        "p90": 1027.5502999999999
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 3,
+        "minimum": 981.1435,
+        "median": 989.2017,
+        "maximum": 1026.8512,
+        "p90": 1026.8512
+      },
+      "fieldSpeedupOverWp1": 1,
+      "rawSpeedupOverWp1": 1,
+      "repeatedOutputBufferAllocations": {
+        "count": 3,
+        "minimum": 4,
+        "median": 4,
+        "maximum": 4,
+        "p90": 4
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.823299999999996,
+        "median": 5.932000000000002,
+        "maximum": 7.129800000000003,
+        "p90": 7.129800000000003
+      },
+      "wasmBytes": 736454,
+      "wasmSha256": "e1ccf4fe04987680bcfdd7a8b71c79ce8056dbe058edcfb80de926ba0a483536"
+    },
+    "SELECTED:secondary": {
+      "repeatedFieldMs": {
+        "count": 3,
+        "minimum": 981.5129000000002,
+        "median": 993.6438999999998,
+        "maximum": 1003.6579000000002,
+        "p90": 1003.6579000000002
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 3,
+        "minimum": 981.1184,
+        "median": 993.2378,
+        "maximum": 1003.223,
+        "p90": 1003.223
+      },
+      "fieldSpeedupOverWp1": 0.9959690790634356,
+      "rawSpeedupOverWp1": 0.9959364212678977,
+      "repeatedOutputBufferAllocations": {
+        "count": 3,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.800000000000004,
+        "median": 5.8304000000000045,
+        "maximum": 6.197000000000003,
+        "p90": 6.197000000000003
+      },
+      "wasmBytes": 737227,
+      "wasmSha256": "ac5e1f92446754a7c22a62bdefed43422ff99aa34164b595077457d0fa4e6453"
+    },
+    "SELECTED_SIMD:secondary": {
+      "repeatedFieldMs": {
+        "count": 3,
+        "minimum": 991.1744000000001,
+        "median": 992.6840000000002,
+        "maximum": 1007.2565999999999,
+        "p90": 1007.2565999999999
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 3,
+        "minimum": 990.7863,
+        "median": 992.2955,
+        "maximum": 1006.8094,
+        "p90": 1006.8094
+      },
+      "fieldSpeedupOverWp1": 0.9969321556507409,
+      "rawSpeedupOverWp1": 0.9968821787461497,
+      "repeatedOutputBufferAllocations": {
+        "count": 3,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.776499999999999,
+        "median": 5.7956999999999965,
+        "maximum": 5.869199999999999,
+        "p90": 5.869199999999999
+      },
+      "wasmBytes": 739905,
+      "wasmSha256": "8f4a5ef9006e22240db0436e9a2b91d4bd83e528b0dbbdc956df91f0b5396733"
+    }
+  }
+}

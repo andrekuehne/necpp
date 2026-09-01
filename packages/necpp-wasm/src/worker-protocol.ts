@@ -524,6 +524,18 @@ export function reviveFarFieldResult(value: unknown): FarFieldResult {
           diagnostics.counts?.segmentDirectionContributions,
           "counts.segmentDirectionContributions",
         ),
+        outputBufferAllocations: finite(
+          diagnostics.counts?.outputBufferAllocations,
+          "counts.outputBufferAllocations",
+        ),
+        intermediateBufferAllocations: finite(
+          diagnostics.counts?.intermediateBufferAllocations,
+          "counts.intermediateBufferAllocations",
+        ),
+        complexSampleCopies: finite(
+          diagnostics.counts?.complexSampleCopies,
+          "counts.complexSampleCopies",
+        ),
       }),
     }),
   };

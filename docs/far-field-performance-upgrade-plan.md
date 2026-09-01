@@ -1,6 +1,6 @@
 # NEC far-field performance upgrade plan
 
-**Status:** implementation in progress; WP0 and WP1 complete, WP2 next
+**Status:** implementation in progress; WP0 through WP2 complete, WP3 next
 **Created:** 2026-08-31
 **Primary engine baseline:** `necpp` commit `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
 **Primary consumer baseline:** `PhasedArrayVisualizer-NG` commit `adf617081e8b53d08729cce57e2a1f7a3bed561c`
@@ -461,20 +461,62 @@ Investigate them independently so attribution remains possible:
 - Rejected compiler flags or micro-optimizations are recorded with measurements
   so later agents do not repeat them without new evidence.
 
-### WP2 handover - fill before marking complete
+### WP2 handover
 
-- **Status:** not started
-- **Implementer / date:**
-- **Commits:**
-- **Candidate matrix and artifacts:**
-- **Selected build flags:**
-- **Generated-WASM/SIMD evidence:**
-- **Numerical comparison:**
-- **Primary/secondary speed-up:**
-- **Code-size/startup impact:**
-- **Rejected candidates and why:**
-- **Deviations:**
-- **Remaining risks / next recommended WP:**
+- **Status:** complete; handed to WP3
+- **Implementer / date:** Codex / 2026-09-01
+- **Commits:** working-tree implementation to be included with this handover,
+  based on WP1 `2e5a7c7` and its documentation follow-up `97f3c63`.
+- **Candidate matrix and artifacts:** the commands, measurements, artifact
+  hashes, and interpretation are in
+  [`packages/necpp-wasm/bench/FAR_FIELD_WP2_RESULTS.md`](../packages/necpp-wasm/bench/FAR_FIELD_WP2_RESULTS.md).
+  Versioned raw and summary records are under
+  `packages/necpp-wasm/bench/evidence/far-field-wp2/`.
+- **Selected build flags:** retain the release scalar flags
+  `-O3 -DNDEBUG -flto -fexceptions` without `-msimd128`; the default
+  `NECPP_FAR_FIELD_OPTIMIZATIONS=SELECTED` enables direction trigonometric
+  caching and native/ABI output-buffer reuse. Diagnostics were `ON/256` only
+  for the measurement artifacts.
+- **Generated-WASM/SIMD evidence:** the selected SIMD artifact contains 4,349
+  SIMD instruction lines module-wide, but the eight-function far-field call
+  graph reaches only one SIMD function and only `v128.load`/`v128.store`--no
+  vector arithmetic in the raw accumulation loop. The scalar artifact reaches
+  no SIMD instructions. `-msimd128` is therefore rejected for this artifact.
+- **Numerical comparison:** all 60 isolated-candidate variant/state records and
+  all 36 final variant/state records were bitwise-identical to their WP1 field
+  hashes (48 and 24 non-baseline comparisons respectively), with zero failures.
+  Native same-grid reuse, failure-state preservation, ABI, package, clean
+  consumer, smoke, and full native regression gates passed.
+- **Primary/secondary speed-up:** the final scalar selection reduced the primary
+  median raw kernel from 3,565.02 ms to 3,515.25 ms (1.014x, 1.4%). The
+  secondary median moved from 989.20 ms to 993.24 ms (0.996x, a 0.4% noise-scale
+  regression below the 5% guardrail). Repeated output allocations fell from
+  four to zero on both grids.
+- **Code-size/startup impact:** selected scalar WASM grew from 736,454 to
+  737,227 bytes (+773 bytes, +0.105%). Median instantiation moved from 6.27 to
+  6.58 ms on the primary sequence and from 5.93 to 5.83 ms on the secondary;
+  this is noise-scale. SIMD added another 2,678 bytes (+0.363%) without a field
+  win.
+- **Rejected candidates and why:** immutable segment half-length caching
+  regressed the primary median by 0.6%; the exploratory combination containing
+  it also regressed. `-msimd128` was 0.25% slower than selected scalar on the
+  primary median and did not vectorize the hot arithmetic. No explicit SIMD
+  prototype was justified because the remaining loop is dominated by scalar
+  `sin`/`cos` transcendentals and order-preserving complex accumulation.
+- **Deviations:** the 15% target was not reached. Artifact inspection explains
+  the gate exception: after row/column trigonometry is hoisted, each
+  segment-direction contribution still performs scalar `sin` evaluations for
+  the segment-current integrals and scalar `sin`/`cos` for phase, while the
+  numerical contract forbids reordering the complex sum. Current WASM SIMD does
+  not accelerate those operations. The final balanced matrix used three fresh
+  measured processes, one warm-up, and two deterministic steering states per
+  grid; the full ten-state correctness fixture remains covered by regression
+  tests and the WP0/WP1 evidence.
+- **Remaining risks / next recommended WP:** proceed to WP3's lightweight
+  far-field-worker proof. The serial kernel remains overwhelmingly raw
+  accumulation bound, so independent angular tiles are the next material
+  source of speed-up. Preserve the scalar selected configuration as its
+  single-worker baseline.
 
 ## WP3 - Lightweight far-field worker proof of concept
 

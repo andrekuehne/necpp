@@ -47,6 +47,27 @@ option(NECPP_ENABLE_LTO     "Enable link-time optimization (IPO) when supported"
 option(NECPP_NATIVE_ARCH    "Optimize for the build machine's CPU (-march=native). Not for distributable binaries." OFF)
 option(NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
        "Enable calibrated far-field phase timing probes" OFF)
+set(NECPP_FAR_FIELD_OPTIMIZATIONS "SELECTED" CACHE STRING
+    "Far-field experiment: WP1, SEGMENT_CACHE, DIRECTION_CACHE, OUTPUT_REUSE, or SELECTED")
+set_property(CACHE NECPP_FAR_FIELD_OPTIMIZATIONS PROPERTY STRINGS
+    WP1 SEGMENT_CACHE DIRECTION_CACHE OUTPUT_REUSE SELECTED)
+set(_necpp_far_field_modes
+    WP1 SEGMENT_CACHE DIRECTION_CACHE OUTPUT_REUSE SELECTED)
+if(NOT NECPP_FAR_FIELD_OPTIMIZATIONS IN_LIST _necpp_far_field_modes)
+    message(FATAL_ERROR
+        "NECPP_FAR_FIELD_OPTIMIZATIONS must be one of: ${_necpp_far_field_modes}")
+endif()
+if(NECPP_FAR_FIELD_OPTIMIZATIONS STREQUAL "SEGMENT_CACHE")
+    add_compile_definitions(NECPP_FAR_FIELD_CACHE_SEGMENTS=1)
+endif()
+if(NECPP_FAR_FIELD_OPTIMIZATIONS STREQUAL "DIRECTION_CACHE" OR
+   NECPP_FAR_FIELD_OPTIMIZATIONS STREQUAL "SELECTED")
+    add_compile_definitions(NECPP_FAR_FIELD_CACHE_DIRECTIONS=1)
+endif()
+if(NECPP_FAR_FIELD_OPTIMIZATIONS STREQUAL "OUTPUT_REUSE" OR
+   NECPP_FAR_FIELD_OPTIMIZATIONS STREQUAL "SELECTED")
+    add_compile_definitions(NECPP_FAR_FIELD_REUSE_OUTPUTS=1)
+endif()
 
 # Emscripten's stack cannot grow with the heap.  Eigen's optimized, blocked LU
 # kernels exceed the SDK's small default stack on otherwise modest systems, so

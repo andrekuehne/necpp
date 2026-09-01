@@ -76,6 +76,19 @@ nec_far_field_sample nec_evaluate_far_field_sample(
   nec_float theta,
   nec_float phi)
 {
+  return nec_evaluate_far_field_sample(input, {
+    std::sin(theta),
+    std::cos(theta),
+    std::tan(theta),
+    std::sin(phi),
+    std::cos(phi),
+  });
+}
+
+nec_far_field_sample nec_evaluate_far_field_sample(
+  const nec_far_field_evaluation_input& input,
+  const nec_far_field_direction& direction)
+{
   static const nec_complex constant(
     0.0, -em::impedance() / four_pi());
   const c_geometry& geometry = input.geometry;
@@ -90,13 +103,13 @@ nec_far_field_sample nec_evaluate_far_field_sample(
   nec_complex zrsin, rrv, rrh, rrv1, rrh1, rrv2, rrh2;
   nec_complex tix, tiy, tiz, ex, ey, ez;
 
-  phx = -std::sin(phi);
-  phy = std::cos(phi);
-  roz = std::cos(theta);
+  phx = -direction.sin_phi;
+  phy = direction.cos_phi;
+  roz = direction.cos_theta;
   rozs = roz;
   thx = roz * phy;
   thy = -roz * phx;
-  thz = -std::sin(theta);
+  thz = -direction.sin_theta;
   rox = -thz * phy;
   roy = thz * phx;
 
@@ -118,7 +131,7 @@ nec_far_field_sample nec_evaluate_far_field_sample(
         if (input.ifar > 1) {
           rrv1 = rrv;
           rrh1 = rrh;
-          tthet = std::tan(theta);
+          tthet = direction.tan_theta;
           if (input.ifar != 4) {
             const nec_complex zrati2 = ground.get_zrati2(input.wavelength);
             zrsin = std::sqrt(1.0 - zrati2 * zrati2 * thz * thz);
@@ -142,7 +155,9 @@ nec_far_field_sample nec_evaluate_far_field_sample(
       for (int64_t i = 0; i < geometry.n_segments; ++i) {
         omega = -(rox * geometry.cab[i] + roy * geometry.sab[i] +
           roz * geometry.salp[i]);
-        el = pi() * geometry.segment_length[i];
+        el = input.segment_half_lengths == nullptr
+          ? pi() * geometry.segment_length[i]
+          : (*input.segment_half_lengths)[i];
         sill = omega * el;
         top = el + sill;
         bot = el - sill;
