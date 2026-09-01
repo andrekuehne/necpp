@@ -1,4 +1,4 @@
-# Far-field WP0 engine baseline
+# Far-field WP0 baseline
 
 ## Decision
 
@@ -10,11 +10,13 @@ account for 10.12%. Copies and JavaScript extraction are individually below
 removes the approximately 10% report-only work and intermediate RP copying,
 while retaining the raw kernel's exact operation order and frozen checksums.
 
-Overall WP0 is not marked complete: the current consumer benchmark was rerun
-and traced, but it produces one repeated steering state and a coarse
-`mappingPost` bucket. The planned ten-state browser sequence and separate
-mapper, fill, power, metric, and commit timers remain consumer work. That gap
-does not change the native WP1 ordering established here.
+WP0 is complete. By owner decision on 2026-09-01, the existing production
+8 x 8, 11-segment, full-resolution browser run is accepted as equivalent
+consumer-side evidence. Extending that harness to the frozen ten-state sequence
+and splitting `mappingPost` into mapper, fill, power, metric, and commit timers
+is waived for WP0. The consumer result shows that 99.57% of its repeated total
+belongs to the package far-field call, while the engine benchmark supplies the
+multi-steering phase attribution needed to order WP1.
 
 ## Reference environment
 
@@ -167,9 +169,11 @@ archived as a ZIP containing Chrome trace JSON.
 
 Consumer limitations are explicit: this harness records only one repeated
 steering, does not use the frozen ten-state current sequence, does not include
-engine artifact hashes in its JSON, and does not split `mappingPost`. Its
-results corroborate that field time dominates end-to-end latency but do not
-satisfy the remaining consumer-specific WP0 Definition of Done.
+engine artifact hashes in its JSON, and does not split `mappingPost`. These
+items were accepted as a WP0 scope waiver on 2026-09-01 because the run uses the
+production 8 x 8 full-resolution path and corroborates that field time dominates
+end-to-end latency. They remain limitations if later work needs to rank consumer
+subphases.
 
 ## Evidence archive
 

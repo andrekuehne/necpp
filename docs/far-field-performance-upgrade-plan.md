@@ -1,6 +1,6 @@
 # NEC far-field performance upgrade plan
 
-**Status:** implementation in progress; engine WP0 evidence ready for conditional WP1 entry
+**Status:** implementation in progress; WP0 complete and WP1 ready
 **Created:** 2026-08-31
 **Primary engine baseline:** `necpp` commit `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
 **Primary consumer baseline:** `PhasedArrayVisualizer-NG` commit `adf617081e8b53d08729cce57e2a1f7a3bed561c`
@@ -321,7 +321,7 @@ selecting an implementation.
 
 ### WP0 handover - fill before marking complete
 
-- **Status:** engine evidence complete and conditionally handed to WP1; overall WP0 remains open on the consumer ten-state/fine-timer DoD
+- **Status:** complete; handed to WP1
 - **Implementer / date:** Codex / 2026-08-31 to 2026-09-01
 - **Engine commit(s):** commit containing this handover, based on `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
 - **Consumer commit(s):** no consumer changes; browser evidence rerun at clean commit `cfba3bab4d6aa7090015bfab634faeb2a0e52635`
@@ -332,8 +332,8 @@ selecting an implementation.
 - **Phase ranking and Amdahl scenarios:** primary/direct median per-call shares: raw accumulation 89.87% (4344.3 ms at median native total), RP-derived work 10.12% (489.0 ms), native copy 0.0031%; raw-only Amdahl ceilings are 1.82x/3.07x/4.68x for 2/4/8 workers; all-direction-work ceilings are 2.00x/4.00x/7.99x and are explicitly scenarios, not forecasts
 - **Instrumentation overhead:** the rejected per-direction-clock probe inflated median time about 96%; the accepted 1/256 sampled probe measured 4226.1 ms versus 4229.5 ms uninstrumented in six balanced pairs, median delta -0.02%, with exact hashes
 - **Decisions made:** hand WP1 a scalar reference; remove the measured approximately 10% report-only RP work and intermediate copies before changing raw-kernel order; retain SIMD as a later experiment because six balanced pairs showed only -1.53% median with -6.17% to +5.30% dispersion; preserve fixture/checksum/generation gates
-- **Deviations from this plan:** the unchanged production browser benchmark and trace were captured, but its schema has one repeated steering and one coarse `mappingPost` bucket rather than the frozen ten-state sequence and requested mapper/fill/power/metric/commit split; therefore overall WP0 is not marked complete even though the native evidence needed to order WP1 is complete
-- **Remaining risks / next recommended WP:** begin WP1 with a dedicated serial complex-field path, preserving exact scalar operation order and hashes; separately finish the consumer ten-state/fine-grained attribution before claiming full WP0 completion or using consumer subphase data for WP6 priorities
+- **Deviations from this plan:** by owner decision on 2026-09-01, the unchanged production 8 x 8, 11-segment, full-resolution browser run is accepted as equivalent consumer-side evidence. Its schema has one repeated steering and one coarse `mappingPost` bucket rather than the frozen ten-state sequence and requested mapper/fill/power/metric/commit split. Those consumer extensions are waived for WP0 because the measured repeated total is 99.57% package far-field time and the engine benchmark already supplies the multi-steering phase attribution needed to select WP1 work.
+- **Remaining risks / next recommended WP:** begin WP1 with a dedicated serial complex-field path, preserving exact scalar operation order and hashes. Consumer subphase data remains unavailable, so later consumer optimization priorities must be justified by new measurement rather than inferred from the coarse `mappingPost` bucket.
 
 ## WP1 - Dedicated raw complex far-field kernel and serial data path
 
