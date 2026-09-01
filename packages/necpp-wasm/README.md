@@ -72,6 +72,53 @@ model or `"require"` to reject a description that cannot use supported
 symmetry. All three modes use a package-supplied worker and expose the same
 asynchronous solver methods.
 
+### Parallel far fields
+
+`createNecArraySolver()` also owns an optional pool of lightweight far-field
+evaluators inside its package-supplied worker. The evaluators receive geometry
+and solved-current snapshots, never the interaction matrix or factorization,
+and use ordinary transferable `ArrayBuffer`s. No `SharedArrayBuffer`,
+cross-origin isolation, COOP, or COEP is required.
+
+```ts
+import {
+  createNecArraySolver,
+  type FullArrayDescription,
+} from "@necpp-engine/wasm";
+
+declare const description: FullArrayDescription;
+
+const solver = await createNecArraySolver(description, {
+  symmetry: "auto",
+  symmetrizer: { positionEpsilonM: 1e-9 },
+  fieldWorkers: "auto", // default; use 1 for the serial field path
+});
+
+await solver.dispose();
+```
+
+`fieldWorkers` accepts `"auto"` or an integer from 1 through 8. `1` always
+uses the native serial WP2a path. Explicit values from 2 through 8 request that
+many evaluators for supported ordinary-wire models in free space or over
+perfect ground. `"auto"` selects at most four evaluators from the logical-core
+hint and stays serial below 250,000 segment-direction-image contributions or
+when the grid contains too few 512-sample tiles. Unsupported ground/geometry,
+worker startup, and asset failures fall back to the serial field path and are
+reported rather than changing the model or grid.
+
+Every returned array field has `fieldBackend`, and
+`solver.getDiagnostics().field` retains the latest report. It identifies the
+selected backend, active count, tile size, fallback reason, warm-up, snapshot,
+dispatch, kernel and merge timings, bytes, restarted workers, and cancelled
+tiles. A newer solve or field request supersedes an active pooled field between
+512-sample tiles; the stale promise rejects with `NecRuntimeError` and
+`details.reason === "superseded"`. Explicit disposal terminates every evaluator.
+
+Schedulers that coalesce interaction updates before issuing the next solve can
+call `solver.cancelFarField()` as soon as a newer generation is known. It is a
+safe no-op without an active pooled field, retains prepared state and the last
+completed result, and bounds obsolete work to tiles that are already running.
+
 ### Full NxN input with automatic selection
 
 This runnable 4 x 4 example supplies all 16 XY positions in row-major order.
@@ -642,6 +689,9 @@ try {
 Worker calls cannot interrupt a synchronous native calculation. Use
 `model.terminate()` for immediate cancellation; it kills the worker and
 rejects outstanding operations. Create a new model to continue afterward.
+The higher-level array solver is different for eligible pooled far fields: a
+newer solve or field request cancels obsolete work between bounded tiles while
+retaining the outer solver and factorization.
 
 ## Lifecycle and disposal
 
@@ -661,6 +711,10 @@ are idempotent. Every other operation after disposal throws `NecStateError`.
 Node and browsers use the same package and public types. By default,
 `nec2pp.wasm` is resolved beside the installed JavaScript with
 `new URL("./nec2pp.wasm", import.meta.url)`; consumers do not copy it.
+The array facade likewise resolves `field-evaluator-worker.js`,
+`field-evaluator.js`, `necpp-field-evaluator.generated.js`, and
+`necpp-field-evaluator.wasm` from the package. Vite emits content-hashed worker,
+loader, and WASM assets even under a non-root `base`.
 
 Direct mode needs no Vite configuration. For the module-worker entry point,
 use this Vite configuration:
@@ -682,10 +736,15 @@ appropriate CORS header.
 import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel({
-  wasmUrl: new URL("https://cdn.example.test/necpp/0.3.0/nec2pp.wasm"),
+  wasmUrl: new URL("https://cdn.example.test/necpp/0.4.0/nec2pp.wasm"),
 });
 model.dispose();
 ```
+
+To relocate the complete evaluator asset set, place the packaged evaluator
+worker, generated loader, and WASM binary in one directory and pass its URL as
+`fieldWorkerAssetBaseUrl` to `createNecArraySolver()`. The default package URL
+is recommended for bundlers because it enables static content hashing.
 
 `wasmBinary` accepts an `ArrayBuffer` or `Uint8Array` when the host application
 wants to fetch/cache the bytes itself. `wasmUrl` and `wasmBinary` are mutually

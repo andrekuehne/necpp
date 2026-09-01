@@ -1,0 +1,304 @@
+{
+  "type": "far-field-wp2-candidate-matrix",
+  "schemaVersion": 2,
+  "measuredAt": "2026-09-01T16:52:31.192Z",
+  "configuration": {
+    "rounds": 3,
+    "warmups": 1,
+    "steeringLimit": 10,
+    "grids": [
+      "primary",
+      "secondary"
+    ],
+    "variants": [
+      {
+        "name": "WP2",
+        "directory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp2a\\artifacts\\SELECTED"
+      },
+      {
+        "name": "ACCUM4_SPLIT_TREE",
+        "directory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp2a\\artifacts\\ACCUM4_SPLIT_TREE"
+      },
+      {
+        "name": "ACCUM4_RELAXED",
+        "directory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp2a\\artifacts\\ACCUM4_RELAXED"
+      }
+    ],
+    "baseline": "WP2",
+    "equivalenceMode": "numeric"
+  },
+  "outputParity": null,
+  "numericalComparison": {
+    "tolerance": 1e-7,
+    "comparisons": 120,
+    "failures": 0
+  },
+  "cases": {
+    "WP2:primary": {
+      "repeatedFieldMs": {
+        "count": 27,
+        "minimum": 3466.1134999999995,
+        "median": 3520.034599999999,
+        "maximum": 3828.616000000002,
+        "p90": 3594.6165
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 27,
+        "minimum": 3464.6661,
+        "median": 3519.3561,
+        "maximum": 3827.7911,
+        "p90": 3593.7025
+      },
+      "fieldSpeedupOverWp1": 1,
+      "rawSpeedupOverWp1": 1,
+      "repeatedOutputBufferAllocations": {
+        "count": 27,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.950099999999999,
+        "median": 6.307000000000002,
+        "maximum": 6.957700000000003,
+        "p90": 6.957700000000003
+      },
+      "wasmBytes": 737227,
+      "wasmSha256": "ac5e1f92446754a7c22a62bdefed43422ff99aa34164b595077457d0fa4e6453",
+      "numerics": null
+    },
+    "ACCUM4_SPLIT_TREE:primary": {
+      "repeatedFieldMs": {
+        "count": 27,
+        "minimum": 3335.1633999999976,
+        "median": 3459.358500000002,
+        "maximum": 4525.7389,
+        "p90": 4091.8523999999998
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 27,
+        "minimum": 3334.2815,
+        "median": 3458.3757,
+        "maximum": 4524.9445,
+        "p90": 4090.4816
+      },
+      "fieldSpeedupOverWp1": 1.0175396970276416,
+      "rawSpeedupOverWp1": 1.0176326707361494,
+      "repeatedOutputBufferAllocations": {
+        "count": 27,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.6825000000000045,
+        "median": 6.101199999999999,
+        "maximum": 6.1455000000000055,
+        "p90": 6.1455000000000055
+      },
+      "wasmBytes": 739312,
+      "wasmSha256": "a553d9d4b866e6e679263fda2b57e5b51a8678b8b80ebffb93727e5797ff67d4",
+      "numerics": {
+        "comparisons": 30,
+        "failures": 0,
+        "maximumRelativeL2": {
+          "eTheta": 1.0093170181716448e-15,
+          "ePhi": 8.579707614623921e-16
+        },
+        "maximumScaledMaximum": {
+          "eTheta": 2.427636712896384e-15,
+          "ePhi": 2.379437843343316e-15
+        },
+        "maximumPeakRelativeDifference": 1.1445510719217319e-15,
+        "maximumNullAbsoluteDifference": 4.0036114863724093e-25,
+        "maximumIntegratedPowerRelativeDifference": 2.938830928489224e-16
+      }
+    },
+    "ACCUM4_RELAXED:primary": {
+      "repeatedFieldMs": {
+        "count": 27,
+        "minimum": 3429.3426999999992,
+        "median": 3503.4321999999993,
+        "maximum": 4888.977899999998,
+        "p90": 4252.9266000000025
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 27,
+        "minimum": 3428.4641,
+        "median": 3502.6563,
+        "maximum": 4888.0123,
+        "p90": 4252.0514
+      },
+      "fieldSpeedupOverWp1": 1.004738895760563,
+      "rawSpeedupOverWp1": 1.0047677529765053,
+      "repeatedOutputBufferAllocations": {
+        "count": 27,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.7834,
+        "median": 5.799399999999999,
+        "maximum": 7.605499999999999,
+        "p90": 7.605499999999999
+      },
+      "wasmBytes": 735976,
+      "wasmSha256": "bf98c322d4fb8e47e18e2d6f235868efffd2855d381b8b7dd895480c155520d8",
+      "numerics": {
+        "comparisons": 30,
+        "failures": 0,
+        "maximumRelativeL2": {
+          "eTheta": 1.0087323626204321e-15,
+          "ePhi": 8.580652603286612e-16
+        },
+        "maximumScaledMaximum": {
+          "eTheta": 2.427636712896384e-15,
+          "ePhi": 2.379437843343316e-15
+        },
+        "maximumPeakRelativeDifference": 1.0173787305970951e-15,
+        "maximumNullAbsoluteDifference": 4.0036114863724093e-25,
+        "maximumIntegratedPowerRelativeDifference": 4.408246392733835e-16
+      }
+    },
+    "WP2:secondary": {
+      "repeatedFieldMs": {
+        "count": 27,
+        "minimum": 976.1127999999999,
+        "median": 1012.1178,
+        "maximum": 1160.1336999999999,
+        "p90": 1080.3878000000004
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 27,
+        "minimum": 975.72,
+        "median": 1011.7395,
+        "maximum": 1159.7146,
+        "p90": 1079.6486
+      },
+      "fieldSpeedupOverWp1": 1,
+      "rawSpeedupOverWp1": 1,
+      "repeatedOutputBufferAllocations": {
+        "count": 27,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.836399999999998,
+        "median": 6.0334999999999965,
+        "maximum": 8.195,
+        "p90": 8.195
+      },
+      "wasmBytes": 737227,
+      "wasmSha256": "ac5e1f92446754a7c22a62bdefed43422ff99aa34164b595077457d0fa4e6453",
+      "numerics": null
+    },
+    "ACCUM4_SPLIT_TREE:secondary": {
+      "repeatedFieldMs": {
+        "count": 27,
+        "minimum": 938.6598999999999,
+        "median": 978.5433999999996,
+        "maximum": 1024.7017000000005,
+        "p90": 1014.6660000000002
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 27,
+        "minimum": 938.2469,
+        "median": 978.1749,
+        "maximum": 1024.2118,
+        "p90": 1014.2482
+      },
+      "fieldSpeedupOverWp1": 1.0343105885748147,
+      "rawSpeedupOverWp1": 1.034313495469982,
+      "repeatedOutputBufferAllocations": {
+        "count": 27,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.809900000000006,
+        "median": 5.8795,
+        "maximum": 5.983699999999999,
+        "p90": 5.983699999999999
+      },
+      "wasmBytes": 739312,
+      "wasmSha256": "a553d9d4b866e6e679263fda2b57e5b51a8678b8b80ebffb93727e5797ff67d4",
+      "numerics": {
+        "comparisons": 30,
+        "failures": 0,
+        "maximumRelativeL2": {
+          "eTheta": 1.0543738874083899e-15,
+          "ePhi": 8.628337482379005e-16
+        },
+        "maximumScaledMaximum": {
+          "eTheta": 2.186492171863733e-15,
+          "ePhi": 2.132924655131791e-15
+        },
+        "maximumPeakRelativeDifference": 1.4017781417187682e-15,
+        "maximumNullAbsoluteDifference": 4.460636674416588e-25,
+        "maximumIntegratedPowerRelativeDifference": 5.321671181047936e-16
+      }
+    },
+    "ACCUM4_RELAXED:secondary": {
+      "repeatedFieldMs": {
+        "count": 27,
+        "minimum": 970.5015000000003,
+        "median": 1016.9208999999992,
+        "maximum": 1062.2152999999998,
+        "p90": 1044.4366
+      },
+      "repeatedRawAccumulationMs": {
+        "count": 27,
+        "minimum": 970.1234,
+        "median": 1016.5534,
+        "maximum": 1061.6446,
+        "p90": 1044.0627
+      },
+      "fieldSpeedupOverWp1": 0.9952768204488676,
+      "rawSpeedupOverWp1": 0.9952644888109173,
+      "repeatedOutputBufferAllocations": {
+        "count": 27,
+        "minimum": 0,
+        "median": 0,
+        "maximum": 0,
+        "p90": 0
+      },
+      "createMs": {
+        "count": 3,
+        "minimum": 5.982700000000001,
+        "median": 6.0966999999999985,
+        "maximum": 7.610400000000006,
+        "p90": 7.610400000000006
+      },
+      "wasmBytes": 735976,
+      "wasmSha256": "bf98c322d4fb8e47e18e2d6f235868efffd2855d381b8b7dd895480c155520d8",
+      "numerics": {
+        "comparisons": 30,
+        "failures": 0,
+        "maximumRelativeL2": {
+          "eTheta": 1.0567334541220947e-15,
+          "ePhi": 8.639438432566393e-16
+        },
+        "maximumScaledMaximum": {
+          "eTheta": 2.186492171863733e-15,
+          "ePhi": 1.9341118323918604e-15
+        },
+        "maximumPeakRelativeDifference": 1.4017781417187682e-15,
+        "maximumNullAbsoluteDifference": 4.460636674416588e-25,
+        "maximumIntegratedPowerRelativeDifference": 5.321671181047936e-16
+      }
+    }
+  }
+}

@@ -69,6 +69,7 @@ add_executable(nec2++_tests
     ${CMAKE_SOURCE_DIR}/src/nec_deck.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_context.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_exception.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_far_field.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_ground.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_output.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_port_matrix.cpp
@@ -86,6 +87,10 @@ target_include_directories(nec2++_tests PRIVATE
 
 # Bounds checking on (matches the old Makefile TEST_CXXFLAGS).
 target_compile_definitions(nec2++_tests PRIVATE NEC_ERROR_CHECK=1)
+if(NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS)
+    target_compile_definitions(nec2++_tests PRIVATE
+        NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS=1)
+endif()
 
 # Rename nec2cpp's main() so the Catch runner owns main().
 set_source_files_properties(${CMAKE_SOURCE_DIR}/src/nec2cpp.cpp PROPERTIES

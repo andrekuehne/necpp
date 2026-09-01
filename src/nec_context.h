@@ -35,6 +35,8 @@
 #include "c_plot_card.h"
 
 class c_geometry;
+class nec_stateful_model;
+struct nec_far_field_evaluation_input;
 
 enum excitation_return {
     FREQ_PRINT_NORMALIZATION = 0,
@@ -953,6 +955,12 @@ public:
   
 
 private:
+  friend class nec_stateful_model;
+
+  /*! Return a read-only view for raw ordinary far-field evaluation. */
+  nec_far_field_evaluation_input far_field_evaluation_input(
+    nec_float wavelength, int far_field_mode) const;
+
 
   /*! \brief Set once the ROM2 step-size explanation has been emitted, so this
    *  context explains it one time rather than once per limited integration.

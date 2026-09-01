@@ -1,7 +1,7 @@
 # `@necpp-engine/wasm` API and numerical contract
 
-Status: normative specification, updated through power/ground support on
-2026-08-31. The
+Status: normative specification, updated through the parallel far-field release
+on 2026-09-01. The
 stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
 optional Web Worker entry point, and packable npm package are implemented.
 The committed TypeScript surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
@@ -21,7 +21,7 @@ while the scoped name identifies this repository and leaves room for future
 npm scope, but the API name will not change if the package is initially
 distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
-The power/ground release package identity is `0.3.0`; it embeds NEC2++ `2.5.0`
+The parallel far-field release package identity is `0.4.0`; it embeds NEC2++ `2.5.0`
 while preserving WASM ABI version `1`.
 
 The packed package exports three version identifiers that can be imported
@@ -241,6 +241,7 @@ enumerates every operation/state pair plus both `prepare()` branches.
 | `solveCurrents(vector)` | N complex amperes, positive into antenna | `PortSolution`; obtains required voltages through \(V=ZI\) and performs one simultaneous source solve | `NecConditioningError` if Z cannot be formed reliably; otherwise same as voltage solve |
 | `computeFarField(request)` | Positive radius in m (default 1), finite angle starts/steps, positive integer counts | Complex V/m for latest solution | `NecInputError` for grid/range/size overflow; `NecSolverError` for field calculation failure |
 | `computeEmbeddedFarFields(request, normalization?)` | Same grid plus unit-voltage (default) or unit-current normalization | Basis-major complex V/m arrays | Matrix/conditioning and far-field failures above |
+| `cancelFarField()` | Worker and array-solver models only; no input | `void`; idempotently stops assigning tiles for the active pooled field without disposing the model | The active field promise rejects with `NecRuntimeError` and `details.reason === "superseded"`; no failure when no pooled field is active |
 | `dispose()` | None | `void`; idempotent | No failure is exposed; cleanup errors are contained |
 | `terminate()` | Worker models only | `void`; kills the worker immediately | Outstanding promises reject with `NecRuntimeError` |
 | `runDeck(deck, options?)` | Complete UTF-8 deck string; optional pre-start abort signal | Promise of formatted report and engine version | `NecInputError` for empty/invalid deck or pre-abort; `NecSolverError` for execution; `NecRuntimeError` for module failure |
@@ -355,6 +356,8 @@ interface FullArrayDescription {
 
 interface CreateArraySolverOptions {
   readonly symmetry?: "auto" | "off" | "require";
+  readonly fieldWorkers?: "auto" | number;
+  readonly fieldWorkerAssetBaseUrl?: string | URL;
   readonly symmetrizer?: {
     readonly positionEpsilonM: number;
     readonly center?: "auto" | readonly [xM: number, yM: number];
@@ -365,6 +368,39 @@ interface CreateArraySolverOptions {
   };
 }
 ```
+
+`fieldWorkers` defaults to `"auto"`, accepts `1` through `8`, and affects only
+`createNecArraySolver()`. `1` retains the serial WP2a field path. Values from 2
+through 8 request a nested ordinary-worker pool for supported wire-only free-
+space and perfect-ground models. `"auto"` uses four workers with at least eight
+logical cores, two with at least four cores, and otherwise one; it also reduces
+the count to the available 512-sample tiles and stays serial below 250,000
+segment-direction-image contributions. Direct `createNecModel()` and the
+low-level `createNecWorkerModel()` remain serial.
+
+The evaluator pool is lazy-prewarmed before its first eligible field. Geometry
+arrays remain resident, repeated solves transfer only the six changed current
+coefficient arrays, and repeated grids after one solve transfer no snapshot
+arrays. `FarFieldResult.fieldBackend` and `ArraySolverDiagnostics.field` report
+the requested/active backend, tile and cancellation counts, worker restarts,
+snapshot/current/result bytes, geometry reuse, fallback reason, and separated
+warm-up, snapshot, dispatch, kernel, merge, and total timings.
+
+Newer solve and field calls send an immediate control message to the outer
+solver worker. Eligible active fields stop receiving work between 512-sample
+tiles; their promises reject as `NecRuntimeError` with
+`details.reason === "superseded"`. Model operations remain ordered. A crashed
+evaluator is reconstructed from the retained snapshot once; unsupported modes,
+startup/asset failure, or unrecoverable evaluator failure use the typed serial
+fallback recorded in diagnostics. Disposal is idempotent and terminates the
+outer worker plus every evaluator child.
+
+Default evaluator worker, loader, and WASM URLs are package-relative and are
+included in the tarball. `fieldWorkerAssetBaseUrl` relocates the complete set;
+the directory must contain `field-evaluator-worker.js`, `field-evaluator.js`,
+`necpp-field-evaluator.generated.js`, and `necpp-field-evaluator.wasm`.
+The packed-consumer test covers Node, a non-root Vite base, content-hashed
+assets, correct WASM MIME, and non-cross-origin-isolated Chromium.
 
 The mode defaults to `"auto"`, but automatic analysis deliberately has no
 default epsilon: omitting `symmetrizer.positionEpsilonM` is `NEC_INPUT`.
@@ -399,6 +435,7 @@ interface NecArraySolver {
     request: FarFieldRequest,
     normalization?: EmbeddedFieldNormalization,
   ): Promise<EmbeddedFarFieldResult>;
+  cancelFarField(): void;
   getDiagnostics(): ArraySolverDiagnostics;
   dispose(): Promise<void>;
 }
@@ -407,9 +444,11 @@ interface NecArraySolver {
 Its lifecycle from creation is `geometry-complete -> prepared -> solved`; the
 factory owns construction, port definition, structural-load expansion, ground
 selection, and any eligible explicit retry. Disposal is deterministic and
-idempotent. All input arrays are borrowed during their operation and all
-returned arrays are caller-owned, exactly as for the low-level direct and
-worker models.
+idempotent. `cancelFarField()` is also idempotent and keeps the solver reusable;
+it bounds stale pooled work at tile boundaries and rejects only the active
+field request as superseded. All input arrays are borrowed during their
+operation and all returned arrays are caller-owned, exactly as for the low-level
+direct and worker models.
 
 ### Representation-independent order and transforms
 

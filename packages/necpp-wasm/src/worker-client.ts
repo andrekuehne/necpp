@@ -31,6 +31,7 @@ import {
   revivePortSolution,
   serializeCreateOptions,
   type SerializedCreateOptions,
+  type WorkerFieldPoolOptions,
   type WorkerMethod,
 } from "./worker-protocol.js";
 
@@ -151,9 +152,15 @@ class WorkerNecModel implements NecWorkerModel {
   readonly #unsubscribeMessage: () => void;
   readonly #unsubscribeError: () => void;
   readonly #unsubscribeExit: () => void;
+  readonly #fieldCancellationEnabled: boolean;
 
-  constructor(host: WorkerHost, onProgress?: NecWorkerProgressListener) {
+  constructor(
+    host: WorkerHost,
+    onProgress?: NecWorkerProgressListener,
+    fieldCancellationEnabled = false,
+  ) {
     this.#host = host;
+    this.#fieldCancellationEnabled = fieldCancellationEnabled;
     if (onProgress !== undefined) {
       this.#listeners.add(onProgress);
     }
@@ -186,8 +193,11 @@ class WorkerNecModel implements NecWorkerModel {
     };
   }
 
-  async initialize(options?: CreateNecWorkerModelOptions): Promise<void> {
-    const serialized = serializeCreateOptions(options);
+  async initialize(
+    options?: CreateNecWorkerModelOptions,
+    fieldPool?: WorkerFieldPoolOptions,
+  ): Promise<void> {
+    const serialized = serializeCreateOptions(options, fieldPool);
     await this.#request(
       serialized.payload === undefined
         ? { kind: "create" }
@@ -235,6 +245,7 @@ class WorkerNecModel implements NecWorkerModel {
   }
 
   async solveVoltages(voltages: ComplexVector): Promise<PortSolution> {
+    this.#cancelField();
     const cloned = cloneComplexVector(voltages);
     return revivePortSolution(
       await this.#invoke("solveVoltages", [cloned.vector], cloned.transfer),
@@ -242,6 +253,7 @@ class WorkerNecModel implements NecWorkerModel {
   }
 
   async solveCurrents(currents: ComplexVector): Promise<PortSolution> {
+    this.#cancelField();
     const cloned = cloneComplexVector(currents);
     return revivePortSolution(
       await this.#invoke("solveCurrents", [cloned.vector], cloned.transfer),
@@ -249,6 +261,7 @@ class WorkerNecModel implements NecWorkerModel {
   }
 
   async computeFarField(request: FarFieldRequest): Promise<FarFieldResult> {
+    this.#cancelField();
     return reviveFarFieldResult(await this.#invoke("computeFarField", [request]));
   }
 
@@ -262,7 +275,12 @@ class WorkerNecModel implements NecWorkerModel {
     );
   }
 
+  cancelFarField(): void {
+    this.#cancelField();
+  }
+
   async dispose(): Promise<void> {
+    this.#cancelField();
     if (this.#terminated || this.#state === "disposed") {
       this.#state = "disposed";
       this.terminate();
@@ -304,6 +322,18 @@ class WorkerNecModel implements NecWorkerModel {
         // Progress listeners must not break the worker client.
       }
     }
+  }
+
+  #cancelField(): void {
+    if (!this.#fieldCancellationEnabled || this.#terminated) return;
+    queueMicrotask(() => {
+      if (this.#terminated) return;
+      try {
+        this.#host.postMessage({ kind: "cancel-field" });
+      } catch {
+        // The ordered request reports a typed worker failure if the host is gone.
+      }
+    });
   }
 
   #failAll(error: NecRuntimeError): void {
@@ -428,10 +458,15 @@ class WorkerNecModel implements NecWorkerModel {
 export async function createNecWorkerModelFromHost(
   host: WorkerHost,
   options?: CreateNecWorkerModelOptions,
+  fieldPool?: WorkerFieldPoolOptions,
 ): Promise<NecWorkerModel> {
-  const model = new WorkerNecModel(host, options?.onProgress);
+  const model = new WorkerNecModel(
+    host,
+    options?.onProgress,
+    fieldPool !== undefined,
+  );
   try {
-    await model.initialize(options);
+    await model.initialize(options, fieldPool);
     return model;
   } catch (error) {
     model.terminate();
@@ -448,4 +483,12 @@ export async function createNecWorkerModel(
   }
   const host = await openWorkerHost();
   return createNecWorkerModelFromHost(host, options);
+}
+
+/** @internal Array facade: create an outer worker that owns evaluator children. */
+export async function createNecArrayWorkerModel(
+  fieldPool: WorkerFieldPoolOptions,
+): Promise<NecWorkerModel> {
+  const host = await openWorkerHost();
+  return createNecWorkerModelFromHost(host, undefined, fieldPool);
 }

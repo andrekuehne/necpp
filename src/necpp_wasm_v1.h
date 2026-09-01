@@ -85,6 +85,33 @@ enum necpp_wasm_v1_embedded_normalization {
   NECPP_WASM_V1_UNIT_CURRENT = 1
 };
 
+enum necpp_wasm_v1_far_field_snapshot_capability {
+  NECPP_WASM_V1_FF_SNAPSHOT_SUPPORTED = 0,
+  NECPP_WASM_V1_FF_SNAPSHOT_NO_SOLUTION = 1,
+  NECPP_WASM_V1_FF_SNAPSHOT_SURFACE_PATCHES = 2,
+  NECPP_WASM_V1_FF_SNAPSHOT_FINITE_GROUND = 3,
+  NECPP_WASM_V1_FF_SNAPSHOT_UNSUPPORTED_MODE = 4
+};
+
+enum necpp_wasm_v1_far_field_diagnostic_kind {
+  NECPP_WASM_V1_FF_DIAGNOSTICS_ENABLED = 0,
+  NECPP_WASM_V1_FF_VALIDATION_ALLOCATION_MS = 1,
+  NECPP_WASM_V1_FF_RESULT_REPLACEMENT_MS = 2,
+  NECPP_WASM_V1_FF_RAW_ACCUMULATION_MS = 3,
+  NECPP_WASM_V1_FF_DERIVED_RP_WORK_MS = 4,
+  NECPP_WASM_V1_FF_NATIVE_RESULT_COPY_MS = 5,
+  NECPP_WASM_V1_FF_NATIVE_TOTAL_MS = 6,
+  NECPP_WASM_V1_FF_ABI_RESULT_COPY_MS = 7,
+  NECPP_WASM_V1_FF_NATIVE_ABI_TOTAL_MS = 8,
+  NECPP_WASM_V1_FF_EVALUATED_DIRECTIONS = 9,
+  NECPP_WASM_V1_FF_SEGMENT_COUNT = 10,
+  NECPP_WASM_V1_FF_GROUND_IMAGE_COUNT = 11,
+  NECPP_WASM_V1_FF_SEGMENT_DIRECTION_CONTRIBUTIONS = 12,
+  NECPP_WASM_V1_FF_OUTPUT_BUFFER_ALLOCATIONS = 13,
+  NECPP_WASM_V1_FF_INTERMEDIATE_BUFFER_ALLOCATIONS = 14,
+  NECPP_WASM_V1_FF_COMPLEX_SAMPLE_COPIES = 15
+};
+
 /*
  * Borrowed double buffers returned by necpp_wasm_v1_result_buffer().  A
  * successful operation replacing a result of the same category may invalidate
@@ -115,7 +142,20 @@ enum necpp_wasm_v1_result_buffer_kind {
   NECPP_WASM_V1_EMBEDDED_E_THETA_REAL = 21,
   NECPP_WASM_V1_EMBEDDED_E_THETA_IMAG = 22,
   NECPP_WASM_V1_EMBEDDED_E_PHI_REAL = 23,
-  NECPP_WASM_V1_EMBEDDED_E_PHI_IMAG = 24
+  NECPP_WASM_V1_EMBEDDED_E_PHI_IMAG = 24,
+  NECPP_WASM_V1_FF_SNAPSHOT_X = 25,
+  NECPP_WASM_V1_FF_SNAPSHOT_Y = 26,
+  NECPP_WASM_V1_FF_SNAPSHOT_Z = 27,
+  NECPP_WASM_V1_FF_SNAPSHOT_CAB = 28,
+  NECPP_WASM_V1_FF_SNAPSHOT_SAB = 29,
+  NECPP_WASM_V1_FF_SNAPSHOT_SALP = 30,
+  NECPP_WASM_V1_FF_SNAPSHOT_HALF_LENGTH = 31,
+  NECPP_WASM_V1_FF_SNAPSHOT_AIR = 32,
+  NECPP_WASM_V1_FF_SNAPSHOT_AII = 33,
+  NECPP_WASM_V1_FF_SNAPSHOT_BIR = 34,
+  NECPP_WASM_V1_FF_SNAPSHOT_BII = 35,
+  NECPP_WASM_V1_FF_SNAPSHOT_CIR = 36,
+  NECPP_WASM_V1_FF_SNAPSHOT_CII = 37
 };
 
 uint32_t necpp_wasm_v1_abi_version(void);
@@ -176,6 +216,23 @@ int32_t necpp_wasm_v1_compute_embedded_far_fields(
   double theta_start_deg, int32_t theta_count, double theta_step_deg,
   double phi_start_deg, int32_t phi_count, double phi_step_deg,
   int32_t normalization);
+int32_t necpp_wasm_v1_capture_far_field_snapshot(necpp_wasm_v1_model* model);
+int32_t necpp_wasm_v1_far_field_snapshot_capability(
+  const necpp_wasm_v1_model* model);
+uint32_t necpp_wasm_v1_far_field_snapshot_schema_version(
+  const necpp_wasm_v1_model* model);
+size_t necpp_wasm_v1_far_field_snapshot_segment_count(
+  const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_far_field_snapshot_frequency_mhz(
+  const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_far_field_snapshot_wavelength_m(
+  const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_far_field_snapshot_model_generation(
+  const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_far_field_snapshot_solution_generation(
+  const necpp_wasm_v1_model* model);
+int32_t necpp_wasm_v1_far_field_snapshot_perfect_ground(
+  const necpp_wasm_v1_model* model);
 
 size_t necpp_wasm_v1_port_count(const necpp_wasm_v1_model* model);
 const int32_t* necpp_wasm_v1_port_tags(const necpp_wasm_v1_model* model);
@@ -226,6 +283,8 @@ size_t necpp_wasm_v1_far_field_theta_count(
   const necpp_wasm_v1_model* model);
 size_t necpp_wasm_v1_far_field_phi_count(
   const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_far_field_diagnostic(
+  const necpp_wasm_v1_model* model, int32_t kind);
 
 double necpp_wasm_v1_embedded_radius_m(const necpp_wasm_v1_model* model);
 double necpp_wasm_v1_embedded_frequency_mhz(

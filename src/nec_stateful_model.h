@@ -92,6 +92,64 @@ struct nec_far_field_grid {
   nec_float phi_step_deg = 0.0;
 };
 
+enum class nec_far_field_snapshot_capability {
+  supported = 0,
+  no_solution = 1,
+  surface_patches = 2,
+  finite_ground = 3,
+  unsupported_far_field_mode = 4,
+};
+
+/*! Versioned O(segments) immutable input for stateless far-field evaluators.
+ *
+ * Geometry coordinates are wavelength-normalized, matching ffld(). Current
+ * coefficient arrays are replaced after every solve. WP3 intentionally
+ * supports only ordinary wire structures in free space or above perfect
+ * ground; callers must use the serial path for every other capability value.
+ */
+struct nec_far_field_snapshot {
+  uint32_t schema_version = 1;
+  nec_far_field_snapshot_capability capability =
+    nec_far_field_snapshot_capability::no_solution;
+  nec_float frequency_mhz = 0.0;
+  nec_float wavelength_m = 0.0;
+  uint64_t model_generation = 0;
+  uint64_t solution_generation = 0;
+  bool perfect_ground = false;
+  std::vector<nec_float> x;
+  std::vector<nec_float> y;
+  std::vector<nec_float> z;
+  std::vector<nec_float> cab;
+  std::vector<nec_float> sab;
+  std::vector<nec_float> salp;
+  std::vector<nec_float> segment_half_lengths;
+  std::vector<nec_float> air;
+  std::vector<nec_float> aii;
+  std::vector<nec_float> bir;
+  std::vector<nec_float> bii;
+  std::vector<nec_float> cir;
+  std::vector<nec_float> cii;
+
+  size_t segment_count() const { return x.size(); }
+};
+
+struct nec_far_field_phase_diagnostics {
+  bool enabled = false;
+  nec_float validation_allocation_ms = 0.0;
+  nec_float result_replacement_ms = 0.0;
+  nec_float raw_accumulation_ms = 0.0;
+  nec_float derived_rp_work_ms = 0.0;
+  nec_float native_result_copy_ms = 0.0;
+  nec_float native_total_ms = 0.0;
+  uint64_t evaluated_directions = 0;
+  uint64_t segment_count = 0;
+  uint64_t ground_image_count = 0;
+  uint64_t segment_direction_contributions = 0;
+  uint64_t output_buffer_allocations = 0;
+  uint64_t intermediate_buffer_allocations = 0;
+  uint64_t complex_sample_copies = 0;
+};
+
 /*! Copied complex far fields in theta-fast angular order.
  *
  * Sample index is phi_index * theta_deg.size() + theta_index. Fields are
@@ -104,6 +162,7 @@ struct nec_far_field_result {
   std::vector<nec_float> phi_deg;
   std::vector<nec_complex> e_theta;
   std::vector<nec_complex> e_phi;
+  nec_far_field_phase_diagnostics diagnostics;
 
   size_t sample_count() const { return e_theta.size(); }
 
@@ -241,6 +300,7 @@ public:
 
   /*! Copy complex far fields for the latest consumer solution. */
   const nec_far_field_result& compute_far_field(const nec_far_field_grid& grid);
+  nec_far_field_snapshot capture_far_field_snapshot() const;
 
   /*! Copy one voltage- or current-normalized complex field basis per port.
    *
@@ -277,9 +337,10 @@ private:
     std::vector<nec_complex>& achieved_currents);
   void restore_after_internal_solves(
     bool had_solution, const nec_port_solution& saved_solution);
-  nec_far_field_result calculate_far_field(
+  void calculate_far_field(
     const nec_far_field_grid& grid,
-    const std::vector<nec_complex>& currents);
+    const std::vector<nec_complex>& currents,
+    nec_far_field_result& output);
   const nec_port_solution& finish_consumer_solve(
     nec_port_drive drive,
     const std::vector<nec_complex>& requested,
@@ -297,7 +358,9 @@ private:
   nec_impedance_result m_impedance_result;
   nec_port_solution m_last_port_solution;
   nec_far_field_result m_far_field_result;
+  nec_far_field_result m_far_field_scratch_result;
   nec_embedded_far_field_result m_embedded_far_field_result;
+  std::vector<nec_float> m_far_field_segment_half_lengths;
   nec_ground_definition m_ground;
   nec_ground_connection m_ground_connection = nec_ground_connection::none;
   nec_float m_frequency_mhz = 0.0;

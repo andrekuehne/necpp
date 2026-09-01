@@ -54,7 +54,7 @@ function addDipole(model) {
 }
 
 test("package, engine, and ABI versions are exported", () => {
-  assert.equal(packageVersion, "0.3.0");
+  assert.equal(packageVersion, "0.4.0");
   assert.equal(engineVersion, "2.5.0");
   assert.equal(abiVersion, 1);
 });
@@ -152,6 +152,24 @@ test("the facade performs a complete stateful solve with owned results", {
   assert.equal(field.phiDeg.length, 2);
   assert.equal(field.eThetaReal.length, 6);
   assert.ok(field.eThetaReal.every(Number.isFinite));
+  assert.equal(typeof field.diagnostics.instrumentationEnabled, "boolean");
+  assert.equal(field.diagnostics.counts.evaluatedDirections, 6);
+  assert.equal(field.diagnostics.counts.segments, 11);
+  assert.equal(field.diagnostics.counts.groundImages, 1);
+  assert.equal(field.diagnostics.counts.segmentDirectionContributions, 66);
+  assert.equal(field.diagnostics.counts.outputBufferAllocations, 4);
+  assert.equal(field.diagnostics.counts.intermediateBufferAllocations, 0);
+  assert.equal(field.diagnostics.counts.complexSampleCopies, 0);
+  if (field.diagnostics.instrumentationEnabled) {
+    assert.ok(field.diagnostics.native.rawAccumulationMs >= 0);
+    assert.ok(field.diagnostics.native.derivedRpWorkMs >= 0);
+    assert.ok(field.diagnostics.native.nativeAbiTotalMs <= field.diagnostics.wasmCallMs);
+  } else {
+    assert.equal(field.diagnostics.native.rawAccumulationMs, 0);
+    assert.equal(field.diagnostics.native.derivedRpWorkMs, 0);
+    assert.equal(field.diagnostics.native.nativeAbiTotalMs, 0);
+  }
+  assert.ok(field.diagnostics.typescriptExtractionMs <= field.diagnostics.packageTotalMs);
   const retainedField = field.eThetaReal.slice();
 
   const embedded = model.computeEmbeddedFarFields({

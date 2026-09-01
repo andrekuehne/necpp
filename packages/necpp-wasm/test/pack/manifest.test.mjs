@@ -17,7 +17,7 @@ test("npm pack contains only the documented publish files", { skip }, () => {
   assert.equal(packed.version, packageJson.version);
   const filenamePrefix = packageJson.name.slice(1).replace("/", "-");
   assert.equal(packed.filename, `${filenamePrefix}-${packageJson.version}.tgz`);
-  assert.equal(packageJson.version, "0.3.0");
+  assert.equal(packageJson.version, "0.4.0");
   assert.equal(packageJson.engines.node, ">=24");
   assert.deepEqual(packageJson.publishConfig, {
     access: "public",
@@ -38,8 +38,13 @@ test("npm pack contains only the documented publish files", { skip }, () => {
     "dist/worker.js",
     "dist/worker.d.ts",
     "dist/worker-entry.js",
+    "dist/field-evaluator-worker.js",
+    "dist/field-evaluator.js",
+    "dist/field-worker-pool.js",
     "dist/nec2pp.generated.js",
     "dist/nec2pp.wasm",
+    "dist/necpp-field-evaluator.generated.js",
+    "dist/necpp-field-evaluator.wasm",
   ];
   for (const path of required) {
     assert.ok(files.has(path), `missing ${path} in packed tarball`);

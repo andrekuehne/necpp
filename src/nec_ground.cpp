@@ -138,7 +138,7 @@ using namespace std;
 #include "electromag.h"
 #include "nec_results.h"
 
-nec_complex nec_ground::get_zrati2(nec_float _wavelength)  {
+nec_complex nec_ground::get_zrati2(nec_float _wavelength) const  {
   return sqrt(1.0 / nec_complex(epsr2,-sig2 * _wavelength * em::impedance_over_2pi()));
 }
 

@@ -61,6 +61,7 @@ async function validUnbranchedArrayConsumer(
     theta: { startDeg: 0, count: 1, stepDeg: 0 },
     phi: { startDeg: 0, count: 1, stepDeg: 0 },
   });
+  solver.cancelFarField();
   solver.getDiagnostics().planner.canonicalizations;
   await solver.dispose();
 }

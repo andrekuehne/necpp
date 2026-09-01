@@ -255,6 +255,48 @@ TEST_CASE("WP3 exact-zero excitation returns finite exact-zero fields",
   REQUIRE(model.retained_result_count() == 1);
 }
 
+TEST_CASE("WP3 raw fields allocate only final buffers and preserve results on failure",
+          "[wasm_api][wp3][far_field][raw_path][failure]")
+{
+  nec_stateful_model model;
+  build_dipoles(model, 1);
+  model.solve_port_voltages({nec_complex(1.0, 0.0)});
+
+  const nec_far_field_result& field = model.compute_far_field(kFieldGrid);
+  const std::vector<nec_complex> expected_theta = field.e_theta;
+  const std::vector<nec_complex> expected_phi = field.e_phi;
+  REQUIRE(field.diagnostics.output_buffer_allocations == 4);
+  REQUIRE(field.diagnostics.intermediate_buffer_allocations == 0);
+  REQUIRE(field.diagnostics.complex_sample_copies == 0);
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  REQUIRE(field.diagnostics.enabled);
+  REQUIRE(field.diagnostics.native_total_ms >= 0.0);
+  REQUIRE(field.diagnostics.raw_accumulation_ms >= 0.0);
+  REQUIRE(field.diagnostics.derived_rp_work_ms == 0.0);
+  REQUIRE(field.diagnostics.native_result_copy_ms == 0.0);
+#else
+  REQUIRE_FALSE(field.diagnostics.enabled);
+#endif
+  REQUIRE(model.retained_result_count() == 1);
+
+  nec_far_field_grid invalid = kFieldGrid;
+  invalid.theta_count = 0;
+  REQUIRE_THROWS_AS(model.compute_far_field(invalid), nec_exception);
+  REQUIRE(field.e_theta == expected_theta);
+  REQUIRE(field.e_phi == expected_phi);
+  REQUIRE(model.retained_result_count() == 1);
+  REQUIRE(model.state() == nec_model_state::solved);
+
+  const nec_far_field_result& repeated = model.compute_far_field(kFieldGrid);
+  REQUIRE(repeated.e_theta == expected_theta);
+  REQUIRE(repeated.e_phi == expected_phi);
+#ifdef NECPP_FAR_FIELD_REUSE_OUTPUTS
+  REQUIRE(repeated.diagnostics.output_buffer_allocations == 0);
+#else
+  REQUIRE(repeated.diagnostics.output_buffer_allocations == 4);
+#endif
+}
+
 TEST_CASE("WP3 center-fed dipole fields have axial nulls and mirror symmetry",
           "[wasm_api][wp3][far_field][symmetry]")
 {
@@ -402,4 +444,53 @@ TEST_CASE("WP3 both signed ground modes reject invalid ground-plane geometry",
     });
     REQUIRE_THROWS_AS(in_plane.complete_geometry(connection), nec_exception);
   }
+}
+
+TEST_CASE("WP3 evaluator snapshots are bounded, versioned, and generation-safe",
+          "[wasm_api][wp3][far_field][snapshot]")
+{
+  nec_stateful_model model;
+  build_dipoles(model, 2);
+  REQUIRE(model.capture_far_field_snapshot().capability ==
+    nec_far_field_snapshot_capability::no_solution);
+
+  model.solve_port_voltages({nec_complex(1.0, 0.0), nec_complex(0.0, 1.0)});
+  const nec_far_field_snapshot first = model.capture_far_field_snapshot();
+  REQUIRE(first.schema_version == 1);
+  REQUIRE(first.capability == nec_far_field_snapshot_capability::supported);
+  REQUIRE(first.model_generation == 1);
+  REQUIRE(first.solution_generation == 1);
+  REQUIRE(first.segment_count() == 2 * kSegments);
+  REQUIRE_FALSE(first.perfect_ground);
+  for (const std::vector<nec_float>* values : {
+         &first.x, &first.y, &first.z, &first.cab, &first.sab, &first.salp,
+         &first.segment_half_lengths, &first.air, &first.aii, &first.bir,
+         &first.bii, &first.cir, &first.cii,
+       }) {
+    REQUIRE(values->size() == first.segment_count());
+    REQUIRE(std::all_of(values->begin(), values->end(),
+      [](nec_float value) { return std::isfinite(value); }));
+  }
+
+  model.solve_port_voltages({nec_complex(0.25, -0.5), nec_complex(-0.5, 0.25)});
+  const nec_far_field_snapshot second = model.capture_far_field_snapshot();
+  REQUIRE(second.model_generation == first.model_generation);
+  REQUIRE(second.solution_generation == first.solution_generation + 1);
+  REQUIRE(second.x == first.x);
+  REQUIRE(second.air != first.air);
+}
+
+TEST_CASE("WP3 evaluator snapshots reject finite ground by capability",
+          "[wasm_api][wp3][far_field][snapshot][ground]")
+{
+  nec_stateful_model model;
+  build_dipoles(model, 1);
+  model.set_ground({
+    nec_ground_kind::finite_reflection_coefficient, 13.0, 0.005,
+  });
+  model.prepare(kFrequencyMHz);
+  model.solve_port_voltages({nec_complex(1.0, 0.0)});
+  const nec_far_field_snapshot snapshot = model.capture_far_field_snapshot();
+  REQUIRE(snapshot.capability == nec_far_field_snapshot_capability::finite_ground);
+  REQUIRE(snapshot.segment_count() == 0);
 }

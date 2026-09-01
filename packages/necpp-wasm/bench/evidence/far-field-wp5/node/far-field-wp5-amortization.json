@@ -1,0 +1,3203 @@
+{
+  "type": "far-field-wp5-amortization",
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-01T20:12:00.966Z",
+  "configuration": {
+    "portCounts": [
+      4,
+      16,
+      64
+    ],
+    "horizons": [
+      1,
+      4,
+      16,
+      64,
+      256
+    ],
+    "measuredStates": 5,
+    "fieldWorkers": 4,
+    "normalization": {
+      "kind": "unit-current",
+      "valueA": 1
+    },
+    "grids": {
+      "primary": {
+        "id": "primary-256-display",
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 181,
+          "stepDeg": 0.5
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 360,
+          "stepDeg": 1
+        }
+      },
+      "secondary": {
+        "id": "consumer-derived-32x32-display",
+        "derivation": {
+          "display": {
+            "n1": 32,
+            "n2": 32
+          },
+          "apertureLambda": 5.419747468305833,
+          "kD": 34.05327766148297,
+          "requestedStepDeg": 1.3214586991401025
+        },
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 69,
+          "stepDeg": 1.3235294117647058
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 272,
+          "stepDeg": 1.3235294117647058
+        }
+      }
+    },
+    "residentPrototype": "benchmark-only Node worker; not production package code"
+  },
+  "environment": {
+    "node": "v24.14.1",
+    "v8": "13.6.233.17-node.44",
+    "platform": "win32",
+    "release": "10.0.26200",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 7 PRO 7840HS w/ Radeon 780M Graphics ",
+    "logicalCpuCount": 16,
+    "totalMemoryBytes": 32916135936,
+    "packageVersion": "0.3.0",
+    "engineVersion": "2.5.0",
+    "engineCommit": "b54e263acbf095ac3aea018dc7b8573a9510d1fd",
+    "gitStatus": [
+      "M packages/necpp-wasm/package.json",
+      " M packages/necpp-wasm/test/far-field-benchmark.test.mjs",
+      "?? packages/necpp-wasm/bench/embedded-resident-worker.mjs",
+      "?? packages/necpp-wasm/bench/evidence/far-field-wp5/",
+      "?? packages/necpp-wasm/bench/far-field-wp5-amortization.mjs"
+    ],
+    "artifacts": {
+      "index.js": {
+        "bytes": 1455,
+        "sha256": "7715e5b356f133a36e1fca49469be8d841bdd0734c306f9491763e9ed2312bf8"
+      },
+      "worker-entry.js": {
+        "bytes": 3562,
+        "sha256": "391600e098bed5b66913b60ba24c48e88b2eca94a13d671445407a2e8cd87197"
+      },
+      "field-worker-pool.js": {
+        "bytes": 17303,
+        "sha256": "4faf90828c1d3d34e13c4504fae505a5826472159313603a109ff00457b918ee"
+      },
+      "field-evaluator.js": {
+        "bytes": 8456,
+        "sha256": "7533f9dcb42d401851bd1dfe465db8145479fbafb940d7b06e69674fcdaae1e7"
+      },
+      "nec2pp.wasm": {
+        "bytes": 750317,
+        "sha256": "efe8e36e71582a7e0ea7d5c00e62b9498b39d32da89b8f3e092170cc7c1b71bd"
+      },
+      "necpp-field-evaluator.wasm": {
+        "bytes": 19367,
+        "sha256": "7c2e35915835cd56b22689edfa66297967c782aa788c222aaae00f5c3ad1f575"
+      }
+    }
+  },
+  "cacheIdentityDecision": {
+    "invalidates": [
+      "geometry",
+      "ports/order",
+      "loads",
+      "ground/connection",
+      "prepared-frequency",
+      "normalization",
+      "source-grid/radius"
+    ],
+    "doesNotInvalidate": [
+      "steering",
+      "taper",
+      "element-enable",
+      "source-power",
+      "matching",
+      "target-grid",
+      "view",
+      "polarization"
+    ]
+  },
+  "cases": [
+    {
+      "portCount": 4,
+      "gridName": "primary",
+      "grid": {
+        "id": "primary-256-display",
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 181,
+          "stepDeg": 0.5
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 360,
+          "stepDeg": 1
+        }
+      },
+      "samplesPerPort": 65160,
+      "basisBytes": 8340480,
+      "estimatedNativePlusTransferredBasisBytes": 16680960,
+      "prepareMs": 7.850599999999986,
+      "initialSolveMs": 7.196300000000008,
+      "poolWarmupMs": 95.9187,
+      "embeddedBasisWarmupMs": 923.1915999999999,
+      "residentBasisTransferMs": 0.8070999999999913,
+      "generationBeforeBasis": 1,
+      "generationAfterBasis": 1,
+      "states": [
+        {
+          "steering": {
+            "id": "broadside",
+            "u": 0,
+            "v": 0
+          },
+          "solveMs": 0.7160000000001219,
+          "directFieldMs": 58.202999999999975,
+          "localCombinationMs": 6.3064999999999145,
+          "requestedChecksum": {
+            "sha256": "ef3fe916c4adf2f9dee3af5962af6760915278bf8ecc411868469500b72e3231",
+            "sumReal": 4,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "b1179fa46e78bf13ae3125899b463df7a210d6b45aba1d85fb3d1e218c471cf6",
+            "sumReal": 4.000000000000006,
+            "sumImag": 6.8165636024043406e-15,
+            "l2Norm": 2.000000000000003
+          },
+          "directChecksum": {
+            "sha256": "7c7e6c7e9e505f6161c691ff4bb8522113413c48ba750db7a018f19b6e77ccd6",
+            "eTheta": {
+              "sha256": "2b65b9bddd1335cc99979ad7b88086cedfcbf34863d236f69d7df3a6ffda35a6",
+              "sumReal": 0.0006900022346389282,
+              "sumImag": -0.0054686365118422715,
+              "l2Norm": 45216.82070321763
+            },
+            "ePhi": {
+              "sha256": "885890975f3b3f41eb59fa3f8472294b03c1bf317ac073b6b3370b45d7a97348",
+              "sumReal": 3.6261641524389704e-10,
+              "sumImag": -9.92226757440093e-9,
+              "l2Norm": 49274.54472451919
+            }
+          },
+          "thetaScaledMaximum": 1.5417214855688065e-11,
+          "phiScaledMaximum": 2.0382683160180378e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 2,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 36.7526,
+            "snapshotCaptureMs": 0.04390000000012151,
+            "snapshotBroadcastMs": 0.38340000000016516,
+            "dispatchMs": 5.615100000000211,
+            "kernelMs": 50.243499999999585,
+            "mergeMs": 0.5078000000000884,
+            "totalMs": 57.148800000000165
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-u",
+            "u": 0.25,
+            "v": 0
+          },
+          "solveMs": 1.0647000000001299,
+          "directFieldMs": 57.455900000000156,
+          "localCombinationMs": 1.588899999999967,
+          "requestedChecksum": {
+            "sha256": "2157a064e1bf1a6e1a8022717d8f8991a68c8ed6c0d2c11948502ed7d3673a5c",
+            "sumReal": 3.695518130045147,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "7615e211e536f8446dc475f227fd7c67f1add43b045fba9b9dd68cd3f578db87",
+            "sumReal": 3.6955181300451576,
+            "sumImag": 6.8833827526759706e-15,
+            "l2Norm": 2.0000000000000058
+          },
+          "directChecksum": {
+            "sha256": "b9c04eaa2cc50f54e14db715facc7351642ee4734f22edc4a49a067e3eed27cd",
+            "eTheta": {
+              "sha256": "406a94f6613765137f51e35568d4849d85e8b0f6cccdd62255881e7553c86a85",
+              "sumReal": -1093565.921695663,
+              "sumImag": -1268413.458916923,
+              "l2Norm": 42923.05543921724
+            },
+            "ePhi": {
+              "sha256": "0c6caa56cf7489e3545525d35d68beac73530500c46fe5527fab0fb39d4d5f31",
+              "sumReal": -1.596856642686821e-9,
+              "sumImag": -5.136997729884909e-9,
+              "l2Norm": 46039.72797454645
+            }
+          },
+          "thetaScaledMaximum": 1.4773841244159475e-11,
+          "phiScaledMaximum": 2.17951945162632e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 3,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 36.7526,
+            "snapshotCaptureMs": 0.07120000000008986,
+            "snapshotBroadcastMs": 0.34199999999987085,
+            "dispatchMs": 7.73020000000065,
+            "kernelMs": 47.25259999999935,
+            "mergeMs": 0.08809999999994034,
+            "totalMs": 55.90750000000003
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-u",
+            "u": -0.25,
+            "v": 0
+          },
+          "solveMs": 1.3037999999999101,
+          "directFieldMs": 57.201699999999846,
+          "localCombinationMs": 1.8806999999999334,
+          "requestedChecksum": {
+            "sha256": "47f28dede69a729c2a8ebf66c473c1fbee6b7b3a10e1ef6cfda7915edcffef7c",
+            "sumReal": 3.695518130045147,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "260f90fd894b8a5ec712e56af5ca92ae4a42d6666e656bc5e9efb473e839df67",
+            "sumReal": 3.695518130045151,
+            "sumImag": 8.604228440844963e-15,
+            "l2Norm": 2.000000000000002
+          },
+          "directChecksum": {
+            "sha256": "127901e7f47a579cbd5665b2489a073f0701b6b79f97d6fa76894d0086d12ad3",
+            "eTheta": {
+              "sha256": "55949ca4a625a7d3b0b2b1f0333ca48b059c9585fffefed68ec7deb1775b1ce8",
+              "sumReal": 1093565.9229705906,
+              "sumImag": 1268413.4488121807,
+              "l2Norm": 42923.055438674884
+            },
+            "ePhi": {
+              "sha256": "6fe4b13d17bc19b7daf382e3010015819debe642bb0b640f426e7b39ee46d4d9",
+              "sumReal": -4.288214054681827e-10,
+              "sumImag": -1.1079494419141689e-8,
+              "l2Norm": 46039.727982540346
+            }
+          },
+          "thetaScaledMaximum": 1.4659340152673047e-11,
+          "phiScaledMaximum": 2.038268061814497e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 4,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 36.7526,
+            "snapshotCaptureMs": 0.12979999999993197,
+            "snapshotBroadcastMs": 0.7364999999999782,
+            "dispatchMs": 5.382200000000012,
+            "kernelMs": 48.63130000000001,
+            "mergeMs": 0.049999999999954525,
+            "totalMs": 55.76839999999993
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-v",
+            "u": 0,
+            "v": 0.25
+          },
+          "solveMs": 1.2545000000000073,
+          "directFieldMs": 59.187000000000126,
+          "localCombinationMs": 1.4803000000001703,
+          "requestedChecksum": {
+            "sha256": "63e47c79b179bbf97ff18ae64f50623cc25a78f5e96fcf644348304c67faa31c",
+            "sumReal": 3.695518130045147,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "81e2c71e8c9f30e2bc9e249334d8b379e7e3a1ad7facc70b1f947397472a888d",
+            "sumReal": 3.695518130045151,
+            "sumImag": 6.827871601444713e-15,
+            "l2Norm": 2.0000000000000013
+          },
+          "directChecksum": {
+            "sha256": "1a33da512fc8f400a92b4e7022f77bb12688276b2c5997608f0d59d92b6c2131",
+            "eTheta": {
+              "sha256": "e232c00c04137834e379db3f33355c269cb5108feb1b863a2f270f0b339768da",
+              "sumReal": 0.0006374419024822609,
+              "sumImag": -0.005052374392794576,
+              "l2Norm": 42168.233517318564
+            },
+            "ePhi": {
+              "sha256": "e88cb10d1b8353fe4e909b4a19c02d34284767d994731717c0a927c0d9e103f8",
+              "sumReal": 1908284.8049225484,
+              "sumImag": 2030958.3938318891,
+              "l2Norm": 48160.2910152043
+            }
+          },
+          "thetaScaledMaximum": 1.541716512920607e-11,
+          "phiScaledMaximum": 1.8652047162817072e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 5,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 36.7526,
+            "snapshotCaptureMs": 0.07169999999996435,
+            "snapshotBroadcastMs": 0.27909999999997126,
+            "dispatchMs": 5.523199999999861,
+            "kernelMs": 51.28460000000018,
+            "mergeMs": 0.03389999999990323,
+            "totalMs": 57.863200000000006
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-v",
+            "u": 0,
+            "v": -0.25
+          },
+          "solveMs": 0.9558999999999287,
+          "directFieldMs": 56.02320000000009,
+          "localCombinationMs": 2.8985000000000127,
+          "requestedChecksum": {
+            "sha256": "32b0f735fdfadce8159e7e2bef10e70e63af5afb0fca4af0d25ad9fb28cb197a",
+            "sumReal": 3.695518130045147,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "cfd0cd14442796357e335b21ba7e6a87678ff26026d1ee7ac741f8662156e97f",
+            "sumReal": 3.6955181300451523,
+            "sumImag": 7.66053886991358e-15,
+            "l2Norm": 2.0000000000000036
+          },
+          "directChecksum": {
+            "sha256": "017f9d21f2a4ca453afbefeb48fb42300ad71393bf8895950d0904aa32f34f58",
+            "eTheta": {
+              "sha256": "a2c87031bfaea2d333c339e5b2beecd0b6171599fec40d46fd4ca3ea1bca7ebc",
+              "sumReal": 0.0006374531001670811,
+              "sumImag": -0.005052381313410586,
+              "l2Norm": 42168.233517318564
+            },
+            "ePhi": {
+              "sha256": "dcbab63cdafba6da40abc09ba535fc3d7255906c3b7371d0ad472ebc636deea1",
+              "sumReal": -1908284.804922583,
+              "sumImag": -2030958.3938319045,
+              "l2Norm": 48160.291015204144
+            }
+          },
+          "thetaScaledMaximum": 1.6429172307400897e-11,
+          "phiScaledMaximum": 1.865399443131676e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 6,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 36.7526,
+            "snapshotCaptureMs": 0.048199999999951615,
+            "snapshotBroadcastMs": 0.26690000000007785,
+            "dispatchMs": 5.867499999999609,
+            "kernelMs": 47.57300000000032,
+            "mergeMs": 0.04379999999991924,
+            "totalMs": 54.325599999999895
+          }
+        }
+      ],
+      "residentStates": [
+        {
+          "index": 0,
+          "roundTripMs": 9.02780000000007,
+          "workerComputeMs": 5.908400000000029
+        },
+        {
+          "index": 1,
+          "roundTripMs": 4.662500000000136,
+          "workerComputeMs": 4.2806000000000495
+        },
+        {
+          "index": 2,
+          "roundTripMs": 2.4634000000000924,
+          "workerComputeMs": 2.1585000000000036
+        },
+        {
+          "index": 3,
+          "roundTripMs": 3.345100000000002,
+          "workerComputeMs": 3.042599999999993
+        },
+        {
+          "index": 4,
+          "roundTripMs": 3.0768000000000484,
+          "workerComputeMs": 2.7821000000001277
+        }
+      ],
+      "summary": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 0.7160000000001219,
+          "median": 1.0647000000001299,
+          "maximum": 1.3037999999999101,
+          "p90": 1.3037999999999101
+        },
+        "directFieldMs": {
+          "count": 5,
+          "minimum": 56.02320000000009,
+          "median": 57.455900000000156,
+          "maximum": 59.187000000000126,
+          "p90": 59.187000000000126
+        },
+        "localCombinationMs": {
+          "count": 5,
+          "minimum": 1.4803000000001703,
+          "median": 1.8806999999999334,
+          "maximum": 6.3064999999999145,
+          "p90": 6.3064999999999145
+        },
+        "residentRoundTripMs": {
+          "count": 5,
+          "minimum": 2.4634000000000924,
+          "median": 3.345100000000002,
+          "maximum": 9.02780000000007,
+          "p90": 9.02780000000007
+        },
+        "residentComputeMs": {
+          "count": 5,
+          "minimum": 2.1585000000000036,
+          "median": 3.042599999999993,
+          "maximum": 5.908400000000029,
+          "p90": 5.908400000000029
+        }
+      },
+      "amortization": {
+        "method": "measured-median linear model; basis setup measured once",
+        "directPerStateMs": 58.520600000000286,
+        "transferredPerStateMs": 2.9454000000000633,
+        "residentPerStateMs": 4.409800000000132,
+        "transferredBreakEvenStates": 17,
+        "residentBreakEvenStates": 18,
+        "transferredTotals": {
+          "1": {
+            "directMs": 58.520600000000286,
+            "cachedMs": 926.137,
+            "cachedToDirectRatio": 15.825828853429313
+          },
+          "4": {
+            "directMs": 234.08240000000114,
+            "cachedMs": 934.9732000000001,
+            "cachedToDirectRatio": 3.994205459274151
+          },
+          "16": {
+            "directMs": 936.3296000000046,
+            "cachedMs": 970.3180000000009,
+            "cachedToDirectRatio": 1.0362996107353608
+          },
+          "64": {
+            "directMs": 3745.3184000000183,
+            "cachedMs": 1111.697200000004,
+            "cachedToDirectRatio": 0.2968231486006633
+          },
+          "256": {
+            "directMs": 14981.273600000073,
+            "cachedMs": 1677.214000000016,
+            "cachedToDirectRatio": 0.11195403306698891
+          }
+        },
+        "residentTotals": {
+          "1": {
+            "directMs": 58.520600000000286,
+            "cachedMs": 928.4085,
+            "cachedToDirectRatio": 15.864644244932476
+          },
+          "4": {
+            "directMs": 234.08240000000114,
+            "cachedMs": 941.6379000000004,
+            "cachedToDirectRatio": 4.022677057309716
+          },
+          "16": {
+            "directMs": 936.3296000000046,
+            "cachedMs": 994.555500000002,
+            "cachedToDirectRatio": 1.0621852604040256
+          },
+          "64": {
+            "directMs": 3745.3184000000183,
+            "cachedMs": 1206.2259000000083,
+            "cachedToDirectRatio": 0.3220623111776031
+          },
+          "256": {
+            "directMs": 14981.273600000073,
+            "cachedMs": 2052.907500000034,
+            "cachedToDirectRatio": 0.13703157387099746
+          }
+        }
+      },
+      "correctness": {
+        "directVersusTransferredThetaScaledMaximum": 1.6429172307400897e-11,
+        "directVersusTransferredPhiScaledMaximum": 2.17951945162632e-11,
+        "transferredVersusResidentThetaScaledMaximum": 0,
+        "transferredVersusResidentPhiScaledMaximum": 0,
+        "metricsEquivalent": true,
+        "peakIndexExact": false,
+        "maximumPeakRelativeError": 3.247558803530401e-12,
+        "maximumMagnitudeSumRelativeError": 9.442519578555505e-12,
+        "powerClosureEquivalent": true,
+        "statePreserved": true,
+        "callerPortOrderPreserved": true
+      },
+      "memory": {
+        "before": {
+          "rssBytes": 65093632,
+          "heapUsedBytes": 5845632,
+          "externalBytes": 2483428,
+          "arrayBuffersBytes": 16627
+        },
+        "afterBasis": {
+          "rssBytes": 196894720,
+          "heapUsedBytes": 6086744,
+          "externalBytes": 31564853,
+          "arrayBuffersBytes": 18782707
+        },
+        "resident": {
+          "rssBytes": 222711808,
+          "heapUsedBytes": 6190480,
+          "externalBytes": 44097565,
+          "arrayBuffersBytes": 31294067
+        },
+        "peakRssBytes": 224100352,
+        "peakRssDeltaBytes": 159006720
+      }
+    },
+    {
+      "portCount": 4,
+      "gridName": "secondary",
+      "grid": {
+        "id": "consumer-derived-32x32-display",
+        "derivation": {
+          "display": {
+            "n1": 32,
+            "n2": 32
+          },
+          "apertureLambda": 5.419747468305833,
+          "kD": 34.05327766148297,
+          "requestedStepDeg": 1.3214586991401025
+        },
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 69,
+          "stepDeg": 1.3235294117647058
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 272,
+          "stepDeg": 1.3235294117647058
+        }
+      },
+      "samplesPerPort": 18768,
+      "basisBytes": 2402304,
+      "estimatedNativePlusTransferredBasisBytes": 4804608,
+      "prepareMs": 7.995799999999917,
+      "initialSolveMs": 6.540700000000015,
+      "poolWarmupMs": 70.70720000000006,
+      "embeddedBasisWarmupMs": 278.44060000000013,
+      "residentBasisTransferMs": 0.8077000000002954,
+      "generationBeforeBasis": 1,
+      "generationAfterBasis": 1,
+      "states": [
+        {
+          "steering": {
+            "id": "broadside",
+            "u": 0,
+            "v": 0
+          },
+          "solveMs": 0.9740000000001601,
+          "directFieldMs": 18.330199999999877,
+          "localCombinationMs": 1.966899999999896,
+          "requestedChecksum": {
+            "sha256": "ef3fe916c4adf2f9dee3af5962af6760915278bf8ecc411868469500b72e3231",
+            "sumReal": 4,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "b1179fa46e78bf13ae3125899b463df7a210d6b45aba1d85fb3d1e218c471cf6",
+            "sumReal": 4.000000000000006,
+            "sumImag": 6.8165636024043406e-15,
+            "l2Norm": 2.000000000000003
+          },
+          "directChecksum": {
+            "sha256": "b44c7e7cc622e2985b60dbd495d3c17e30b1021cf213929b1fa146f3b45a1f48",
+            "eTheta": {
+              "sha256": "761a94e81396179056b46b004b23eef3bf4346bd155ef5b1b461e7270f82943a",
+              "sumReal": 0.0001968857890737863,
+              "sumImag": -0.0015606056976903535,
+              "l2Norm": 24349.798604375464
+            },
+            "ePhi": {
+              "sha256": "f97dcfededbdd58c32dd578eb4e1ebf1870808c5f2a5a3eb7d0c7c2c9875a480",
+              "sumReal": -6.003972638548181e-10,
+              "sumImag": -1.971755163275654e-9,
+              "l2Norm": 26501.94396780826
+            }
+          },
+          "thetaScaledMaximum": 1.5401353860576526e-11,
+          "phiScaledMaximum": 2.034363982434853e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 2,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 40.633400000000165,
+            "snapshotCaptureMs": 0.06430000000000291,
+            "snapshotBroadcastMs": 0.5851999999999862,
+            "dispatchMs": 1.6097000000006574,
+            "kernelMs": 15.012499999999363,
+            "mergeMs": 0.04250000000001819,
+            "totalMs": 17.633299999999736
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-u",
+            "u": 0.25,
+            "v": 0
+          },
+          "solveMs": 1.4302999999999884,
+          "directFieldMs": 19.090700000000197,
+          "localCombinationMs": 0.7644000000000233,
+          "requestedChecksum": {
+            "sha256": "2157a064e1bf1a6e1a8022717d8f8991a68c8ed6c0d2c11948502ed7d3673a5c",
+            "sumReal": 3.695518130045147,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "7615e211e536f8446dc475f227fd7c67f1add43b045fba9b9dd68cd3f578db87",
+            "sumReal": 3.6955181300451576,
+            "sumImag": 6.8833827526759706e-15,
+            "l2Norm": 2.0000000000000058
+          },
+          "directChecksum": {
+            "sha256": "338ff71290e0bec1d98314bf5354d1aac074b4cc997507ce24af6b95415b4d68",
+            "eTheta": {
+              "sha256": "2998d5fe38602be2f7aae021435b35a84701f4ef21e7f33f8ab6cc37eed04c50",
+              "sumReal": -312097.53088273,
+              "sumImag": -361998.360743579,
+              "l2Norm": 23104.97788377489
+            },
+            "ePhi": {
+              "sha256": "1a110cda0f04b41e40596eed504a5a7e52a605129cfeae40a470af16e9c23b93",
+              "sumReal": -1.5437557658800704e-9,
+              "sumImag": -1.7965657919004454e-9,
+              "l2Norm": 24758.456156937533
+            }
+          },
+          "thetaScaledMaximum": 1.4754145892490676e-11,
+          "phiScaledMaximum": 2.175105134256056e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 3,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 40.633400000000165,
+            "snapshotCaptureMs": 0.10629999999991924,
+            "snapshotBroadcastMs": 0.6304000000000087,
+            "dispatchMs": 1.7817000000000007,
+            "kernelMs": 15.569700000000012,
+            "mergeMs": 0.051199999999880674,
+            "totalMs": 18.32490000000007
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-u",
+            "u": -0.25,
+            "v": 0
+          },
+          "solveMs": 0.7146999999999935,
+          "directFieldMs": 19.01780000000008,
+          "localCombinationMs": 0.7798999999999978,
+          "requestedChecksum": {
+            "sha256": "47f28dede69a729c2a8ebf66c473c1fbee6b7b3a10e1ef6cfda7915edcffef7c",
+            "sumReal": 3.695518130045147,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "260f90fd894b8a5ec712e56af5ca92ae4a42d6666e656bc5e9efb473e839df67",
+            "sumReal": 3.695518130045151,
+            "sumImag": 8.604228440844963e-15,
+            "l2Norm": 2.000000000000002
+          },
+          "directChecksum": {
+            "sha256": "00134ab39cc6304f1c09a709685b752d14f17db12bf06cec8b1c696c8d27440f",
+            "eTheta": {
+              "sha256": "a6fdee7126104e9670c0e3f259435a23ecd68c2fb7ebf44952bbf38d6ab1b51c",
+              "sumReal": 312097.531246527,
+              "sumImag": 361998.3578599476,
+              "l2Norm": 23104.97788360099
+            },
+            "ePhi": {
+              "sha256": "a807b820ac0b94e8d0db3a0859a6ddd2752825dc2597f45215b7ca81d725b943",
+              "sumReal": -3.404429853302753e-10,
+              "sumImag": -3.2009441604345153e-9,
+              "l2Norm": 24758.456161286464
+            }
+          },
+          "thetaScaledMaximum": 1.464470959485602e-11,
+          "phiScaledMaximum": 2.0343639589802015e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 4,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 40.633400000000165,
+            "snapshotCaptureMs": 0.08629999999993743,
+            "snapshotBroadcastMs": 0.4163999999996122,
+            "dispatchMs": 2.4206000000008316,
+            "kernelMs": 15.33049999999912,
+            "mergeMs": 0.029899999999997817,
+            "totalMs": 18.44669999999951
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-v",
+            "u": 0,
+            "v": 0.25
+          },
+          "solveMs": 1.5608000000001994,
+          "directFieldMs": 16.910499999999956,
+          "localCombinationMs": 0.6777999999999338,
+          "requestedChecksum": {
+            "sha256": "63e47c79b179bbf97ff18ae64f50623cc25a78f5e96fcf644348304c67faa31c",
+            "sumReal": 3.695518130045147,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "81e2c71e8c9f30e2bc9e249334d8b379e7e3a1ad7facc70b1f947397472a888d",
+            "sumReal": 3.695518130045151,
+            "sumImag": 6.827871601444713e-15,
+            "l2Norm": 2.0000000000000013
+          },
+          "directChecksum": {
+            "sha256": "362eb8cfc872b4c0e0c05e3bbd10d993c7206f8c32a85905f8b0b7cf8135aa98",
+            "eTheta": {
+              "sha256": "27f25b86a23783ed69df435f9e1275507d7de41c6ca7925ba14c4025fa78c6d7",
+              "sumReal": 0.00018189761276188408,
+              "sumImag": -0.0014418161764545496,
+              "l2Norm": 22704.780340578516
+            },
+            "ePhi": {
+              "sha256": "431ee87dc1a8929fa9a8f9eae326a5540214cdff0ce1eeef75286812b1daf718",
+              "sumReal": 544603.6813864459,
+              "sumImag": 579613.4230400773,
+              "l2Norm": 25884.324088024958
+            }
+          },
+          "thetaScaledMaximum": 1.5401307378767464e-11,
+          "phiScaledMaximum": 1.861719750287143e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 5,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 40.633400000000165,
+            "snapshotCaptureMs": 0.041600000000016735,
+            "snapshotBroadcastMs": 0.28989999999976135,
+            "dispatchMs": 1.3135999999990418,
+            "kernelMs": 14.36200000000099,
+            "mergeMs": 0.04349999999976717,
+            "totalMs": 16.27619999999979
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-v",
+            "u": 0,
+            "v": -0.25
+          },
+          "solveMs": 0.6880000000001019,
+          "directFieldMs": 17.252199999999903,
+          "localCombinationMs": 1.2089000000000851,
+          "requestedChecksum": {
+            "sha256": "32b0f735fdfadce8159e7e2bef10e70e63af5afb0fca4af0d25ad9fb28cb197a",
+            "sumReal": 3.695518130045147,
+            "sumImag": 0,
+            "l2Norm": 2
+          },
+          "achievedChecksum": {
+            "sha256": "cfd0cd14442796357e335b21ba7e6a87678ff26026d1ee7ac741f8662156e97f",
+            "sumReal": 3.6955181300451523,
+            "sumImag": 7.66053886991358e-15,
+            "l2Norm": 2.0000000000000036
+          },
+          "directChecksum": {
+            "sha256": "5907ca610114423df43d4e9eb17808842939aa5d679f7acdedeff5017c9e1443",
+            "eTheta": {
+              "sha256": "4833a35db8244b6a627bb8e877e560188a516d12806d9a7a5f8fdcfa24241612",
+              "sumReal": 0.000181899456820565,
+              "sumImag": -0.001441816767923772,
+              "l2Norm": 22704.780340578658
+            },
+            "ePhi": {
+              "sha256": "8e21bf268e52f9f7befb00d1dc08d1331779b602c00b1f78efeed4981a87f951",
+              "sumReal": -544603.6813864582,
+              "sumImag": -579613.4230400805,
+              "l2Norm": 25884.324088025078
+            }
+          },
+          "thetaScaledMaximum": 1.6410450177859528e-11,
+          "phiScaledMaximum": 1.8617205448188885e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 6,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 4576,
+            "lastBroadcastBytesPerWorker": 2112,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 40.633400000000165,
+            "snapshotCaptureMs": 0.0397000000002663,
+            "snapshotBroadcastMs": 0.29999999999972715,
+            "dispatchMs": 1.6002000000007683,
+            "kernelMs": 14.337499999999181,
+            "mergeMs": 0.03749999999990905,
+            "totalMs": 16.622599999999693
+          }
+        }
+      ],
+      "residentStates": [
+        {
+          "index": 0,
+          "roundTripMs": 6.774899999999889,
+          "workerComputeMs": 4.791600000000017
+        },
+        {
+          "index": 1,
+          "roundTripMs": 1.3432999999999993,
+          "workerComputeMs": 1.1417999999998756
+        },
+        {
+          "index": 2,
+          "roundTripMs": 0.7826000000000022,
+          "workerComputeMs": 0.5717999999997119
+        },
+        {
+          "index": 3,
+          "roundTripMs": 1.0948999999995976,
+          "workerComputeMs": 0.9097000000001572
+        },
+        {
+          "index": 4,
+          "roundTripMs": 0.8040000000000873,
+          "workerComputeMs": 0.6170999999999367
+        }
+      ],
+      "summary": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 0.6880000000001019,
+          "median": 0.9740000000001601,
+          "maximum": 1.5608000000001994,
+          "p90": 1.5608000000001994
+        },
+        "directFieldMs": {
+          "count": 5,
+          "minimum": 16.910499999999956,
+          "median": 18.330199999999877,
+          "maximum": 19.090700000000197,
+          "p90": 19.090700000000197
+        },
+        "localCombinationMs": {
+          "count": 5,
+          "minimum": 0.6777999999999338,
+          "median": 0.7798999999999978,
+          "maximum": 1.966899999999896,
+          "p90": 1.966899999999896
+        },
+        "residentRoundTripMs": {
+          "count": 5,
+          "minimum": 0.7826000000000022,
+          "median": 1.0948999999995976,
+          "maximum": 6.774899999999889,
+          "p90": 6.774899999999889
+        },
+        "residentComputeMs": {
+          "count": 5,
+          "minimum": 0.5717999999997119,
+          "median": 0.9097000000001572,
+          "maximum": 4.791600000000017,
+          "p90": 4.791600000000017
+        }
+      },
+      "amortization": {
+        "method": "measured-median linear model; basis setup measured once",
+        "directPerStateMs": 19.304200000000037,
+        "transferredPerStateMs": 1.7539000000001579,
+        "residentPerStateMs": 2.0688999999997577,
+        "transferredBreakEvenStates": 16,
+        "residentBreakEvenStates": 17,
+        "transferredTotals": {
+          "1": {
+            "directMs": 19.304200000000037,
+            "cachedMs": 280.1945000000003,
+            "cachedToDirectRatio": 14.514691103490419
+          },
+          "4": {
+            "directMs": 77.21680000000015,
+            "cachedMs": 285.45620000000076,
+            "cachedToDirectRatio": 3.6968146828151416
+          },
+          "16": {
+            "directMs": 308.8672000000006,
+            "cachedMs": 306.50300000000266,
+            "cachedToDirectRatio": 0.992345577646322
+          },
+          "64": {
+            "directMs": 1235.4688000000024,
+            "cachedMs": 390.69020000001024,
+            "cachedToDirectRatio": 0.31622830135411717
+          },
+          "256": {
+            "directMs": 4941.8752000000095,
+            "cachedMs": 727.4390000000406,
+            "cachedToDirectRatio": 0.14719898228106593
+          }
+        },
+        "residentTotals": {
+          "1": {
+            "directMs": 19.304200000000037,
+            "cachedMs": 281.3172000000002,
+            "cachedToDirectRatio": 14.572849431729864
+          },
+          "4": {
+            "directMs": 77.21680000000015,
+            "cachedMs": 287.52389999999946,
+            "cachedToDirectRatio": 3.7235925342671403
+          },
+          "16": {
+            "directMs": 308.8672000000006,
+            "cachedMs": 312.35069999999655,
+            "cachedToDirectRatio": 1.011278309901459
+          },
+          "64": {
+            "directMs": 1235.4688000000024,
+            "cachedMs": 411.6578999999849,
+            "cachedToDirectRatio": 0.33319975381003886
+          },
+          "256": {
+            "directMs": 4941.8752000000095,
+            "cachedMs": 808.8866999999384,
+            "cachedToDirectRatio": 0.16368011478718378
+          }
+        }
+      },
+      "correctness": {
+        "directVersusTransferredThetaScaledMaximum": 1.6410450177859528e-11,
+        "directVersusTransferredPhiScaledMaximum": 2.175105134256056e-11,
+        "transferredVersusResidentThetaScaledMaximum": 0,
+        "transferredVersusResidentPhiScaledMaximum": 0,
+        "metricsEquivalent": true,
+        "peakIndexExact": false,
+        "maximumPeakRelativeError": 3.247558803530401e-12,
+        "maximumMagnitudeSumRelativeError": 9.355074763809464e-12,
+        "powerClosureEquivalent": true,
+        "statePreserved": true,
+        "callerPortOrderPreserved": true
+      },
+      "memory": {
+        "before": {
+          "rssBytes": 170602496,
+          "heapUsedBytes": 6221408,
+          "externalBytes": 27398973,
+          "arrayBuffersBytes": 14091443
+        },
+        "afterBasis": {
+          "rssBytes": 175042560,
+          "heapUsedBytes": 6304528,
+          "externalBytes": 10778037,
+          "arrayBuffersBytes": 4220659
+        },
+        "resident": {
+          "rssBytes": 184885248,
+          "heapUsedBytes": 6371576,
+          "externalBytes": 14395485,
+          "arrayBuffersBytes": 9026035
+        },
+        "peakRssBytes": 185221120,
+        "peakRssDeltaBytes": 14618624
+      }
+    },
+    {
+      "portCount": 16,
+      "gridName": "primary",
+      "grid": {
+        "id": "primary-256-display",
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 181,
+          "stepDeg": 0.5
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 360,
+          "stepDeg": 1
+        }
+      },
+      "samplesPerPort": 65160,
+      "basisBytes": 33361920,
+      "estimatedNativePlusTransferredBasisBytes": 66723840,
+      "prepareMs": 24.83269999999993,
+      "initialSolveMs": 16.431100000000242,
+      "poolWarmupMs": 251.89330000000018,
+      "embeddedBasisWarmupMs": 14346.749899999999,
+      "residentBasisTransferMs": 0.48219999999855645,
+      "generationBeforeBasis": 1,
+      "generationAfterBasis": 1,
+      "states": [
+        {
+          "steering": {
+            "id": "broadside",
+            "u": 0,
+            "v": 0
+          },
+          "solveMs": 1.1758000000008906,
+          "directFieldMs": 247.86419999999998,
+          "localCombinationMs": 11.695199999998295,
+          "requestedChecksum": {
+            "sha256": "f9b132bf786a896c7dd20a6ee01da9fb90e06ce31039e398c12cd7216a4c59f6",
+            "sumReal": 16,
+            "sumImag": 0,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "9f8bd587798a221762a49d21be2655fcd516a624e47c7c6d34fe019282efd267",
+            "sumReal": 16.000000000000014,
+            "sumImag": 5.112422701803256e-15,
+            "l2Norm": 4.000000000000004
+          },
+          "directChecksum": {
+            "sha256": "f75e101961b171dbf0652b6c46a8771d6a41a9a5c27d8948dcfe4a34a6e82a9c",
+            "eTheta": {
+              "sha256": "bd8e26f57cca4e2e513533a747e1b0c42b3a961508a6f7eff5cd32fe4c2e39a5",
+              "sumReal": -0.0004312280916208685,
+              "sumImag": -0.0027016747326127724,
+              "l2Norm": 130631.44841766136
+            },
+            "ePhi": {
+              "sha256": "ecd63e8c01f190377a0a616d185339e85fc86e4215687d2d821c9e621f9db388",
+              "sumReal": 4.03112448476121e-8,
+              "sumImag": -2.1797625039186058e-8,
+              "l2Norm": 134287.07817170979
+            }
+          },
+          "thetaScaledMaximum": 1.5417267756151294e-11,
+          "phiScaledMaximum": 2.0382676930520347e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 2,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 39.0934000000002,
+            "snapshotCaptureMs": 0.04730000000199652,
+            "snapshotBroadcastMs": 0.6430999999975029,
+            "dispatchMs": 5.698400000019319,
+            "kernelMs": 239.22639999998137,
+            "mergeMs": 0.07129999999961001,
+            "totalMs": 246.8026000000027
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-u",
+            "u": 0.25,
+            "v": 0
+          },
+          "solveMs": 0.8874000000032538,
+          "directFieldMs": 248.17469999999958,
+          "localCombinationMs": 4.31590000000142,
+          "requestedChecksum": {
+            "sha256": "e9c534ea13c8934987eb64f4c48f63e5b7b6575e401096c777dc001c4e6703a0",
+            "sumReal": 10.45250371901101,
+            "sumImag": 0,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "76e63ce9314c2716336ef659889a4d840a06e8f965c7b2ad39c16efb85f179ba",
+            "sumReal": 10.452503719011021,
+            "sumImag": 4.773959005888173e-15,
+            "l2Norm": 3.9999999999999987
+          },
+          "directChecksum": {
+            "sha256": "54aa3ddf56b47ed90c5d0728924ee27c6f0b1d8ce6fda133998f6193c611b74f",
+            "eTheta": {
+              "sha256": "ad13a4f97d5aae66828cd8104912c629e6891079c5183e1ab248e388d4c67579",
+              "sumReal": -5633216.61888626,
+              "sumImag": -5896183.742614232,
+              "l2Norm": 115114.53280675202
+            },
+            "ePhi": {
+              "sha256": "f14a14dd55b4864a354fcef9a7591593ff77f64aa222cac0630cde578d5ec9f7",
+              "sumReal": 7.263031145693509e-9,
+              "sumImag": -4.013588852644048e-8,
+              "l2Norm": 98480.02263841937
+            }
+          },
+          "thetaScaledMaximum": 1.463650716236103e-11,
+          "phiScaledMaximum": 3.070988577098052e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 3,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 39.0934000000002,
+            "snapshotCaptureMs": 0.11730000000170548,
+            "snapshotBroadcastMs": 0.78610000000117,
+            "dispatchMs": 4.9372999999977765,
+            "kernelMs": 239.94350000000122,
+            "mergeMs": 0.07679999999891152,
+            "totalMs": 246.71659999999974
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-u",
+            "u": -0.25,
+            "v": 0
+          },
+          "solveMs": 1.109199999998964,
+          "directFieldMs": 265.3739999999998,
+          "localCombinationMs": 8.567399999999907,
+          "requestedChecksum": {
+            "sha256": "0bdd79768fdcf52154a6c8cab960c3fdc423026bc4ffd7c3f12977d2d7afcde0",
+            "sumReal": 10.45250371901101,
+            "sumImag": 0,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "daa407019a3bcdb14d2a8f4fbeb730e6f68fa1cb22cc4b1d88bfaa88f1bc6a59",
+            "sumReal": 10.452503719011029,
+            "sumImag": 5.995204332975845e-15,
+            "l2Norm": 4
+          },
+          "directChecksum": {
+            "sha256": "ae01c6b6357eff99e887cfe03e336f42947fa4c10eea0927aad17cb8c014eba2",
+            "eTheta": {
+              "sha256": "ab969f6bb245b0eebddaa3f183f38c16c18c6fc9b8eccd0db76f98a296872bed",
+              "sumReal": 5633216.617284223,
+              "sumImag": 5896183.7405775115,
+              "l2Norm": 115114.53279992312
+            },
+            "ePhi": {
+              "sha256": "de73a8a44608a55c9dcbf21bcc975cd885ecbae97d221ce0549ab8a954315261",
+              "sumReal": 3.469676495569757e-8,
+              "sumImag": 2.520112700550433e-8,
+              "l2Norm": 98480.02266315203
+            }
+          },
+          "thetaScaledMaximum": 1.4941506207770576e-11,
+          "phiScaledMaximum": 2.0349257364313287e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 4,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 39.0934000000002,
+            "snapshotCaptureMs": 0.06490000000121654,
+            "snapshotBroadcastMs": 0.5868000000009488,
+            "dispatchMs": 6.078999999990629,
+            "kernelMs": 253.02560000001176,
+            "mergeMs": 0.08610000000044238,
+            "totalMs": 260.58140000000276
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-v",
+            "u": 0,
+            "v": 0.25
+          },
+          "solveMs": 1.0155999999988126,
+          "directFieldMs": 242.43799999999828,
+          "localCombinationMs": 3.6450999999979103,
+          "requestedChecksum": {
+            "sha256": "86a570a0d7a3985dcdbaa2d12c4574408bf030d4ed76b6b59a310c62d305ee68",
+            "sumReal": 10.452503719011013,
+            "sumImag": -2.220446049250313e-16,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "d02865e4d521319ddafd2c204a7cfe141331fe213c3733581dec5ff5d812a647",
+            "sumReal": 10.452503719011034,
+            "sumImag": 3.0531133177191805e-14,
+            "l2Norm": 4.000000000000005
+          },
+          "directChecksum": {
+            "sha256": "7c80eb866ba52852711364a0a297d247c88f88d65728cd62708a36e77cc12006",
+            "eTheta": {
+              "sha256": "b931d392186174a89007105246156454d30698480cf3813e2629c8d86c7fe1f2",
+              "sumReal": -0.0004512758426515901,
+              "sumImag": -0.001836102397696929,
+              "l2Norm": 94273.9702955811
+            },
+            "ePhi": {
+              "sha256": "347d8245f9148356e26cbff552c73ea13dbb85e1d54b9fb4e77f2858873718d6",
+              "sumReal": 5921695.657028868,
+              "sumImag": 5902043.136180957,
+              "l2Norm": 122982.78629666971
+            }
+          },
+          "thetaScaledMaximum": 1.539915117978841e-11,
+          "phiScaledMaximum": 1.3127265638610402e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 5,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 39.0934000000002,
+            "snapshotCaptureMs": 0.054800000001705484,
+            "snapshotBroadcastMs": 0.359599999999773,
+            "dispatchMs": 5.362200000006851,
+            "kernelMs": 235.32389999999214,
+            "mergeMs": 0.03110000000015134,
+            "totalMs": 241.6241000000009
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-v",
+            "u": 0,
+            "v": -0.25
+          },
+          "solveMs": 0.7057999999997264,
+          "directFieldMs": 249.3817999999992,
+          "localCombinationMs": 4.108799999998155,
+          "requestedChecksum": {
+            "sha256": "cae09fd788013c088bbb423d041b6af7f7dca3462c8a10e6377a692387d2a27b",
+            "sumReal": 10.452503719011013,
+            "sumImag": 2.220446049250313e-16,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "771ba2894c93efb49a62796d34e5e7788415b3e57f696a25a949a3f9348bf96a",
+            "sumReal": 10.452503719011007,
+            "sumImag": -2.8754776337791554e-14,
+            "l2Norm": 4.000000000000002
+          },
+          "directChecksum": {
+            "sha256": "266fbc4ecf3e64a0c3ef1820de82fb9a90aa68165e2a3fa257f4b4dbc28ed14f",
+            "eTheta": {
+              "sha256": "6b57e00f24ef60332b87a69098d087e3540612a25bc5a357d05f0a1286406f92",
+              "sumReal": -0.00045126820354075034,
+              "sumImag": -0.001836134574513612,
+              "l2Norm": 94273.97029558111
+            },
+            "ePhi": {
+              "sha256": "8b536db27af5eaf309c0dcebdcccdc1e16d045922e6fb03075ac03d10aa44fa9",
+              "sumReal": -5921695.657028867,
+              "sumImag": -5902043.1361808535,
+              "l2Norm": 122982.78629666897
+            }
+          },
+          "thetaScaledMaximum": 2.3112139872298942e-11,
+          "phiScaledMaximum": 2.0231594803288573e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 6,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 39.0934000000002,
+            "snapshotCaptureMs": 0.05529999999998836,
+            "snapshotBroadcastMs": 0.4683999999979278,
+            "dispatchMs": 5.9055999999982305,
+            "kernelMs": 240.89459999999963,
+            "mergeMs": 0.05760000000009313,
+            "totalMs": 248.1316999999981
+          }
+        }
+      ],
+      "residentStates": [
+        {
+          "index": 0,
+          "roundTripMs": 12.40230000000156,
+          "workerComputeMs": 10.357299999999668
+        },
+        {
+          "index": 1,
+          "roundTripMs": 10.23700000000099,
+          "workerComputeMs": 9.935699999998178
+        },
+        {
+          "index": 2,
+          "roundTripMs": 4.164000000000669,
+          "workerComputeMs": 3.8706999999994878
+        },
+        {
+          "index": 3,
+          "roundTripMs": 4.130800000002637,
+          "workerComputeMs": 3.866600000001199
+        },
+        {
+          "index": 4,
+          "roundTripMs": 4.053500000001804,
+          "workerComputeMs": 3.7331000000012864
+        }
+      ],
+      "summary": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 0.7057999999997264,
+          "median": 1.0155999999988126,
+          "maximum": 1.1758000000008906,
+          "p90": 1.1758000000008906
+        },
+        "directFieldMs": {
+          "count": 5,
+          "minimum": 242.43799999999828,
+          "median": 248.17469999999958,
+          "maximum": 265.3739999999998,
+          "p90": 265.3739999999998
+        },
+        "localCombinationMs": {
+          "count": 5,
+          "minimum": 3.6450999999979103,
+          "median": 4.31590000000142,
+          "maximum": 11.695199999998295,
+          "p90": 11.695199999998295
+        },
+        "residentRoundTripMs": {
+          "count": 5,
+          "minimum": 4.053500000001804,
+          "median": 4.164000000000669,
+          "maximum": 12.40230000000156,
+          "p90": 12.40230000000156
+        },
+        "residentComputeMs": {
+          "count": 5,
+          "minimum": 3.7331000000012864,
+          "median": 3.8706999999994878,
+          "maximum": 10.357299999999668,
+          "p90": 10.357299999999668
+        }
+      },
+      "amortization": {
+        "method": "measured-median linear model; basis setup measured once",
+        "directPerStateMs": 249.1902999999984,
+        "transferredPerStateMs": 5.331500000000233,
+        "residentPerStateMs": 5.179599999999482,
+        "transferredBreakEvenStates": 59,
+        "residentBreakEvenStates": 59,
+        "transferredTotals": {
+          "1": {
+            "directMs": 249.1902999999984,
+            "cachedMs": 14352.0814,
+            "cachedToDirectRatio": 57.59486384502162
+          },
+          "4": {
+            "directMs": 996.7611999999936,
+            "cachedMs": 14368.0759,
+            "cachedToDirectRatio": 14.41476243256669
+          },
+          "16": {
+            "directMs": 3987.044799999974,
+            "cachedMs": 14432.053900000003,
+            "cachedToDirectRatio": 3.6197370794529564
+          },
+          "64": {
+            "directMs": 15948.179199999897,
+            "cachedMs": 14687.965900000014,
+            "cachedToDirectRatio": 0.9209807411745229
+          },
+          "256": {
+            "directMs": 63792.71679999959,
+            "cachedMs": 15711.613900000058,
+            "cachedToDirectRatio": 0.2462916566049145
+          }
+        },
+        "residentTotals": {
+          "1": {
+            "directMs": 249.1902999999984,
+            "cachedMs": 14352.411699999997,
+            "cachedToDirectRatio": 57.59618933802837
+          },
+          "4": {
+            "directMs": 996.7611999999936,
+            "cachedMs": 14367.950499999995,
+            "cachedToDirectRatio": 14.414636625101467
+          },
+          "16": {
+            "directMs": 3987.044799999974,
+            "cachedMs": 14430.10569999999,
+            "cachedToDirectRatio": 3.6192484468697423
+          },
+          "64": {
+            "directMs": 15948.179199999897,
+            "cachedMs": 14678.726499999964,
+            "cachedToDirectRatio": 0.9204014023118112
+          },
+          "256": {
+            "directMs": 63792.71679999959,
+            "cachedMs": 15673.209699999865,
+            "cachedToDirectRatio": 0.24568964117232842
+          }
+        }
+      },
+      "correctness": {
+        "directVersusTransferredThetaScaledMaximum": 2.3112139872298942e-11,
+        "directVersusTransferredPhiScaledMaximum": 3.070988577098052e-11,
+        "transferredVersusResidentThetaScaledMaximum": 0,
+        "transferredVersusResidentPhiScaledMaximum": 0,
+        "metricsEquivalent": true,
+        "peakIndexExact": false,
+        "maximumPeakRelativeError": 3.2463630517675804e-12,
+        "maximumMagnitudeSumRelativeError": 1.0951745841457361e-11,
+        "powerClosureEquivalent": true,
+        "statePreserved": true,
+        "callerPortOrderPreserved": true
+      },
+      "memory": {
+        "before": {
+          "rssBytes": 147324928,
+          "heapUsedBytes": 6622664,
+          "externalBytes": 8979069,
+          "arrayBuffersBytes": 3770611
+        },
+        "afterBasis": {
+          "rssBytes": 281346048,
+          "heapUsedBytes": 6469944,
+          "externalBytes": 71183253,
+          "arrayBuffersBytes": 35465075
+        },
+        "resident": {
+          "rssBytes": 280559616,
+          "heapUsedBytes": 6506176,
+          "externalBytes": 29503669,
+          "arrayBuffersBytes": 53192691
+        },
+        "peakRssBytes": 299180032,
+        "peakRssDeltaBytes": 151855104
+      }
+    },
+    {
+      "portCount": 16,
+      "gridName": "secondary",
+      "grid": {
+        "id": "consumer-derived-32x32-display",
+        "derivation": {
+          "display": {
+            "n1": 32,
+            "n2": 32
+          },
+          "apertureLambda": 5.419747468305833,
+          "kD": 34.05327766148297,
+          "requestedStepDeg": 1.3214586991401025
+        },
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 69,
+          "stepDeg": 1.3235294117647058
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 272,
+          "stepDeg": 1.3235294117647058
+        }
+      },
+      "samplesPerPort": 18768,
+      "basisBytes": 9609216,
+      "estimatedNativePlusTransferredBasisBytes": 19218432,
+      "prepareMs": 29.800200000001496,
+      "initialSolveMs": 19.715400000000955,
+      "poolWarmupMs": 133.91589999999997,
+      "embeddedBasisWarmupMs": 4045.0469999999987,
+      "residentBasisTransferMs": 0.39069999999992433,
+      "generationBeforeBasis": 1,
+      "generationAfterBasis": 1,
+      "states": [
+        {
+          "steering": {
+            "id": "broadside",
+            "u": 0,
+            "v": 0
+          },
+          "solveMs": 1.3518999999978405,
+          "directFieldMs": 68.9965000000011,
+          "localCombinationMs": 4.797200000000885,
+          "requestedChecksum": {
+            "sha256": "f9b132bf786a896c7dd20a6ee01da9fb90e06ce31039e398c12cd7216a4c59f6",
+            "sumReal": 16,
+            "sumImag": 0,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "9f8bd587798a221762a49d21be2655fcd516a624e47c7c6d34fe019282efd267",
+            "sumReal": 16.000000000000014,
+            "sumImag": 5.112422701803256e-15,
+            "l2Norm": 4.000000000000004
+          },
+          "directChecksum": {
+            "sha256": "f57407a21d0f28ee9bba172e97dbbfbb551eb8a0db7078e9b0ab93ff9f7efc55",
+            "eTheta": {
+              "sha256": "2ce0b9311a5ef9d0315766b1b0193877231d47e8b3c70980b2044b6eac674da2",
+              "sumReal": -0.00012324683648888904,
+              "sumImag": -0.0007700035542125179,
+              "l2Norm": 70840.47622684516
+            },
+            "ePhi": {
+              "sha256": "eab18c07d76afaa1ac5c240fc07e8169db1e391abe4eb64bd2b963ee008ebe3a",
+              "sumReal": 1.0008818904218752e-8,
+              "sumImag": -5.301948282424179e-9,
+              "l2Norm": 72765.36325244683
+            }
+          },
+          "thetaScaledMaximum": 1.5401379670977785e-11,
+          "phiScaledMaximum": 2.0343630221044337e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 2,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 48.20049999999901,
+            "snapshotCaptureMs": 0.041799999999057036,
+            "snapshotBroadcastMs": 0.7036000000007334,
+            "dispatchMs": 1.693200000005163,
+            "kernelMs": 65.61389999999301,
+            "mergeMs": 0.04830000000220025,
+            "totalMs": 68.41460000000006
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-u",
+            "u": 0.25,
+            "v": 0
+          },
+          "solveMs": 0.8974999999991269,
+          "directFieldMs": 79.91570000000138,
+          "localCombinationMs": 1.9663999999975204,
+          "requestedChecksum": {
+            "sha256": "e9c534ea13c8934987eb64f4c48f63e5b7b6575e401096c777dc001c4e6703a0",
+            "sumReal": 10.45250371901101,
+            "sumImag": 0,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "76e63ce9314c2716336ef659889a4d840a06e8f965c7b2ad39c16efb85f179ba",
+            "sumReal": 10.452503719011021,
+            "sumImag": 4.773959005888173e-15,
+            "l2Norm": 3.9999999999999987
+          },
+          "directChecksum": {
+            "sha256": "25260488bb52ce4469dc7ac04ab864f33707b9ac1869ea8db0f58ab07eb628a4",
+            "eTheta": {
+              "sha256": "31fa309c0cb3f3bfbdf6abff711d3ac3864ee2357da92e0aaac2841dc1c2353d",
+              "sumReal": -1607191.958264083,
+              "sumImag": -1682203.914019688,
+              "l2Norm": 62012.359789966424
+            },
+            "ePhi": {
+              "sha256": "8e3bcf42536e3a9148cae2b3491a0c1ad0bf67db4bf96a008d49456df6e1cb37",
+              "sumReal": 3.736981696434615e-9,
+              "sumImag": -1.1046837423786329e-8,
+              "l2Norm": 53210.721409373225
+            }
+          },
+          "thetaScaledMaximum": 1.46154101479433e-11,
+          "phiScaledMaximum": 3.0628685702291067e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 3,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 48.20049999999901,
+            "snapshotCaptureMs": 0.11429999999745633,
+            "snapshotBroadcastMs": 0.6628000000018801,
+            "dispatchMs": 2.186100000002625,
+            "kernelMs": 75.46729999999661,
+            "mergeMs": 0.055899999999383,
+            "totalMs": 78.7451000000001
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-u",
+            "u": -0.25,
+            "v": 0
+          },
+          "solveMs": 0.7582000000002154,
+          "directFieldMs": 76.70739999999932,
+          "localCombinationMs": 2.115300000001298,
+          "requestedChecksum": {
+            "sha256": "0bdd79768fdcf52154a6c8cab960c3fdc423026bc4ffd7c3f12977d2d7afcde0",
+            "sumReal": 10.45250371901101,
+            "sumImag": 0,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "daa407019a3bcdb14d2a8f4fbeb730e6f68fa1cb22cc4b1d88bfaa88f1bc6a59",
+            "sumReal": 10.452503719011029,
+            "sumImag": 5.995204332975845e-15,
+            "l2Norm": 4
+          },
+          "directChecksum": {
+            "sha256": "347d14cb9797c08d0b154604c982380d8d942edeacb0ddbafabadffefeb267d8",
+            "eTheta": {
+              "sha256": "51a1a3846b5d750a67c53c0ea5d9d725e16da7dfb42270fd7177531d86e00f49",
+              "sumReal": 1607191.957806955,
+              "sumImag": 1682203.913439122,
+              "l2Norm": 62012.35978689147
+            },
+            "ePhi": {
+              "sha256": "4e02d669ae1684bb80b9f35cc39bc13b6c03c2c46cb237fc525442a493d03355",
+              "sumReal": 7.101924094436467e-9,
+              "sumImag": 5.117136661314312e-9,
+              "l2Norm": 53210.72142307194
+            }
+          },
+          "thetaScaledMaximum": 1.4937790880317564e-11,
+          "phiScaledMaximum": 2.0311594413470955e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 4,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 48.20049999999901,
+            "snapshotCaptureMs": 0.11619999999675201,
+            "snapshotBroadcastMs": 0.5432000000000698,
+            "dispatchMs": 1.291800000002695,
+            "kernelMs": 73.7761999999966,
+            "mergeMs": 0.03290000000197324,
+            "totalMs": 75.96349999999802
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-v",
+            "u": 0,
+            "v": 0.25
+          },
+          "solveMs": 0.8032999999995809,
+          "directFieldMs": 81.4416999999994,
+          "localCombinationMs": 2.976700000002893,
+          "requestedChecksum": {
+            "sha256": "86a570a0d7a3985dcdbaa2d12c4574408bf030d4ed76b6b59a310c62d305ee68",
+            "sumReal": 10.452503719011013,
+            "sumImag": -2.220446049250313e-16,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "d02865e4d521319ddafd2c204a7cfe141331fe213c3733581dec5ff5d812a647",
+            "sumReal": 10.452503719011034,
+            "sumImag": 3.0531133177191805e-14,
+            "l2Norm": 4.000000000000005
+          },
+          "directChecksum": {
+            "sha256": "c90ff57994cdcfbdd097daee09b1decac570b70582f428305329387ac5e88439",
+            "eTheta": {
+              "sha256": "98806c7bb05ffa19547d967dce2333fa2bc21d94dd4e1823f65377808af194f8",
+              "sumReal": -0.00012890048418215394,
+              "sumImag": -0.0005233762941901734,
+              "l2Norm": 50979.95452104589
+            },
+            "ePhi": {
+              "sha256": "711eabb8a86f4c295d5d426690a901746869993e6f4966bf0db5bef5d5f8de4b",
+              "sumReal": 1689559.0515469504,
+              "sumImag": 1683932.0251076538,
+              "l2Norm": 66175.88952052029
+            }
+          },
+          "thetaScaledMaximum": 1.538582333395848e-11,
+          "phiScaledMaximum": 1.3102144348397978e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 5,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 48.20049999999901,
+            "snapshotCaptureMs": 0.059600000000500586,
+            "snapshotBroadcastMs": 0.38100000000122236,
+            "dispatchMs": 1.539200000002893,
+            "kernelMs": 78.54699999999502,
+            "mergeMs": 0.02260000000023865,
+            "totalMs": 80.79300000000148
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-v",
+            "u": 0,
+            "v": -0.25
+          },
+          "solveMs": 0.6232999999992899,
+          "directFieldMs": 71.05949999999939,
+          "localCombinationMs": 1.2908000000024913,
+          "requestedChecksum": {
+            "sha256": "cae09fd788013c088bbb423d041b6af7f7dca3462c8a10e6377a692387d2a27b",
+            "sumReal": 10.452503719011013,
+            "sumImag": 2.220446049250313e-16,
+            "l2Norm": 4
+          },
+          "achievedChecksum": {
+            "sha256": "771ba2894c93efb49a62796d34e5e7788415b3e57f696a25a949a3f9348bf96a",
+            "sumReal": 10.452503719011007,
+            "sumImag": -2.8754776337791554e-14,
+            "l2Norm": 4.000000000000002
+          },
+          "directChecksum": {
+            "sha256": "3a6ddc8367b9737e3071501bcccb8fd0ad6ad1de7f1ecba94ee45fe08f24b512",
+            "eTheta": {
+              "sha256": "0ee7d9a49a88d2f62034ca7c317d90aead9ba3ba700b0785ccdb1d1a75a75ebc",
+              "sumReal": -0.0001288959849431899,
+              "sumImag": -0.0005233839479284338,
+              "l2Norm": 50979.95452104576
+            },
+            "ePhi": {
+              "sha256": "261b6eff97c3fab919285e92c24b8a13c5c5d5a6b4bdb8b03de6315afc023832",
+              "sumReal": -1689559.051546918,
+              "sumImag": -1683932.025107631,
+              "l2Norm": 66175.88952052055
+            }
+          },
+          "thetaScaledMaximum": 2.3094117529041927e-11,
+          "phiScaledMaximum": 2.019934769513984e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 6,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 18304,
+            "lastBroadcastBytesPerWorker": 8448,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 48.20049999999901,
+            "snapshotCaptureMs": 0.03589999999894644,
+            "snapshotBroadcastMs": 0.3359999999993306,
+            "dispatchMs": 1.5949999999975262,
+            "kernelMs": 68.22890000000189,
+            "mergeMs": 0.02289999999993597,
+            "totalMs": 70.53399999999601
+          }
+        }
+      ],
+      "residentStates": [
+        {
+          "index": 0,
+          "roundTripMs": 9.566200000001118,
+          "workerComputeMs": 7.691999999999098
+        },
+        {
+          "index": 1,
+          "roundTripMs": 3.465699999997014,
+          "workerComputeMs": 3.2608000000000175
+        },
+        {
+          "index": 2,
+          "roundTripMs": 1.3716999999996915,
+          "workerComputeMs": 1.1965000000018335
+        },
+        {
+          "index": 3,
+          "roundTripMs": 2.2534000000014203,
+          "workerComputeMs": 2.071200000002136
+        },
+        {
+          "index": 4,
+          "roundTripMs": 2.1931000000004133,
+          "workerComputeMs": 2.0764000000017404
+        }
+      ],
+      "summary": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 0.6232999999992899,
+          "median": 0.8032999999995809,
+          "maximum": 1.3518999999978405,
+          "p90": 1.3518999999978405
+        },
+        "directFieldMs": {
+          "count": 5,
+          "minimum": 68.9965000000011,
+          "median": 76.70739999999932,
+          "maximum": 81.4416999999994,
+          "p90": 81.4416999999994
+        },
+        "localCombinationMs": {
+          "count": 5,
+          "minimum": 1.2908000000024913,
+          "median": 2.115300000001298,
+          "maximum": 4.797200000000885,
+          "p90": 4.797200000000885
+        },
+        "residentRoundTripMs": {
+          "count": 5,
+          "minimum": 1.3716999999996915,
+          "median": 2.2534000000014203,
+          "maximum": 9.566200000001118,
+          "p90": 9.566200000001118
+        },
+        "residentComputeMs": {
+          "count": 5,
+          "minimum": 1.1965000000018335,
+          "median": 2.0764000000017404,
+          "maximum": 7.691999999999098,
+          "p90": 7.691999999999098
+        }
+      },
+      "amortization": {
+        "method": "measured-median linear model; basis setup measured once",
+        "directPerStateMs": 77.5106999999989,
+        "transferredPerStateMs": 2.918600000000879,
+        "residentPerStateMs": 3.056700000001001,
+        "transferredBreakEvenStates": 55,
+        "residentBreakEvenStates": 55,
+        "transferredTotals": {
+          "1": {
+            "directMs": 77.5106999999989,
+            "cachedMs": 4047.9655999999995,
+            "cachedToDirectRatio": 52.22460382889145
+          },
+          "4": {
+            "directMs": 310.0427999999956,
+            "cachedMs": 4056.721400000002,
+            "cachedToDirectRatio": 13.08439157432477
+          },
+          "16": {
+            "directMs": 1240.1711999999825,
+            "cachedMs": 4091.7446000000127,
+            "cachedToDirectRatio": 3.299338510683098
+          },
+          "64": {
+            "directMs": 4960.68479999993,
+            "cachedMs": 4231.837400000055,
+            "cachedToDirectRatio": 0.8530752447726803
+          },
+          "256": {
+            "directMs": 19842.73919999972,
+            "cachedMs": 4792.208600000224,
+            "cachedToDirectRatio": 0.24150942829507588
+          }
+        },
+        "residentTotals": {
+          "1": {
+            "directMs": 77.5106999999989,
+            "cachedMs": 4048.4943999999996,
+            "cachedToDirectRatio": 52.23142611278258
+          },
+          "4": {
+            "directMs": 310.0427999999956,
+            "cachedMs": 4057.6645000000026,
+            "cachedToDirectRatio": 13.087433412419381
+          },
+          "16": {
+            "directMs": 1240.1711999999825,
+            "cachedMs": 4094.3449000000146,
+            "cachedToDirectRatio": 3.3014352373285822
+          },
+          "64": {
+            "directMs": 4960.68479999993,
+            "cachedMs": 4241.066500000063,
+            "cachedToDirectRatio": 0.8549356935558822
+          },
+          "256": {
+            "directMs": 19842.73919999972,
+            "cachedMs": 4827.952900000255,
+            "cachedToDirectRatio": 0.24331080761270718
+          }
+        }
+      },
+      "correctness": {
+        "directVersusTransferredThetaScaledMaximum": 2.3094117529041927e-11,
+        "directVersusTransferredPhiScaledMaximum": 3.0628685702291067e-11,
+        "transferredVersusResidentThetaScaledMaximum": 0,
+        "transferredVersusResidentPhiScaledMaximum": 0,
+        "metricsEquivalent": true,
+        "peakIndexExact": false,
+        "maximumPeakRelativeError": 3.2466300333911474e-12,
+        "maximumMagnitudeSumRelativeError": 1.0797355459152425e-11,
+        "powerClosureEquivalent": true,
+        "statePreserved": true,
+        "callerPortOrderPreserved": true
+      },
+      "memory": {
+        "before": {
+          "rssBytes": 207679488,
+          "heapUsedBytes": 6485720,
+          "externalBytes": 27401341,
+          "arrayBuffersBytes": 13570675
+        },
+        "afterBasis": {
+          "rssBytes": 211853312,
+          "heapUsedBytes": 6532984,
+          "externalBytes": 32401301,
+          "arrayBuffersBytes": 19837043
+        },
+        "resident": {
+          "rssBytes": 214290432,
+          "heapUsedBytes": 6568088,
+          "externalBytes": 21611485,
+          "arrayBuffersBytes": 16241907
+        },
+        "peakRssBytes": 214290432,
+        "peakRssDeltaBytes": 6610944
+      }
+    },
+    {
+      "portCount": 64,
+      "gridName": "primary",
+      "grid": {
+        "id": "primary-256-display",
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 181,
+          "stepDeg": 0.5
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 360,
+          "stepDeg": 1
+        }
+      },
+      "samplesPerPort": 65160,
+      "basisBytes": 133447680,
+      "estimatedNativePlusTransferredBasisBytes": 266895360,
+      "prepareMs": 312.9975999999988,
+      "initialSolveMs": 158.60039999999935,
+      "poolWarmupMs": 1125.334899999998,
+      "embeddedBasisWarmupMs": 224623.56819999998,
+      "residentBasisTransferMs": 0.8237999999837484,
+      "generationBeforeBasis": 1,
+      "generationAfterBasis": 1,
+      "states": [
+        {
+          "steering": {
+            "id": "broadside",
+            "u": 0,
+            "v": 0
+          },
+          "solveMs": 4.444799999997485,
+          "directFieldMs": 1178.7853999999934,
+          "localCombinationMs": 23.22500000000582,
+          "requestedChecksum": {
+            "sha256": "ca38cc89646b9cd9290a769f54e81852a1d9aa70f2286792f741dc4937f59925",
+            "sumReal": 64,
+            "sumImag": 0,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "a54ada851db8f0d140db3345f237fddefa45edad46dde5889c626d607dc35c24",
+            "sumReal": 63.99999999999994,
+            "sumImag": -5.66626849449861e-14,
+            "l2Norm": 7.9999999999999964
+          },
+          "directChecksum": {
+            "sha256": "1b45b8009c2bc262a1a7453a8601c4bc3b14dbe655912d8d70f727a9be87c8a6",
+            "eTheta": {
+              "sha256": "6f195a1f6dddf17a89165b6d970fa1ffb2fe545e272538abe4c0147f301b30cf",
+              "sumReal": -0.000004863498191211291,
+              "sumImag": -0.0033711364738261487,
+              "l2Norm": 373546.2714001982
+            },
+            "ePhi": {
+              "sha256": "8d57b1471dd7bd3b2ec569b515b6b39f725f7aba011188e12d380ae7fcf988d3",
+              "sumReal": -1.912723468860671e-8,
+              "sumImag": -7.227963485697581e-9,
+              "l2Norm": 376558.45447744615
+            }
+          },
+          "thetaScaledMaximum": 1.5417074013779053e-11,
+          "phiScaledMaximum": 2.0382696827258355e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 2,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 40.86139999999796,
+            "snapshotCaptureMs": 0.14470000000437722,
+            "snapshotBroadcastMs": 1.6543999999994412,
+            "dispatchMs": 9.135299999994459,
+            "kernelMs": 1166.060300000012,
+            "mergeMs": 0.07279999999445863,
+            "totalMs": 1177.4545000000217
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-u",
+            "u": 0.25,
+            "v": 0
+          },
+          "solveMs": 2.4949999999953434,
+          "directFieldMs": 1096.622800000012,
+          "localCombinationMs": 14.645099999994272,
+          "requestedChecksum": {
+            "sha256": "0350938ee155954c87bdb12cebfebc2584d2d8f126d174a4bfbb865004e93bde",
+            "sumReal": 1.6653345369377348e-15,
+            "sumImag": 1.6653345369377348e-16,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "1e1248bf8d883b1ba0bc645f214286d4151d7ccb24723b32fcc4e4b476d07e86",
+            "sumReal": -1.1390888232654106e-13,
+            "sumImag": -3.7636560534792807e-14,
+            "l2Norm": 8.00000000000001
+          },
+          "directChecksum": {
+            "sha256": "7a3d1f80cfab26ae543b615c35900b59c09e40747fd5e9f225299072aae7f7c5",
+            "eTheta": {
+              "sha256": "6665c899670ffda9badedfbc518911cb400199af6f79f39fa4caf69cdfebc573",
+              "sumReal": -12161584.488549005,
+              "sumImag": -12469230.133868128,
+              "l2Norm": 265935.1323001915
+            },
+            "ePhi": {
+              "sha256": "3c79d823c4c38643d6470e5f574b85bbc96d0b56a13a0e1b8f8ee95bb06807dd",
+              "sumReal": 1.2578328573302304e-7,
+              "sumImag": -8.839442061003161e-10,
+              "l2Norm": 121926.0411823267
+            }
+          },
+          "thetaScaledMaximum": 2.2937535501339282e-11,
+          "phiScaledMaximum": 6.203838209840369e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 3,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 40.86139999999796,
+            "snapshotCaptureMs": 0.10660000002826564,
+            "snapshotBroadcastMs": 1.2742999999900348,
+            "dispatchMs": 6.764900000038324,
+            "kernelMs": 1086.0658999999869,
+            "mergeMs": 0.0717000000004191,
+            "totalMs": 1094.7652999999991
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-u",
+            "u": -0.25,
+            "v": 0
+          },
+          "solveMs": 2.2987000000139233,
+          "directFieldMs": 1064.39969999998,
+          "localCombinationMs": 15.42149999999674,
+          "requestedChecksum": {
+            "sha256": "dc4761c06459325fe0d767b919ab48fd4188159c8250a477423713d1d187019b",
+            "sumReal": 1.6653345369377348e-15,
+            "sumImag": -1.6653345369377348e-16,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "ffa442361a87432a04503968b4aa209c50b8a37e2ebd044c2481cca2f62eec05",
+            "sumReal": 6.050715484207103e-14,
+            "sumImag": 6.394884621840902e-14,
+            "l2Norm": 7.999999999999992
+          },
+          "directChecksum": {
+            "sha256": "f12171911732287a40ce08893de355706dcc01fad573249a0fb51db15b570ee1",
+            "eTheta": {
+              "sha256": "1e1d3c3dd18cfff6a7fd53ad73b0af8db9c30978a82df8557660c134ed361d4c",
+              "sumReal": 12161584.482851237,
+              "sumImag": 12469230.140349802,
+              "l2Norm": 265935.13226824644
+            },
+            "ePhi": {
+              "sha256": "b30a30923327ff225395d48641eb5f98380977ec1d2b676da95a4f7fe197c3bd",
+              "sumReal": 1.3320952789738401e-8,
+              "sumImag": -5.801750123814968e-8,
+              "l2Norm": 121926.04118759483
+            }
+          },
+          "thetaScaledMaximum": 2.3113232016317346e-11,
+          "phiScaledMaximum": 4.2566700582633346e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 4,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 40.86139999999796,
+            "snapshotCaptureMs": 0.083199999993667,
+            "snapshotBroadcastMs": 0.9662000000244007,
+            "dispatchMs": 6.22199999995064,
+            "kernelMs": 1054.7591000000539,
+            "mergeMs": 0.06890000001294538,
+            "totalMs": 1062.565900000016
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-v",
+            "u": 0,
+            "v": 0.25
+          },
+          "solveMs": 3.0265999999828637,
+          "directFieldMs": 1024.1204000000143,
+          "localCombinationMs": 14.666899999981979,
+          "requestedChecksum": {
+            "sha256": "548a90579c2debd93c149335a50ddafee5b6c5709be47dac71de74f2f4372a9b",
+            "sumReal": -1.1102230246251565e-15,
+            "sumImag": -5.551115123125783e-16,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "4c1d56e18ee2a637a057612e1220f7e610424278c7cd955b74bdb91a1920f4cf",
+            "sumReal": -2.398081733190338e-14,
+            "sumImag": 1.199040866595169e-14,
+            "l2Norm": 7.9999999999999964
+          },
+          "directChecksum": {
+            "sha256": "64a4178663c43524ff87e8e71186633367f1c6a67189ffa95a3e40469b918447",
+            "eTheta": {
+              "sha256": "b1fca3e9ba60f35c4d7457b74e0af8db1a58a669a336937e880530838a954620",
+              "sumReal": -0.00024177117883758423,
+              "sumImag": -0.00009243031326935385,
+              "l2Norm": 115750.27127144761
+            },
+            "ePhi": {
+              "sha256": "6d7cd398a34b5a762205e933588d6ce46beeb00d26a0f3fd3b311140fb0a5ab1",
+              "sumReal": 12596507.461274972,
+              "sumImag": 12779704.31127433,
+              "l2Norm": 280992.4094708265
+            }
+          },
+          "thetaScaledMaximum": 3.007442987766105e-11,
+          "phiScaledMaximum": 1.6695355664943616e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 5,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 40.86139999999796,
+            "snapshotCaptureMs": 0.09819999997853301,
+            "snapshotBroadcastMs": 1.090200000006007,
+            "dispatchMs": 6.292199999967124,
+            "kernelMs": 1014.937200000044,
+            "mergeMs": 0.0348000000230968,
+            "totalMs": 1022.836399999971
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-v",
+            "u": 0,
+            "v": -0.25
+          },
+          "solveMs": 1.8563000000140164,
+          "directFieldMs": 1052.6902000000118,
+          "localCombinationMs": 15.715300000010757,
+          "requestedChecksum": {
+            "sha256": "0a4860216b64f9ea5e0ae4cc536d7974b23f434be26202d1c2db4e999b038fcd",
+            "sumReal": -1.1102230246251565e-15,
+            "sumImag": 5.551115123125783e-16,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "2949ecb765e583aa17d5c9e2e472d86f5d6d647d755ac50e2ea08ec6a4e83cd8",
+            "sumReal": 8.881784197001252e-16,
+            "sumImag": 2.603472992745992e-14,
+            "l2Norm": 8.000000000000012
+          },
+          "directChecksum": {
+            "sha256": "9567c83d6fdd21bcb7fd167257a852f425c8620aecfb683e3fd2c3177d51c7ac",
+            "eTheta": {
+              "sha256": "c2551c18b133c8cec0b7dddae953ea908fc0a652395f2580c87ac01547ba6927",
+              "sumReal": -0.00024174110569135927,
+              "sumImag": -0.00009241602317547421,
+              "l2Norm": 115750.27127144902
+            },
+            "ePhi": {
+              "sha256": "2827116522a4ac1bc19da824d7b53f012b724846347aa668d0e8e3b70aa3c6ec",
+              "sumReal": -12596507.461275116,
+              "sumImag": -12779704.311274288,
+              "l2Norm": 280992.40947082854
+            }
+          },
+          "thetaScaledMaximum": 5.1571591939681735e-11,
+          "phiScaledMaximum": 3.076407225342957e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 6,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 128,
+            "completedTiles": 128,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 2089448,
+            "geometryReused": true,
+            "warmupMs": 40.86139999999796,
+            "snapshotCaptureMs": 0.06359999999403954,
+            "snapshotBroadcastMs": 0.6754999999830034,
+            "dispatchMs": 6.137400000006892,
+            "kernelMs": 1043.6684999999998,
+            "mergeMs": 0.032100000011269,
+            "totalMs": 1051.0454999999783
+          }
+        }
+      ],
+      "residentStates": [
+        {
+          "index": 0,
+          "roundTripMs": 26.642800000001444,
+          "workerComputeMs": 24.972399999998743
+        },
+        {
+          "index": 1,
+          "roundTripMs": 19.86799999998766,
+          "workerComputeMs": 19.57839999999851
+        },
+        {
+          "index": 2,
+          "roundTripMs": 17.696100000001024,
+          "workerComputeMs": 17.337100000004284
+        },
+        {
+          "index": 3,
+          "roundTripMs": 21.13039999999455,
+          "workerComputeMs": 20.788100000005215
+        },
+        {
+          "index": 4,
+          "roundTripMs": 16.00539999999455,
+          "workerComputeMs": 15.666700000001583
+        }
+      ],
+      "summary": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 1.8563000000140164,
+          "median": 2.4949999999953434,
+          "maximum": 4.444799999997485,
+          "p90": 4.444799999997485
+        },
+        "directFieldMs": {
+          "count": 5,
+          "minimum": 1024.1204000000143,
+          "median": 1064.39969999998,
+          "maximum": 1178.7853999999934,
+          "p90": 1178.7853999999934
+        },
+        "localCombinationMs": {
+          "count": 5,
+          "minimum": 14.645099999994272,
+          "median": 15.42149999999674,
+          "maximum": 23.22500000000582,
+          "p90": 23.22500000000582
+        },
+        "residentRoundTripMs": {
+          "count": 5,
+          "minimum": 16.00539999999455,
+          "median": 19.86799999998766,
+          "maximum": 26.642800000001444,
+          "p90": 26.642800000001444
+        },
+        "residentComputeMs": {
+          "count": 5,
+          "minimum": 15.666700000001583,
+          "median": 19.57839999999851,
+          "maximum": 24.972399999998743,
+          "p90": 24.972399999998743
+        }
+      },
+      "amortization": {
+        "method": "measured-median linear model; basis setup measured once",
+        "directPerStateMs": 1066.8946999999753,
+        "transferredPerStateMs": 17.916499999992084,
+        "residentPerStateMs": 22.362999999983003,
+        "transferredBreakEvenStates": 215,
+        "residentBreakEvenStates": 216,
+        "transferredTotals": {
+          "1": {
+            "directMs": 1066.8946999999753,
+            "cachedMs": 224641.48469999997,
+            "cachedToDirectRatio": 210.55637890037806
+          },
+          "4": {
+            "directMs": 4267.578799999901,
+            "cachedMs": 224695.23419999995,
+            "cachedToDirectRatio": 52.65168957161497
+          },
+          "16": {
+            "directMs": 17070.315199999604,
+            "cachedMs": 224910.23219999985,
+            "cachedToDirectRatio": 13.175517239424206
+          },
+          "64": {
+            "directMs": 68281.26079999842,
+            "cachedMs": 225770.22419999947,
+            "cachedToDirectRatio": 3.3064741563765137
+          },
+          "256": {
+            "directMs": 273125.04319999367,
+            "cachedMs": 229210.19219999795,
+            "cachedToDirectRatio": 0.8392133856145905
+          }
+        },
+        "residentTotals": {
+          "1": {
+            "directMs": 1066.8946999999753,
+            "cachedMs": 224646.75499999995,
+            "cachedToDirectRatio": 210.56131875058068
+          },
+          "4": {
+            "directMs": 4267.578799999901,
+            "cachedMs": 224713.8439999999,
+            "cachedToDirectRatio": 52.65605031124559
+          },
+          "16": {
+            "directMs": 17070.315199999604,
+            "cachedMs": 224982.1999999997,
+            "cachedToDirectRatio": 13.179733201411823
+          },
+          "64": {
+            "directMs": 68281.26079999842,
+            "cachedMs": 226055.62399999888,
+            "cachedToDirectRatio": 3.3106539239533803
+          },
+          "256": {
+            "directMs": 273125.04319999367,
+            "cachedMs": 230349.3199999956,
+            "cachedToDirectRatio": 0.8433841045887693
+          }
+        }
+      },
+      "correctness": {
+        "directVersusTransferredThetaScaledMaximum": 5.1571591939681735e-11,
+        "directVersusTransferredPhiScaledMaximum": 6.203838209840369e-11,
+        "transferredVersusResidentThetaScaledMaximum": 0,
+        "transferredVersusResidentPhiScaledMaximum": 0,
+        "metricsEquivalent": true,
+        "peakIndexExact": false,
+        "maximumPeakRelativeError": 3.2482454579689468e-12,
+        "maximumMagnitudeSumRelativeError": 1.242464341080018e-11,
+        "powerClosureEquivalent": true,
+        "statePreserved": true,
+        "callerPortOrderPreserved": true
+      },
+      "memory": {
+        "before": {
+          "rssBytes": 161718272,
+          "heapUsedBytes": 6523888,
+          "externalBytes": 8981437,
+          "arrayBuffersBytes": 4223347
+        },
+        "afterBasis": {
+          "rssBytes": 821673984,
+          "heapUsedBytes": 6632336,
+          "externalBytes": 404806677,
+          "arrayBuffersBytes": 235640819
+        },
+        "resident": {
+          "rssBytes": 728956928,
+          "heapUsedBytes": 6670736,
+          "externalBytes": 169243037,
+          "arrayBuffersBytes": 156439539
+        },
+        "peakRssBytes": 821673984,
+        "peakRssDeltaBytes": 659955712
+      }
+    },
+    {
+      "portCount": 64,
+      "gridName": "secondary",
+      "grid": {
+        "id": "consumer-derived-32x32-display",
+        "derivation": {
+          "display": {
+            "n1": 32,
+            "n2": 32
+          },
+          "apertureLambda": 5.419747468305833,
+          "kD": 34.05327766148297,
+          "requestedStepDeg": 1.3214586991401025
+        },
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 69,
+          "stepDeg": 1.3235294117647058
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 272,
+          "stepDeg": 1.3235294117647058
+        }
+      },
+      "samplesPerPort": 18768,
+      "basisBytes": 38436864,
+      "estimatedNativePlusTransferredBasisBytes": 76873728,
+      "prepareMs": 330.2861999999732,
+      "initialSolveMs": 154.4206000000122,
+      "poolWarmupMs": 381.95569999999134,
+      "embeddedBasisWarmupMs": 67033.26970000003,
+      "residentBasisTransferMs": 0.44239999999990687,
+      "generationBeforeBasis": 1,
+      "generationAfterBasis": 1,
+      "states": [
+        {
+          "steering": {
+            "id": "broadside",
+            "u": 0,
+            "v": 0
+          },
+          "solveMs": 3.218600000021979,
+          "directFieldMs": 323.6753000000026,
+          "localCombinationMs": 9.222499999974389,
+          "requestedChecksum": {
+            "sha256": "ca38cc89646b9cd9290a769f54e81852a1d9aa70f2286792f741dc4937f59925",
+            "sumReal": 64,
+            "sumImag": 0,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "a54ada851db8f0d140db3345f237fddefa45edad46dde5889c626d607dc35c24",
+            "sumReal": 63.99999999999994,
+            "sumImag": -5.66626849449861e-14,
+            "l2Norm": 7.9999999999999964
+          },
+          "directChecksum": {
+            "sha256": "a05a26ddb23182f81a7ae31b520658d63abcad3aea4e184467d4b521500e3e9f",
+            "eTheta": {
+              "sha256": "2bbd162b7c3a683235ebd8e3e9717a27aad201c57638ea26b0094e054f8d8bce",
+              "sumReal": -0.0000018140867170043928,
+              "sumImag": -0.0009579178220251259,
+              "l2Norm": 205358.3329248566
+            },
+            "ePhi": {
+              "sha256": "2d8a3919e7eef6e19485fa038036d545696d29f85d5f9378543299bffa68e3e1",
+              "sumReal": -1.31335818785465e-9,
+              "sumImag": -4.9356044408541485e-9,
+              "l2Norm": 206922.60689793908
+            }
+          },
+          "thetaScaledMaximum": 1.5401301285707797e-11,
+          "phiScaledMaximum": 2.0343658678884958e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 2,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 43.60529999999562,
+            "snapshotCaptureMs": 0.11430000001564622,
+            "snapshotBroadcastMs": 1.4747000000206754,
+            "dispatchMs": 2.0290999999269843,
+            "kernelMs": 318.8414000000921,
+            "mergeMs": 0.05770000000484288,
+            "totalMs": 322.6299000000581
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-u",
+            "u": 0.25,
+            "v": 0
+          },
+          "solveMs": 2.395299999974668,
+          "directFieldMs": 312.45390000002226,
+          "localCombinationMs": 4.801100000040606,
+          "requestedChecksum": {
+            "sha256": "0350938ee155954c87bdb12cebfebc2584d2d8f126d174a4bfbb865004e93bde",
+            "sumReal": 1.6653345369377348e-15,
+            "sumImag": 1.6653345369377348e-16,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "1e1248bf8d883b1ba0bc645f214286d4151d7ccb24723b32fcc4e4b476d07e86",
+            "sumReal": -1.1390888232654106e-13,
+            "sumImag": -3.7636560534792807e-14,
+            "l2Norm": 8.00000000000001
+          },
+          "directChecksum": {
+            "sha256": "d86340e91f8e188cc6bee57364a76eb6f64fdd9e3d89dd770d861816abc95c73",
+            "eTheta": {
+              "sha256": "e3947fc1d40d077769d7fad0a335723682348ca0f0b96d704860c4773cc5ad79",
+              "sumReal": -3466510.224966251,
+              "sumImag": -3554206.9597780695,
+              "l2Norm": 142078.27759319975
+            },
+            "ePhi": {
+              "sha256": "7809b7798a3ff5e5a658abd416f38ef253fac0fe507d3276e07270508d39120b",
+              "sumReal": 3.46088220417022e-8,
+              "sumImag": 1.620992160330836e-9,
+              "l2Norm": 65140.42032610568
+            }
+          },
+          "thetaScaledMaximum": 2.294445848870083e-11,
+          "phiScaledMaximum": 6.183617822300064e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 3,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 43.60529999999562,
+            "snapshotCaptureMs": 0.09899999998742715,
+            "snapshotBroadcastMs": 1.3818000000319444,
+            "dispatchMs": 2.319400000036694,
+            "kernelMs": 307.0693999999785,
+            "mergeMs": 0.06829999998444691,
+            "totalMs": 311.4495000000461
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-u",
+            "u": -0.25,
+            "v": 0
+          },
+          "solveMs": 2.557299999985844,
+          "directFieldMs": 339.8398000000161,
+          "localCombinationMs": 4.776599999982864,
+          "requestedChecksum": {
+            "sha256": "dc4761c06459325fe0d767b919ab48fd4188159c8250a477423713d1d187019b",
+            "sumReal": 1.6653345369377348e-15,
+            "sumImag": -1.6653345369377348e-16,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "ffa442361a87432a04503968b4aa209c50b8a37e2ebd044c2481cca2f62eec05",
+            "sumReal": 6.050715484207103e-14,
+            "sumImag": 6.394884621840902e-14,
+            "l2Norm": 7.999999999999992
+          },
+          "directChecksum": {
+            "sha256": "1c0763fd3f29aa8400796f9a2f5f98a13d587f8f0a9632bc010d698ab13ce8bc",
+            "eTheta": {
+              "sha256": "48b10dc95ebea8093dc14adc56f192b28a06cc7862fcb4b6677d0d78855b289c",
+              "sumReal": 3466510.2233431833,
+              "sumImag": 3554206.9616198065,
+              "l2Norm": 142078.27757612496
+            },
+            "ePhi": {
+              "sha256": "cba9f067e6ee05c85a23105ccfe640308ff70aab8b791978343801e4c35b03b0",
+              "sumReal": 5.0378444681060375e-9,
+              "sumImag": -1.4688087219138354e-8,
+              "l2Norm": 65140.42032890204
+            }
+          },
+          "thetaScaledMaximum": 2.308010316749347e-11,
+          "phiScaledMaximum": 4.2492391091768216e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 4,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 43.60529999999562,
+            "snapshotCaptureMs": 0.08979999995790422,
+            "snapshotBroadcastMs": 0.6626999999862164,
+            "dispatchMs": 2.6824999999953434,
+            "kernelMs": 335.4133000000147,
+            "mergeMs": 0.03700000001117587,
+            "totalMs": 339.02499999990687
+          }
+        },
+        {
+          "steering": {
+            "id": "positive-v",
+            "u": 0,
+            "v": 0.25
+          },
+          "solveMs": 2.9705000000540167,
+          "directFieldMs": 324.04220000002533,
+          "localCombinationMs": 6.108699999982491,
+          "requestedChecksum": {
+            "sha256": "548a90579c2debd93c149335a50ddafee5b6c5709be47dac71de74f2f4372a9b",
+            "sumReal": -1.1102230246251565e-15,
+            "sumImag": -5.551115123125783e-16,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "4c1d56e18ee2a637a057612e1220f7e610424278c7cd955b74bdb91a1920f4cf",
+            "sumReal": -2.398081733190338e-14,
+            "sumImag": 1.199040866595169e-14,
+            "l2Norm": 7.9999999999999964
+          },
+          "directChecksum": {
+            "sha256": "c1880d39f58ba231e12fb8e0731ea65b05a9a5a407cddb0ea16f42a8f1bcd55d",
+            "eTheta": {
+              "sha256": "6a7a09ddc120cb15f4e8453a60d9d19c9b0a14a3f65d2e6549dcebd316169e4a",
+              "sumReal": -0.00006892743535665338,
+              "sumImag": -0.000026537718753922353,
+              "l2Norm": 61841.22512049221
+            },
+            "ePhi": {
+              "sha256": "d6282084ab365562691d32c0a81bb44c824941f3f531d4a1130055a3ddde3be1",
+              "sumReal": 3590664.4886354734,
+              "sumImag": 3642842.0697563095,
+              "l2Norm": 150122.84452872115
+            }
+          },
+          "thetaScaledMaximum": 2.999819243994194e-11,
+          "phiScaledMaximum": 1.664606042169336e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 5,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 43.60529999999562,
+            "snapshotCaptureMs": 0.06479999999282882,
+            "snapshotBroadcastMs": 0.9924999999930151,
+            "dispatchMs": 2.9945999999181367,
+            "kernelMs": 319.0918000001111,
+            "mergeMs": 0.06130000000121072,
+            "totalMs": 323.28800000000047
+          }
+        },
+        {
+          "steering": {
+            "id": "negative-v",
+            "u": 0,
+            "v": -0.25
+          },
+          "solveMs": 2.116600000008475,
+          "directFieldMs": 319.0819999999949,
+          "localCombinationMs": 4.864700000034645,
+          "requestedChecksum": {
+            "sha256": "0a4860216b64f9ea5e0ae4cc536d7974b23f434be26202d1c2db4e999b038fcd",
+            "sumReal": -1.1102230246251565e-15,
+            "sumImag": 5.551115123125783e-16,
+            "l2Norm": 8
+          },
+          "achievedChecksum": {
+            "sha256": "2949ecb765e583aa17d5c9e2e472d86f5d6d647d755ac50e2ea08ec6a4e83cd8",
+            "sumReal": 8.881784197001252e-16,
+            "sumImag": 2.603472992745992e-14,
+            "l2Norm": 8.000000000000012
+          },
+          "directChecksum": {
+            "sha256": "41e6d060c91a2ae2831f5bb3680d7fc91cb91ab409791d2589ee4a69822ef885",
+            "eTheta": {
+              "sha256": "5296696947dbe5a23e33c8dd48c466b04dcb5560e96c19670b61845d2b643e97",
+              "sumReal": -0.00006891781289769441,
+              "sumImag": -0.000026535003628081833,
+              "l2Norm": 61841.22512049259
+            },
+            "ePhi": {
+              "sha256": "fda4b807741ac5f5c6b5469d95aaab41b9914002ed29fa0d5aef6c8348937ccd",
+              "sumReal": -3590664.4886355144,
+              "sumImag": -3642842.0697563486,
+              "l2Norm": 150122.84452872182
+            }
+          },
+          "thetaScaledMaximum": 5.151663746083752e-11,
+          "phiScaledMaximum": 3.0653639185189234e-11,
+          "factorizationGeneration": 1,
+          "solveGeneration": 6,
+          "fieldBackend": {
+            "backend": "worker-pool",
+            "requestedWorkers": 4,
+            "activeWorkerCount": 4,
+            "tileSize": 512,
+            "totalTiles": 37,
+            "completedTiles": 37,
+            "cancelledTiles": 0,
+            "cancelledJobs": 0,
+            "restartedWorkers": 0,
+            "snapshotBytesPerWorker": 73216,
+            "lastBroadcastBytesPerWorker": 33792,
+            "resultBytes": 603304,
+            "geometryReused": true,
+            "warmupMs": 43.60529999999562,
+            "snapshotCaptureMs": 0.06309999997029081,
+            "snapshotBroadcastMs": 0.5569999999715947,
+            "dispatchMs": 1.7288999999291264,
+            "kernelMs": 315.9293000000762,
+            "mergeMs": 0.024800000013783574,
+            "totalMs": 318.4852999999421
+          }
+        }
+      ],
+      "residentStates": [
+        {
+          "index": 0,
+          "roundTripMs": 14.549799999978859,
+          "workerComputeMs": 13.013099999981932
+        },
+        {
+          "index": 1,
+          "roundTripMs": 10.884599999990314,
+          "workerComputeMs": 10.579900000011548
+        },
+        {
+          "index": 2,
+          "roundTripMs": 5.510000000009313,
+          "workerComputeMs": 5.167599999986123
+        },
+        {
+          "index": 3,
+          "roundTripMs": 4.962999999988824,
+          "workerComputeMs": 4.728799999982584
+        },
+        {
+          "index": 4,
+          "roundTripMs": 4.90590000001248,
+          "workerComputeMs": 4.619399999966845
+        }
+      ],
+      "summary": {
+        "solveMs": {
+          "count": 5,
+          "minimum": 2.116600000008475,
+          "median": 2.557299999985844,
+          "maximum": 3.218600000021979,
+          "p90": 3.218600000021979
+        },
+        "directFieldMs": {
+          "count": 5,
+          "minimum": 312.45390000002226,
+          "median": 323.6753000000026,
+          "maximum": 339.8398000000161,
+          "p90": 339.8398000000161
+        },
+        "localCombinationMs": {
+          "count": 5,
+          "minimum": 4.776599999982864,
+          "median": 4.864700000034645,
+          "maximum": 9.222499999974389,
+          "p90": 9.222499999974389
+        },
+        "residentRoundTripMs": {
+          "count": 5,
+          "minimum": 4.90590000001248,
+          "median": 5.510000000009313,
+          "maximum": 14.549799999978859,
+          "p90": 14.549799999978859
+        },
+        "residentComputeMs": {
+          "count": 5,
+          "minimum": 4.619399999966845,
+          "median": 5.167599999986123,
+          "maximum": 13.013099999981932,
+          "p90": 13.013099999981932
+        }
+      },
+      "amortization": {
+        "method": "measured-median linear model; basis setup measured once",
+        "directPerStateMs": 326.23259999998845,
+        "transferredPerStateMs": 7.422000000020489,
+        "residentPerStateMs": 8.067299999995157,
+        "transferredBreakEvenStates": 211,
+        "residentBreakEvenStates": 211,
+        "transferredTotals": {
+          "1": {
+            "directMs": 326.23259999998845,
+            "cachedMs": 67040.69170000005,
+            "cachedToDirectRatio": 205.4996701739876
+          },
+          "4": {
+            "directMs": 1304.9303999999538,
+            "cachedMs": 67062.95770000012,
+            "cachedToDirectRatio": 51.39198052248801
+          },
+          "16": {
+            "directMs": 5219.721599999815,
+            "cachedMs": 67152.02170000036,
+            "cachedToDirectRatio": 12.865058109613114
+          },
+          "64": {
+            "directMs": 20878.88639999926,
+            "cachedMs": 67508.27770000134,
+            "cachedToDirectRatio": 3.2333275063943896
+          },
+          "256": {
+            "directMs": 83515.54559999704,
+            "cachedMs": 68933.30170000528,
+            "cachedToDirectRatio": 0.8253948555897086
+          }
+        },
+        "residentTotals": {
+          "1": {
+            "directMs": 326.23259999998845,
+            "cachedMs": 67041.77940000003,
+            "cachedToDirectRatio": 205.50300429816764
+          },
+          "4": {
+            "directMs": 1304.9303999999538,
+            "cachedMs": 67065.98130000001,
+            "cachedToDirectRatio": 51.394297580930285
+          },
+          "16": {
+            "directMs": 5219.721599999815,
+            "cachedMs": 67162.78889999996,
+            "cachedToDirectRatio": 12.867120901620947
+          },
+          "64": {
+            "directMs": 20878.88639999926,
+            "cachedMs": 67550.01929999972,
+            "cachedToDirectRatio": 3.235326731793613
+          },
+          "256": {
+            "directMs": 83515.54559999704,
+            "cachedMs": 69098.9408999988,
+            "cachedToDirectRatio": 0.8273781893367794
+          }
+        }
+      },
+      "correctness": {
+        "directVersusTransferredThetaScaledMaximum": 5.151663746083752e-11,
+        "directVersusTransferredPhiScaledMaximum": 6.183617822300064e-11,
+        "transferredVersusResidentThetaScaledMaximum": 0,
+        "transferredVersusResidentPhiScaledMaximum": 0,
+        "metricsEquivalent": true,
+        "peakIndexExact": false,
+        "maximumPeakRelativeError": 3.736549921057679e-12,
+        "maximumMagnitudeSumRelativeError": 1.2417747771110696e-11,
+        "powerClosureEquivalent": true,
+        "statePreserved": true,
+        "callerPortOrderPreserved": true
+      },
+      "memory": {
+        "before": {
+          "rssBytes": 422088704,
+          "heapUsedBytes": 6609352,
+          "externalBytes": 27409405,
+          "arrayBuffersBytes": 13574003
+        },
+        "afterBasis": {
+          "rssBytes": 333193216,
+          "heapUsedBytes": 5739224,
+          "externalBytes": 99064437,
+          "arrayBuffersBytes": 48668915
+        },
+        "resident": {
+          "rssBytes": 326270976,
+          "heapUsedBytes": 5764560,
+          "externalBytes": 50464701,
+          "arrayBuffersBytes": 45098739
+        },
+        "peakRssBytes": 422088704,
+        "peakRssDeltaBytes": 0
+      }
+    }
+  ],
+  "gates": {
+    "allCasesPresent": true,
+    "numericalParity": true,
+    "lifecycleAndPower": true
+  },
+  "ok": true
+}

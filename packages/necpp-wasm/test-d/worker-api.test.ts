@@ -50,6 +50,7 @@ async function validWorkerConsumer(): Promise<void> {
   field.eThetaReal[0];
   events[0]?.operation;
 
+  model.cancelFarField();
   const unsubscribe = model.subscribeProgress(() => undefined);
   unsubscribe();
   await model.dispose();

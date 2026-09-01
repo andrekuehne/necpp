@@ -195,7 +195,9 @@ TEST_CASE("WP1 far-field grids do not invalidate the factorization",
   REQUIRE(first.e_theta.size() == 6);
   REQUIRE(model.factorization_generation() == 1);
   REQUIRE(model.solve_generation() == 1);
-  REQUIRE(model.retained_result_count() == 2);
+  // Only the antenna-input result from the solve is retained.  Stateful raw
+  // fields no longer create a legacy radiation-pattern result.
+  REQUIRE(model.retained_result_count() == 1);
 
   const nec_far_field_result& second = model.compute_far_field({
     2.0, 10.0, 2, 20.0, 15.0, 3, 30.0,
@@ -203,7 +205,7 @@ TEST_CASE("WP1 far-field grids do not invalidate the factorization",
   REQUIRE(second.e_theta.size() == 6);
   REQUIRE(model.factorization_generation() == 1);
   REQUIRE(model.solve_generation() == 1);
-  REQUIRE(model.retained_result_count() == 2);
+  REQUIRE(model.retained_result_count() == 1);
 }
 
 TEST_CASE("WP1 invalid and duplicate ports fail without changing state",

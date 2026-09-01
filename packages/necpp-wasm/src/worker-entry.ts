@@ -7,7 +7,11 @@ import {
   type WorkerRequest,
   type WorkerResponse,
 } from "./worker-protocol.js";
-import { handleWorkerRequest, type WorkerSession } from "./worker-runtime.js";
+import {
+  cancelWorkerFarField,
+  handleWorkerRequest,
+  type WorkerSession,
+} from "./worker-runtime.js";
 
 interface WorkerParent {
   postMessage(value: unknown, transfer?: readonly ArrayBuffer[]): void;
@@ -55,13 +59,22 @@ async function connectParent(): Promise<WorkerParent> {
   };
 }
 
-function isWorkerRequest(value: unknown): value is WorkerRequest {
+function isWorkerRequest(
+  value: unknown,
+): value is Exclude<WorkerRequest, { readonly kind: "cancel-field" }> {
   if (typeof value !== "object" || value === null) {
     return false;
   }
   const record = value as { id?: unknown; kind?: unknown };
   return typeof record.id === "number"
     && (record.kind === "create" || record.kind === "invoke");
+}
+
+function isCancelFieldRequest(
+  value: unknown,
+): value is Extract<WorkerRequest, { readonly kind: "cancel-field" }> {
+  return typeof value === "object" && value !== null
+    && (value as { kind?: unknown }).kind === "cancel-field";
 }
 
 void startWorker();
@@ -76,6 +89,10 @@ async function startWorker(): Promise<void> {
   }
 
   parent.onMessage((value) => {
+    if (isCancelFieldRequest(value)) {
+      cancelWorkerFarField(session);
+      return;
+    }
     queue = queue.then(async () => {
       if (!isWorkerRequest(value)) {
         post({

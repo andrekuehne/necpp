@@ -20,8 +20,13 @@ packages/necpp-wasm/
     worker.js
     worker.d.ts
     worker-entry.js
+    field-evaluator-worker.js
+    field-evaluator.js
+    field-worker-pool.js
     nec2pp.generated.js
     nec2pp.wasm
+    necpp-field-evaluator.generated.js
+    necpp-field-evaluator.wasm
 ```
 
 `package.json` is `"type": "module"` with encapsulated `exports` for `.` and
@@ -33,10 +38,11 @@ guards registry publication behind the complete tagged release workflow. Node
 as ES2024.
 
 `prepack` runs `scripts/build-dist.mjs`, which compiles `src/` to `dist/`,
-copies the generated loader and WASM, copies `COPYING`, and rejects source
-maps, debug symbols, a WASM binary at or above 1 MiB, or a loader at or above
-200 KiB. `packageVersion` must match `package.json`; `engineVersion` must
-match the CMake project version.
+copies both generated loaders and WASM binaries, copies `COPYING`, and rejects
+source maps, debug symbols, a main WASM binary at or above 1 MiB, a main loader
+at or above 200 KiB, or an evaluator loader/binary at or above 64 KiB.
+`packageVersion` must match `package.json`; `engineVersion` must match the CMake
+project version.
 
 ## Loading and versions
 
@@ -58,8 +64,11 @@ Package tests never import workspace `src/` or `.test-build`. They:
 4. solve the centre-fed dipole
 5. import `@necpp-engine/wasm/worker` and repeat
 6. load WASM from an HTTP `wasmUrl`
-7. build a Vite fixture, confirm the worker is bundled, and fetch the
-   emitted `.wasm` with `Content-Type: application/wasm`
+7. build a non-root Vite fixture, confirm the outer and nested workers are
+   bundled, and fetch both emitted `.wasm` files with
+   `Content-Type: application/wasm`
+8. execute the packed pooled-field fixture in Chromium and Firefox without
+   cross-origin isolation
 
 Direct `createNecModel()` needs no bundler config. Vite apps that import the
 worker subpath set `worker: { format: "es" }` and `build.target: "es2024"`,

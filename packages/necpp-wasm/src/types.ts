@@ -285,6 +285,33 @@ export interface FarFieldRequest {
   readonly phi: AngleSweep;
 }
 
+export interface FarFieldDiagnostics {
+  readonly instrumentationEnabled: boolean;
+  readonly validationMs: number;
+  readonly wasmCallMs: number;
+  readonly typescriptExtractionMs: number;
+  readonly packageTotalMs: number;
+  readonly native: {
+    readonly validationAllocationMs: number;
+    readonly resultReplacementMs: number;
+    readonly rawAccumulationMs: number;
+    readonly derivedRpWorkMs: number;
+    readonly resultCopyMs: number;
+    readonly totalMs: number;
+    readonly abiResultCopyMs: number;
+    readonly nativeAbiTotalMs: number;
+  };
+  readonly counts: {
+    readonly evaluatedDirections: number;
+    readonly segments: number;
+    readonly groundImages: number;
+    readonly segmentDirectionContributions: number;
+    readonly outputBufferAllocations: number;
+    readonly intermediateBufferAllocations: number;
+    readonly complexSampleCopies: number;
+  };
+}
+
 export interface FarFieldResult {
   readonly radiusM: number;
   readonly frequencyMHz: number;
@@ -295,6 +322,39 @@ export interface FarFieldResult {
   readonly eThetaImag: Float64Array;
   readonly ePhiReal: Float64Array;
   readonly ePhiImag: Float64Array;
+  /** Present on ordinary fields produced by diagnostic-capable artifacts. */
+  readonly diagnostics?: FarFieldDiagnostics;
+  /** Present on fields produced by the worker-backed array facade. */
+  readonly fieldBackend?: FieldBackendDiagnostics;
+}
+
+export type FieldWorkerSelection = "auto" | number;
+
+export type FieldBackendKind = "pending" | "serial" | "worker-pool";
+
+/** Last field-backend selection and timing reported by an array solver. */
+export interface FieldBackendDiagnostics {
+  readonly backend: FieldBackendKind;
+  readonly requestedWorkers: FieldWorkerSelection;
+  readonly activeWorkerCount: number;
+  readonly tileSize: number;
+  readonly totalTiles: number;
+  readonly completedTiles: number;
+  readonly cancelledTiles: number;
+  readonly cancelledJobs: number;
+  readonly restartedWorkers: number;
+  readonly snapshotBytesPerWorker: number;
+  readonly lastBroadcastBytesPerWorker: number;
+  readonly resultBytes: number;
+  readonly geometryReused: boolean;
+  readonly warmupMs: number;
+  readonly snapshotCaptureMs: number;
+  readonly snapshotBroadcastMs: number;
+  readonly dispatchMs: number;
+  readonly kernelMs: number;
+  readonly mergeMs: number;
+  readonly totalMs: number;
+  readonly fallbackReason?: string;
 }
 
 export type EmbeddedFieldNormalization =
@@ -409,6 +469,11 @@ export interface NecWorkerModel {
     request: FarFieldRequest,
     normalization?: EmbeddedFieldNormalization,
   ): Promise<EmbeddedFarFieldResult>;
+  /**
+   * Stop assigning tiles for the active pooled far-field request. This is a
+   * no-op when no pooled field is active and does not dispose the model.
+   */
+  cancelFarField(): void;
   /** Idempotent. Disposes the native model, then releases the worker thread. */
   dispose(): Promise<void>;
   /**
@@ -571,12 +636,25 @@ export interface CreateArraySolverOptions {
   /** Defaults to `"auto"`. */
   readonly symmetry?: "auto" | "off" | "require";
   readonly symmetrizer?: SymmetrizerOptions;
+  /**
+   * Far-field evaluator workers. `"auto"` (the default) uses up to four
+   * workers only above the measured small-field crossover; `1` forces the
+   * deterministic serial field path; integers from 2 through 8 force a
+   * bounded pool when the model is supported.
+   */
+  readonly fieldWorkers?: FieldWorkerSelection;
+  /**
+   * Optional directory containing the packaged evaluator worker, loader, and
+   * WASM assets. The default is resolved relative to the installed package.
+   */
+  readonly fieldWorkerAssetBaseUrl?: string | URL;
 }
 
 export interface ArraySolverDiagnostics {
   readonly representation: "explicit" | "symmetric";
   readonly planner: SymmetrizerDiagnostics;
   readonly symmetry?: SymmetryExpansion;
+  readonly field: FieldBackendDiagnostics;
 }
 
 /** Representation-independent, worker-backed array solver. */
@@ -591,6 +669,11 @@ export interface NecArraySolver {
     request: FarFieldRequest,
     normalization?: EmbeddedFieldNormalization,
   ): Promise<EmbeddedFarFieldResult>;
+  /**
+   * Cancel the active pooled field between bounded tiles. The active field
+   * promise rejects with `NecRuntimeError` and `details.reason = "superseded"`.
+   */
+  cancelFarField(): void;
   dispose(): Promise<void>;
   getDiagnostics(): ArraySolverDiagnostics;
 }

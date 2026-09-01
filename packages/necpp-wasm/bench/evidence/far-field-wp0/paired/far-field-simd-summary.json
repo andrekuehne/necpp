@@ -1,0 +1,84 @@
+{
+  "type": "far-field-simd-comparison",
+  "schemaVersion": 1,
+  "measuredAt": "2026-08-31T21:46:11.431Z",
+  "configuration": {
+    "rounds": 6,
+    "warmups": 1,
+    "backend": "direct",
+    "grid": "primary",
+    "steeringStatesPerCase": 1,
+    "reuseGrid": false,
+    "scalarDirectory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp0-final\\artifacts\\scalar-sampled",
+    "simdDirectory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp0-final\\artifacts\\simd-sampled"
+  },
+  "outputParity": {
+    "compared": 6,
+    "failures": []
+  },
+  "fieldMs": {
+    "scalar": {
+      "count": 6,
+      "minimum": 4117.387000000001,
+      "median": 4157.802299999999,
+      "maximum": 4388.319900000002,
+      "p90": 4388.319900000002
+    },
+    "simd128": {
+      "count": 6,
+      "minimum": 4046.450100000002,
+      "median": 4131.33985,
+      "maximum": 4382.559099999999,
+      "p90": 4382.559099999999
+    }
+  },
+  "simdDeltaPercent": {
+    "median": -1.5334440258716608,
+    "minimum": -6.172464774047293,
+    "maximum": 5.301408090902671
+  },
+  "pairs": [
+    {
+      "round": 0,
+      "first": "simd128",
+      "scalarFieldMs": 4117.387000000001,
+      "simdFieldMs": 4265.636199999999,
+      "simdDeltaPercent": 3.6005651156910456
+    },
+    {
+      "round": 1,
+      "first": "scalar",
+      "scalarFieldMs": 4289.788199999999,
+      "simdFieldMs": 4144.0913,
+      "simdDeltaPercent": -3.3963658159160137
+    },
+    {
+      "round": 2,
+      "first": "simd128",
+      "scalarFieldMs": 4153.685799999999,
+      "simdFieldMs": 4118.588400000001,
+      "simdDeltaPercent": -0.8449700263799098
+    },
+    {
+      "round": 3,
+      "first": "scalar",
+      "scalarFieldMs": 4161.9187999999995,
+      "simdFieldMs": 4382.559099999999,
+      "simdDeltaPercent": 5.301408090902671
+    },
+    {
+      "round": 4,
+      "first": "simd128",
+      "scalarFieldMs": 4388.319900000002,
+      "simdFieldMs": 4117.452399999995,
+      "simdDeltaPercent": -6.172464774047293
+    },
+    {
+      "round": 5,
+      "first": "scalar",
+      "scalarFieldMs": 4138.402000000002,
+      "simdFieldMs": 4046.450100000002,
+      "simdDeltaPercent": -2.221918025363412
+    }
+  ]
+}

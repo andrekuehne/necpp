@@ -1,6 +1,6 @@
 # Local build environment notes
 
-Last verified on 2026-08-28. These notes describe the current Windows
+Last verified on 2026-09-01. These notes describe the current Windows
 workstation and its existing build trees. Paths under the user's temporary
 directory are machine-specific and may disappear after cleanup or reboot.
 
@@ -33,21 +33,22 @@ partitions. Its relevant configuration is:
 - MSBuild:
   `C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe`
 
-`cmake` and `ctest` are not on the PowerShell `PATH`. The existing build cache
-currently points to CMake/CTest 3.31.6 here:
+The x64 CMake MSI installation is on the machine-wide `PATH`. PowerShell
+resolves `cmake` and `ctest` from:
 
 ```powershell
-$CMakeTools = "C:\Users\andre\AppData\Local\Temp\codex-necpp-cmake\cmake\data\bin"
+C:\Program Files\CMake\bin
 ```
 
-Because this is a temporary path, inspect `build-wp0\CMakeCache.txt` entries
-`CMAKE_COMMAND` and `CMAKE_CTEST_COMMAND` if it stops working. Installing CMake
-normally and adding it to `PATH` is the durable alternative.
+The installed version last verified here is CMake 4.4.3. Use the commands from
+`PATH` rather than a downloaded copy in the user's temporary directory. When
+opening a shell that predates the MSI installation, restart the shell so it
+inherits the updated machine `PATH`.
 
 Build the native test runner:
 
 ```powershell
-& "$CMakeTools\cmake.exe" --build "build-wp0" `
+cmake --build "build-wp0" `
     --config Release --target "nec2++_tests" --parallel
 ```
 
@@ -67,7 +68,7 @@ confirm the new source appears in the compiler output.
 Run all registered tests:
 
 ```powershell
-& "$CMakeTools\ctest.exe" --test-dir "build-wp0" `
+ctest --test-dir "build-wp0" `
     -C Release --output-on-failure -j1
 ```
 

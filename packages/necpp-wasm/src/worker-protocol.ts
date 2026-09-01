@@ -14,6 +14,7 @@ import type {
   CreateNecModelOptions,
   CreateNecWorkerModelOptions,
   EmbeddedFarFieldResult,
+  FieldBackendDiagnostics,
   FarFieldResult,
   GeometryCompletionResult,
   ImpedanceResult,
@@ -41,6 +42,14 @@ export type WorkerMethod = Exclude<NecWorkerOperation, "create">;
 export interface SerializedCreateOptions {
   readonly wasmUrl?: string;
   readonly wasmBinary?: ArrayBuffer;
+  /** Internal array-facade configuration; not exposed by createNecWorkerModel. */
+  readonly fieldWorkers?: "auto" | number;
+  readonly fieldWorkerAssetBaseUrl?: string;
+}
+
+export interface WorkerFieldPoolOptions {
+  readonly fieldWorkers: "auto" | number;
+  readonly fieldWorkerAssetBaseUrl?: string;
 }
 
 export type WorkerRequest =
@@ -54,6 +63,9 @@ export type WorkerRequest =
     readonly kind: "invoke";
     readonly method: WorkerMethod;
     readonly args: readonly unknown[];
+  }
+  | {
+    readonly kind: "cancel-field";
   };
 
 export interface SerializedNecError {
@@ -457,7 +469,7 @@ export function reviveImpedanceResult(value: unknown): ImpedanceResult {
 
 export function reviveFarFieldResult(value: unknown): FarFieldResult {
   const record = value as FarFieldResult;
-  return {
+  const result: FarFieldResult = {
     radiusM: record.radiusM,
     frequencyMHz: record.frequencyMHz,
     thetaDeg: copyFloat64(record.thetaDeg, "thetaDeg"),
@@ -467,6 +479,135 @@ export function reviveFarFieldResult(value: unknown): FarFieldResult {
     ePhiReal: copyFloat64(record.ePhiReal, "ePhiReal"),
     ePhiImag: copyFloat64(record.ePhiImag, "ePhiImag"),
   };
+  const fieldBackend = record.fieldBackend === undefined
+    ? undefined
+    : reviveFieldBackendDiagnostics(record.fieldBackend);
+  if (record.diagnostics === undefined) {
+    return fieldBackend === undefined ? result : { ...result, fieldBackend };
+  }
+  const finite = (number: unknown, name: string): number =>
+    finiteWorkerNumber(number, `diagnostics.${name}`);
+  const diagnostics = record.diagnostics;
+  return {
+    ...result,
+    ...(fieldBackend === undefined ? {} : { fieldBackend }),
+    diagnostics: Object.freeze({
+      instrumentationEnabled: diagnostics.instrumentationEnabled === true,
+      validationMs: finite(diagnostics.validationMs, "validationMs"),
+      wasmCallMs: finite(diagnostics.wasmCallMs, "wasmCallMs"),
+      typescriptExtractionMs: finite(
+        diagnostics.typescriptExtractionMs,
+        "typescriptExtractionMs",
+      ),
+      packageTotalMs: finite(diagnostics.packageTotalMs, "packageTotalMs"),
+      native: Object.freeze({
+        validationAllocationMs: finite(
+          diagnostics.native?.validationAllocationMs,
+          "native.validationAllocationMs",
+        ),
+        resultReplacementMs: finite(
+          diagnostics.native?.resultReplacementMs,
+          "native.resultReplacementMs",
+        ),
+        rawAccumulationMs: finite(
+          diagnostics.native?.rawAccumulationMs,
+          "native.rawAccumulationMs",
+        ),
+        derivedRpWorkMs: finite(
+          diagnostics.native?.derivedRpWorkMs,
+          "native.derivedRpWorkMs",
+        ),
+        resultCopyMs: finite(diagnostics.native?.resultCopyMs, "native.resultCopyMs"),
+        totalMs: finite(diagnostics.native?.totalMs, "native.totalMs"),
+        abiResultCopyMs: finite(
+          diagnostics.native?.abiResultCopyMs,
+          "native.abiResultCopyMs",
+        ),
+        nativeAbiTotalMs: finite(
+          diagnostics.native?.nativeAbiTotalMs,
+          "native.nativeAbiTotalMs",
+        ),
+      }),
+      counts: Object.freeze({
+        evaluatedDirections: finite(
+          diagnostics.counts?.evaluatedDirections,
+          "counts.evaluatedDirections",
+        ),
+        segments: finite(diagnostics.counts?.segments, "counts.segments"),
+        groundImages: finite(
+          diagnostics.counts?.groundImages,
+          "counts.groundImages",
+        ),
+        segmentDirectionContributions: finite(
+          diagnostics.counts?.segmentDirectionContributions,
+          "counts.segmentDirectionContributions",
+        ),
+        outputBufferAllocations: finite(
+          diagnostics.counts?.outputBufferAllocations,
+          "counts.outputBufferAllocations",
+        ),
+        intermediateBufferAllocations: finite(
+          diagnostics.counts?.intermediateBufferAllocations,
+          "counts.intermediateBufferAllocations",
+        ),
+        complexSampleCopies: finite(
+          diagnostics.counts?.complexSampleCopies,
+          "counts.complexSampleCopies",
+        ),
+      }),
+    }),
+  };
+}
+
+export function reviveFieldBackendDiagnostics(value: unknown): FieldBackendDiagnostics {
+  const record = value as FieldBackendDiagnostics;
+  if (record.backend !== "pending" && record.backend !== "serial"
+      && record.backend !== "worker-pool") {
+    throw new NecRuntimeError("Worker field backend is invalid");
+  }
+  if (record.requestedWorkers !== "auto"
+      && (!Number.isInteger(record.requestedWorkers)
+        || record.requestedWorkers < 1 || record.requestedWorkers > 8)) {
+    throw new NecRuntimeError("Worker field worker selection is invalid");
+  }
+  const number = (entry: unknown, name: string): number => {
+    const result = finiteWorkerNumber(entry, `fieldBackend.${name}`);
+    if (result < 0) throw new NecRuntimeError(`Worker fieldBackend.${name} is negative`);
+    return result;
+  };
+  const fallbackReason = record.fallbackReason;
+  if (fallbackReason !== undefined && typeof fallbackReason !== "string") {
+    throw new NecRuntimeError("Worker field fallback reason is invalid");
+  }
+  return Object.freeze({
+    backend: record.backend,
+    requestedWorkers: record.requestedWorkers,
+    activeWorkerCount: number(record.activeWorkerCount, "activeWorkerCount"),
+    tileSize: number(record.tileSize, "tileSize"),
+    totalTiles: number(record.totalTiles, "totalTiles"),
+    completedTiles: number(record.completedTiles, "completedTiles"),
+    cancelledTiles: number(record.cancelledTiles, "cancelledTiles"),
+    cancelledJobs: number(record.cancelledJobs, "cancelledJobs"),
+    restartedWorkers: number(record.restartedWorkers, "restartedWorkers"),
+    snapshotBytesPerWorker: number(
+      record.snapshotBytesPerWorker,
+      "snapshotBytesPerWorker",
+    ),
+    lastBroadcastBytesPerWorker: number(
+      record.lastBroadcastBytesPerWorker,
+      "lastBroadcastBytesPerWorker",
+    ),
+    resultBytes: number(record.resultBytes, "resultBytes"),
+    geometryReused: record.geometryReused === true,
+    warmupMs: number(record.warmupMs, "warmupMs"),
+    snapshotCaptureMs: number(record.snapshotCaptureMs, "snapshotCaptureMs"),
+    snapshotBroadcastMs: number(record.snapshotBroadcastMs, "snapshotBroadcastMs"),
+    dispatchMs: number(record.dispatchMs, "dispatchMs"),
+    kernelMs: number(record.kernelMs, "kernelMs"),
+    mergeMs: number(record.mergeMs, "mergeMs"),
+    totalMs: number(record.totalMs, "totalMs"),
+    ...(fallbackReason === undefined ? {} : { fallbackReason }),
+  });
 }
 
 export function reviveEmbeddedFarFieldResult(
@@ -493,30 +634,33 @@ export function cloneFloat64(
 
 export function serializeCreateOptions(
   options: CreateNecWorkerModelOptions | undefined,
+  fieldPool?: WorkerFieldPoolOptions,
 ): {
   readonly payload?: SerializedCreateOptions;
   readonly transfer: ArrayBuffer[];
 } {
-  if (options === undefined) {
+  if (options === undefined && fieldPool === undefined) {
     return { transfer: [] };
   }
   const payload: {
     wasmUrl?: string;
     wasmBinary?: ArrayBuffer;
+    fieldWorkers?: "auto" | number;
+    fieldWorkerAssetBaseUrl?: string;
   } = {};
   const transfer: ArrayBuffer[] = [];
 
-  if (options.wasmUrl !== undefined && options.wasmBinary !== undefined) {
+  if (options?.wasmUrl !== undefined && options.wasmBinary !== undefined) {
     throw new NecInputError("wasmUrl and wasmBinary cannot both be supplied");
   }
 
-  if (options.wasmUrl !== undefined) {
+  if (options?.wasmUrl !== undefined) {
     payload.wasmUrl = options.wasmUrl instanceof URL
       ? options.wasmUrl.href
       : options.wasmUrl;
   }
 
-  if (options.wasmBinary !== undefined) {
+  if (options?.wasmBinary !== undefined) {
     let bytes: Uint8Array<ArrayBuffer>;
     try {
       if (options.wasmBinary instanceof Uint8Array) {
@@ -536,7 +680,15 @@ export function serializeCreateOptions(
     transfer.push(bytes.buffer);
   }
 
-  if (payload.wasmUrl === undefined && payload.wasmBinary === undefined) {
+  if (fieldPool !== undefined) {
+    payload.fieldWorkers = fieldPool.fieldWorkers;
+    if (fieldPool.fieldWorkerAssetBaseUrl !== undefined) {
+      payload.fieldWorkerAssetBaseUrl = fieldPool.fieldWorkerAssetBaseUrl;
+    }
+  }
+
+  if (payload.wasmUrl === undefined && payload.wasmBinary === undefined
+      && payload.fieldWorkers === undefined) {
     return { transfer };
   }
   return { payload, transfer };

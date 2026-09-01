@@ -1,6 +1,6 @@
 {
   "name": "@necpp-engine/wasm",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": false,
   "type": "module",
   "description": "Stateful NEC2++ electromagnetic solver and symmetric-array API for Node and browsers",
@@ -53,6 +53,14 @@
   ],
   "scripts": {
     "bench:array": "node bench/array-benchmark.mjs",
+    "bench:far-field": "node bench/far-field-benchmark.mjs",
+    "bench:far-field-overhead": "node bench/far-field-overhead.mjs",
+    "bench:far-field-candidates": "node bench/far-field-candidate-matrix.mjs",
+    "bench:far-field-simd": "node bench/far-field-simd-compare.mjs",
+    "bench:far-field-wp3": "node bench/far-field-wp3-poc.mjs",
+    "bench:far-field-wp4": "node bench/far-field-wp4-production.mjs",
+    "bench:far-field-wp5": "node --expose-gc bench/far-field-wp5-amortization.mjs",
+    "bench:consumer-trace": "node bench/consumer-browser-trace.mjs",
     "build": "node scripts/build-dist.mjs",
     "prepack": "npm run build",
     "build:test": "node test/build.mjs",
@@ -60,6 +68,7 @@
     "test:wasm": "node test/require-wasm.mjs && npm test && npm run test:pack",
     "test:pack": "node test/require-wasm.mjs && node --test --test-timeout=180000 --test-concurrency=1 test/pack/manifest.test.mjs test/pack/consumer.test.mjs",
     "test:browser": "node test/browser-integration.mjs",
+    "test:field-worker-browser": "npm run build:test && node test/browser-field-worker-production.mjs",
     "pack:release": "node scripts/pack-release.mjs",
     "typecheck": "tsc --project tsconfig.json"
   },

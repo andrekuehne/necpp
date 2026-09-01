@@ -94,6 +94,15 @@ export interface NecWasmModule {
     phiStepDeg: number,
     normalization: number,
   ): number;
+  _necpp_wasm_v1_capture_far_field_snapshot(model: number): number;
+  _necpp_wasm_v1_far_field_snapshot_capability(model: number): number;
+  _necpp_wasm_v1_far_field_snapshot_schema_version(model: number): number;
+  _necpp_wasm_v1_far_field_snapshot_segment_count(model: number): number;
+  _necpp_wasm_v1_far_field_snapshot_frequency_mhz(model: number): number;
+  _necpp_wasm_v1_far_field_snapshot_wavelength_m(model: number): number;
+  _necpp_wasm_v1_far_field_snapshot_model_generation(model: number): number;
+  _necpp_wasm_v1_far_field_snapshot_solution_generation(model: number): number;
+  _necpp_wasm_v1_far_field_snapshot_perfect_ground(model: number): number;
 
   _necpp_wasm_v1_impedance_order(model: number): number;
   _necpp_wasm_v1_impedance_frequency_mhz(model: number): number;
@@ -114,6 +123,7 @@ export interface NecWasmModule {
   _necpp_wasm_v1_far_field_frequency_mhz(model: number): number;
   _necpp_wasm_v1_far_field_theta_count(model: number): number;
   _necpp_wasm_v1_far_field_phi_count(model: number): number;
+  _necpp_wasm_v1_far_field_diagnostic?(model: number, kind: number): number;
 
   _necpp_wasm_v1_embedded_radius_m(model: number): number;
   _necpp_wasm_v1_embedded_frequency_mhz(model: number): number;

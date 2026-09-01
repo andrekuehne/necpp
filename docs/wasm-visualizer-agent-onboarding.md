@@ -1,6 +1,6 @@
 # External implementation guide: NEC2++ TypeScript/WASM visualizer
 
-This handoff targets `@necpp-engine/wasm` **0.3.0**, containing NEC2++ 2.5.0
+This handoff targets `@necpp-engine/wasm` **0.4.0**, containing NEC2++ 2.5.0
 and stable WASM ABI 1.
 
 This document is the handoff for the agent implementing a browser visualizer
@@ -442,7 +442,9 @@ Worker method calls are asynchronous and serialized for each model. If the
 user cancels a long low-level worker calculation, call `model.terminate()`;
 this immediately kills that worker and rejects outstanding operations. A
 terminated model cannot be reused, so create a new one. The higher-level
-`NecArraySolver` exposes `dispose()`, but not `terminate()`.
+`NecArraySolver` exposes `cancelFarField()` for generation supersession and
+`dispose()`, but not `terminate()`. Cancellation stops assigning pooled field
+tiles, rejects the active field as superseded, and leaves the solver reusable.
 
 ## Numerical and ordering contract
 

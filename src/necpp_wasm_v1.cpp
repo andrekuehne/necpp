@@ -13,6 +13,7 @@
 #include "nec_stateful_model.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <complex>
 #include <exception>
@@ -49,6 +50,16 @@ struct split_complex_buffer {
     }
     real = std::move(next_real);
     imag = std::move(next_imag);
+  }
+
+  void assign_reusing(const std::vector<nec_complex>& values)
+  {
+    real.resize(values.size());
+    imag.resize(values.size());
+    for (size_t index = 0; index < values.size(); ++index) {
+      real[index] = values[index].real();
+      imag[index] = values[index].imag();
+    }
   }
 };
 
@@ -115,6 +126,9 @@ struct far_field_buffers {
   split_complex_buffer e_phi;
   double radius_m = 0.0;
   double frequency_mhz = 0.0;
+  nec_far_field_phase_diagnostics diagnostics;
+  double abi_result_copy_ms = 0.0;
+  double native_abi_total_ms = 0.0;
   bool available = false;
 
   void clear()
@@ -125,6 +139,9 @@ struct far_field_buffers {
     e_phi.clear();
     radius_m = 0.0;
     frequency_mhz = 0.0;
+    diagnostics = nec_far_field_phase_diagnostics();
+    abi_result_copy_ms = 0.0;
+    native_abi_total_ms = 0.0;
     available = false;
   }
 };
@@ -143,6 +160,17 @@ struct embedded_buffers : far_field_buffers {
   }
 };
 
+struct far_field_snapshot_buffers {
+  nec_far_field_snapshot value;
+  bool available = false;
+
+  void clear()
+  {
+    value = nec_far_field_snapshot();
+    available = false;
+  }
+};
+
 } // namespace
 
 struct necpp_wasm_v1_model {
@@ -157,6 +185,7 @@ struct necpp_wasm_v1_model {
   solution_buffers solution;
   far_field_buffers far_field;
   embedded_buffers embedded;
+  far_field_snapshot_buffers field_snapshot;
 };
 
 struct necpp_wasm_v1_deck {
@@ -289,6 +318,7 @@ void reconcile_consumer_results_after_failure(necpp_wasm_v1_model& model)
   if (model.native.state() != nec_model_state::solved) {
     model.solution.clear();
     model.far_field.clear();
+    model.field_snapshot.clear();
   }
 }
 
@@ -298,6 +328,7 @@ void clear_calculated_results(necpp_wasm_v1_model& model)
   model.solution.clear();
   model.far_field.clear();
   model.embedded.clear();
+  model.field_snapshot.clear();
 }
 
 void sync_impedance(
@@ -340,6 +371,17 @@ void sync_solution(
 void sync_far_field(
   necpp_wasm_v1_model& model, const nec_far_field_result& result)
 {
+#ifdef NECPP_FAR_FIELD_REUSE_OUTPUTS
+  far_field_buffers& next = model.far_field;
+  next.theta_deg.assign(result.theta_deg.begin(), result.theta_deg.end());
+  next.phi_deg.assign(result.phi_deg.begin(), result.phi_deg.end());
+  next.e_theta.assign_reusing(result.e_theta);
+  next.e_phi.assign_reusing(result.e_phi);
+  next.radius_m = result.radius_m;
+  next.frequency_mhz = result.frequency_mhz;
+  next.diagnostics = result.diagnostics;
+  next.available = true;
+#else
   far_field_buffers next;
   next.theta_deg.assign(result.theta_deg.begin(), result.theta_deg.end());
   next.phi_deg.assign(result.phi_deg.begin(), result.phi_deg.end());
@@ -347,8 +389,10 @@ void sync_far_field(
   next.e_phi.assign(result.e_phi);
   next.radius_m = result.radius_m;
   next.frequency_mhz = result.frequency_mhz;
+  next.diagnostics = result.diagnostics;
   next.available = true;
   model.far_field = std::move(next);
+#endif
 }
 
 void sync_embedded(
@@ -515,6 +559,33 @@ const std::vector<double>* result_buffer(
     return model->embedded.available ? &model->embedded.e_phi.real : nullptr;
   case NECPP_WASM_V1_EMBEDDED_E_PHI_IMAG:
     return model->embedded.available ? &model->embedded.e_phi.imag : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_X:
+    return model->field_snapshot.available ? &model->field_snapshot.value.x : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_Y:
+    return model->field_snapshot.available ? &model->field_snapshot.value.y : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_Z:
+    return model->field_snapshot.available ? &model->field_snapshot.value.z : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_CAB:
+    return model->field_snapshot.available ? &model->field_snapshot.value.cab : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_SAB:
+    return model->field_snapshot.available ? &model->field_snapshot.value.sab : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_SALP:
+    return model->field_snapshot.available ? &model->field_snapshot.value.salp : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_HALF_LENGTH:
+    return model->field_snapshot.available
+      ? &model->field_snapshot.value.segment_half_lengths : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_AIR:
+    return model->field_snapshot.available ? &model->field_snapshot.value.air : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_AII:
+    return model->field_snapshot.available ? &model->field_snapshot.value.aii : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_BIR:
+    return model->field_snapshot.available ? &model->field_snapshot.value.bir : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_BII:
+    return model->field_snapshot.available ? &model->field_snapshot.value.bii : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_CIR:
+    return model->field_snapshot.available ? &model->field_snapshot.value.cir : nullptr;
+  case NECPP_WASM_V1_FF_SNAPSHOT_CII:
+    return model->field_snapshot.available ? &model->field_snapshot.value.cii : nullptr;
   default:
     return nullptr;
   }
@@ -885,10 +956,12 @@ int32_t necpp_wasm_v1_solve_voltages(
     native_succeeded = true;
     sync_solution(*model, result);
     model->far_field.clear();
+    model->field_snapshot.clear();
   });
   if (status != NECPP_WASM_V1_OK && native_succeeded) {
     model->solution.clear();
     model->far_field.clear();
+    model->field_snapshot.clear();
   } else if (status != NECPP_WASM_V1_OK) {
     reconcile_consumer_results_after_failure(*model);
   }
@@ -924,10 +997,12 @@ int32_t necpp_wasm_v1_solve_currents(
     native_succeeded = true;
     sync_solution(*model, result);
     model->far_field.clear();
+    model->field_snapshot.clear();
   });
   if (status != NECPP_WASM_V1_OK && native_succeeded) {
     model->solution.clear();
     model->far_field.clear();
+    model->field_snapshot.clear();
   } else if (status != NECPP_WASM_V1_OK) {
     reconcile_consumer_results_after_failure(*model);
   }
@@ -951,13 +1026,27 @@ int32_t necpp_wasm_v1_compute_far_field(
     return fail(model, NECPP_WASM_V1_INPUT_ERROR,
       "Invalid far-field grid");
   bool native_succeeded = false;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  const auto native_abi_started = std::chrono::steady_clock::now();
+#endif
   const int32_t status = invoke(model, NECPP_WASM_V1_SOLVER_ERROR, [&] {
     const nec_far_field_result& result = model->native.compute_far_field(
       make_grid(
         radius_m, theta_start_deg, theta_count, theta_step_deg,
         phi_start_deg, phi_count, phi_step_deg));
     native_succeeded = true;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+    const auto abi_copy_started = std::chrono::steady_clock::now();
+#endif
     sync_far_field(*model, result);
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+    model->far_field.abi_result_copy_ms =
+      std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - abi_copy_started).count();
+    model->far_field.native_abi_total_ms =
+      std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - native_abi_started).count();
+#endif
   });
   if (status != NECPP_WASM_V1_OK && native_succeeded)
     model->far_field.clear();
@@ -1015,6 +1104,79 @@ int32_t necpp_wasm_v1_compute_embedded_far_fields(
     reconcile_consumer_results_after_failure(*model);
   }
   return status;
+}
+
+int32_t necpp_wasm_v1_capture_far_field_snapshot(necpp_wasm_v1_model* model)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  far_field_snapshot_buffers next;
+  const int32_t status = invoke(model, NECPP_WASM_V1_RUNTIME_ERROR, [&] {
+    next.value = model->native.capture_far_field_snapshot();
+    next.available = true;
+  });
+  if (status == NECPP_WASM_V1_OK)
+    model->field_snapshot = std::move(next);
+  else
+    model->field_snapshot.clear();
+  return status;
+}
+
+int32_t necpp_wasm_v1_far_field_snapshot_capability(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->field_snapshot.available
+    ? static_cast<int32_t>(model->field_snapshot.value.capability)
+    : NECPP_WASM_V1_FF_SNAPSHOT_NO_SOLUTION;
+}
+
+uint32_t necpp_wasm_v1_far_field_snapshot_schema_version(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->field_snapshot.available
+    ? model->field_snapshot.value.schema_version : 0;
+}
+
+size_t necpp_wasm_v1_far_field_snapshot_segment_count(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->field_snapshot.available
+    ? model->field_snapshot.value.segment_count() : 0;
+}
+
+double necpp_wasm_v1_far_field_snapshot_frequency_mhz(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->field_snapshot.available
+    ? model->field_snapshot.value.frequency_mhz : 0.0;
+}
+
+double necpp_wasm_v1_far_field_snapshot_wavelength_m(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->field_snapshot.available
+    ? model->field_snapshot.value.wavelength_m : 0.0;
+}
+
+double necpp_wasm_v1_far_field_snapshot_model_generation(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->field_snapshot.available
+    ? static_cast<double>(model->field_snapshot.value.model_generation) : 0.0;
+}
+
+double necpp_wasm_v1_far_field_snapshot_solution_generation(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->field_snapshot.available
+    ? static_cast<double>(model->field_snapshot.value.solution_generation) : 0.0;
+}
+
+int32_t necpp_wasm_v1_far_field_snapshot_perfect_ground(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->field_snapshot.available &&
+    model->field_snapshot.value.perfect_ground ? 1 : 0;
 }
 
 size_t necpp_wasm_v1_port_count(const necpp_wasm_v1_model* model)
@@ -1175,6 +1337,51 @@ size_t necpp_wasm_v1_far_field_phi_count(
 {
   return model != nullptr && model->far_field.available
     ? model->far_field.phi_deg.size() : 0;
+}
+
+double necpp_wasm_v1_far_field_diagnostic(
+  const necpp_wasm_v1_model* model, int32_t kind)
+{
+  if (model == nullptr || !model->far_field.available)
+    return 0.0;
+  const far_field_buffers& field = model->far_field;
+  const nec_far_field_phase_diagnostics& diagnostics = field.diagnostics;
+  switch (kind) {
+  case NECPP_WASM_V1_FF_DIAGNOSTICS_ENABLED:
+    return diagnostics.enabled ? 1.0 : 0.0;
+  case NECPP_WASM_V1_FF_VALIDATION_ALLOCATION_MS:
+    return diagnostics.validation_allocation_ms;
+  case NECPP_WASM_V1_FF_RESULT_REPLACEMENT_MS:
+    return diagnostics.result_replacement_ms;
+  case NECPP_WASM_V1_FF_RAW_ACCUMULATION_MS:
+    return diagnostics.raw_accumulation_ms;
+  case NECPP_WASM_V1_FF_DERIVED_RP_WORK_MS:
+    return diagnostics.derived_rp_work_ms;
+  case NECPP_WASM_V1_FF_NATIVE_RESULT_COPY_MS:
+    return diagnostics.native_result_copy_ms;
+  case NECPP_WASM_V1_FF_NATIVE_TOTAL_MS:
+    return diagnostics.native_total_ms;
+  case NECPP_WASM_V1_FF_ABI_RESULT_COPY_MS:
+    return field.abi_result_copy_ms;
+  case NECPP_WASM_V1_FF_NATIVE_ABI_TOTAL_MS:
+    return field.native_abi_total_ms;
+  case NECPP_WASM_V1_FF_EVALUATED_DIRECTIONS:
+    return static_cast<double>(diagnostics.evaluated_directions);
+  case NECPP_WASM_V1_FF_SEGMENT_COUNT:
+    return static_cast<double>(diagnostics.segment_count);
+  case NECPP_WASM_V1_FF_GROUND_IMAGE_COUNT:
+    return static_cast<double>(diagnostics.ground_image_count);
+  case NECPP_WASM_V1_FF_SEGMENT_DIRECTION_CONTRIBUTIONS:
+    return static_cast<double>(diagnostics.segment_direction_contributions);
+  case NECPP_WASM_V1_FF_OUTPUT_BUFFER_ALLOCATIONS:
+    return static_cast<double>(diagnostics.output_buffer_allocations);
+  case NECPP_WASM_V1_FF_INTERMEDIATE_BUFFER_ALLOCATIONS:
+    return static_cast<double>(diagnostics.intermediate_buffer_allocations);
+  case NECPP_WASM_V1_FF_COMPLEX_SAMPLE_COPIES:
+    return static_cast<double>(diagnostics.complex_sample_copies);
+  default:
+    return 0.0;
+  }
 }
 
 double necpp_wasm_v1_embedded_radius_m(const necpp_wasm_v1_model* model)

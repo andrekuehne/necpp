@@ -3,6 +3,8 @@
 # Produces in wasm/:
 #   nec2pp.js
 #   nec2pp.wasm
+#   necpp-field-evaluator.js
+#   necpp-field-evaluator.wasm
 #
 # Usage (from repo root or scripts/):
 #   .\scripts\build_wasm_docker.ps1
@@ -13,6 +15,15 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectDir = Resolve-Path (Join-Path $ScriptDir "..")
 $BuildDir = "build-wasm"
 $WasmImage = "emscripten/emsdk:4.0.7"
+$EnablePerformanceDiagnostics = if ($env:NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS) {
+    $env:NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+} else { "OFF" }
+$EnableWasmSimd = if ($env:NECPP_ENABLE_WASM_SIMD) {
+    $env:NECPP_ENABLE_WASM_SIMD
+} else { "OFF" }
+$FarFieldOptimizations = if ($env:NECPP_FAR_FIELD_OPTIMIZATIONS) {
+    $env:NECPP_FAR_FIELD_OPTIMIZATIONS
+} else { "SELECTED" }
 
 Set-Location $ProjectDir
 
@@ -32,12 +43,17 @@ New-Item -ItemType Directory -Force -Path $WasmOutDir | Out-Null
 Remove-Item -ErrorAction SilentlyContinue `
     (Join-Path $WasmOutDir "nec2pp.js"), `
     (Join-Path $WasmOutDir "nec2pp.wasm"), `
-    (Join-Path $WasmOutDir "nec2pp.d.ts")
+    (Join-Path $WasmOutDir "nec2pp.d.ts"), `
+    (Join-Path $WasmOutDir "necpp-field-evaluator.js"), `
+    (Join-Path $WasmOutDir "necpp-field-evaluator.wasm")
 
 Write-Host "=== Building WASM via Emscripten Docker image: $WasmImage ==="
 
 docker run --rm `
     -e "BUILD_DIR=$BuildDir" `
+    -e "ENABLE_PERFORMANCE_DIAGNOSTICS=$EnablePerformanceDiagnostics" `
+    -e "ENABLE_WASM_SIMD=$EnableWasmSimd" `
+    -e "FAR_FIELD_OPTIMIZATIONS=$FarFieldOptimizations" `
     -v "${ProjectDir}:/src" `
     -w /src `
     $WasmImage `

@@ -1,3 +1,44 @@
+## 0.4.0 - 2026-09-01
+
+### Added
+
+* **Parallel complex far fields for array solvers:** `createNecArraySolver()`
+  can evaluate supported wire-only free-space and perfect-ground fields with a
+  pool of two to eight lightweight workers. The default `"auto"` policy uses
+  at most four workers, keeps small grids serial, and requires neither shared
+  memory nor cross-origin isolation. Package diagnostics report the selected
+  backend, worker and tile counts, fallback reason, transferred bytes, reuse,
+  cancellation, and phase timings.
+* **Relocatable evaluator assets and explicit cancellation:**
+  `fieldWorkerAssetBaseUrl` relocates the nested worker, loader, and dedicated
+  evaluator WASM together. `cancelFarField()` stops assigning stale tiles,
+  rejects the active pooled request as superseded, and leaves the prepared
+  solver reusable.
+* **Reproducible far-field evidence:** checked-in WP0-WP5 benchmarks cover the
+  original bottleneck, raw-kernel refactor, scalar/SIMD decisions, worker
+  scaling, production pool, numerical parity, cancellation, memory, fallback,
+  and the decision not to ship an embedded-field steering cache.
+
+### Performance
+
+* The raw stateful field path no longer constructs report-only radiation
+  matrices or copies complex samples through intermediate buffers. On the
+  reference 8 x 8, 65,160-sample workload, the production four-worker package
+  reduced repeated field median from 5,321.07 ms serial to 1,583.15 ms
+  (3.361x). The downstream browser workflow measured a 3.59x repeated-steering
+  median improvement over its WP0 baseline. Results are host and model
+  specific; complete fixtures and raw records are in
+  `packages/necpp-wasm/bench/evidence/`.
+
+### Compatibility
+
+* The scalar release artifact remains the portable default: generated-WASM
+  inspection found no arithmetic SIMD in the far-field hot loop, so
+  `-msimd128` is not enabled. Unsupported ground modes, small grids, missing
+  evaluator assets, and worker failures use the documented serial fallback.
+  Complex field layout, phase, power, caller ordering, and WASM ABI version 1
+  are unchanged.
+
 ## 0.3.0 - 2026-08-31
 
 ### Added
