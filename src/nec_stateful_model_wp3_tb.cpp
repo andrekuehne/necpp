@@ -255,6 +255,39 @@ TEST_CASE("WP3 exact-zero excitation returns finite exact-zero fields",
   REQUIRE(model.retained_result_count() == 1);
 }
 
+TEST_CASE("WP3 raw fields allocate only final buffers and preserve results on failure",
+          "[wasm_api][wp3][far_field][raw_path][failure]")
+{
+  nec_stateful_model model;
+  build_dipoles(model, 1);
+  model.solve_port_voltages({nec_complex(1.0, 0.0)});
+
+  const nec_far_field_result& field = model.compute_far_field(kFieldGrid);
+  const std::vector<nec_complex> expected_theta = field.e_theta;
+  const std::vector<nec_complex> expected_phi = field.e_phi;
+  REQUIRE(field.diagnostics.output_buffer_allocations == 4);
+  REQUIRE(field.diagnostics.intermediate_buffer_allocations == 0);
+  REQUIRE(field.diagnostics.complex_sample_copies == 0);
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  REQUIRE(field.diagnostics.enabled);
+  REQUIRE(field.diagnostics.native_total_ms >= 0.0);
+  REQUIRE(field.diagnostics.raw_accumulation_ms >= 0.0);
+  REQUIRE(field.diagnostics.derived_rp_work_ms == 0.0);
+  REQUIRE(field.diagnostics.native_result_copy_ms == 0.0);
+#else
+  REQUIRE_FALSE(field.diagnostics.enabled);
+#endif
+  REQUIRE(model.retained_result_count() == 1);
+
+  nec_far_field_grid invalid = kFieldGrid;
+  invalid.theta_count = 0;
+  REQUIRE_THROWS_AS(model.compute_far_field(invalid), nec_exception);
+  REQUIRE(field.e_theta == expected_theta);
+  REQUIRE(field.e_phi == expected_phi);
+  REQUIRE(model.retained_result_count() == 1);
+  REQUIRE(model.state() == nec_model_state::solved);
+}
+
 TEST_CASE("WP3 center-fed dipole fields have axial nulls and mirror symmetry",
           "[wasm_api][wp3][far_field][symmetry]")
 {

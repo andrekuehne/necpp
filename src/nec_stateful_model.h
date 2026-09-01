@@ -104,6 +104,9 @@ struct nec_far_field_phase_diagnostics {
   uint64_t segment_count = 0;
   uint64_t ground_image_count = 0;
   uint64_t segment_direction_contributions = 0;
+  uint64_t output_buffer_allocations = 0;
+  uint64_t intermediate_buffer_allocations = 0;
+  uint64_t complex_sample_copies = 0;
 };
 
 /*! Copied complex far fields in theta-fast angular order.

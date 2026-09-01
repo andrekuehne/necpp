@@ -114,7 +114,7 @@ public:
     nec_float in_sig2,
     nec_float clt, nec_float cht);
   
-  nec_complex get_zrati2(nec_float _wavelength);
+  nec_complex get_zrati2(nec_float _wavelength) const;
 
 
   /*! \brief Returns the relative dielectric constant (no units) of the ground medium 1. */
@@ -199,9 +199,9 @@ public:
   }
   
   // accessors for the ground type
-  inline bool type_finite_reflection()  {  return (0 == iperf); }
-  inline bool type_perfect()        {  return (1 == iperf); }
-  inline bool type_sommerfeld_norton()  {  return (2 == iperf); }
+  inline bool type_finite_reflection() const { return (0 == iperf); }
+  inline bool type_perfect() const { return (1 == iperf); }
+  inline bool type_sommerfeld_norton() const { return (2 == iperf); }
   
   
   bool is_valid() const {

@@ -1,6 +1,6 @@
 # NEC far-field performance upgrade plan
 
-**Status:** implementation in progress; WP0 complete and WP1 ready
+**Status:** implementation in progress; WP0 and WP1 complete, WP2 next
 **Created:** 2026-08-31
 **Primary engine baseline:** `necpp` commit `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
 **Primary consumer baseline:** `PhasedArrayVisualizer-NG` commit `adf617081e8b53d08729cce57e2a1f7a3bed561c`
@@ -388,20 +388,20 @@ checksums and timing baselines.
   diagnostics are versioned and tested.
 - Sanitizer and exception/failure-path tests show no leak or stale result.
 
-### WP1 handover - fill before marking complete
+### WP1 handover
 
-- **Status:** not started
-- **Implementer / date:**
-- **Commits:**
-- **Changed internal/public interfaces:**
-- **Commands and test matrix:**
-- **Raw before/after artifacts:**
-- **Field equality results:**
-- **Allocation/copy changes:**
-- **Measured speed-up:**
-- **Decisions / rejected alternatives:**
-- **Deviations:**
-- **Remaining risks / next recommended WP:**
+- **Status:** complete; handed to WP2
+- **Implementer / date:** Codex / 2026-09-01
+- **Commits:** the commit containing this handover, based on WP0 handover commit `fb573ac`
+- **Changed internal/public interfaces:** added the private immutable `nec_far_field_evaluation_input`, read-only `nec_evaluate_far_field_sample()`, and legacy-order range scaler; `nec_context::ffld()` delegates to the raw kernel; no public C, WASM, or TypeScript contract changed
+- **Commands and test matrix:** fresh MSVC Release build; canonical native partitions passed: non-WP suite 1,044 assertions/82 cases, WP1 54 assertions/7 cases including stress, WP2 83/8, WP3 228/10, WP4 63/2, WP-S2 10,599/5, WP-S3 12/2; focused numerical-contract 75/3, surface-patch legacy RP 47/1, and WASM ABI 75/4 checks also passed; a fresh diagnostics-enabled build passed the raw-path timing/allocation checks (14 assertions). The Emscripten 4.0.7 release build (`-O3 -DNDEBUG -flto -fexceptions`, diagnostics `ON/256`, SIMD off) passed its smoke check, 77 package tests, typecheck, clean package-consumer tests, Vite/browser bundle checks, and package audit. A native GCC 11 Debug build with AddressSanitizer, UndefinedBehaviorSanitizer, leak detection, and halt-on-error passed all 12,083 assertions in 116 Catch2 cases.
+- **Raw before/after artifacts:** before is `packages/necpp-wasm/bench/evidence/far-field-wp0/scalar/`; after is `packages/necpp-wasm/bench/evidence/far-field-wp1/scalar/`. The preserved local release module used for the run is under ignored `packages/necpp-wasm/bench/results/far-field-wp1-final/artifacts/scalar-sampled/`.
+- **Field equality results:** native free-space, perfect/finite ground, explicit/symmetric, zero excitation, range phase/scaling, translated-array, embedded-superposition, legacy deck/RP, and surface-patch checks passed at their existing tolerances. The frozen release WASM run compared 200 requested-current, achieved-current, and complex-field checksum triples against WP0 with zero mismatches; direct/worker parity also reported zero failures.
+- **Allocation/copy changes:** the old stateful request allocated four final buffers plus 13 RP report matrices and two intermediate complex field buffers (19 backing allocations), then copied both complex fields through the intermediate and final buffers; the raw path allocates only the four final axis/field buffers and reports zero intermediate field buffers and zero complex sample-copy pass
+- **Measured speed-up:** repeated-field median before -> after: primary direct 4,834.98 -> 3,547.42 ms (26.63%), primary single-worker 6,015.83 -> 3,562.88 ms (40.77%), secondary direct 1,329.49 -> 1,031.25 ms (22.43%), and secondary single-worker 1,258.00 -> 1,037.48 ms (17.53%). The required primary single-worker improvement therefore exceeds the 10% gate by 30.77 percentage points.
+- **Decisions / rejected alternatives:** preserved the scalar contribution order and historical magnitude/phase range transform; retained the legacy RP derivations above the shared sample kernel; rejected keeping stateful fields coupled to `nec_radiation_pattern` or exposing a new public ABI solely for the refactor
+- **Deviations:** CTest's 180-second WP1 timeout was unsuitable for the sanitizer configuration and its forced termination caused noisy repeated `AddressSanitizer:DEADLYSIGNAL` lines without a sanitizer stack report. The same WP1 partition and then the complete 116-case suite were run directly from the identical instrumented binary without CTest's timeout; both passed with leak/UB halting enabled.
+- **Remaining risks / next recommended WP:** begin WP2 from the archived scalar WP1 artifact and retain the exact checksum gate. Treat the large difference between the noisy WP0 worker median and the tighter WP1 run as an environment/dispersion risk when attributing worker-only gains; the direct primary result independently passes the gate at 26.63%.
 
 ## WP2 - Serial kernel optimization and WASM SIMD decision
 

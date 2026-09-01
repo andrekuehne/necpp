@@ -35,6 +35,7 @@
    ========================================================================== */
 
 #include "nec_context.h"
+#include "nec_far_field.h"
 #include "c_geometry.h"
 #include "nec_exception.h"
  
@@ -390,6 +391,19 @@ nec_power_budget nec_context::stateful_power_budget() const
     input_power - structure_power_loss - network_power_loss,
     structure_power_loss,
     network_power_loss,
+  };
+}
+
+nec_far_field_evaluation_input nec_context::far_field_evaluation_input(
+  nec_float wavelength, int far_field_mode) const
+{
+  return {
+    *m_geometry,
+    ground,
+    air, aii, bir, bii, cir, cii,
+    current_vector,
+    far_field_mode,
+    wavelength,
   };
 }
 
@@ -6794,250 +6808,9 @@ void nec_context::gfld(nec_float rho, nec_float phi, nec_float rz,
 void nec_context::ffld(nec_float thet, nec_float phi,
     nec_complex *eth, nec_complex *eph, nec_float in_wavelength )
 {
-  static nec_complex CONST3(0.0, -em::impedance() / four_pi()); // -29.97922085;
-
-  int k, i;
-  bool jump;
-  nec_float phx, phy, roz, rozs, thx, thy, thz, rox, roy;
-  nec_float tthet=0., darg=0., omega, el, sill, top, bot, a;
-  nec_float too, boo, b, c, d, rr, ri, arg, dr;
-  nec_complex cix, ciy, ciz, exa, ccx, ccy, ccz, cdp;
-  nec_complex zrsin, rrv, rrh, rrv1, rrh1, rrv2, rrh2;
-  nec_complex tix, tiy, tiz, ex, ey, ez;
-  
-  phx = - sin( phi);
-  phy= cos( phi);
-  roz= cos( thet);
-  rozs= roz;
-  thx= roz* phy;
-  thy = - roz* phx;
-  thz = - sin( thet);
-  rox = - thz* phy;
-  roy= thz* phx;
-  
-  jump = false;
-  if ( m_geometry->n_segments != 0)  {
-    /* loop for structure image if any */
-    /* calculation of reflection coeffecients */
-    for( k = 0; k < ground.ksymp; k++ )  {
-    if ( k != 0 )  {
-      /* for perfect ground */
-      if (ground.type_perfect()) {
-        rrv = -cplx_10();
-        rrh = -cplx_10();
-      } else {
-        /* for infinite planar ground */
-        zrsin= sqrt(1.- ground.get_zrati_sqr() * thz* thz);
-        rrv = -( roz- ground.zrati * zrsin)/( roz+ ground.zrati* zrsin);
-        rrh=( ground.zrati* roz- zrsin)/( ground.zrati* roz+ zrsin);
-      }
-    
-      /* for the cliff problem, two reflction coefficients calculated */
-      if ( ifar > 1)  {
-        rrv1= rrv;
-        rrh1= rrh;
-        tthet= tan( thet);
-      
-        if ( ifar != 4)  {
-          nec_complex zrati2 = ground.get_zrati2(in_wavelength);
-          
-          zrsin = sqrt(1.-  zrati2 *  zrati2 * thz* thz);
-          rrv2 = -( roz-  zrati2* zrsin)/( roz+  zrati2* zrsin);
-          rrh2 =(  zrati2* roz- zrsin)/(  zrati2* roz+ zrsin);
-          darg = -two_pi() * 2.0 * ground.get_ch(in_wavelength) * roz;
-        }
-      } /* if ( ifar > 1) */
-    
-      roz = - roz;
-      ccx= cix;
-      ccy= ciy;
-      ccz= ciz;
-    } /* if ( k != 0 ) */
-  
-    cix=cplx_00();
-    ciy=cplx_00();
-    ciz=cplx_00();
-  
-    /* loop over structure segments */
-    for( i = 0; i < m_geometry->n_segments; i++ )  {
-      omega = -( rox* m_geometry->cab[i]+ roy* m_geometry->sab[i]+ roz* m_geometry->salp[i]);
-      el= pi()* m_geometry->segment_length[i];
-      sill= omega* el;
-      top= el+ sill;
-      bot= el- sill;
-    
-      if ( fabs( omega) >= 1.0e-7)
-        a=2.* sin( sill)/ omega;
-      else
-        a=(2.- omega* omega* el* el/3.)* el;
-    
-      if ( fabs( top) >= 1.0e-7)
-        too= sin( top)/ top;
-      else
-        too=1.- top* top/6.;
-    
-      if ( fabs( bot) >= 1.0e-7)
-        boo= sin( bot)/ bot;
-      else
-        boo=1.- bot* bot/6.;
-    
-      b= el*( boo- too);
-      c= el*( boo+ too);
-      rr= a* air[i]+ b* bii[i]+ c* cir[i];
-      ri= a* aii[i]- b* bir[i]+ c* cii[i];
-      arg= two_pi()*( m_geometry->x[i]* rox+ m_geometry->y[i]* roy+ m_geometry->z[i]* roz);
-    
-      if ( (k != 1) || (ifar < 2) )  {
-        /* summation for far field integral */
-        exa= nec_complex( cos( arg), sin( arg))* nec_complex( rr, ri);
-        cix= cix+ exa* m_geometry->cab[i];
-        ciy= ciy+ exa* m_geometry->sab[i];
-        ciz= ciz+ exa* m_geometry->salp[i];
-        continue;
-      }
-    
-      /* calculation of image contribution */
-      /* in cliff and ground screen problems */
-    
-      /* specular point distance */
-      dr= m_geometry->z[i]* tthet;
-    
-      d= dr* phy+ m_geometry->x[i];
-      if ( ifar == 2)  {
-        if (( ground.get_cl(in_wavelength) - d) > 0.0) {
-          rrv= rrv1;
-          rrh= rrh1;
-        } else {
-          rrv= rrv2;
-          rrh= rrh2;
-          arg= arg+ darg;
-        }
-      } else { /* if ( ifar == 2) */
-        d= sqrt( d*d + (m_geometry->y[i]-dr*phx)*(m_geometry->y[i]-dr*phx) );
-        if ( ifar == 3)  {
-          if (( ground.get_cl(in_wavelength) - d) > 0.0)  {
-            rrv= rrv1;
-            rrh= rrh1;
-          } else {
-            rrv= rrv2;
-            rrh= rrh2;
-            arg= arg+ darg;
-          }
-        } else { /* if ( ifar == 3) */
-          if (( ground.get_radial_wire_length_wavelengths() - d) >= 0.0)  {
-            /* radial wire ground screen reflection coefficient */
-            d += ground.t2;
-            nec_complex zscrn= ground.m_t1 * d* log( d/ ground.t2);
-            zscrn=( zscrn* ground.zrati)/( em::impedance() * ground.zrati+ zscrn);
-            zrsin= sqrt(1.- zscrn* zscrn* thz* thz);
-            rrv=( roz+ zscrn* zrsin)/(- roz+ zscrn* zrsin);
-            rrh=( zscrn* roz+ zrsin)/( zscrn* roz- zrsin);
-          } else  {  /* if (( ground.scrwl- d) < 0.) */
-            if ( ifar == 4)  {
-              rrv= rrv1;
-              rrh= rrh1;
-            } else  { /* if ( ifar == 4) */
-              if ( ifar == 5)
-                d= dr* phy+ m_geometry->x[i];
-          
-              if (( ground.get_cl(in_wavelength) - d) > 0.)  {
-                rrv= rrv1;
-                rrh= rrh1;
-              } else {
-                rrv= rrv2;
-                rrh= rrh2;
-                arg= arg+ darg;
-              } /* if (( cl- d) > 0.) */
-            } /* if ( ifar == 4) */
-          } /* if (( ground.scrwl- d) < 0.) */
-        } /* if ( ifar == 3) */
-      } /* if ( ifar == 2) */
-      
-      /* contribution of each image segment modified by */
-      /* reflection coef, for cliff and ground screen problems */
-      exa= nec_complex( cos( arg), sin( arg))* nec_complex( rr, ri);
-      tix= exa* m_geometry->cab[i];
-      tiy= exa* m_geometry->sab[i];
-      tiz= exa* m_geometry->salp[i];
-      cdp=( tix* phx+ tiy* phy)*( rrh- rrv);
-      cix= cix+ tix* rrv+ cdp* phx;
-      ciy= ciy+ tiy* rrv+ cdp* phy;
-      ciz= ciz- tiz* rrv;
-    
-      } /* for( i = 0; i < n; i++ ) */
-  
-    if ( k == 0 )
-      continue;
-  
-    /* calculation of contribution of structure image for infinite ground */
-    if ( ifar < 2) {
-      cdp=( cix* phx+ ciy* phy)*( rrh- rrv);
-      cix= ccx+ cix* rrv+ cdp* phx;
-      ciy= ccy+ ciy* rrv+ cdp* phy;
-      ciz= ccz- ciz* rrv;
-    } else {
-      cix= cix+ ccx;
-      ciy= ciy+ ccy;
-      ciz= ciz+ ccz;
-    }
-  
-    } /* for( k=0; k < ground.ksymp; k++ ) */
-  
-    if ( m_geometry->m > 0) {
-      jump = true;
-    } else {
-      *eth=( cix* thx+ ciy* thy+ ciz* thz)* CONST3;
-      *eph=( cix* phx+ ciy* phy)* CONST3;
-      return;
-    }
-  } /* if ( n != 0) */
-  
-  if ( ! jump )  {
-    cix=cplx_00();
-    ciy=cplx_00();
-    ciz=cplx_00();
-  }
-  
-  /* electric field components */
-  roz= rozs;
-  { // without ground 
-    complex_array temp = current_vector.eigen_segment(m_geometry->n_segments, current_vector.size()-m_geometry->n_segments);
-    m_geometry->fflds(rox, roy, roz, temp, &ex, &ey, &ez);
-  }
-  if (ground.present())  {
-    // with ground
-    nec_complex tempx, tempy, tempz;
-    
-    complex_array temp = current_vector.eigen_segment(m_geometry->n_segments, current_vector.size()-m_geometry->n_segments);
-    m_geometry->fflds(rox, roy, -roz, temp, &tempx, &tempy, &tempz);
-  
-    if (ground.type_perfect())  {
-      tempx = -tempx;
-      tempy = -tempy;
-      tempz = -tempz;
-    } else {
-      // get reflection co-efficient?? 
-      rrv= sqrt(1.0 - ground.get_zrati_sqr() * thz* thz);
-      rrh= ground.zrati * roz;
-      rrh=( rrh- rrv)/( rrh+ rrv);
-      rrv= ground.zrati * rrv;
-      rrv = -( roz- rrv)/( roz+ rrv);
-      
-      *eth=( tempx* phx+ tempy* phy)*( rrh- rrv);
-      tempx= tempx* rrv+ *eth* phx;
-      tempy= tempy* rrv+ *eth* phy;
-      tempz= tempz* rrv;
-    } /* if (  ground.iperf == 1) */
-  
-    ex += tempx;
-    ey += tempy;
-    ez -= tempz;
-  }
-  
-  ex += cix* CONST3;
-  ey += ciy* CONST3;
-  ez += ciz* CONST3;
-  *eth= ex*thx + ey*thy + ez*thz;
-  *eph= ex*phx + ey*phy;
+  const nec_far_field_sample sample = nec_evaluate_far_field_sample(
+    far_field_evaluation_input(in_wavelength, ifar), thet, phi);
+  *eth = sample.e_theta;
+  *eph = sample.e_phi;
 }
 

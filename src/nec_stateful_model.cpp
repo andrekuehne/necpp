@@ -9,10 +9,11 @@
 #include "nec_stateful_model.h"
 
 #include "c_geometry.h"
+#include "electromag.h"
 #include "nec_context.h"
 #include "nec_exception.h"
+#include "nec_far_field.h"
 #include "nec_port_matrix.h"
-#include "nec_radiation_pattern.h"
 #include "nec_results.h"
 
 #include <algorithm>
@@ -755,6 +756,9 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
     grid, copied.theta_deg, copied.phi_deg, "COMPUTE FAR FIELD");
   copied.e_theta.assign(sample_count, nec_complex(0.0, 0.0));
   copied.e_phi.assign(sample_count, nec_complex(0.0, 0.0));
+  // theta, phi, E-theta, and E-phi are the only backing allocations.  The
+  // raw path writes samples in place and never creates an RP field matrix.
+  copied.diagnostics.output_buffer_allocations = 4;
   copied.diagnostics.segment_count = static_cast<uint64_t>(
     m_geometry_completion.full_segment_count);
   copied.diagnostics.ground_image_count =
@@ -767,7 +771,6 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
   phase_started = std::chrono::steady_clock::now();
 #endif
 
-  m_context->stateful_clear_results(RESULT_RADIATION_PATTERN);
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
   copied.diagnostics.result_replacement_ms =
     std::chrono::duration<nec_float, std::milli>(
@@ -785,61 +788,72 @@ nec_far_field_result nec_stateful_model::calculate_far_field(
     return copied;
   }
 
-  m_context->rp_card(
-    0, grid.theta_count, grid.phi_count,
-    0, 0, 0, 0,
-    grid.theta_start_deg, grid.phi_start_deg,
-    grid.theta_step_deg, grid.phi_step_deg,
-    grid.radius_m, 0.0);
-
-  nec_radiation_pattern* result = m_context->get_radiation_pattern(0);
-  if (result == nullptr)
-    fail("COMPUTE FAR FIELD", "ENGINE DID NOT RETURN A RADIATION PATTERN");
-  const complex_array e_theta = result->get_e_theta();
-  const complex_array e_phi = result->get_e_phi();
-  if (static_cast<size_t>(e_theta.size()) != sample_count ||
-      static_cast<size_t>(e_phi.size()) != sample_count)
-    fail("COMPUTE FAR FIELD", "ENGINE RETURNED THE WRONG FIELD SAMPLE COUNT");
-
-  const nec_radiation_pattern_diagnostics& rp_diagnostics =
-    result->diagnostics();
-  copied.diagnostics.raw_accumulation_ms =
-    rp_diagnostics.raw_accumulation_ms;
-  copied.diagnostics.derived_rp_work_ms =
-    rp_diagnostics.derived_work_ms;
-  copied.diagnostics.evaluated_directions =
-    rp_diagnostics.evaluated_directions;
-  copied.diagnostics.segment_count = rp_diagnostics.segment_count;
-  copied.diagnostics.ground_image_count = rp_diagnostics.ground_image_count;
-  copied.diagnostics.segment_direction_contributions =
-    rp_diagnostics.segment_direction_contributions;
+  const nec_float wavelength = em::get_wavelength(m_frequency_mhz * 1.0e6);
+  const nec_far_field_evaluation_input input =
+    m_context->far_field_evaluation_input(wavelength, 0);
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
-  phase_started = std::chrono::steady_clock::now();
+  std::chrono::steady_clock::duration raw_duration{};
+  uint64_t raw_timing_samples = 0;
+  constexpr uint64_t raw_timing_stride = 256;
 #endif
-
-  for (size_t index = 0; index < sample_count; ++index) {
-    copied.e_theta[index] = e_theta[static_cast<int64_t>(index)];
-    copied.e_phi[index] = e_phi[static_cast<int64_t>(index)];
-    if (!finite_value(copied.e_theta[index].real()) ||
-        !finite_value(copied.e_theta[index].imag()) ||
-        !finite_value(copied.e_phi[index].real()) ||
-        !finite_value(copied.e_phi[index].imag()))
-      fail("COMPUTE FAR FIELD", "ENGINE RETURNED A NONFINITE FIELD VALUE");
-  }
+  nec_float phi_deg = grid.phi_start_deg - grid.phi_step_deg;
+  for (int phi_index = 0; phi_index < grid.phi_count; ++phi_index) {
+    phi_deg += grid.phi_step_deg;
+    const nec_float phi_rad = degrees_to_rad(phi_deg);
+    nec_float theta_deg = grid.theta_start_deg - grid.theta_step_deg;
+    for (int theta_index = 0; theta_index < grid.theta_count; ++theta_index) {
+      theta_deg += grid.theta_step_deg;
+      if (input.ground.present() && theta_deg > 90.01)
+        continue;
+      ++copied.diagnostics.evaluated_directions;
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
-  copied.diagnostics.native_result_copy_ms =
-    std::chrono::duration<nec_float, std::milli>(
-      std::chrono::steady_clock::now() - phase_started).count();
+      const bool time_raw =
+        (copied.diagnostics.evaluated_directions - 1) %
+          raw_timing_stride == 0;
+      const auto raw_started = time_raw
+        ? std::chrono::steady_clock::now()
+        : std::chrono::steady_clock::time_point();
+#endif
+      const nec_far_field_sample raw = nec_evaluate_far_field_sample(
+        input, degrees_to_rad(theta_deg), phi_rad);
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+      if (time_raw) {
+        raw_duration += std::chrono::steady_clock::now() - raw_started;
+        ++raw_timing_samples;
+      }
+#endif
+      const nec_far_field_sample scaled = nec_scale_far_field_sample(
+        raw, wavelength, grid.radius_m);
+      const size_t index =
+        static_cast<size_t>(phi_index) *
+          static_cast<size_t>(grid.theta_count) +
+        static_cast<size_t>(theta_index);
+      copied.e_theta[index] = scaled.e_theta;
+      copied.e_phi[index] = scaled.e_phi;
+      if (!finite_value(copied.e_theta[index].real()) ||
+          !finite_value(copied.e_theta[index].imag()) ||
+          !finite_value(copied.e_phi[index].real()) ||
+          !finite_value(copied.e_phi[index].imag()))
+        fail("COMPUTE FAR FIELD", "ENGINE RETURNED A NONFINITE FIELD VALUE");
+    }
+  }
+  copied.diagnostics.segment_direction_contributions =
+    copied.diagnostics.evaluated_directions *
+    copied.diagnostics.segment_count *
+    copied.diagnostics.ground_image_count;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
   copied.diagnostics.native_total_ms =
     std::chrono::duration<nec_float, std::milli>(
       std::chrono::steady_clock::now() - total_started).count();
-  copied.diagnostics.derived_rp_work_ms = std::max(
-    nec_float(0.0),
-    copied.diagnostics.native_total_ms
-      - copied.diagnostics.validation_allocation_ms
-      - copied.diagnostics.result_replacement_ms
-      - copied.diagnostics.raw_accumulation_ms
-      - copied.diagnostics.native_result_copy_ms);
+  const nec_float sampled_raw_ms =
+    std::chrono::duration<nec_float, std::milli>(raw_duration).count();
+  copied.diagnostics.raw_accumulation_ms = raw_timing_samples == 0
+    ? nec_float(0.0)
+    : std::min(
+        copied.diagnostics.native_total_ms,
+        sampled_raw_ms *
+          static_cast<nec_float>(copied.diagnostics.evaluated_directions) /
+          static_cast<nec_float>(raw_timing_samples));
 #endif
   return copied;
 }
