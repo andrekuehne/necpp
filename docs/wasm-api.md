@@ -355,6 +355,8 @@ interface FullArrayDescription {
 
 interface CreateArraySolverOptions {
   readonly symmetry?: "auto" | "off" | "require";
+  readonly fieldWorkers?: "auto" | number;
+  readonly fieldWorkerAssetBaseUrl?: string | URL;
   readonly symmetrizer?: {
     readonly positionEpsilonM: number;
     readonly center?: "auto" | readonly [xM: number, yM: number];
@@ -365,6 +367,39 @@ interface CreateArraySolverOptions {
   };
 }
 ```
+
+`fieldWorkers` defaults to `"auto"`, accepts `1` through `8`, and affects only
+`createNecArraySolver()`. `1` retains the serial WP2a field path. Values from 2
+through 8 request a nested ordinary-worker pool for supported wire-only free-
+space and perfect-ground models. `"auto"` uses four workers with at least eight
+logical cores, two with at least four cores, and otherwise one; it also reduces
+the count to the available 512-sample tiles and stays serial below 250,000
+segment-direction-image contributions. Direct `createNecModel()` and the
+low-level `createNecWorkerModel()` remain serial.
+
+The evaluator pool is lazy-prewarmed before its first eligible field. Geometry
+arrays remain resident, repeated solves transfer only the six changed current
+coefficient arrays, and repeated grids after one solve transfer no snapshot
+arrays. `FarFieldResult.fieldBackend` and `ArraySolverDiagnostics.field` report
+the requested/active backend, tile and cancellation counts, worker restarts,
+snapshot/current/result bytes, geometry reuse, fallback reason, and separated
+warm-up, snapshot, dispatch, kernel, merge, and total timings.
+
+Newer solve and field calls send an immediate control message to the outer
+solver worker. Eligible active fields stop receiving work between 512-sample
+tiles; their promises reject as `NecRuntimeError` with
+`details.reason === "superseded"`. Model operations remain ordered. A crashed
+evaluator is reconstructed from the retained snapshot once; unsupported modes,
+startup/asset failure, or unrecoverable evaluator failure use the typed serial
+fallback recorded in diagnostics. Disposal is idempotent and terminates the
+outer worker plus every evaluator child.
+
+Default evaluator worker, loader, and WASM URLs are package-relative and are
+included in the tarball. `fieldWorkerAssetBaseUrl` relocates the complete set;
+the directory must contain `field-evaluator-worker.js`, `field-evaluator.js`,
+`necpp-field-evaluator.generated.js`, and `necpp-field-evaluator.wasm`.
+The packed-consumer test covers Node, a non-root Vite base, content-hashed
+assets, correct WASM MIME, and non-cross-origin-isolated Chromium.
 
 The mode defaults to `"auto"`, but automatic analysis deliberately has no
 default epsilon: omitting `symmetrizer.positionEpsilonM` is `NEC_INPUT`.

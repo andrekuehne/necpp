@@ -211,7 +211,7 @@ function validateComplexVector(
   return { real, imag };
 }
 
-interface ValidatedGrid {
+export interface ValidatedGrid {
   readonly radiusM: number;
   readonly thetaStartDeg: number;
   readonly thetaCount: number;
@@ -222,7 +222,10 @@ interface ValidatedGrid {
   readonly sampleCount: number;
 }
 
-function validateGrid(request: unknown, portCountForEmbedded = 1): ValidatedGrid {
+export function validateFarFieldGrid(
+  request: unknown,
+  portCountForEmbedded = 1,
+): ValidatedGrid {
   const record = requireRecord(request, "request");
   const theta = requireRecord(record.theta, "request.theta");
   const phi = requireRecord(record.phi, "request.phi");
@@ -259,6 +262,8 @@ function validateGrid(request: unknown, portCountForEmbedded = 1): ValidatedGrid
     sampleCount,
   };
 }
+
+const validateGrid = validateFarFieldGrid;
 
 function validateTarget(target: unknown): {
   readonly tag: number;

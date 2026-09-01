@@ -3,7 +3,7 @@ import {
   createExplicitArrayBuildPlan,
 } from "./array-symmetry.js";
 import { NecError, NecGeometryError, NecInputError } from "./errors.js";
-import { createNecWorkerModel } from "./worker-client.js";
+import { createNecArrayWorkerModel } from "./worker-client.js";
 import type {
   ArrayBuildPlan,
   ArraySolverDiagnostics,
@@ -15,6 +15,8 @@ import type {
   EmbeddedFieldNormalization,
   FarFieldRequest,
   FarFieldResult,
+  FieldBackendDiagnostics,
+  FieldWorkerSelection,
   FullArrayDescription,
   GeometryCompletionResult,
   ImpedanceResult,
@@ -424,8 +426,13 @@ function explicitRetryPlan(
 async function buildWorker(
   description: FullArrayDescription,
   plan: ArrayBuildPlan,
+  fieldWorkers: FieldWorkerSelection,
+  fieldWorkerAssetBaseUrl?: string,
 ): Promise<{ readonly model: NecWorkerModel; readonly application: AppliedArrayBuildPlan }> {
-  const model = await createNecWorkerModel();
+  const model = await createNecArrayWorkerModel({
+    fieldWorkers,
+    ...(fieldWorkerAssetBaseUrl === undefined ? {} : { fieldWorkerAssetBaseUrl }),
+  });
   try {
     return { model, application: await applyArrayBuildPlan(model, description, plan) };
   } catch (error) {
@@ -440,6 +447,9 @@ class WorkerNecArraySolver implements NecArraySolver {
   #application: AppliedArrayBuildPlan;
   readonly #description: FullArrayDescription;
   readonly #mode: "auto" | "off" | "require";
+  readonly #fieldWorkers: FieldWorkerSelection;
+  readonly #fieldWorkerAssetBaseUrl: string | undefined;
+  #fieldDiagnostics: FieldBackendDiagnostics;
   #retried = false;
 
   constructor(
@@ -448,12 +458,17 @@ class WorkerNecArraySolver implements NecArraySolver {
     plan: ArrayBuildPlan,
     application: AppliedArrayBuildPlan,
     mode: "auto" | "off" | "require",
+    fieldWorkers: FieldWorkerSelection,
+    fieldWorkerAssetBaseUrl?: string,
   ) {
     this.#model = model;
     this.#description = description;
     this.#plan = plan;
     this.#application = application;
     this.#mode = mode;
+    this.#fieldWorkers = fieldWorkers;
+    this.#fieldWorkerAssetBaseUrl = fieldWorkerAssetBaseUrl;
+    this.#fieldDiagnostics = pendingFieldDiagnostics(fieldWorkers);
   }
 
   get state(): NecModelState {
@@ -472,7 +487,12 @@ class WorkerNecArraySolver implements NecArraySolver {
       this.#retried = true;
       await this.#model.dispose();
       const retryPlan = explicitRetryPlan(this.#description, this.#plan, failure);
-      const built = await buildWorker(this.#description, retryPlan);
+      const built = await buildWorker(
+        this.#description,
+        retryPlan,
+        this.#fieldWorkers,
+        this.#fieldWorkerAssetBaseUrl,
+      );
       this.#model = built.model;
       this.#plan = retryPlan;
       this.#application = built.application;
@@ -527,6 +547,9 @@ class WorkerNecArraySolver implements NecArraySolver {
 
   async computeFarField(request: FarFieldRequest): Promise<FarFieldResult> {
     const result = await this.#model.computeFarField(request);
+    if (result.fieldBackend !== undefined) {
+      this.#fieldDiagnostics = result.fieldBackend;
+    }
     const center = this.#plan.kind === "symmetric" ? this.#plan.centerM : [0, 0] as const;
     return rephaseFarField(result, center);
   }
@@ -560,7 +583,52 @@ class WorkerNecArraySolver implements NecArraySolver {
       ...(this.#application.completion.symmetry === undefined
         ? {}
         : { symmetry: this.#application.completion.symmetry }),
+      field: this.#fieldDiagnostics,
     });
+  }
+}
+
+function pendingFieldDiagnostics(
+  requestedWorkers: FieldWorkerSelection,
+): FieldBackendDiagnostics {
+  return Object.freeze({
+    backend: "pending",
+    requestedWorkers,
+    activeWorkerCount: 0,
+    tileSize: 512,
+    totalTiles: 0,
+    completedTiles: 0,
+    cancelledTiles: 0,
+    cancelledJobs: 0,
+    restartedWorkers: 0,
+    snapshotBytesPerWorker: 0,
+    lastBroadcastBytesPerWorker: 0,
+    resultBytes: 0,
+    geometryReused: false,
+    warmupMs: 0,
+    snapshotCaptureMs: 0,
+    snapshotBroadcastMs: 0,
+    dispatchMs: 0,
+    kernelMs: 0,
+    mergeMs: 0,
+    totalMs: 0,
+  });
+}
+
+function resolveFieldAssetBase(value: string | URL | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (!(typeof value === "string" || value instanceof URL)
+      || (typeof value === "string" && value.trim().length === 0)) {
+    throw new NecInputError("fieldWorkerAssetBaseUrl must be a nonempty string or URL");
+  }
+  try {
+    const resolved = value instanceof URL
+      ? new URL(value.href)
+      : new URL(value, import.meta.url);
+    if (!resolved.pathname.endsWith("/")) resolved.pathname += "/";
+    return resolved.href;
+  } catch (cause) {
+    throw new NecInputError("fieldWorkerAssetBaseUrl is not a valid URL", { cause });
   }
 }
 
@@ -581,6 +649,14 @@ export async function createNecArraySolver(
       "Automatic array symmetry requires an explicit symmetrizer.positionEpsilonM",
     );
   }
+  const fieldWorkers = options.fieldWorkers ?? "auto";
+  if (fieldWorkers !== "auto"
+      && (!Number.isInteger(fieldWorkers) || fieldWorkers < 1 || fieldWorkers > 8)) {
+    throw new NecInputError("fieldWorkers must be \"auto\" or an integer from 1 through 8");
+  }
+  const fieldWorkerAssetBaseUrl = resolveFieldAssetBase(
+    options.fieldWorkerAssetBaseUrl,
+  );
   let plan = mode === "off"
     ? createExplicitArrayBuildPlan(description)
     : analyzeArraySymmetry(description, options.symmetrizer!);
@@ -590,15 +666,41 @@ export async function createNecArraySolver(
     });
   }
   try {
-    const built = await buildWorker(description, plan);
-    return new WorkerNecArraySolver(built.model, description, plan, built.application, mode);
+    const built = await buildWorker(
+      description,
+      plan,
+      fieldWorkers,
+      fieldWorkerAssetBaseUrl,
+    );
+    return new WorkerNecArraySolver(
+      built.model,
+      description,
+      plan,
+      built.application,
+      mode,
+      fieldWorkers,
+      fieldWorkerAssetBaseUrl,
+    );
   } catch (error) {
     const failure = failureReason(error);
     if (mode !== "auto" || plan.kind !== "symmetric" || failure === undefined) {
       throw error;
     }
     plan = explicitRetryPlan(description, plan, failure);
-    const built = await buildWorker(description, plan);
-    return new WorkerNecArraySolver(built.model, description, plan, built.application, mode);
+    const built = await buildWorker(
+      description,
+      plan,
+      fieldWorkers,
+      fieldWorkerAssetBaseUrl,
+    );
+    return new WorkerNecArraySolver(
+      built.model,
+      description,
+      plan,
+      built.application,
+      mode,
+      fieldWorkers,
+      fieldWorkerAssetBaseUrl,
+    );
   }
 }

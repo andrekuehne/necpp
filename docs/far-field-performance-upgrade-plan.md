@@ -1,6 +1,6 @@
 # NEC far-field performance upgrade plan
 
-**Status:** implementation in progress; WP0 through WP3 complete, WP4 next
+**Status:** implementation in progress; WP0 through WP4 complete, WP5 next
 **Created:** 2026-08-31
 **Primary engine baseline:** `necpp` commit `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
 **Primary consumer baseline:** `PhasedArrayVisualizer-NG` commit `adf617081e8b53d08729cce57e2a1f7a3bed561c`
@@ -880,19 +880,62 @@ Turn the successful WP3 design into a supported package capability used by
 
 ### WP4 handover - fill before marking complete
 
-- **Status:** not started
-- **Implementer / date:**
-- **Commits / package version:**
-- **Public API additions:**
-- **Generated/package assets:**
-- **Backend-selection rules:**
-- **Benchmark artifacts and gates:**
-- **Correctness/lifecycle matrix:**
-- **Cancellation evidence:**
-- **Fallback evidence:**
-- **Memory and startup:**
-- **Deviations:**
-- **Remaining risks / next recommended WP:**
+- **Status:** complete; handed to WP5
+- **Implementer / date:** Codex / 2026-09-01
+- **Commits / package version:** commit containing this handover; package remains
+  the unreleased `0.3.0` development version
+- **Public API additions:** `CreateArraySolverOptions.fieldWorkers` accepts
+  `"auto"` or 1 through 8; `fieldWorkerAssetBaseUrl` relocates the complete
+  evaluator asset directory; `FarFieldResult.fieldBackend` and
+  `ArraySolverDiagnostics.field` expose backend, worker/tile/cancellation,
+  byte, fallback, and phase-timing diagnostics
+- **Generated/package assets:** `field-evaluator-worker.js`,
+  `field-evaluator.js`, `field-worker-pool.js`,
+  `necpp-field-evaluator.generated.js`, and
+  `necpp-field-evaluator.wasm` are package-owned; static nested-worker and WASM
+  URLs let Vite emit content-hashed assets under a non-root base
+- **Backend-selection rules:** `1` is always serial; explicit 2 through 8 uses
+  that bounded count for supported wire-only free-space/perfect-ground fields;
+  auto uses 4 workers at 8+ logical cores, 2 at 4+, otherwise serial, reduces
+  to available 512-sample tiles, and stays serial below 250,000
+  segment-direction-image contributions; unsupported/startup/runtime cases
+  explicitly report serial fallback
+- **Benchmark artifacts and gates:** raw versioned evidence is
+  `packages/necpp-wasm/bench/evidence/far-field-wp4/node/far-field-wp4-production.json`
+  with the curated report in `FAR_FIELD_WP4_RESULTS.md`; primary serial versus
+  four-worker medians/p90 are 5,321.07/5,553.84 versus
+  1,583.15/2,258.04 ms (3.361x), and solve-plus-field is 3.359x; the secondary
+  parallel/serial median ratio is 0.320; all gates pass
+- **Correctness/lifecycle matrix:** scaled maximum primary differences are
+  `5.16e-11` E-theta and `3.08e-11` E-phi; explicit one-worker, current-only
+  refresh, same-solve grid reuse, finite-ground fallback, worker restart,
+  partial-start cleanup, custom assets, idempotent disposal, Node, raw
+  non-isolated Chromium, Chromium page-teardown target cleanup, packed Node,
+  and packed non-root Vite/Chromium pass; the package suite has 89 passing tests
+- **Cancellation evidence:** newer solve/field calls bypass the ordered data
+  queue with a cancellation control message; the obsolete 181 x 360 promise
+  rejects with typed `details.reason = "superseded"`, no new stale tiles are
+  assigned after the signal, and the complete newest generation alone returns;
+  the 40 ms replacement records one cancelled job and all 128 stale tiles as
+  cancelled, with concurrently running stale work bounded to the four
+  already-issued tiles
+- **Fallback evidence:** finite ground reports `unsupported-finite-ground`, an
+  absent custom evaluator directory reports `worker-pool-failed`, small auto
+  grids report `below-auto-threshold`, and `fieldWorkers: 1` reports
+  `explicit-one-worker`; none changes the requested model or angular grid
+- **Memory and startup:** four-worker lazy startup is 114.47 ms; each worker
+  retains a 73,216-byte primary snapshot, repeated solves broadcast 33,792
+  bytes/worker, same-solve grids broadcast zero snapshot bytes, and the primary
+  result is 2,089,448 bytes; observed serial/four-worker peak-RSS deltas were
+  53.2/79.8 MB in the sequential benchmark process
+- **Deviations:** the production benchmark used five measured states after one
+  warm-up rather than fresh processes because it specifically measures retained
+  pool/geometry behavior. Firefox and CDN execution of the nested pool remain
+  WP7 release-matrix work; CDN-style relocation is covered by custom-base Node
+  execution and packed asset presence.
+- **Remaining risks / next recommended WP:** WP5 should measure embedded basis
+  warm-up/combination against this packaged direct path. WP6 should consume the
+  public diagnostics and cancellation semantics without recreating a pool.
 
 ## WP5 - Embedded-field cache and repeated-steering decision
 

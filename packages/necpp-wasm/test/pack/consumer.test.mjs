@@ -4,6 +4,7 @@ import { createServer as createNetServer } from "node:net";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { chromium } from "playwright";
 
 import { stopChild, waitForHttpServer } from "../http-server-process.mjs";
 
@@ -267,6 +268,7 @@ test("a clean Vite fixture builds, serves WASM with the correct MIME type, and b
 }, async () => {
   const fixture = createCleanFixture("vite");
   writeFixtureFile(fixture.root, "vite.config.js", `export default {
+  base: "/nested/",
   build: {
     target: "es2024",
   },
@@ -283,12 +285,13 @@ test("a clean Vite fixture builds, serves WASM with the correct MIME type, and b
   </head>
   <body>
     <pre id="out">loading</pre>
-    <script type="module" src="/main.js"></script>
+    <script type="module" src="./main.js"></script>
   </body>
 </html>
 `);
   writeFixtureFile(fixture.root, "main.js", `import {
   abiVersion,
+  createNecArraySolver,
   createNecModel,
   engineVersion,
   packageVersion,
@@ -342,13 +345,39 @@ async function runWorker() {
   }
 }
 
+async function runArray() {
+  const solver = await createNecArraySolver({
+    elements: [{ id: "e0", positionM: [0, 0], patternId: "dipole" }],
+    patterns: [{
+      id: "dipole", kind: "straight-wire-pattern",
+      wires: [{ id: "wire", segments: 11,
+        startM: [-0.235, 0, 0.25], endM: [0.235, 0, 0.25], radiusM: 0.001 }],
+      ports: [{ wireId: "wire", segment: 6 }],
+    }],
+    ground: { kind: "perfect" },
+  }, { symmetry: "off", fieldWorkers: 2 });
+  try {
+    await solver.prepare({ frequencyMHz: 300 });
+    await solver.solveVoltages({ real: Float64Array.of(1), imag: Float64Array.of(0) });
+    const field = await solver.computeFarField({
+      theta: { startDeg: 0, count: 31, stepDeg: 3 },
+      phi: { startDeg: 0, count: 40, stepDeg: 9 },
+    });
+    return field.fieldBackend;
+  } finally {
+    await solver.dispose();
+  }
+}
+
 try {
   const direct = await runDirect();
   const workerResistanceOhm = await runWorker();
+  const fieldBackend = await runArray();
   const payload = {
     ...direct,
     workerResistanceOhm,
     workerOk: Number.isFinite(workerResistanceOhm),
+    fieldBackend,
   };
   out.textContent = JSON.stringify(payload);
   window.__NEC_RESULT__ = payload;
@@ -366,7 +395,7 @@ try {
   const builtRoot = join(fixture.root, "dist");
   const builtFiles = collectFiles(builtRoot);
   const wasmFiles = builtFiles.filter((path) => path.endsWith(".wasm"));
-  assert.ok(wasmFiles.length >= 1, "Vite build must emit the WASM binary");
+  assert.ok(wasmFiles.length >= 2, "Vite build must emit both WASM binaries");
   const builtJs = builtFiles
     .filter((path) => path.endsWith(".js"))
     .map((path) => readFileSync(path, "utf8"));
@@ -384,16 +413,29 @@ try {
 
   const preview = await startVitePreview(fixture.root);
   try {
-    const htmlResponse = await fetch(`${preview.origin}/`);
+    const htmlResponse = await fetch(`${preview.origin}/nested/`);
     assert.equal(htmlResponse.ok, true);
     assert.match(await htmlResponse.text(), /NEC WASM Vite fixture/);
 
     const wasmPath = wasmFiles[0].slice(builtRoot.length).replaceAll("\\", "/");
-    const wasmResponse = await fetch(preview.origin + wasmPath);
+    const wasmResponse = await fetch(`${preview.origin}/nested${wasmPath}`);
     assert.equal(wasmResponse.ok, true, `WASM asset ${wasmPath} must be served`);
     const mime = wasmResponse.headers.get("content-type") ?? "";
     assert.match(mime, /application\/wasm/);
     assert.ok((await wasmResponse.arrayBuffer()).byteLength > 0);
+
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage();
+      await page.goto(`${preview.origin}/nested/`);
+      await page.waitForFunction(() => window.__NEC_RESULT__ !== undefined);
+      const result = await page.evaluate(() => window.__NEC_RESULT__);
+      assert.equal(result.workerOk, true);
+      assert.equal(result.fieldBackend.backend, "worker-pool");
+      assert.equal(result.fieldBackend.activeWorkerCount, 2);
+    } finally {
+      await browser.close();
+    }
   } finally {
     await preview.close();
   }

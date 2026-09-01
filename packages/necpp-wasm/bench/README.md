@@ -221,3 +221,22 @@ npm --prefix packages/necpp-wasm run bench:far-field-wp3
 The command writes summary JSON and raw NDJSON to
 `bench/evidence/far-field-wp3/node/`. See
 [FAR_FIELD_WP3_RESULTS.md](FAR_FIELD_WP3_RESULTS.md) for the WP4 decision.
+
+## Far-field WP4 production package benchmark
+
+`far-field-wp4-production.mjs` compares the supported
+`createNecArraySolver()` facade with `fieldWorkers: 1` and `fieldWorkers: 4`
+on the frozen primary and consumer-derived secondary grids. It records five
+retained steering states, median/minimum/maximum/p90, public backend timings,
+startup and memory, artifact hashes, numerical differences, and a rapid-request
+cancellation result:
+
+```powershell
+npm --prefix packages/necpp-wasm run build
+npm --prefix packages/necpp-wasm run bench:far-field-wp4
+```
+
+The command writes the versioned result to
+`bench/evidence/far-field-wp4/node/far-field-wp4-production.json`. See
+[FAR_FIELD_WP4_RESULTS.md](FAR_FIELD_WP4_RESULTS.md) for the production decision
+and gate summary.

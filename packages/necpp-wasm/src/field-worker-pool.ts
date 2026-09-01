@@ -11,8 +11,13 @@ interface WorkerHost {
 
 export type FieldEvaluatorArtifactShape = "dedicated" | "full-nec";
 
-async function openEvaluatorWorker(artifactShape: FieldEvaluatorArtifactShape): Promise<WorkerHost> {
-  const workerUrl = new URL("./field-evaluator-worker.js", import.meta.url);
+async function openEvaluatorWorker(
+  artifactShape: FieldEvaluatorArtifactShape,
+  assetBaseUrl?: string,
+): Promise<WorkerHost> {
+  const workerUrl = assetBaseUrl === undefined
+    ? new URL("./field-evaluator-worker.js", import.meta.url)
+    : new URL("field-evaluator-worker.js", assetBaseUrl);
   workerUrl.searchParams.set("artifact", artifactShape);
   const runtime = globalThis as typeof globalThis & {
     process?: { versions?: { node?: string } };
@@ -20,6 +25,9 @@ async function openEvaluatorWorker(artifactShape: FieldEvaluatorArtifactShape): 
   if (typeof runtime.process?.versions?.node === "string") {
     const { Worker: NodeWorker } = await import("node:worker_threads");
     const worker = new NodeWorker(workerUrl);
+    const earlyFailures: Error[] = [];
+    const captureEarlyFailure = (error: Error) => { earlyFailures.push(error); };
+    worker.on("error", captureEarlyFailure);
     return {
       post: (message, transfer = []) => worker.postMessage(message, transfer),
       onMessage(handler) {
@@ -33,14 +41,25 @@ async function openEvaluatorWorker(artifactShape: FieldEvaluatorArtifactShape): 
         };
         worker.on("error", error);
         worker.on("exit", exit);
+        worker.off("error", captureEarlyFailure);
+        for (const failure of earlyFailures.splice(0)) handler(failure);
         return () => { worker.off("error", error); worker.off("exit", exit); };
       },
-      terminate: () => { void worker.terminate(); },
+      terminate: () => {
+        // A sibling startup failure may terminate this worker before its own
+        // module-resolution error arrives. Keep that late error contained.
+        worker.on("error", () => undefined);
+        void worker.terminate();
+      },
     };
   }
-  const worker = new Worker(workerUrl, {
-    type: "module",
-  });
+  // Keep the default constructor in Vite's statically analyzable form so the
+  // nested worker, generated loader, and evaluator WASM are all emitted.
+  const worker = assetBaseUrl === undefined
+    ? new Worker(new URL("./field-evaluator-worker.js", import.meta.url), {
+      type: "module",
+    })
+    : new Worker(workerUrl, { type: "module" });
   return {
     post: (message, transfer = []) => worker.postMessage(message, transfer),
     onMessage(handler) {
@@ -51,8 +70,15 @@ async function openEvaluatorWorker(artifactShape: FieldEvaluatorArtifactShape): 
     onFailure(handler) {
       const listener = (event: ErrorEvent) => handler(event.error instanceof Error
         ? event.error : new Error(event.message));
+      const messageListener = () => handler(new Error(
+        "Evaluator worker could not deserialize a message",
+      ));
       worker.addEventListener("error", listener);
-      return () => worker.removeEventListener("error", listener);
+      worker.addEventListener("messageerror", messageListener);
+      return () => {
+        worker.removeEventListener("error", listener);
+        worker.removeEventListener("messageerror", messageListener);
+      };
     },
     terminate: () => worker.terminate(),
   };
@@ -71,14 +97,20 @@ class EvaluatorSlot {
   #removeMessage: (() => void) | undefined;
   #removeFailure: (() => void) | undefined;
   readonly artifactShape: FieldEvaluatorArtifactShape;
+  readonly assetBaseUrl: string | undefined;
 
-  constructor(index: number, artifactShape: FieldEvaluatorArtifactShape) {
+  constructor(
+    index: number,
+    artifactShape: FieldEvaluatorArtifactShape,
+    assetBaseUrl?: string,
+  ) {
     this.index = index;
     this.artifactShape = artifactShape;
+    this.assetBaseUrl = assetBaseUrl;
   }
 
   async start(): Promise<void> {
-    this.#host = await openEvaluatorWorker(this.artifactShape);
+    this.#host = await openEvaluatorWorker(this.artifactShape, this.assetBaseUrl);
     this.#removeMessage = this.#host.onMessage((message) => {
       const response = message as { id?: number; kind?: string; result?: unknown; message?: string };
       if (typeof response.id !== "number") return;
@@ -157,6 +189,10 @@ export interface FarFieldPoolDiagnostics {
   readonly mergeMs: number;
   readonly totalMs: number;
   readonly workerComputeMs: number;
+  readonly kernelMs: number;
+  readonly completedTiles: number;
+  readonly cancelledTiles: number;
+  readonly cancelledJobs: number;
   readonly restartedWorkers: number;
   readonly snapshotBytesPerWorker: number;
   readonly geometryBytesPerWorker: number;
@@ -173,11 +209,12 @@ export class StaleFarFieldJobError extends Error {
   constructor() { super("Far-field job was superseded by a newer generation"); }
 }
 
-/** WP3-only prewarmed evaluator pool. It is intentionally not a public export. */
+/** Internal prewarmed evaluator pool owned by the array facade's outer worker. */
 export class FarFieldWorkerPool {
   readonly workerCount: number;
   readonly tileSize: number;
   readonly artifactShape: FieldEvaluatorArtifactShape;
+  readonly assetBaseUrl: string | undefined;
   #slots: EvaluatorSlot[] = [];
   #snapshot: FarFieldEvaluationSnapshot | undefined;
   #activeGeneration = 0;
@@ -186,11 +223,21 @@ export class FarFieldWorkerPool {
   #geometryReused = false;
   #disposed = false;
   #restartedWorkers = 0;
+  #warmupMs = 0;
+  #cancelledTiles = 0;
+  #cancelledJobs = 0;
+  #activeJob: {
+    readonly generation: number;
+    readonly totalTiles: number;
+    completedTiles: number;
+    dispatchedTiles: number;
+  } | undefined;
 
   constructor(
     workerCount: number,
     tileSize = 512,
     artifactShape: FieldEvaluatorArtifactShape = "dedicated",
+    assetBaseUrl?: string,
   ) {
     if (!Number.isInteger(workerCount) || workerCount < 1 || workerCount > 8)
       throw new Error("Evaluator worker count must be from 1 through 8");
@@ -198,23 +245,44 @@ export class FarFieldWorkerPool {
     this.workerCount = workerCount;
     this.tileSize = tileSize;
     this.artifactShape = artifactShape;
+    this.assetBaseUrl = assetBaseUrl;
   }
 
   async prewarm(): Promise<void> {
     if (this.#disposed) throw new Error("Evaluator pool is disposed");
     if (this.#slots.length !== 0) return;
+    const started = performance.now();
     this.#slots = Array.from(
       { length: this.workerCount },
-      (_, index) => new EvaluatorSlot(index, this.artifactShape),
+      (_, index) => new EvaluatorSlot(
+        index,
+        this.artifactShape,
+        this.assetBaseUrl,
+      ),
     );
-    await Promise.all(this.#slots.map((slot) => slot.start()));
-    await Promise.all(this.#slots.map((slot) => slot.request({ kind: "ping" })));
+    try {
+      await Promise.all(this.#slots.map((slot) => slot.start()));
+      await Promise.all(this.#slots.map((slot) => slot.request({ kind: "ping" })));
+      this.#warmupMs = performance.now() - started;
+    } catch (error) {
+      for (const slot of this.#slots) slot.terminate();
+      this.#slots = [];
+      throw error;
+    }
   }
 
   async setSnapshot(snapshot: FarFieldEvaluationSnapshot): Promise<void> {
     validateFarFieldSnapshot(snapshot);
     await this.prewarm();
-    this.#activeGeneration += 1;
+    this.cancelActive();
+    if (this.#snapshot?.modelGeneration === snapshot.modelGeneration
+        && this.#snapshot.solutionGeneration === snapshot.solutionGeneration) {
+      this.#snapshot = snapshot;
+      this.#snapshotBroadcastMs = 0;
+      this.#geometryReused = true;
+      this.#lastBroadcastBytesPerWorker = 0;
+      return;
+    }
     const started = performance.now();
     const reuseGeometry = this.#snapshot?.modelGeneration === snapshot.modelGeneration;
     await Promise.all(this.#slots.map(async (slot) => {
@@ -234,7 +302,11 @@ export class FarFieldWorkerPool {
 
   async #restart(slotIndex: number): Promise<EvaluatorSlot> {
     this.#slots[slotIndex]?.terminate();
-    const replacement = new EvaluatorSlot(slotIndex, this.artifactShape);
+    const replacement = new EvaluatorSlot(
+      slotIndex,
+      this.artifactShape,
+      this.assetBaseUrl,
+    );
     await replacement.start();
     const snapshot = this.#snapshot;
     if (snapshot === undefined) throw new Error("No evaluator snapshot is available");
@@ -261,6 +333,14 @@ export class FarFieldWorkerPool {
     const ePhiImag = new Float64Array(totalSamples);
     let nextTile = 0;
     let workerComputeMs = 0;
+    const computeByWorker = new Float64Array(this.workerCount);
+    const activeJob = {
+      generation,
+      totalTiles: tiles.length,
+      completedTiles: 0,
+      dispatchedTiles: 0,
+    };
+    this.#activeJob = activeJob;
     const dispatchStarted = performance.now();
     const run = async (initialSlot: EvaluatorSlot): Promise<void> => {
       let slot = initialSlot;
@@ -268,6 +348,7 @@ export class FarFieldWorkerPool {
         const tileIndex = nextTile++;
         const tile = tiles[tileIndex];
         if (tile === undefined) return;
+        activeJob.dispatchedTiles += 1;
         const message = { kind: "evaluate", tile: tileRequest(
           request, tile.start, tile.count, generation, snapshot.solutionGeneration,
         ) };
@@ -278,21 +359,45 @@ export class FarFieldWorkerPool {
           slot = await this.#restart(slot.index);
           result = await slot.request(message) as FarFieldTileResult;
         }
+        if (!(result.eThetaReal instanceof Float64Array)
+            || !(result.eThetaImag instanceof Float64Array)
+            || !(result.ePhiReal instanceof Float64Array)
+            || !(result.ePhiImag instanceof Float64Array)
+            || result.count !== tile.count || result.start !== tile.start
+            || result.eThetaReal.length !== tile.count
+            || result.eThetaImag.length !== tile.count
+            || result.ePhiReal.length !== tile.count
+            || result.ePhiImag.length !== tile.count
+            || !Number.isFinite(result.computeMs) || result.computeMs < 0) {
+          throw new Error("Evaluator returned an invalid field tile");
+        }
         if (generation !== this.#activeGeneration
             || result.jobGeneration !== generation
             || result.solutionGeneration !== snapshot.solutionGeneration) {
           throw new StaleFarFieldJobError();
         }
         workerComputeMs += result.computeMs;
+        computeByWorker[slot.index] = (computeByWorker[slot.index] ?? 0)
+          + result.computeMs;
         eThetaReal.set(result.eThetaReal, result.start);
         eThetaImag.set(result.eThetaImag, result.start);
         ePhiReal.set(result.ePhiReal, result.start);
         ePhiImag.set(result.ePhiImag, result.start);
+        activeJob.completedTiles += 1;
       }
       throw new StaleFarFieldJobError();
     };
-    await Promise.all(this.#slots.map(run));
-    if (generation !== this.#activeGeneration) throw new StaleFarFieldJobError();
+    try {
+      await Promise.all(this.#slots.map(run));
+      if (generation !== this.#activeGeneration) throw new StaleFarFieldJobError();
+    } finally {
+      if (this.#activeJob?.generation === generation) this.#activeJob = undefined;
+    }
+    for (const values of [eThetaReal, eThetaImag, ePhiReal, ePhiImag]) {
+      if (!values.every(Number.isFinite)) {
+        throw new Error("Evaluator returned a nonfinite field result");
+      }
+    }
     const dispatchComputeTransferMs = performance.now() - dispatchStarted;
     const mergeStarted = performance.now();
     const thetaDeg = Float64Array.from({ length: request.theta.count }, (_, index) =>
@@ -312,7 +417,12 @@ export class FarFieldWorkerPool {
         snapshotBroadcastMs: this.#snapshotBroadcastMs,
         dispatchComputeTransferMs, mergeMs,
         totalMs: performance.now() - totalStarted,
-        workerComputeMs, restartedWorkers: this.#restartedWorkers,
+        workerComputeMs,
+        kernelMs: Math.max(...computeByWorker),
+        completedTiles: activeJob.completedTiles,
+        cancelledTiles: this.#cancelledTiles,
+        cancelledJobs: this.#cancelledJobs,
+        restartedWorkers: this.#restartedWorkers,
         snapshotBytesPerWorker, geometryBytesPerWorker, currentBytesPerWorker,
         lastBroadcastBytesPerWorker: this.#lastBroadcastBytesPerWorker,
         geometryReused: this.#geometryReused,
@@ -323,10 +433,22 @@ export class FarFieldWorkerPool {
   /** Test hook used to prove recovery without exposing failure injection publicly. */
   terminateEvaluatorForTest(index: number): void { this.#slots[index]?.terminate(); }
 
+  get warmupMs(): number { return this.#warmupMs; }
+
+  /** Stop assigning tiles to the active generation. In-flight tiles are bounded by worker count. */
+  cancelActive(): void {
+    const active = this.#activeJob;
+    if (active !== undefined && active.generation === this.#activeGeneration) {
+      this.#cancelledJobs += 1;
+      this.#cancelledTiles += active.totalTiles - active.completedTiles;
+    }
+    this.#activeGeneration += 1;
+  }
+
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.#activeGeneration += 1;
+    this.cancelActive();
     for (const slot of this.#slots) slot.terminate();
     this.#slots = [];
     this.#snapshot = undefined;

@@ -1,0 +1,3342 @@
+{
+  "type": "far-field-wp4-production",
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-01T19:34:20.571Z",
+  "fixture": {
+    "schemaVersion": 1,
+    "fixtureId": "pav-ng-8x8-x-dipole-v1",
+    "geometry": {
+      "side": 8,
+      "elements": 64,
+      "segmentsPerElement": 11,
+      "totalSegments": 704,
+      "frequencyMHz": 10000,
+      "wavelengthM": 0.0299792458,
+      "spacingM": 0.0149896229,
+      "lengthM": 0.014090245525999998,
+      "radiusM": 0.0000299792458,
+      "heightM": 0.00749481145,
+      "feedSegment": 6,
+      "orientation": "x-directed",
+      "ground": "infinite-perfect",
+      "groundConnection": "none"
+    },
+    "grids": {
+      "primary": {
+        "id": "primary-256-display",
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 181,
+          "stepDeg": 0.5
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 360,
+          "stepDeg": 1
+        }
+      },
+      "secondary": {
+        "id": "consumer-derived-32x32-display",
+        "derivation": {
+          "display": {
+            "n1": 32,
+            "n2": 32
+          },
+          "apertureLambda": 5.419747468305833,
+          "kD": 34.05327766148297,
+          "requestedStepDeg": 1.3214586991401025
+        },
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 69,
+          "stepDeg": 1.3235294117647058
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 272,
+          "stepDeg": 1.3235294117647058
+        }
+      }
+    },
+    "steering": [
+      {
+        "id": "broadside",
+        "u": 0,
+        "v": 0,
+        "requestedChecksum": {
+          "sha256": "ca38cc89646b9cd9290a769f54e81852a1d9aa70f2286792f741dc4937f59925",
+          "sumReal": 64,
+          "sumImag": 0,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "positive-u",
+        "u": 0.25,
+        "v": 0,
+        "requestedChecksum": {
+          "sha256": "0350938ee155954c87bdb12cebfebc2584d2d8f126d174a4bfbb865004e93bde",
+          "sumReal": 1.6653345369377348e-15,
+          "sumImag": 1.6653345369377348e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-u",
+        "u": -0.25,
+        "v": 0,
+        "requestedChecksum": {
+          "sha256": "dc4761c06459325fe0d767b919ab48fd4188159c8250a477423713d1d187019b",
+          "sumReal": 1.6653345369377348e-15,
+          "sumImag": -1.6653345369377348e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "positive-v",
+        "u": 0,
+        "v": 0.25,
+        "requestedChecksum": {
+          "sha256": "548a90579c2debd93c149335a50ddafee5b6c5709be47dac71de74f2f4372a9b",
+          "sumReal": -1.1102230246251565e-15,
+          "sumImag": -5.551115123125783e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-v",
+        "u": 0,
+        "v": -0.25,
+        "requestedChecksum": {
+          "sha256": "0a4860216b64f9ea5e0ae4cc536d7974b23f434be26202d1c2db4e999b038fcd",
+          "sumReal": -1.1102230246251565e-15,
+          "sumImag": 5.551115123125783e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "positive-diagonal",
+        "u": 0.25,
+        "v": 0.25,
+        "requestedChecksum": {
+          "sha256": "4c15a06a16d52b87943cff35ac91f42bc5e2376bc80f9a0c616fcdc53189758a",
+          "sumReal": -5.551115123125783e-16,
+          "sumImag": 2.220446049250313e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-u-diagonal",
+        "u": -0.25,
+        "v": 0.25,
+        "requestedChecksum": {
+          "sha256": "dae86a165706198ccbbfbfa588021ef84b57d54b8eba8e4f2338a136e96ff9d4",
+          "sumReal": -1.3322676295501878e-15,
+          "sumImag": 0,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-v-diagonal",
+        "u": 0.25,
+        "v": -0.25,
+        "requestedChecksum": {
+          "sha256": "0eb276cb1ff560fec88abaa043cd094ecc4a042d233489e5be1374ea48c60a6d",
+          "sumReal": -1.3322676295501878e-15,
+          "sumImag": 0,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "negative-diagonal",
+        "u": -0.25,
+        "v": -0.25,
+        "requestedChecksum": {
+          "sha256": "c328737b01c99d826f4a341dda5bd8bf88781580af27a7c2d214cbf46a86dbf0",
+          "sumReal": -5.551115123125783e-16,
+          "sumImag": -2.220446049250313e-16,
+          "l2Norm": 8
+        }
+      },
+      {
+        "id": "near-edge",
+        "u": 0.65,
+        "v": 0.35,
+        "requestedChecksum": {
+          "sha256": "602906112f63c81e6b4c7f9459a03c7f8fa60ffdde6d779b12b805190d1ceb0d",
+          "sumReal": -2.030307237113455,
+          "sumImag": -4.440892098500626e-16,
+          "l2Norm": 8
+        }
+      }
+    ]
+  },
+  "configuration": {
+    "measuredStates": 5,
+    "tileSize": 512,
+    "serialWorkers": 1,
+    "parallelWorkers": 4,
+    "primaryGrid": {
+      "id": "primary-256-display",
+      "radiusM": 1,
+      "theta": {
+        "startDeg": 0,
+        "count": 181,
+        "stepDeg": 0.5
+      },
+      "phi": {
+        "startDeg": 0,
+        "count": 360,
+        "stepDeg": 1
+      }
+    },
+    "secondaryGrid": {
+      "id": "consumer-derived-32x32-display",
+      "derivation": {
+        "display": {
+          "n1": 32,
+          "n2": 32
+        },
+        "apertureLambda": 5.419747468305833,
+        "kD": 34.05327766148297,
+        "requestedStepDeg": 1.3214586991401025
+      },
+      "radiusM": 1,
+      "theta": {
+        "startDeg": 0,
+        "count": 69,
+        "stepDeg": 1.3235294117647058
+      },
+      "phi": {
+        "startDeg": 0,
+        "count": 272,
+        "stepDeg": 1.3235294117647058
+      }
+    },
+    "primaryResultBytes": 2089448,
+    "secondaryResultBytes": 603304
+  },
+  "environment": {
+    "node": "v24.14.1",
+    "v8": "13.6.233.17-node.44",
+    "platform": "win32",
+    "release": "10.0.26200",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 7 PRO 7840HS w/ Radeon 780M Graphics ",
+    "logicalCpuCount": 16,
+    "totalMemoryBytes": 32916135936,
+    "packageVersion": "0.3.0",
+    "engineVersion": "2.5.0",
+    "engineBaseCommit": "1f48573e7ebb50aa906196364385d65d8163464d",
+    "gitStatus": [
+      "M docs/far-field-performance-upgrade-plan.md",
+      " M docs/wasm-api.md",
+      " M packages/necpp-wasm/README.md",
+      " M packages/necpp-wasm/bench/README.md",
+      " M packages/necpp-wasm/package.json",
+      " M packages/necpp-wasm/scripts/build-dist.mjs",
+      " M packages/necpp-wasm/src/array-solver.ts",
+      " M packages/necpp-wasm/src/field-evaluator-worker.ts",
+      " M packages/necpp-wasm/src/field-worker-pool.ts",
+      " M packages/necpp-wasm/src/index.ts",
+      " M packages/necpp-wasm/src/model.ts",
+      " M packages/necpp-wasm/src/types.ts",
+      " M packages/necpp-wasm/src/worker-client.ts",
+      " M packages/necpp-wasm/src/worker-entry.ts",
+      " M packages/necpp-wasm/src/worker-protocol.ts",
+      " M packages/necpp-wasm/src/worker-runtime.ts",
+      " M packages/necpp-wasm/test/pack/consumer.test.mjs",
+      " M packages/necpp-wasm/test/pack/manifest.test.mjs",
+      "?? packages/necpp-wasm/bench/FAR_FIELD_WP4_RESULTS.md",
+      "?? packages/necpp-wasm/bench/evidence/far-field-wp4/",
+      "?? packages/necpp-wasm/bench/far-field-wp4-production.mjs",
+      "?? packages/necpp-wasm/test/browser-field-worker-production.mjs",
+      "?? packages/necpp-wasm/test/field-worker-production.test.mjs"
+    ],
+    "trackedDiffSha256": "ddf0ab3cdd524e8eb9b7890443985ca0fad3294278597d586f7e8f8d251fdc1a",
+    "build": {
+      "cmakeBuildType": "Release",
+      "cxxFlags": "-O3 -DNDEBUG -flto -fexceptions",
+      "linkFlags": "-O3 -flto -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,worker,node",
+      "performanceDiagnostics": false,
+      "wasmSimd128": false,
+      "pthreads": false,
+      "farFieldOptimizations": "SELECTED"
+    },
+    "artifacts": {
+      "index.js": {
+        "bytes": 1455,
+        "sha256": "7715e5b356f133a36e1fca49469be8d841bdd0734c306f9491763e9ed2312bf8"
+      },
+      "worker-entry.js": {
+        "bytes": 3562,
+        "sha256": "391600e098bed5b66913b60ba24c48e88b2eca94a13d671445407a2e8cd87197"
+      },
+      "worker-runtime.js": {
+        "bytes": 12270,
+        "sha256": "b9412ef8a2e02d189b624ddf9f8d709014456dffee032e6106cf02464e7e65bf"
+      },
+      "field-worker-pool.js": {
+        "bytes": 17303,
+        "sha256": "4faf90828c1d3d34e13c4504fae505a5826472159313603a109ff00457b918ee"
+      },
+      "field-evaluator.js": {
+        "bytes": 8456,
+        "sha256": "7533f9dcb42d401851bd1dfe465db8145479fbafb940d7b06e69674fcdaae1e7"
+      },
+      "necpp-field-evaluator.generated.js": {
+        "bytes": 11021,
+        "sha256": "e38ebae38406983919daea32de7753748aa187a6d8062547e721f0e27130807d"
+      },
+      "nec2pp.wasm": {
+        "bytes": 750317,
+        "sha256": "efe8e36e71582a7e0ea7d5c00e62b9498b39d32da89b8f3e092170cc7c1b71bd"
+      },
+      "necpp-field-evaluator.wasm": {
+        "bytes": 19367,
+        "sha256": "7c2e35915835cd56b22689edfa66297967c782aa788c222aaae00f5c3ad1f575"
+      },
+      "field-evaluator-worker.js": {
+        "bytes": 7251,
+        "sha256": "ff04ea3619e72af9fcdce82839c24d7b862b010a1232f53a8102a1d080a6a90e"
+      }
+    }
+  },
+  "serial": {
+    "fieldWorkers": 1,
+    "createMs": 84.48850000000002,
+    "prepareMs": 389.87340000000006,
+    "warmupMs": 4544.2686,
+    "warmupBackend": {
+      "backend": "serial",
+      "requestedWorkers": 1,
+      "activeWorkerCount": 1,
+      "tileSize": 512,
+      "totalTiles": 1,
+      "completedTiles": 1,
+      "cancelledTiles": 0,
+      "cancelledJobs": 0,
+      "restartedWorkers": 0,
+      "snapshotBytesPerWorker": 0,
+      "lastBroadcastBytesPerWorker": 0,
+      "resultBytes": 2089448,
+      "geometryReused": false,
+      "warmupMs": 0,
+      "snapshotCaptureMs": 0,
+      "snapshotBroadcastMs": 0,
+      "dispatchMs": 0,
+      "kernelMs": 4540.0088,
+      "mergeMs": 0,
+      "totalMs": 4540.0088,
+      "fallbackReason": "explicit-one-worker"
+    },
+    "diagnostics": {
+      "representation": "explicit",
+      "planner": {
+        "representation": "explicit",
+        "exact": true,
+        "effectiveCenterM": [
+          0,
+          0
+        ],
+        "maxPositionAdjustmentM": 0,
+        "canonicalizations": [
+          {
+            "callerElementIndex": 0,
+            "originalPositionM": [
+              -0.05246368015,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 1,
+            "originalPositionM": [
+              -0.03747405725,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 2,
+            "originalPositionM": [
+              -0.02248443435,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 3,
+            "originalPositionM": [
+              -0.00749481145,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 4,
+            "originalPositionM": [
+              0.00749481145,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 5,
+            "originalPositionM": [
+              0.02248443435,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 6,
+            "originalPositionM": [
+              0.03747405725,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 7,
+            "originalPositionM": [
+              0.05246368015,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 8,
+            "originalPositionM": [
+              -0.05246368015,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 9,
+            "originalPositionM": [
+              -0.03747405725,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 10,
+            "originalPositionM": [
+              -0.02248443435,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 11,
+            "originalPositionM": [
+              -0.00749481145,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 12,
+            "originalPositionM": [
+              0.00749481145,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 13,
+            "originalPositionM": [
+              0.02248443435,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 14,
+            "originalPositionM": [
+              0.03747405725,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 15,
+            "originalPositionM": [
+              0.05246368015,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 16,
+            "originalPositionM": [
+              -0.05246368015,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 17,
+            "originalPositionM": [
+              -0.03747405725,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 18,
+            "originalPositionM": [
+              -0.02248443435,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 19,
+            "originalPositionM": [
+              -0.00749481145,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 20,
+            "originalPositionM": [
+              0.00749481145,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 21,
+            "originalPositionM": [
+              0.02248443435,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 22,
+            "originalPositionM": [
+              0.03747405725,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 23,
+            "originalPositionM": [
+              0.05246368015,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 24,
+            "originalPositionM": [
+              -0.05246368015,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 25,
+            "originalPositionM": [
+              -0.03747405725,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 26,
+            "originalPositionM": [
+              -0.02248443435,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 27,
+            "originalPositionM": [
+              -0.00749481145,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 28,
+            "originalPositionM": [
+              0.00749481145,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 29,
+            "originalPositionM": [
+              0.02248443435,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 30,
+            "originalPositionM": [
+              0.03747405725,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 31,
+            "originalPositionM": [
+              0.05246368015,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 32,
+            "originalPositionM": [
+              -0.05246368015,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 33,
+            "originalPositionM": [
+              -0.03747405725,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 34,
+            "originalPositionM": [
+              -0.02248443435,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 35,
+            "originalPositionM": [
+              -0.00749481145,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 36,
+            "originalPositionM": [
+              0.00749481145,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 37,
+            "originalPositionM": [
+              0.02248443435,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 38,
+            "originalPositionM": [
+              0.03747405725,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 39,
+            "originalPositionM": [
+              0.05246368015,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 40,
+            "originalPositionM": [
+              -0.05246368015,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 41,
+            "originalPositionM": [
+              -0.03747405725,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 42,
+            "originalPositionM": [
+              -0.02248443435,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 43,
+            "originalPositionM": [
+              -0.00749481145,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 44,
+            "originalPositionM": [
+              0.00749481145,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 45,
+            "originalPositionM": [
+              0.02248443435,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 46,
+            "originalPositionM": [
+              0.03747405725,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 47,
+            "originalPositionM": [
+              0.05246368015,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 48,
+            "originalPositionM": [
+              -0.05246368015,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 49,
+            "originalPositionM": [
+              -0.03747405725,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 50,
+            "originalPositionM": [
+              -0.02248443435,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 51,
+            "originalPositionM": [
+              -0.00749481145,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 52,
+            "originalPositionM": [
+              0.00749481145,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 53,
+            "originalPositionM": [
+              0.02248443435,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 54,
+            "originalPositionM": [
+              0.03747405725,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 55,
+            "originalPositionM": [
+              0.05246368015,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 56,
+            "originalPositionM": [
+              -0.05246368015,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 57,
+            "originalPositionM": [
+              -0.03747405725,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 58,
+            "originalPositionM": [
+              -0.02248443435,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 59,
+            "originalPositionM": [
+              -0.00749481145,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 60,
+            "originalPositionM": [
+              0.00749481145,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 61,
+            "originalPositionM": [
+              0.02248443435,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 62,
+            "originalPositionM": [
+              0.03747405725,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 63,
+            "originalPositionM": [
+              0.05246368015,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          }
+        ],
+        "candidates": [],
+        "reasons": [
+          {
+            "code": "UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM",
+            "message": "Pattern x-directed-dipole wire radiator is not pointwise on the local Z axis",
+            "callerElementIndex": 0,
+            "patternId": "x-directed-dipole"
+          }
+        ]
+      },
+      "field": {
+        "backend": "serial",
+        "requestedWorkers": 1,
+        "activeWorkerCount": 1,
+        "tileSize": 512,
+        "totalTiles": 1,
+        "completedTiles": 1,
+        "cancelledTiles": 0,
+        "cancelledJobs": 0,
+        "restartedWorkers": 0,
+        "snapshotBytesPerWorker": 0,
+        "lastBroadcastBytesPerWorker": 0,
+        "resultBytes": 603304,
+        "geometryReused": false,
+        "warmupMs": 0,
+        "snapshotCaptureMs": 0,
+        "snapshotBroadcastMs": 0,
+        "dispatchMs": 0,
+        "kernelMs": 1318.951000000001,
+        "mergeMs": 0,
+        "totalMs": 1318.951000000001,
+        "fallbackReason": "explicit-one-worker"
+      }
+    },
+    "primary": [
+      {
+        "index": 0,
+        "solveMs": 4.935999999999694,
+        "fieldMs": 5321.069699999999,
+        "solveAndFieldMs": 5326.005699999999,
+        "requestedChecksum": {
+          "sha256": "ca38cc89646b9cd9290a769f54e81852a1d9aa70f2286792f741dc4937f59925",
+          "sumReal": 64,
+          "sumImag": 0,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "a54ada851db8f0d140db3345f237fddefa45edad46dde5889c626d607dc35c24",
+          "sumReal": 63.99999999999994,
+          "sumImag": -5.66626849449861e-14,
+          "l2Norm": 7.9999999999999964
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 2,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 2089448,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 5319.835499999999,
+          "mergeMs": 0,
+          "totalMs": 5319.835499999999,
+          "fallbackReason": "explicit-one-worker"
+        }
+      },
+      {
+        "index": 1,
+        "solveMs": 4.42410000000018,
+        "fieldMs": 5553.838299999999,
+        "solveAndFieldMs": 5558.2624,
+        "requestedChecksum": {
+          "sha256": "0350938ee155954c87bdb12cebfebc2584d2d8f126d174a4bfbb865004e93bde",
+          "sumReal": 1.6653345369377348e-15,
+          "sumImag": 1.6653345369377348e-16,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "1e1248bf8d883b1ba0bc645f214286d4151d7ccb24723b32fcc4e4b476d07e86",
+          "sumReal": -1.1390888232654106e-13,
+          "sumImag": -3.7636560534792807e-14,
+          "l2Norm": 8.00000000000001
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 3,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 2089448,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 5545.9526000000005,
+          "mergeMs": 0,
+          "totalMs": 5545.9526000000005,
+          "fallbackReason": "explicit-one-worker"
+        }
+      },
+      {
+        "index": 2,
+        "solveMs": 3.676900000000387,
+        "fieldMs": 5248.6354999999985,
+        "solveAndFieldMs": 5252.312399999999,
+        "requestedChecksum": {
+          "sha256": "dc4761c06459325fe0d767b919ab48fd4188159c8250a477423713d1d187019b",
+          "sumReal": 1.6653345369377348e-15,
+          "sumImag": -1.6653345369377348e-16,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "ffa442361a87432a04503968b4aa209c50b8a37e2ebd044c2481cca2f62eec05",
+          "sumReal": 6.050715484207103e-14,
+          "sumImag": 6.394884621840902e-14,
+          "l2Norm": 7.999999999999992
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 4,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 2089448,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 5244.960799999999,
+          "mergeMs": 0,
+          "totalMs": 5244.960799999999,
+          "fallbackReason": "explicit-one-worker"
+        }
+      },
+      {
+        "index": 3,
+        "solveMs": 3.7652999999991152,
+        "fieldMs": 5282.0797999999995,
+        "solveAndFieldMs": 5285.845099999999,
+        "requestedChecksum": {
+          "sha256": "548a90579c2debd93c149335a50ddafee5b6c5709be47dac71de74f2f4372a9b",
+          "sumReal": -1.1102230246251565e-15,
+          "sumImag": -5.551115123125783e-16,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "4c1d56e18ee2a637a057612e1220f7e610424278c7cd955b74bdb91a1920f4cf",
+          "sumReal": -2.398081733190338e-14,
+          "sumImag": 1.199040866595169e-14,
+          "l2Norm": 7.9999999999999964
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 5,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 2089448,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 5281.045099999999,
+          "mergeMs": 0,
+          "totalMs": 5281.045099999999,
+          "fallbackReason": "explicit-one-worker"
+        }
+      },
+      {
+        "index": 4,
+        "solveMs": 2.960299999998824,
+        "fieldMs": 5496.297299999998,
+        "solveAndFieldMs": 5499.257599999997,
+        "requestedChecksum": {
+          "sha256": "0a4860216b64f9ea5e0ae4cc536d7974b23f434be26202d1c2db4e999b038fcd",
+          "sumReal": -1.1102230246251565e-15,
+          "sumImag": 5.551115123125783e-16,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "2949ecb765e583aa17d5c9e2e472d86f5d6d647d755ac50e2ea08ec6a4e83cd8",
+          "sumReal": 8.881784197001252e-16,
+          "sumImag": 2.603472992745992e-14,
+          "l2Norm": 8.000000000000012
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 6,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 2089448,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 5495.213800000001,
+          "mergeMs": 0,
+          "totalMs": 5495.213800000001,
+          "fallbackReason": "explicit-one-worker"
+        }
+      }
+    ],
+    "secondary": [
+      {
+        "index": 0,
+        "fieldMs": 1461.3232000000025,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 1460.7209999999977,
+          "mergeMs": 0,
+          "totalMs": 1460.7209999999977,
+          "fallbackReason": "explicit-one-worker"
+        }
+      },
+      {
+        "index": 1,
+        "fieldMs": 1286.5503000000026,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 1285.7482999999993,
+          "mergeMs": 0,
+          "totalMs": 1285.7482999999993,
+          "fallbackReason": "explicit-one-worker"
+        }
+      },
+      {
+        "index": 2,
+        "fieldMs": 1532.6628999999957,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 1525.8424000000014,
+          "mergeMs": 0,
+          "totalMs": 1525.8424000000014,
+          "fallbackReason": "explicit-one-worker"
+        }
+      },
+      {
+        "index": 3,
+        "fieldMs": 1569.2183000000005,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 1568.2808000000005,
+          "mergeMs": 0,
+          "totalMs": 1568.2808000000005,
+          "fallbackReason": "explicit-one-worker"
+        }
+      },
+      {
+        "index": 4,
+        "fieldMs": 1319.5213000000003,
+        "backend": {
+          "backend": "serial",
+          "requestedWorkers": 1,
+          "activeWorkerCount": 1,
+          "tileSize": 512,
+          "totalTiles": 1,
+          "completedTiles": 1,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 0,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": false,
+          "warmupMs": 0,
+          "snapshotCaptureMs": 0,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 0,
+          "kernelMs": 1318.951000000001,
+          "mergeMs": 0,
+          "totalMs": 1318.951000000001,
+          "fallbackReason": "explicit-one-worker"
+        }
+      }
+    ],
+    "cancellation": null,
+    "summary": {
+      "primarySolveMs": {
+        "count": 5,
+        "minimum": 2.960299999998824,
+        "median": 3.7652999999991152,
+        "maximum": 4.935999999999694,
+        "p90": 4.935999999999694
+      },
+      "primaryFieldMs": {
+        "count": 5,
+        "minimum": 5248.6354999999985,
+        "median": 5321.069699999999,
+        "maximum": 5553.838299999999,
+        "p90": 5553.838299999999
+      },
+      "primarySolveAndFieldMs": {
+        "count": 5,
+        "minimum": 5252.312399999999,
+        "median": 5326.005699999999,
+        "maximum": 5558.2624,
+        "p90": 5558.2624
+      },
+      "secondaryFieldMs": {
+        "count": 5,
+        "minimum": 1286.5503000000026,
+        "median": 1461.3232000000025,
+        "maximum": 1569.2183000000005,
+        "p90": 1569.2183000000005
+      }
+    },
+    "memory": {
+      "before": {
+        "rssBytes": 63946752,
+        "heapUsedBytes": 6363464,
+        "externalBytes": 2425318,
+        "arrayBuffersBytes": 135862
+      },
+      "after": {
+        "rssBytes": 102522880,
+        "heapUsedBytes": 6238928,
+        "externalBytes": 10763680,
+        "arrayBuffersBytes": 6597875
+      },
+      "peakRssBytes": 119779328,
+      "peakRssDeltaBytes": 55832576
+    }
+  },
+  "pool": {
+    "fieldWorkers": 4,
+    "createMs": 77.81109999999899,
+    "prepareMs": 387.0404000000053,
+    "warmupMs": 1753.0072,
+    "warmupBackend": {
+      "backend": "worker-pool",
+      "requestedWorkers": 4,
+      "activeWorkerCount": 4,
+      "tileSize": 512,
+      "totalTiles": 128,
+      "completedTiles": 128,
+      "cancelledTiles": 0,
+      "cancelledJobs": 0,
+      "restartedWorkers": 0,
+      "snapshotBytesPerWorker": 73216,
+      "lastBroadcastBytesPerWorker": 73216,
+      "resultBytes": 2089448,
+      "geometryReused": false,
+      "warmupMs": 114.47110000000248,
+      "snapshotCaptureMs": 0.7382999999972526,
+      "snapshotBroadcastMs": 2.0280000000057044,
+      "dispatchMs": 20.89139999998588,
+      "kernelMs": 1608.4216000000088,
+      "mergeMs": 0.15680000000429573,
+      "totalMs": 1633.1861000000063
+    },
+    "diagnostics": {
+      "representation": "explicit",
+      "planner": {
+        "representation": "explicit",
+        "exact": true,
+        "effectiveCenterM": [
+          0,
+          0
+        ],
+        "maxPositionAdjustmentM": 0,
+        "canonicalizations": [
+          {
+            "callerElementIndex": 0,
+            "originalPositionM": [
+              -0.05246368015,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 1,
+            "originalPositionM": [
+              -0.03747405725,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 2,
+            "originalPositionM": [
+              -0.02248443435,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 3,
+            "originalPositionM": [
+              -0.00749481145,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 4,
+            "originalPositionM": [
+              0.00749481145,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 5,
+            "originalPositionM": [
+              0.02248443435,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 6,
+            "originalPositionM": [
+              0.03747405725,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 7,
+            "originalPositionM": [
+              0.05246368015,
+              -0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              -0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 8,
+            "originalPositionM": [
+              -0.05246368015,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 9,
+            "originalPositionM": [
+              -0.03747405725,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 10,
+            "originalPositionM": [
+              -0.02248443435,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 11,
+            "originalPositionM": [
+              -0.00749481145,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 12,
+            "originalPositionM": [
+              0.00749481145,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 13,
+            "originalPositionM": [
+              0.02248443435,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 14,
+            "originalPositionM": [
+              0.03747405725,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 15,
+            "originalPositionM": [
+              0.05246368015,
+              -0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              -0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 16,
+            "originalPositionM": [
+              -0.05246368015,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 17,
+            "originalPositionM": [
+              -0.03747405725,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 18,
+            "originalPositionM": [
+              -0.02248443435,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 19,
+            "originalPositionM": [
+              -0.00749481145,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 20,
+            "originalPositionM": [
+              0.00749481145,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 21,
+            "originalPositionM": [
+              0.02248443435,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 22,
+            "originalPositionM": [
+              0.03747405725,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 23,
+            "originalPositionM": [
+              0.05246368015,
+              -0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              -0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 24,
+            "originalPositionM": [
+              -0.05246368015,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 25,
+            "originalPositionM": [
+              -0.03747405725,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 26,
+            "originalPositionM": [
+              -0.02248443435,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 27,
+            "originalPositionM": [
+              -0.00749481145,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 28,
+            "originalPositionM": [
+              0.00749481145,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 29,
+            "originalPositionM": [
+              0.02248443435,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 30,
+            "originalPositionM": [
+              0.03747405725,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 31,
+            "originalPositionM": [
+              0.05246368015,
+              -0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              -0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 32,
+            "originalPositionM": [
+              -0.05246368015,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 33,
+            "originalPositionM": [
+              -0.03747405725,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 34,
+            "originalPositionM": [
+              -0.02248443435,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 35,
+            "originalPositionM": [
+              -0.00749481145,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 36,
+            "originalPositionM": [
+              0.00749481145,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 37,
+            "originalPositionM": [
+              0.02248443435,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 38,
+            "originalPositionM": [
+              0.03747405725,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 39,
+            "originalPositionM": [
+              0.05246368015,
+              0.00749481145
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              0.00749481145
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 40,
+            "originalPositionM": [
+              -0.05246368015,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 41,
+            "originalPositionM": [
+              -0.03747405725,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 42,
+            "originalPositionM": [
+              -0.02248443435,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 43,
+            "originalPositionM": [
+              -0.00749481145,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 44,
+            "originalPositionM": [
+              0.00749481145,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 45,
+            "originalPositionM": [
+              0.02248443435,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 46,
+            "originalPositionM": [
+              0.03747405725,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 47,
+            "originalPositionM": [
+              0.05246368015,
+              0.02248443435
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              0.02248443435
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 48,
+            "originalPositionM": [
+              -0.05246368015,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 49,
+            "originalPositionM": [
+              -0.03747405725,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 50,
+            "originalPositionM": [
+              -0.02248443435,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 51,
+            "originalPositionM": [
+              -0.00749481145,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 52,
+            "originalPositionM": [
+              0.00749481145,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 53,
+            "originalPositionM": [
+              0.02248443435,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 54,
+            "originalPositionM": [
+              0.03747405725,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 55,
+            "originalPositionM": [
+              0.05246368015,
+              0.03747405725
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              0.03747405725
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 56,
+            "originalPositionM": [
+              -0.05246368015,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.05246368015,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 57,
+            "originalPositionM": [
+              -0.03747405725,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.03747405725,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 58,
+            "originalPositionM": [
+              -0.02248443435,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.02248443435,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 59,
+            "originalPositionM": [
+              -0.00749481145,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              -0.00749481145,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 60,
+            "originalPositionM": [
+              0.00749481145,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.00749481145,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 61,
+            "originalPositionM": [
+              0.02248443435,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.02248443435,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 62,
+            "originalPositionM": [
+              0.03747405725,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.03747405725,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          },
+          {
+            "callerElementIndex": 63,
+            "originalPositionM": [
+              0.05246368015,
+              0.05246368015
+            ],
+            "canonicalPositionM": [
+              0.05246368015,
+              0.05246368015
+            ],
+            "adjustmentM": [
+              0,
+              0
+            ],
+            "distanceM": 0
+          }
+        ],
+        "candidates": [],
+        "reasons": [
+          {
+            "code": "UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM",
+            "message": "Pattern x-directed-dipole wire radiator is not pointwise on the local Z axis",
+            "callerElementIndex": 0,
+            "patternId": "x-directed-dipole"
+          }
+        ]
+      },
+      "field": {
+        "backend": "worker-pool",
+        "requestedWorkers": 4,
+        "activeWorkerCount": 4,
+        "tileSize": 512,
+        "totalTiles": 128,
+        "completedTiles": 128,
+        "cancelledTiles": 128,
+        "cancelledJobs": 1,
+        "restartedWorkers": 0,
+        "snapshotBytesPerWorker": 73216,
+        "lastBroadcastBytesPerWorker": 0,
+        "resultBytes": 2089448,
+        "geometryReused": true,
+        "warmupMs": 114.47110000000248,
+        "snapshotCaptureMs": 0.08269999999902211,
+        "snapshotBroadcastMs": 0,
+        "dispatchMs": 8.425900000016554,
+        "kernelMs": 1608.9901999999784,
+        "mergeMs": 0.03719999999884749,
+        "totalMs": 1618.1143999999986
+      }
+    },
+    "primary": [
+      {
+        "index": 0,
+        "solveMs": 3.8044000000008964,
+        "fieldMs": 1549.381300000001,
+        "solveAndFieldMs": 1553.1857000000018,
+        "requestedChecksum": {
+          "sha256": "ca38cc89646b9cd9290a769f54e81852a1d9aa70f2286792f741dc4937f59925",
+          "sumReal": 64,
+          "sumImag": 0,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "a54ada851db8f0d140db3345f237fddefa45edad46dde5889c626d607dc35c24",
+          "sumReal": 63.99999999999994,
+          "sumImag": -5.66626849449861e-14,
+          "l2Norm": 7.9999999999999964
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 2,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 128,
+          "completedTiles": 128,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 33792,
+          "resultBytes": 2089448,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.2488999999986845,
+          "snapshotBroadcastMs": 1.8096999999979744,
+          "dispatchMs": 10.356199999987439,
+          "kernelMs": 1534.8582000000097,
+          "mergeMs": 0.13360000000102445,
+          "totalMs": 1547.9007999999958
+        }
+      },
+      {
+        "index": 1,
+        "solveMs": 3.4272000000055414,
+        "fieldMs": 2258.043900000004,
+        "solveAndFieldMs": 2261.4711000000098,
+        "requestedChecksum": {
+          "sha256": "0350938ee155954c87bdb12cebfebc2584d2d8f126d174a4bfbb865004e93bde",
+          "sumReal": 1.6653345369377348e-15,
+          "sumImag": 1.6653345369377348e-16,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "1e1248bf8d883b1ba0bc645f214286d4151d7ccb24723b32fcc4e4b476d07e86",
+          "sumReal": -1.1390888232654106e-13,
+          "sumImag": -3.7636560534792807e-14,
+          "l2Norm": 8.00000000000001
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 3,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 128,
+          "completedTiles": 128,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 33792,
+          "resultBytes": 2089448,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.14769999999407446,
+          "snapshotBroadcastMs": 1.3557000000000698,
+          "dispatchMs": 29.68409999999858,
+          "kernelMs": 2224.671300000002,
+          "mergeMs": 0.1275999999998021,
+          "totalMs": 2256.5072999999975
+        }
+      },
+      {
+        "index": 2,
+        "solveMs": 2.516700000000128,
+        "fieldMs": 1602.2623000000021,
+        "solveAndFieldMs": 1604.7790000000023,
+        "requestedChecksum": {
+          "sha256": "dc4761c06459325fe0d767b919ab48fd4188159c8250a477423713d1d187019b",
+          "sumReal": 1.6653345369377348e-15,
+          "sumImag": -1.6653345369377348e-16,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "ffa442361a87432a04503968b4aa209c50b8a37e2ebd044c2481cca2f62eec05",
+          "sumReal": 6.050715484207103e-14,
+          "sumImag": 6.394884621840902e-14,
+          "l2Norm": 7.999999999999992
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 4,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 128,
+          "completedTiles": 128,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 33792,
+          "resultBytes": 2089448,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.06930000000284053,
+          "snapshotBroadcastMs": 0.6638000000020838,
+          "dispatchMs": 8.830699999991339,
+          "kernelMs": 1590.9261000000042,
+          "mergeMs": 0.09570000000530854,
+          "totalMs": 1601.1117000000013
+        }
+      },
+      {
+        "index": 3,
+        "solveMs": 3.499599999995553,
+        "fieldMs": 1515.431199999999,
+        "solveAndFieldMs": 1518.9307999999946,
+        "requestedChecksum": {
+          "sha256": "548a90579c2debd93c149335a50ddafee5b6c5709be47dac71de74f2f4372a9b",
+          "sumReal": -1.1102230246251565e-15,
+          "sumImag": -5.551115123125783e-16,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "4c1d56e18ee2a637a057612e1220f7e610424278c7cd955b74bdb91a1920f4cf",
+          "sumReal": -2.398081733190338e-14,
+          "sumImag": 1.199040866595169e-14,
+          "l2Norm": 7.9999999999999964
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 5,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 128,
+          "completedTiles": 128,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 33792,
+          "resultBytes": 2089448,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.12719999999535503,
+          "snapshotBroadcastMs": 1.090199999998731,
+          "dispatchMs": 7.616700000013225,
+          "kernelMs": 1504.925299999988,
+          "mergeMs": 0.039400000001478475,
+          "totalMs": 1514.2513999999937
+        }
+      },
+      {
+        "index": 4,
+        "solveMs": 2.4547999999995227,
+        "fieldMs": 1583.145899999996,
+        "solveAndFieldMs": 1585.6006999999954,
+        "requestedChecksum": {
+          "sha256": "0a4860216b64f9ea5e0ae4cc536d7974b23f434be26202d1c2db4e999b038fcd",
+          "sumReal": -1.1102230246251565e-15,
+          "sumImag": 5.551115123125783e-16,
+          "l2Norm": 8
+        },
+        "achievedChecksum": {
+          "sha256": "2949ecb765e583aa17d5c9e2e472d86f5d6d647d755ac50e2ea08ec6a4e83cd8",
+          "sumReal": 8.881784197001252e-16,
+          "sumImag": 2.603472992745992e-14,
+          "l2Norm": 8.000000000000012
+        },
+        "factorizationGeneration": 1,
+        "solveGeneration": 6,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 128,
+          "completedTiles": 128,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 33792,
+          "resultBytes": 2089448,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.06519999999727588,
+          "snapshotBroadcastMs": 0.5412999999971362,
+          "dispatchMs": 8.083400000003166,
+          "kernelMs": 1573.1192999999985,
+          "mergeMs": 0.03559999999561114,
+          "totalMs": 1582.2963999999993
+        }
+      }
+    ],
+    "secondary": [
+      {
+        "index": 0,
+        "fieldMs": 462.04009999999835,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 37,
+          "completedTiles": 37,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.09520000000338769,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 3.405300000020361,
+          "kernelMs": 457.95109999998385,
+          "mergeMs": 0.028599999997823033,
+          "totalMs": 461.53949999999895
+        }
+      },
+      {
+        "index": 1,
+        "fieldMs": 453.400999999998,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 37,
+          "completedTiles": 37,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.08690000000206055,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 2.7718999999997322,
+          "kernelMs": 449.46570000000065,
+          "mergeMs": 0.03289999999833526,
+          "totalMs": 452.51230000000214
+        }
+      },
+      {
+        "index": 2,
+        "fieldMs": 485.52769999999873,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 37,
+          "completedTiles": 37,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.1978000000017346,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 2.6675000000032014,
+          "kernelMs": 481.65499999999884,
+          "mergeMs": 0.05920000000332948,
+          "totalMs": 484.7789000000048
+        }
+      },
+      {
+        "index": 3,
+        "fieldMs": 468.34189999999944,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 37,
+          "completedTiles": 37,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.09950000000389991,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 3.435299999990093,
+          "kernelMs": 463.7959000000119,
+          "mergeMs": 0.04020000000309665,
+          "totalMs": 467.5260000000053
+        }
+      },
+      {
+        "index": 4,
+        "fieldMs": 467.5429000000004,
+        "backend": {
+          "backend": "worker-pool",
+          "requestedWorkers": 4,
+          "activeWorkerCount": 4,
+          "tileSize": 512,
+          "totalTiles": 37,
+          "completedTiles": 37,
+          "cancelledTiles": 0,
+          "cancelledJobs": 0,
+          "restartedWorkers": 0,
+          "snapshotBytesPerWorker": 73216,
+          "lastBroadcastBytesPerWorker": 0,
+          "resultBytes": 603304,
+          "geometryReused": true,
+          "warmupMs": 114.47110000000248,
+          "snapshotCaptureMs": 0.09389999999984866,
+          "snapshotBroadcastMs": 0,
+          "dispatchMs": 2.519799999994575,
+          "kernelMs": 463.8458000000028,
+          "mergeMs": 0.033999999999650754,
+          "totalMs": 466.7266000000018
+        }
+      }
+    ],
+    "cancellation": {
+      "delayBeforeSupersedeMs": 40,
+      "staleError": {
+        "name": "NecRuntimeError",
+        "code": "NEC_RUNTIME",
+        "reason": "superseded"
+      },
+      "newestBackend": {
+        "backend": "worker-pool",
+        "requestedWorkers": 4,
+        "activeWorkerCount": 4,
+        "tileSize": 512,
+        "totalTiles": 128,
+        "completedTiles": 128,
+        "cancelledTiles": 128,
+        "cancelledJobs": 1,
+        "restartedWorkers": 0,
+        "snapshotBytesPerWorker": 73216,
+        "lastBroadcastBytesPerWorker": 0,
+        "resultBytes": 2089448,
+        "geometryReused": true,
+        "warmupMs": 114.47110000000248,
+        "snapshotCaptureMs": 0.08269999999902211,
+        "snapshotBroadcastMs": 0,
+        "dispatchMs": 8.425900000016554,
+        "kernelMs": 1608.9901999999784,
+        "mergeMs": 0.03719999999884749,
+        "totalMs": 1618.1143999999986
+      },
+      "newestSamples": 65160
+    },
+    "summary": {
+      "primarySolveMs": {
+        "count": 5,
+        "minimum": 2.4547999999995227,
+        "median": 3.4272000000055414,
+        "maximum": 3.8044000000008964,
+        "p90": 3.8044000000008964
+      },
+      "primaryFieldMs": {
+        "count": 5,
+        "minimum": 1515.431199999999,
+        "median": 1583.145899999996,
+        "maximum": 2258.043900000004,
+        "p90": 2258.043900000004
+      },
+      "primarySolveAndFieldMs": {
+        "count": 5,
+        "minimum": 1518.9307999999946,
+        "median": 1585.6006999999954,
+        "maximum": 2261.4711000000098,
+        "p90": 2261.4711000000098
+      },
+      "secondaryFieldMs": {
+        "count": 5,
+        "minimum": 453.400999999998,
+        "median": 467.5429000000004,
+        "maximum": 485.52769999999873,
+        "p90": 485.52769999999873
+      }
+    },
+    "memory": {
+      "before": {
+        "rssBytes": 102563840,
+        "heapUsedBytes": 6255816,
+        "externalBytes": 10763680,
+        "arrayBuffersBytes": 6597875
+      },
+      "after": {
+        "rssBytes": 190980096,
+        "heapUsedBytes": 6900824,
+        "externalBytes": 42167192,
+        "arrayBuffersBytes": 23626227
+      },
+      "peakRssBytes": 186187776,
+      "peakRssDeltaBytes": 83623936
+    }
+  },
+  "correctness": {
+    "eThetaScaledMaximum": 5.157576513399137e-11,
+    "ePhiScaledMaximum": 3.076558954619036e-11,
+    "secondaryEThetaScaledMaximum": 5.152108924106736e-11
+  },
+  "comparison": {
+    "primaryFieldSpeedup": 3.3610734803406386,
+    "primaryEndToEndSpeedup": 3.358982939399569,
+    "secondaryParallelToSerialRatio": 0.31994489651570546
+  },
+  "gates": {
+    "primaryFieldAtLeast2x": true,
+    "primaryEndToEndAtLeast1_75x": true,
+    "secondaryNoRegression": true,
+    "numericalParity": true
+  },
+  "ok": true
+}

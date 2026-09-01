@@ -57,7 +57,14 @@ const moduleImport = artifactShape === "full-nec"
   ? await import("./nec2pp.generated.js")
   : await import("./necpp-field-evaluator.generated.js");
 const createFieldEvaluatorModule = moduleImport.default as unknown as FieldEvaluatorWasmFactory;
-const wasm = await createFieldEvaluatorModule();
+const evaluatorWasmUrl = artifactShape === "full-nec"
+  ? new URL("./nec2pp.wasm", import.meta.url).href
+  : new URL("./necpp-field-evaluator.wasm", import.meta.url).href;
+const wasm = await createFieldEvaluatorModule({
+  locateFile(path, prefix) {
+    return path.endsWith(".wasm") ? evaluatorWasmUrl : `${prefix}${path}`;
+  },
+});
 if (wasm._necpp_field_evaluator_v1_version() !== 1) {
   throw new Error("Unsupported dedicated field-evaluator WASM version");
 }
