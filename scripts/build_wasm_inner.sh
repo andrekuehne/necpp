@@ -15,7 +15,9 @@ CONTAINER_BUILD_DIR="/tmp/necpp-${BUILD_DIR}"
 
 rm -f \
     packages/necpp-wasm/src/nec2pp.generated.js \
-    packages/necpp-wasm/src/nec2pp.wasm
+    packages/necpp-wasm/src/nec2pp.wasm \
+    packages/necpp-wasm/src/necpp-field-evaluator.generated.js \
+    packages/necpp-wasm/src/necpp-field-evaluator.wasm
 rm -f "$WASM_OUT_DIR/nec2pp.d.ts"
 rm -rf "$CONTAINER_BUILD_DIR"
 
@@ -51,15 +53,23 @@ cmake --build "$CONTAINER_BUILD_DIR" --config Release -j"$(nproc)"
 
 test -s "$CONTAINER_BUILD_DIR/src/nec2pp.js"
 test -s "$CONTAINER_BUILD_DIR/src/nec2pp.wasm"
+test -s "$CONTAINER_BUILD_DIR/src/necpp-field-evaluator.js"
+test -s "$CONTAINER_BUILD_DIR/src/necpp-field-evaluator.wasm"
 
 cp "$CONTAINER_BUILD_DIR/src/nec2pp.js" \
     packages/necpp-wasm/src/nec2pp.generated.js
 cp "$CONTAINER_BUILD_DIR/src/nec2pp.wasm" \
     packages/necpp-wasm/src/nec2pp.wasm
+cp "$CONTAINER_BUILD_DIR/src/necpp-field-evaluator.js" \
+    packages/necpp-wasm/src/necpp-field-evaluator.generated.js
+cp "$CONTAINER_BUILD_DIR/src/necpp-field-evaluator.wasm" \
+    packages/necpp-wasm/src/necpp-field-evaluator.wasm
 
 mkdir -p "$WASM_OUT_DIR"
 
 cp \
     "$CONTAINER_BUILD_DIR/src/nec2pp.js" \
     "$CONTAINER_BUILD_DIR/src/nec2pp.wasm" \
+    "$CONTAINER_BUILD_DIR/src/necpp-field-evaluator.js" \
+    "$CONTAINER_BUILD_DIR/src/necpp-field-evaluator.wasm" \
     "$WASM_OUT_DIR/"

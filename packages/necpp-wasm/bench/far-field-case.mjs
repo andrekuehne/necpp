@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { arch, cpus, platform, release, totalmem } from "node:os";
 import { basename, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -64,6 +64,9 @@ function parseArguments(argv) {
     ),
     steeringLimit: Number(values.get("steering-limit") ?? STEERING_POINTS.length),
     reuseGrid: parseBoolean(values.get("reuse-grid") ?? "true", "--reuse-grid"),
+    fieldDumpDirectory: values.has("field-dump-directory")
+      ? resolve(values.get("field-dump-directory"))
+      : null,
   };
 }
 
@@ -133,6 +136,18 @@ function representativeFieldSamples(field) {
     ePhiReal: field.ePhiReal[index],
     ePhiImag: field.ePhiImag[index],
   }));
+}
+
+function dumpField(directory, state, field) {
+  if (directory === null) return;
+  mkdirSync(directory, { recursive: true });
+  const samples = field.eThetaReal.length;
+  const values = new Float64Array(samples * 4);
+  values.set(field.eThetaReal, 0);
+  values.set(field.eThetaImag, samples);
+  values.set(field.ePhiReal, samples * 2);
+  values.set(field.ePhiImag, samples * 3);
+  writeFileSync(resolve(directory, `${state}.f64`), new Uint8Array(values.buffer));
 }
 
 function assertExplicitFallback(diagnostics) {
@@ -245,6 +260,7 @@ export async function runFarFieldCase(options) {
           || field.value.ePhiImag.length !== expectedSamples) {
         throw new Error("far-field extraction returned the wrong sample count");
       }
+      dumpField(options.fieldDumpDirectory, index, field.value);
       steering.push({
         index,
         point,

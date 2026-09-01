@@ -1,0 +1,26 @@
+{
+  "type": "far-field-wasm-simd-inspection",
+  "schemaVersion": 1,
+  "generatedJs": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp2a\\artifacts\\ACCUM4_TREE_SIMD\\nec2pp.generated.js",
+  "wat": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\results\\far-field-wp2a\\final\\accum4-tree-simd.wat",
+  "publicExport": "_necpp_wasm_v1_compute_far_field",
+  "minifiedExport": "Ja",
+  "rootFunction": 802,
+  "module": {
+    "functionCount": 916,
+    "simdFunctionCount": 118,
+    "simdInstructionLines": 4432
+  },
+  "farFieldCallGraph": {
+    "reachableFunctionCount": 8,
+    "simdReachableFunctionCount": 1,
+    "simdInstructionLines": 2,
+    "simdOperations": [
+      "v128.load",
+      "v128.store"
+    ],
+    "simdFunctionIds": [
+      802
+    ]
+  }
+}

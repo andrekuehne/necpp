@@ -188,3 +188,36 @@ output. It maps the public far-field ABI export to the minified WASM function
 and reports SIMD operations reachable through its call graph. See
 [FAR_FIELD_WP2_RESULTS.md](FAR_FIELD_WP2_RESULTS.md) and
 `bench/evidence/far-field-wp2/` for the accepted WP2 decision and evidence.
+
+For WP2A reassociated candidates, add `--baseline WP2 --equivalence-mode
+numeric`. Numeric mode writes temporary component-major f64 field dumps,
+compares E-theta and E-phi with relative-L2 and scaled-maximum metrics, records
+peak/null/integrated-power deltas, and removes the dumps after the summary is
+written:
+
+```powershell
+npm --prefix packages/necpp-wasm run bench:far-field-candidates -- `
+  --variants "WP2=C:\path\WP2,ACCUM4_TREE=C:\path\ACCUM4_TREE" `
+  --baseline WP2 --equivalence-mode numeric `
+  --output-directory bench/results/far-field-wp2a `
+  --rounds 3 --steering-limit 10
+```
+
+Exact-hash mode remains the default for reproducing WP2. See
+[FAR_FIELD_WP2A_RESULTS.md](FAR_FIELD_WP2A_RESULTS.md) and
+`bench/evidence/far-field-wp2a/` for reduction topologies, measurements,
+accuracy, SIMD inspection, and the fallback decision.
+
+## Far-field WP3 worker proof
+
+`far-field-wp3-poc.mjs` measures the versioned O(segments) snapshot, compares
+the full NEC evaluator-only and dedicated evaluator artifacts, benchmarks 1,
+2, 4, and 8 prewarmed workers, and compares static slabs with bounded tiles:
+
+```powershell
+npm --prefix packages/necpp-wasm run bench:far-field-wp3
+```
+
+The command writes summary JSON and raw NDJSON to
+`bench/evidence/far-field-wp3/node/`. See
+[FAR_FIELD_WP3_RESULTS.md](FAR_FIELD_WP3_RESULTS.md) for the WP4 decision.

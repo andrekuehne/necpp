@@ -1,0 +1,14 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>WP3 field-worker smoke</title>
+<pre id="result">running</pre>
+<script type="module">
+  const worker = new Worker("../../.test-build/src/field-worker-poc-outer.js", {
+    type: "module",
+  });
+  worker.addEventListener("message", (event) => {
+    document.querySelector("#result").textContent = JSON.stringify(event.data);
+    worker.terminate();
+  });
+  worker.postMessage({ kind: "run" });
+</script>

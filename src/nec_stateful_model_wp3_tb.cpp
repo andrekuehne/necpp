@@ -445,3 +445,52 @@ TEST_CASE("WP3 both signed ground modes reject invalid ground-plane geometry",
     REQUIRE_THROWS_AS(in_plane.complete_geometry(connection), nec_exception);
   }
 }
+
+TEST_CASE("WP3 evaluator snapshots are bounded, versioned, and generation-safe",
+          "[wasm_api][wp3][far_field][snapshot]")
+{
+  nec_stateful_model model;
+  build_dipoles(model, 2);
+  REQUIRE(model.capture_far_field_snapshot().capability ==
+    nec_far_field_snapshot_capability::no_solution);
+
+  model.solve_port_voltages({nec_complex(1.0, 0.0), nec_complex(0.0, 1.0)});
+  const nec_far_field_snapshot first = model.capture_far_field_snapshot();
+  REQUIRE(first.schema_version == 1);
+  REQUIRE(first.capability == nec_far_field_snapshot_capability::supported);
+  REQUIRE(first.model_generation == 1);
+  REQUIRE(first.solution_generation == 1);
+  REQUIRE(first.segment_count() == 2 * kSegments);
+  REQUIRE_FALSE(first.perfect_ground);
+  for (const std::vector<nec_float>* values : {
+         &first.x, &first.y, &first.z, &first.cab, &first.sab, &first.salp,
+         &first.segment_half_lengths, &first.air, &first.aii, &first.bir,
+         &first.bii, &first.cir, &first.cii,
+       }) {
+    REQUIRE(values->size() == first.segment_count());
+    REQUIRE(std::all_of(values->begin(), values->end(),
+      [](nec_float value) { return std::isfinite(value); }));
+  }
+
+  model.solve_port_voltages({nec_complex(0.25, -0.5), nec_complex(-0.5, 0.25)});
+  const nec_far_field_snapshot second = model.capture_far_field_snapshot();
+  REQUIRE(second.model_generation == first.model_generation);
+  REQUIRE(second.solution_generation == first.solution_generation + 1);
+  REQUIRE(second.x == first.x);
+  REQUIRE(second.air != first.air);
+}
+
+TEST_CASE("WP3 evaluator snapshots reject finite ground by capability",
+          "[wasm_api][wp3][far_field][snapshot][ground]")
+{
+  nec_stateful_model model;
+  build_dipoles(model, 1);
+  model.set_ground({
+    nec_ground_kind::finite_reflection_coefficient, 13.0, 0.005,
+  });
+  model.prepare(kFrequencyMHz);
+  model.solve_port_voltages({nec_complex(1.0, 0.0)});
+  const nec_far_field_snapshot snapshot = model.capture_far_field_snapshot();
+  REQUIRE(snapshot.capability == nec_far_field_snapshot_capability::finite_ground);
+  REQUIRE(snapshot.segment_count() == 0);
+}

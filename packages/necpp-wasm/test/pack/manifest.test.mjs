@@ -40,6 +40,8 @@ test("npm pack contains only the documented publish files", { skip }, () => {
     "dist/worker-entry.js",
     "dist/nec2pp.generated.js",
     "dist/nec2pp.wasm",
+    "dist/necpp-field-evaluator.generated.js",
+    "dist/necpp-field-evaluator.wasm",
   ];
   for (const path of required) {
     assert.ok(files.has(path), `missing ${path} in packed tarball`);

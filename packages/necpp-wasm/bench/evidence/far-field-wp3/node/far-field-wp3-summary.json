@@ -1,0 +1,279 @@
+{
+  "type": "far-field-wp3-poc",
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-01T18:23:09.245Z",
+  "environment": {
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 PRO 7840HS w/ Radeon 780M Graphics ",
+    "logicalCpus": 16,
+    "node": "v24.14.1"
+  },
+  "fixture": {
+    "id": "pav-ng-8x8-x-dipole-v1",
+    "segments": 704,
+    "samples": 65160
+  },
+  "setupMs": 325.27889999999996,
+  "snapshotCaptureMs": 0.5047000000000139,
+  "serialMs": 3642.8722,
+  "serialChecksum": "960eb40de027b57d729ce20348857d56f55bbfbc6440448b629445210d7f1aee",
+  "snapshot": {
+    "schemaVersion": 1,
+    "modelGeneration": 1,
+    "solutionGeneration": 1,
+    "bytes": 73216,
+    "geometryBytes": 39424,
+    "currentBytes": 33792
+  },
+  "retainedMatrixBytes": 7929856,
+  "artifactShapes": {
+    "existingNecWasmBytesPerWorker": 750317,
+    "existingNecWasmSha256": "efe8e36e71582a7e0ea7d5c00e62b9498b39d32da89b8f3e092170cc7c1b71bd",
+    "dedicatedEvaluatorArtifactBytesPerWorker": 45801,
+    "dedicatedEvaluatorWasmBytesPerWorker": 19367,
+    "dedicatedEvaluatorWasmSha256": "7c2e35915835cd56b22689edfa66297967c782aa788c222aaae00f5c3ad1f575"
+  },
+  "artifactShapeComparison": {
+    "dedicated": {
+      "startupMs": 116.5600999999997,
+      "fieldMs": {
+        "min": 2772.3357000000015,
+        "median": 2780.6387000000013,
+        "max": 2793.1983
+      }
+    },
+    "fullNecEvaluatorOnly": {
+      "startupMs": 34.07600000000093,
+      "fieldMs": {
+        "min": 2782.508600000001,
+        "median": 2789.654499999997,
+        "max": 2793.7963999999993
+      },
+      "fieldRunsMs": [
+        2793.7963999999993,
+        2782.508600000001,
+        2789.654499999997
+      ]
+    }
+  },
+  "boundedMemory": {
+    "mergedOutputBytes": 2085120,
+    "maximumTileBytesPerWorker": 16384,
+    "snapshotBytesPerWorker": 73216
+  },
+  "currentUpdateProbe": {
+    "modelGeneration": 1,
+    "solutionGeneration": 2,
+    "geometryReused": true,
+    "broadcastBytesPerWorker": 33792,
+    "broadcastMs": 0.854299999999057
+  },
+  "records": [
+    {
+      "workers": 1,
+      "strategy": "bounded-tiles",
+      "tileSize": 512,
+      "startupMs": 116.5600999999997,
+      "fieldMs": {
+        "min": 2772.3357000000015,
+        "median": 2780.6387000000013,
+        "max": 2793.1983
+      },
+      "fieldRunsMs": [
+        2793.1983,
+        2780.6387000000013,
+        2772.3357000000015
+      ],
+      "speedupOverOneWorker": 1,
+      "diagnostics": {
+        "workers": 1,
+        "tileSize": 512,
+        "tiles": 128,
+        "snapshotBroadcastMs": 1.5794999999998254,
+        "dispatchComputeTransferMs": 2771.5591999999997,
+        "mergeMs": 0.035200000000259024,
+        "totalMs": 2772.3357000000015,
+        "workerComputeMs": 2740.846000000003,
+        "restartedWorkers": 0,
+        "snapshotBytesPerWorker": 73216,
+        "geometryBytesPerWorker": 39424,
+        "currentBytesPerWorker": 33792,
+        "lastBroadcastBytesPerWorker": 73216,
+        "geometryReused": false
+      },
+      "checksum": "ec34e5d50dd8c7d440ed994e7cbdb523cf7a50ccfae9fbf85be872a5d393717b",
+      "scaledMaximum": {
+        "eTheta": 1.54169059475245e-11,
+        "ePhi": 2.0382721970691336e-11
+      }
+    },
+    {
+      "workers": 2,
+      "strategy": "bounded-tiles",
+      "tileSize": 512,
+      "startupMs": 30.132400000000416,
+      "fieldMs": {
+        "min": 1473.824199999999,
+        "median": 1477.201000000001,
+        "max": 1479.9408000000003
+      },
+      "fieldRunsMs": [
+        1477.201000000001,
+        1479.9408000000003,
+        1473.824199999999
+      ],
+      "speedupOverOneWorker": 1.8823699009139578,
+      "diagnostics": {
+        "workers": 2,
+        "tileSize": 512,
+        "tiles": 128,
+        "snapshotBroadcastMs": 1.7070999999996275,
+        "dispatchComputeTransferMs": 1473.3315000000002,
+        "mergeMs": 0.05529999999998836,
+        "totalMs": 1473.824199999999,
+        "workerComputeMs": 2907.6295000000027,
+        "restartedWorkers": 0,
+        "snapshotBytesPerWorker": 73216,
+        "geometryBytesPerWorker": 39424,
+        "currentBytesPerWorker": 33792,
+        "lastBroadcastBytesPerWorker": 73216,
+        "geometryReused": false
+      },
+      "checksum": "ec34e5d50dd8c7d440ed994e7cbdb523cf7a50ccfae9fbf85be872a5d393717b",
+      "scaledMaximum": {
+        "eTheta": 1.54169059475245e-11,
+        "ePhi": 2.0382721970691336e-11
+      }
+    },
+    {
+      "workers": 4,
+      "strategy": "bounded-tiles",
+      "tileSize": 512,
+      "startupMs": 35.91840000000229,
+      "fieldMs": {
+        "min": 726.1124999999993,
+        "median": 738.195300000003,
+        "max": 740.178899999999
+      },
+      "fieldRunsMs": [
+        726.1124999999993,
+        738.195300000003,
+        740.178899999999
+      ],
+      "speedupOverOneWorker": 3.766806290963909,
+      "diagnostics": {
+        "workers": 4,
+        "tileSize": 512,
+        "tiles": 128,
+        "snapshotBroadcastMs": 1.6035999999985506,
+        "dispatchComputeTransferMs": 739.4448999999986,
+        "mergeMs": 0.053900000002613524,
+        "totalMs": 740.178899999999,
+        "workerComputeMs": 2897.1450000000114,
+        "restartedWorkers": 0,
+        "snapshotBytesPerWorker": 73216,
+        "geometryBytesPerWorker": 39424,
+        "currentBytesPerWorker": 33792,
+        "lastBroadcastBytesPerWorker": 73216,
+        "geometryReused": false
+      },
+      "checksum": "ec34e5d50dd8c7d440ed994e7cbdb523cf7a50ccfae9fbf85be872a5d393717b",
+      "scaledMaximum": {
+        "eTheta": 1.54169059475245e-11,
+        "ePhi": 2.0382721970691336e-11
+      }
+    },
+    {
+      "workers": 8,
+      "strategy": "bounded-tiles",
+      "tileSize": 512,
+      "startupMs": 49.01759999999922,
+      "fieldMs": {
+        "min": 440.3673999999992,
+        "median": 440.78540000000066,
+        "max": 446.1392999999989
+      },
+      "fieldRunsMs": [
+        440.78540000000066,
+        440.3673999999992,
+        446.1392999999989
+      ],
+      "speedupOverOneWorker": 6.308372963351321,
+      "diagnostics": {
+        "workers": 8,
+        "tileSize": 512,
+        "tiles": 128,
+        "snapshotBroadcastMs": 2.022099999998318,
+        "dispatchComputeTransferMs": 445.2706999999973,
+        "mergeMs": 0.04320000000006985,
+        "totalMs": 446.1392999999989,
+        "workerComputeMs": 3480.1508999999714,
+        "restartedWorkers": 0,
+        "snapshotBytesPerWorker": 73216,
+        "geometryBytesPerWorker": 39424,
+        "currentBytesPerWorker": 33792,
+        "lastBroadcastBytesPerWorker": 73216,
+        "geometryReused": false
+      },
+      "checksum": "ec34e5d50dd8c7d440ed994e7cbdb523cf7a50ccfae9fbf85be872a5d393717b",
+      "scaledMaximum": {
+        "eTheta": 1.54169059475245e-11,
+        "ePhi": 2.0382721970691336e-11
+      }
+    },
+    {
+      "workers": 4,
+      "strategy": "static-slabs",
+      "tileSize": 16290,
+      "fieldMs": {
+        "min": 704.6307000000015,
+        "median": 704.6307000000015,
+        "max": 704.6307000000015
+      },
+      "diagnostics": {
+        "workers": 4,
+        "tileSize": 16290,
+        "tiles": 4,
+        "snapshotBroadcastMs": 1.6990999999979977,
+        "dispatchComputeTransferMs": 703.9041999999972,
+        "mergeMs": 0.0808000000033644,
+        "totalMs": 704.6307000000015,
+        "workerComputeMs": 2806.0886999999857,
+        "restartedWorkers": 0,
+        "snapshotBytesPerWorker": 73216,
+        "geometryBytesPerWorker": 39424,
+        "currentBytesPerWorker": 33792,
+        "lastBroadcastBytesPerWorker": 73216,
+        "geometryReused": false
+      }
+    },
+    {
+      "workers": 4,
+      "strategy": "bounded-tiles",
+      "tileSize": 512,
+      "fieldMs": {
+        "min": 725.9386999999988,
+        "median": 725.9386999999988,
+        "max": 725.9386999999988
+      },
+      "diagnostics": {
+        "workers": 4,
+        "tileSize": 512,
+        "tiles": 128,
+        "snapshotBroadcastMs": 1.1447000000043772,
+        "dispatchComputeTransferMs": 725.2658999999985,
+        "mergeMs": 0.07100000000355067,
+        "totalMs": 725.9386999999988,
+        "workerComputeMs": 2864.071499999969,
+        "restartedWorkers": 0,
+        "snapshotBytesPerWorker": 73216,
+        "geometryBytesPerWorker": 39424,
+        "currentBytesPerWorker": 33792,
+        "lastBroadcastBytesPerWorker": 73216,
+        "geometryReused": false
+      }
+    }
+  ]
+}

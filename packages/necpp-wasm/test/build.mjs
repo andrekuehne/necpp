@@ -38,7 +38,10 @@ const sourceDirectory = resolve(packageDirectory, "src");
 const builtSourceDirectory = resolve(outputDirectory, "src");
 mkdirSync(builtSourceDirectory, { recursive: true });
 
-for (const name of ["nec2pp.generated.js", "nec2pp.wasm"]) {
+for (const name of [
+  "nec2pp.generated.js", "nec2pp.wasm",
+  "necpp-field-evaluator.generated.js", "necpp-field-evaluator.wasm",
+]) {
   const source = join(sourceDirectory, name);
   if (existsSync(source)) {
     copyFileSync(source, join(builtSourceDirectory, name));

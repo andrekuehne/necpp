@@ -37,7 +37,10 @@ if (!versionsSource.includes(`engineVersion = "${cmakeVersion[1]}"`)) {
   );
 }
 
-const requiredArtifacts = ["nec2pp.generated.js", "nec2pp.wasm"];
+const requiredArtifacts = [
+  "nec2pp.generated.js", "nec2pp.wasm",
+  "necpp-field-evaluator.generated.js", "necpp-field-evaluator.wasm",
+];
 const missingArtifacts = requiredArtifacts.filter(
   (name) => !existsSync(join(sourceDirectory, name)),
 );
@@ -85,6 +88,8 @@ const requiredDistFiles = [
   "worker-entry.js",
   "nec2pp.generated.js",
   "nec2pp.wasm",
+  "necpp-field-evaluator.generated.js",
+  "necpp-field-evaluator.wasm",
 ];
 const missingDistFiles = requiredDistFiles.filter(
   (name) => !existsSync(join(distDirectory, name)),
@@ -113,6 +118,12 @@ if (disallowed.length > 0) {
 
 const wasmBytes = statSync(join(distDirectory, "nec2pp.wasm")).size;
 const loaderBytes = statSync(join(distDirectory, "nec2pp.generated.js")).size;
+const evaluatorWasmBytes = statSync(
+  join(distDirectory, "necpp-field-evaluator.wasm"),
+).size;
+const evaluatorLoaderBytes = statSync(
+  join(distDirectory, "necpp-field-evaluator.generated.js"),
+).size;
 if (wasmBytes >= 1024 * 1024) {
   throw new Error(`nec2pp.wasm is ${wasmBytes} bytes; expected under 1 MiB`);
 }
@@ -121,8 +132,19 @@ if (loaderBytes >= 200 * 1024) {
     `nec2pp.generated.js is ${loaderBytes} bytes; expected under 200 KiB`,
   );
 }
+if (evaluatorWasmBytes >= 64 * 1024) {
+  throw new Error(
+    `necpp-field-evaluator.wasm is ${evaluatorWasmBytes} bytes; expected under 64 KiB`,
+  );
+}
+if (evaluatorLoaderBytes >= 64 * 1024) {
+  throw new Error(
+    `necpp-field-evaluator.generated.js is ${evaluatorLoaderBytes} bytes; expected under 64 KiB`,
+  );
+}
 
 process.stdout.write(
   `Assembled ${relative(dirname(packageDirectory), distDirectory)} `
-    + `(wasm ${wasmBytes} bytes, loader ${loaderBytes} bytes)\n`,
+    + `(wasm ${wasmBytes} bytes, loader ${loaderBytes} bytes; evaluator wasm `
+    + `${evaluatorWasmBytes} bytes, loader ${evaluatorLoaderBytes} bytes)\n`,
 );

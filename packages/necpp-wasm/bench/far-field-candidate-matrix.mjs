@@ -1,4 +1,10 @@
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -31,8 +37,9 @@ function parseArguments(argv) {
       directory: resolve(entry.slice(separator + 1)),
     };
   });
-  if (!variants.some(({ name }) => name === "WP1")) {
-    throw new Error("--variants must include the WP1 baseline");
+  const baseline = values.get("baseline") ?? "WP1";
+  if (!variants.some(({ name }) => name === baseline)) {
+    throw new Error(`--variants must include the ${baseline} baseline`);
   }
   if (new Set(variants.map(({ name }) => name)).size !== variants.length) {
     throw new Error("--variants names must be unique");
@@ -45,8 +52,14 @@ function parseArguments(argv) {
   if (!Number.isSafeInteger(steeringLimit) || steeringLimit < 2 || steeringLimit > 10) {
     throw new Error("--steering-limit must be an integer from 2 through 10");
   }
+  const equivalenceMode = values.get("equivalence-mode") ?? "exact";
+  if (!new Set(["exact", "numeric"]).has(equivalenceMode)) {
+    throw new Error("--equivalence-mode must be exact or numeric");
+  }
   return {
     variants,
+    baseline,
+    equivalenceMode,
     rounds,
     steeringLimit,
     outputDirectory: resolve(values.get("output-directory")),
@@ -54,7 +67,7 @@ function parseArguments(argv) {
 }
 
 function runCase(options, variant, grid, round) {
-  const result = spawnSync(process.execPath, [
+  const args = [
     caseScript,
     "--backend", "direct",
     "--grid", grid,
@@ -66,7 +79,14 @@ function runCase(options, variant, grid, round) {
     "--require-diagnostics", "true",
     "--steering-limit", String(options.steeringLimit),
     "--reuse-grid", "false",
-  ], {
+  ];
+  if (options.equivalenceMode === "numeric") {
+    args.push(
+      "--field-dump-directory",
+      resolve(options.dumpDirectory, variant.name, grid, String(round)),
+    );
+  }
+  const result = spawnSync(process.execPath, args, {
     cwd: resolve(import.meta.dirname, ".."),
     encoding: "utf8",
     maxBuffer: 32 * 1024 * 1024,
@@ -92,13 +112,13 @@ function median(values) {
     : sorted[middle];
 }
 
-function assertParity(values, rounds, variants) {
+function assertParity(values, rounds, variants, baselineName) {
   const failures = [];
   let compared = 0;
   for (const grid of grids) {
     for (let round = 0; round < rounds; round += 1) {
       const baseline = values.find(
-        (record) => record.variant === "WP1" && record.grid === grid && record.round === round,
+        (record) => record.variant === baselineName && record.grid === grid && record.round === round,
       );
       for (const variant of variants) {
         const candidate = values.find(
@@ -121,6 +141,148 @@ function assertParity(values, rounds, variants) {
   return { compared, failures };
 }
 
+function readFieldDump(options, variant, grid, round, state, samples) {
+  const path = resolve(options.dumpDirectory, variant, grid, String(round), `${state}.f64`);
+  const bytes = readFileSync(path);
+  if (bytes.byteLength !== samples * 4 * Float64Array.BYTES_PER_ELEMENT) {
+    throw new Error(`${path} has an unexpected field-dump length`);
+  }
+  const copied = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  return new Float64Array(copied);
+}
+
+function complexMetrics(reference, candidate, realOffset, imagOffset, samples) {
+  let differenceSquared = 0;
+  let referenceSquared = 0;
+  let candidateSquared = 0;
+  let maximumDifference = 0;
+  let maximumReference = 0;
+  let maximumCandidate = 0;
+  let finite = true;
+  for (let index = 0; index < samples; index += 1) {
+    const ar = reference[realOffset + index];
+    const ai = reference[imagOffset + index];
+    const br = candidate[realOffset + index];
+    const bi = candidate[imagOffset + index];
+    finite &&= Number.isFinite(ar) && Number.isFinite(ai)
+      && Number.isFinite(br) && Number.isFinite(bi);
+    const difference = Math.hypot(ar - br, ai - bi);
+    const aMagnitude = Math.hypot(ar, ai);
+    const bMagnitude = Math.hypot(br, bi);
+    differenceSquared += difference * difference;
+    referenceSquared += aMagnitude * aMagnitude;
+    candidateSquared += bMagnitude * bMagnitude;
+    maximumDifference = Math.max(maximumDifference, difference);
+    maximumReference = Math.max(maximumReference, aMagnitude);
+    maximumCandidate = Math.max(maximumCandidate, bMagnitude);
+  }
+  const referenceL2 = Math.sqrt(referenceSquared);
+  const candidateL2 = Math.sqrt(candidateSquared);
+  return {
+    finite,
+    relativeL2: Math.sqrt(differenceSquared) /
+      Math.max(1, referenceL2, candidateL2),
+    scaledMaximum: maximumDifference /
+      Math.max(1, maximumReference, maximumCandidate),
+  };
+}
+
+function patternMetrics(values, grid, samples) {
+  const thetaCount = grid.theta.count;
+  const thetaStart = grid.theta.startDeg * Math.PI / 180;
+  const thetaStep = grid.theta.stepDeg * Math.PI / 180;
+  let peak = 0;
+  let nullMagnitude = Number.POSITIVE_INFINITY;
+  let integratedPower = 0;
+  for (let index = 0; index < samples; index += 1) {
+    const magnitudeSquared = values[index] ** 2 + values[samples + index] ** 2
+      + values[2 * samples + index] ** 2 + values[3 * samples + index] ** 2;
+    const magnitude = Math.sqrt(magnitudeSquared);
+    peak = Math.max(peak, magnitude);
+    nullMagnitude = Math.min(nullMagnitude, magnitude);
+    const thetaIndex = index % thetaCount;
+    const endpointWeight = thetaIndex === 0 || thetaIndex === thetaCount - 1 ? 0.5 : 1;
+    integratedPower += endpointWeight * magnitudeSquared *
+      Math.sin(thetaStart + thetaIndex * thetaStep);
+  }
+  integratedPower *= thetaStep * grid.phi.stepDeg * Math.PI / 180;
+  return { peak, nullMagnitude, integratedPower };
+}
+
+function relativeDifference(left, right) {
+  return Math.abs(left - right) / Math.max(1, Math.abs(left), Math.abs(right));
+}
+
+function numericComparisons(options, values) {
+  const comparisons = [];
+  for (const record of values) {
+    if (record.variant === options.baseline) continue;
+    const baseline = values.find((candidate) =>
+      candidate.variant === options.baseline
+      && candidate.grid === record.grid
+      && candidate.round === record.round);
+    for (let state = 0; state < record.steering.length; state += 1) {
+      const samples = record.steering[state].field.samples;
+      const expected = readFieldDump(
+        options, options.baseline, record.grid, record.round, state, samples,
+      );
+      const actual = readFieldDump(
+        options, record.variant, record.grid, record.round, state, samples,
+      );
+      const expectedPattern = patternMetrics(expected, record.selectedGrid, samples);
+      const actualPattern = patternMetrics(actual, record.selectedGrid, samples);
+      const eTheta = complexMetrics(expected, actual, 0, samples, samples);
+      const ePhi = complexMetrics(expected, actual, 2 * samples, 3 * samples, samples);
+      comparisons.push({
+        grid: record.grid,
+        round: record.round,
+        state,
+        steeringId: record.steering[state].point.id,
+        variant: record.variant,
+        eTheta,
+        ePhi,
+        peakRelativeDifference: relativeDifference(expectedPattern.peak, actualPattern.peak),
+        nullAbsoluteDifference: Math.abs(
+          expectedPattern.nullMagnitude - actualPattern.nullMagnitude,
+        ),
+        integratedPowerRelativeDifference: relativeDifference(
+          expectedPattern.integratedPower, actualPattern.integratedPower,
+        ),
+        passes: eTheta.finite && ePhi.finite
+          && eTheta.relativeL2 <= 1e-7 && eTheta.scaledMaximum <= 1e-7
+          && ePhi.relativeL2 <= 1e-7 && ePhi.scaledMaximum <= 1e-7,
+      });
+    }
+  }
+  return comparisons;
+}
+
+function summarizeNumerics(comparisons, variant, grid) {
+  const selected = comparisons.filter(
+    (comparison) => comparison.variant === variant && comparison.grid === grid,
+  );
+  const maximum = (select) => Math.max(...selected.map(select));
+  return {
+    comparisons: selected.length,
+    failures: selected.filter(({ passes }) => !passes).length,
+    maximumRelativeL2: {
+      eTheta: maximum(({ eTheta }) => eTheta.relativeL2),
+      ePhi: maximum(({ ePhi }) => ePhi.relativeL2),
+    },
+    maximumScaledMaximum: {
+      eTheta: maximum(({ eTheta }) => eTheta.scaledMaximum),
+      ePhi: maximum(({ ePhi }) => ePhi.scaledMaximum),
+    },
+    maximumPeakRelativeDifference: maximum(({ peakRelativeDifference }) =>
+      peakRelativeDifference),
+    maximumNullAbsoluteDifference: maximum(({ nullAbsoluteDifference }) =>
+      nullAbsoluteDifference),
+    maximumIntegratedPowerRelativeDifference: maximum(
+      ({ integratedPowerRelativeDifference }) => integratedPowerRelativeDifference,
+    ),
+  };
+}
+
 function summarizeVariant(values, baselineValues) {
   const repeated = values.flatMap(({ steering }) => steering.slice(1));
   const baselineRepeated = baselineValues.flatMap(({ steering }) => steering.slice(1));
@@ -130,11 +292,16 @@ function summarizeVariant(values, baselineValues) {
   const baselineRawMedian = median(
     baselineRepeated.map(({ field }) => field.phases.native.rawAccumulationMs),
   );
+  const fieldSpeedupOverBaseline = baselineFieldMedian / median(fieldMs);
+  const rawSpeedupOverBaseline = baselineRawMedian / median(rawMs);
   return {
     repeatedFieldMs: timingStats(fieldMs),
     repeatedRawAccumulationMs: timingStats(rawMs),
-    fieldSpeedupOverWp1: baselineFieldMedian / median(fieldMs),
-    rawSpeedupOverWp1: baselineRawMedian / median(rawMs),
+    fieldSpeedupOverBaseline,
+    rawSpeedupOverBaseline,
+    // Schema-v1 compatibility for the existing WP2 evidence consumer.
+    fieldSpeedupOverWp1: fieldSpeedupOverBaseline,
+    rawSpeedupOverWp1: rawSpeedupOverBaseline,
     repeatedOutputBufferAllocations: timingStats(
       repeated.map(({ field }) => field.phases.counts.outputBufferAllocations),
     ),
@@ -147,6 +314,7 @@ function summarizeVariant(values, baselineValues) {
 async function main() {
   const options = parseArguments(process.argv.slice(2));
   mkdirSync(options.outputDirectory, { recursive: true });
+  options.dumpDirectory = resolve(options.outputDirectory, ".field-dumps");
   const rawPath = resolve(options.outputDirectory, "far-field-wp2-candidate-raw.ndjson");
   const summaryPath = resolve(options.outputDirectory, "far-field-wp2-candidate-summary.json");
   writeFileSync(rawPath, "", "utf8");
@@ -174,22 +342,43 @@ async function main() {
     }
   }
 
-  const parity = assertParity(values, options.rounds, options.variants);
+  const parity = options.equivalenceMode === "exact"
+    ? assertParity(values, options.rounds, options.variants, options.baseline)
+    : null;
+  const comparisons = options.equivalenceMode === "numeric"
+    ? numericComparisons(options, values)
+    : [];
+  if (comparisons.length > 0) {
+    const comparisonPath = resolve(
+      options.outputDirectory, "far-field-wp2a-comparisons.ndjson",
+    );
+    writeFileSync(
+      comparisonPath,
+      `${comparisons.map((comparison) => JSON.stringify(comparison)).join("\n")}\n`,
+      "utf8",
+    );
+    rmSync(options.dumpDirectory, { recursive: true, force: true });
+  }
   const cases = {};
   for (const grid of grids) {
     const baseline = values.filter(
-      (record) => record.variant === "WP1" && record.grid === grid,
+      (record) => record.variant === options.baseline && record.grid === grid,
     );
     for (const variant of options.variants) {
       const selected = values.filter(
         (record) => record.variant === variant.name && record.grid === grid,
       );
-      cases[`${variant.name}:${grid}`] = summarizeVariant(selected, baseline);
+      cases[`${variant.name}:${grid}`] = {
+        ...summarizeVariant(selected, baseline),
+        numerics: variant.name === options.baseline || options.equivalenceMode === "exact"
+          ? null
+          : summarizeNumerics(comparisons, variant.name, grid),
+      };
     }
   }
   const summary = {
     type: "far-field-wp2-candidate-matrix",
-    schemaVersion: 1,
+    schemaVersion: 2,
     measuredAt: new Date().toISOString(),
     configuration: {
       rounds: options.rounds,
@@ -197,8 +386,17 @@ async function main() {
       steeringLimit: options.steeringLimit,
       grids,
       variants: options.variants,
+      baseline: options.baseline,
+      equivalenceMode: options.equivalenceMode,
     },
     outputParity: parity,
+    numericalComparison: options.equivalenceMode === "numeric"
+      ? {
+          tolerance: 1e-7,
+          comparisons: comparisons.length,
+          failures: comparisons.filter(({ passes }) => !passes).length,
+        }
+      : null,
     cases,
   };
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");

@@ -1,6 +1,6 @@
 # NEC far-field performance upgrade plan
 
-**Status:** implementation in progress; WP0 through WP2 complete, WP3 next
+**Status:** implementation in progress; WP0 through WP3 complete, WP4 next
 **Created:** 2026-08-31
 **Primary engine baseline:** `necpp` commit `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
 **Primary consumer baseline:** `PhasedArrayVisualizer-NG` commit `adf617081e8b53d08729cce57e2a1f7a3bed561c`
@@ -463,10 +463,10 @@ Investigate them independently so attribution remains possible:
 
 ### WP2 handover
 
-- **Status:** complete; handed to WP3
+- **Status:** complete; handed to WP2a
 - **Implementer / date:** Codex / 2026-09-01
-- **Commits:** working-tree implementation to be included with this handover,
-  based on WP1 `2e5a7c7` and its documentation follow-up `97f3c63`.
+- **Commits:** WP2 implementation, evidence, and handover `f17300e`, based on
+  WP1 `2e5a7c7` and its documentation follow-up `97f3c63`.
 - **Candidate matrix and artifacts:** the commands, measurements, artifact
   hashes, and interpretation are in
   [`packages/necpp-wasm/bench/FAR_FIELD_WP2_RESULTS.md`](../packages/necpp-wasm/bench/FAR_FIELD_WP2_RESULTS.md).
@@ -512,11 +512,176 @@ Investigate them independently so attribution remains possible:
   measured processes, one warm-up, and two deterministic steering states per
   grid; the full ten-state correctness fixture remains covered by regression
   tests and the WP0/WP1 evidence.
-- **Remaining risks / next recommended WP:** proceed to WP3's lightweight
-  far-field-worker proof. The serial kernel remains overwhelmingly raw
-  accumulation bound, so independent angular tiles are the next material
-  source of speed-up. Preserve the scalar selected configuration as its
-  single-worker baseline.
+- **Remaining risks / next recommended WP:** proceed to WP2a's explicitly
+  reordered low-level kernel experiments before the lightweight-worker proof.
+  Preserve this scalar selected configuration as WP2a's numerical and
+  performance reference and as the fallback if no reordered candidate passes.
+
+## WP2a - Numerically equivalent reordered kernel experiments
+
+### Goal
+
+Determine whether deliberately reassociating and reordering the binary64
+segment accumulation can expose instruction-level parallelism or useful WASM
+SIMD that WP2's exact-order contract prevented. This package is limited to the
+low-level serial field kernel; worker distribution remains WP3.
+
+### Entry gate
+
+WP2 is complete, its selected scalar artifact and raw evidence are archived,
+and its bitwise-identical output is the reference for every WP2a candidate.
+
+### Numerical-equivalence contract
+
+WP2a explicitly permits a different addition order and therefore does not
+require candidate field hashes to equal WP2. It does not permit a different
+physical model or reduced precision:
+
+- Keep geometry, solved currents, transcendental inputs/results, complex field
+  buffers, and final accumulation in binary64. Do not enable global
+  `-ffast-math` and do not introduce an f32 kernel.
+- Compare `E_theta` and `E_phi` separately against WP2 using the public
+  scale-aware relative-L2 metric from [`wasm-api.md`](wasm-api.md), with a
+  maximum error of `1e-7` on every frozen fixture and steering state.
+- Also require a scaled-maximum complex-sample error of at most `1e-7`:
+  `max_i |a_i-b_i| / max(1, max_i |a_i|, max_i |b_i|)`. This prevents a good
+  global norm from hiding one badly changed direction.
+- Reject NaN and infinity before computing an error. Deep-null phase is not
+  compared pointwise because phase is undefined as magnitude approaches zero;
+  null regions remain protected by the complex scaled-maximum bound, integrated
+  power, and existing null/symmetry fixtures.
+- Preserve exact axes, theta-fast ordering, sample counts, generations, state
+  transitions, ownership, range convention, and exact complex zero output for
+  zero excitation.
+- Existing peak/null/symmetry, radial phase, power closure, direct-versus-
+  embedded superposition, ground, native/WASM, package, and consumer regression
+  tests must continue to pass at their documented tolerances. Any proposed
+  relaxation beyond the two `1e-7` field-comparison gates requires a separate
+  decision record and is not authorized by this package.
+
+### Candidate experiments
+
+Investigate each shape independently before combining it with another:
+
+1. Use two, four, and eight independent complex accumulators over consecutive
+   segment blocks, then combine them in a fixed documented order. This breaks
+   the single dependency chain while keeping results deterministic.
+2. Compare linear multi-accumulator, balanced pairwise, and fixed-size tree
+   reductions. Record the exact reduction topology and block/tail behavior.
+3. Prototype explicit WASM SIMD over segment contributions with binary64 lanes,
+   including the horizontal reduction cost. Inspect WAT to prove arithmetic
+   SIMD instructions are reachable from the raw far-field export.
+4. Prototype SIMD across two or more independent directions while advancing
+   through segments in the original order within each lane. Include any
+   segment-major/direction-major transpose, scratch, and tail costs.
+5. Test split real/imaginary accumulators, loop unrolling, and local
+   structure-of-arrays views where they help the compiler schedule independent
+   work. Do not change the public complex-field layout solely for a microbench.
+6. A function- or translation-unit-scoped reassociation compiler experiment
+   may be measured against the explicit reductions. Record the exact flags and
+   generated operations; do not apply relaxed floating-point flags globally.
+
+Transcendental approximations, lookup tables, reduced precision, angular-grid
+changes, and worker parallelism are out of scope. They confound the question
+this package is intended to answer.
+
+### Measurement and decision gates
+
+- Extend the checked-in WP2 candidate driver to record relative-L2,
+  scaled-maximum, peak/null, and power differences instead of requiring exact
+  hashes for reordered variants. Keep the exact-hash mode for the WP2 reference.
+- Benchmark every candidate independently on both frozen grids, the full ten
+  steering states, and fresh balanced processes. Report raw-kernel and complete
+  field medians, min/max/p90, startup, code bytes, scratch bytes, and allocation
+  counts.
+- Inspect scalar and `-msimd128` artifacts. A SIMD candidate is not credited
+  unless arithmetic vector instructions occur in the reachable hot loop and
+  the measured end-to-end field stage improves.
+- Select a candidate only if the primary raw-kernel median improves by at least
+  10% over WP2, every numerical gate passes, and the secondary complete-field
+  median regresses by less than 5%. A smaller result may be retained only as a
+  non-default experiment with an explicit enabling rationale.
+- If no candidate passes, keep the WP2 scalar configuration unchanged, record
+  the negative result, and proceed to WP3. WP2a is an investigation gate, not a
+  requirement to ship reassociated arithmetic.
+
+### Definition of Done
+
+- The isolated candidate matrix, exact reduction topology, build flags,
+  generated-WASM inspection, raw output, and summary are checked in.
+- Numerical evidence covers both complex polarizations, all frozen steering
+  states, null/peak/phase fixtures, power closure, and embedded superposition.
+- Native and WASM regression suites, sanitizer coverage, package tests, worker
+  tests, clean-consumer tests, and browser smoke tests pass for the selected
+  configuration and its WP2 fallback.
+- The decision record selects one deterministic reordered implementation or
+  explicitly rejects all candidates. It records performance, error maxima,
+  code/startup/memory costs, supported runtimes, and fallback behavior.
+- WP3 receives one frozen serial baseline: the WP2a selection when a candidate
+  passes, otherwise the unchanged WP2 scalar artifact.
+
+### WP2a handover
+
+- **Status:** complete; handed to WP3 with the unchanged WP2 serial fallback
+- **Implementer / date:** Codex / 2026-09-01
+- **Commits:** working-tree implementation and evidence to be included with
+  this handover, based on WP2 `f17300e`
+- **Reference and candidate artifacts:** complete commands, tables, numerical
+  maxima, and interpretation are in
+  [`packages/necpp-wasm/bench/FAR_FIELD_WP2A_RESULTS.md`](../packages/necpp-wasm/bench/FAR_FIELD_WP2A_RESULTS.md).
+  Versioned raw cases, 420 per-state comparisons, summaries, and WAT inspection
+  reports are under `packages/necpp-wasm/bench/evidence/far-field-wp2a/`.
+- **Reduction topologies / exact flags:** added non-default one-, two-, four-,
+  and eight-chain binary64 x/y/z accumulators over consecutive segment groups.
+  Four-chain linear reduces `((0+1)+2)+3`; four-chain tree reduces
+  `(0+1)+(2+3)`; eight-chain tree reduces
+  `((0+1)+(2+3))+((4+5)+(6+7))`. All use
+  `-O3 -DNDEBUG -flto -fexceptions`, without global fast-math or f32.
+- **Generated-WASM/SIMD evidence:** scalar four-chain tree has no SIMD. Its
+  `-msimd128` artifact has 4,432 SIMD lines module-wide, but the reachable
+  eight-function far-field graph still has only `v128.load`/`v128.store` and
+  no arithmetic SIMD. A paired-sine/cosine source experiment produced
+  byte-identical artifacts to the ordinary adjacent calls, proving LLVM had
+  already combined them where supported.
+- **Relative-L2 / scaled-maximum errors:** all 420 candidate comparisons passed
+  the `1e-7` gates. Worst relative L2 was 1.1693e-15 E-theta and 9.8474e-16
+  E-phi; worst scaled maximum was 2.6974e-15 E-theta and 2.3794e-15 E-phi.
+- **Peak/null/power/superposition results:** worst peak relative difference was
+  1.4018e-15, worst absolute deep-null magnitude difference 5.2697e-25 V/m,
+  and worst integrated-power relative difference 6.6521e-16. The full native
+  candidate suite, including power closure and embedded superposition, passed
+  all 8 CTest partitions; 77 package tests and all 5 packed-consumer tests
+  passed.
+- **Primary/secondary speed-up:** best candidate was four-chain balanced tree:
+  primary raw median 3,556.39 -> 3,426.97 ms (1.038x, 3.6% reduction) and
+  secondary raw median 1,017.43 -> 989.94 ms (1.028x, 2.7% reduction). No
+  candidate met the 1.10x primary selection gate. The full timing table retains
+  one six-hour host-suspension wall-time outlier in the two-chain candidate and
+  reports its separate sampled-native timing.
+- **Code-size/startup/scratch impact:** explicit candidate WASM size ranged from
+  738,934 to 739,989 bytes versus 737,227 for WP2; the four-chain tree adds
+  2,046 bytes. TU-scoped `-ffast-math` produced 735,976 bytes but no material
+  speed benefit.
+  Module-creation medians ranged from 5.76 to 7.85 ms without a monotonic
+  penalty. Logical bounded scratch is 48 bytes per chain and repeated heap
+  allocations remain zero.
+- **Selected candidate or rejection decision:** reject every reordered variant
+  for production because the best primary improvement is 3.8%, below the 10%
+  gate. Retain the implementations only as explicit CMake experiments.
+- **Fallback and runtime support:** the default remains WP2 `SELECTED`, scalar
+  `-O3` WASM, supported everywhere the existing package runs. WP3 must use that
+  artifact as its frozen serial baseline.
+- **Deviations:** explicit direction-lane SIMD was not implemented after scalar
+  artifact inspection and the explicit multi-chain, split real/imaginary, and
+  TU-scoped relaxed-arithmetic candidates showed that scalar transcendental
+  evaluations, not the addition dependency, remain dominant. Sanitizers were
+  not repeated for non-shipping experimental modes; the full native suite ran
+  against both complex and split four-chain implementations. Direct, worker,
+  and example browser smoke tests passed against a retained tarball of the
+  restored scalar fallback.
+- **Remaining risks / next recommended WP:** proceed to WP3 angular tiling.
+  Revisit the reordered kernel only with a runtime offering vector
+  transcendental operations or a separately authorized approximation contract.
 
 ## WP3 - Lightweight far-field worker proof of concept
 
@@ -524,6 +689,12 @@ Investigate them independently so attribution remains possible:
 
 Demonstrate multi-core far-field scaling without cross-origin isolation and
 without constructing multiple full NEC models.
+
+### Entry gate
+
+WP2a has selected a numerically equivalent reordered serial kernel or has
+explicitly retained the WP2 scalar fallback. That frozen result is the serial
+reference for all worker comparisons.
 
 ### Architecture to prove
 
@@ -579,11 +750,12 @@ instantiation/warm-up, snapshot copy bytes, and steady-state field time.
 
 ### Definition of Done
 
-- One evaluator worker matches the WP2 serial output and generations.
+- One evaluator worker matches the frozen WP2a serial output and generations
+  within its selected numerical contract.
 - No evaluator worker contains or receives the interaction matrix, factorization,
   Z/Y matrix, or a complete `NecModel` serialization.
-- Four workers improve primary-grid raw field time by at least 2x over the WP2
-  single-worker kernel on the reference host.
+- Four workers improve primary-grid raw field time by at least 2x over the
+  frozen WP2a single-worker kernel on the reference host.
 - Worker startup is measured separately and prewarming removes it from repeated
   steering.
 - Snapshot, tile, code-instance, and peak-memory costs are itemized and bounded.
@@ -595,19 +767,62 @@ instantiation/warm-up, snapshot copy bytes, and steady-state field time.
 
 ### WP3 handover - fill before marking complete
 
-- **Status:** not started
-- **Implementer / date:**
-- **Prototype commit(s):**
-- **Snapshot schema and byte counts:**
-- **Artifact-shape comparison:**
-- **1/2/4/8-worker raw artifacts:**
-- **Selected worker/tile design:**
-- **Parity and failure tests:**
-- **Speed-up and efficiency:**
-- **Memory/startup costs:**
-- **Unsupported-mode behavior:**
-- **Deviations:**
-- **Remaining risks / WP4 recommendation:**
+- **Status:** complete; handed to WP4
+- **Implementer / date:** Codex / 2026-09-01
+- **Prototype commit(s):** working-tree implementation; no commit created
+- **Snapshot schema and byte counts:** internal schema v1 contains checked
+  frequency/wavelength, perfect-ground mode, model/solution generations, seven
+  geometry arrays, and six current-coefficient arrays. The 704-segment primary
+  fixture snapshot is 73,216 bytes (39,424 geometry plus 33,792 current), versus
+  a 7,929,856-byte retained interaction matrix. Geometry is reused and only the
+  33,792 current bytes are replaced after a subsequent solve.
+- **Artifact-shape comparison:** the full NEC evaluator-only artifact is 750,317
+  bytes per worker and ran the one-worker field in 2,789.65 ms median. The
+  dedicated artifact is 45,801 total bytes (19,367 WASM) and ran in 2,780.64 ms
+  median. Startup was 34.08 ms and 116.56 ms respectively in this run; startup
+  is noisy, explicitly separated, and excluded from repeated field timing.
+- **1/2/4/8-worker raw artifacts:** summary JSON and raw NDJSON are under
+  `packages/necpp-wasm/bench/evidence/far-field-wp3/node/`; the curated record is
+  `packages/necpp-wasm/bench/FAR_FIELD_WP3_RESULTS.md`.
+- **Selected worker/tile design:** four prewarmed ordinary evaluator workers,
+  the dedicated evaluator artifact, and dynamically claimed bounded 512-sample
+  tiles with theta-fast merge. Static four-way slabs measured 704.63 ms versus
+  725.94 ms for bounded tiles in the strategy probe, but cannot bound stale-job
+  work as tightly.
+- **Parity and failure tests:** one-worker dedicated and full-artifact parity,
+  identical hashes across worker counts, checked generation replacement,
+  current-only updates, superseded-job rejection, worker termination/restart,
+  disposal, and typed finite-ground fallback pass. A real solver-owning outer
+  worker plus two evaluator children returns finite results in non-isolated
+  Chromium; the same pool and benchmark run in Node.
+- **Speed-up and efficiency:** 1/2/4/8-worker medians are 2,780.64 / 1,477.20 /
+  738.20 / 440.79 ms: 1.000x / 1.882x / 3.767x / 6.308x speed-up and 100.0% /
+  94.1% / 94.2% / 78.9% efficiency. Four workers clear the required 2x gate.
+  Scaled-maximum differences from the frozen serial output are `1.54e-11`
+  E-theta and `2.04e-11` E-phi.
+- **Memory/startup costs:** merged output is 2,085,120 bytes; each worker holds
+  a 73,216-byte snapshot, a 45,801-byte artifact payload, and at most 16,384
+  bytes of tile output. Prewarming completes module instantiation before field
+  timing; snapshot broadcast was approximately 1-2 ms in the reference runs.
+- **Unsupported-mode behavior:** no solution, surface patches, and finite ground
+  produce explicit typed capability results; the caller retains the existing
+  serial field path. The evaluator accepts only ordinary wire structures in
+  free space or over perfect ground.
+- **Deviations:** this is deliberately an internal proof, not a public API or
+  production integration. The static-versus-bounded strategy comparison used
+  one timed field per shape; the worker-scaling comparison used three. The
+  browser proof uses a small perfect-ground dipole while the primary performance
+  evidence uses the 8x8 fixture in Node. The focused native snapshot tests pass
+  39 assertions, but the existing MSVC Release build's full `ctest` run is red
+  in three older exception-path cases (`necpp_wp1`, `necpp_wp3`, and
+  `necpp_wp_s2`); those failures reproduce outside the snapshot path and remain
+  unresolved. The WASM suite passes all 83 tests, the clean-package suite passes
+  all five tests, and the non-isolated Chromium proof passes.
+- **Remaining risks / WP4 recommendation:** integrate the chosen four-worker,
+  512-sample bounded-tile design into the supported outer worker, add public
+  option/default semantics and serial fallback, broaden browser lifecycle tests,
+  and revalidate default memory/performance on representative devices. Preserve
+  the snapshot capability boundary rather than serializing a `NecModel`.
 
 ## WP4 - Production field-worker pool and package integration
 
@@ -650,7 +865,7 @@ Turn the successful WP3 design into a supported package capability used by
 - The production package works without `SharedArrayBuffer`, COOP, or COEP.
 - The package contains all declared evaluator assets and no consumer copies a
   WASM asset manually.
-- `fieldWorkers: 1` is numerically equivalent to the WP2 serial path.
+- `fieldWorkers: 1` is numerically equivalent to the frozen WP2a serial path.
 - `auto` chooses the documented backend and exposes the choice in diagnostics.
 - Four-worker median primary field time and end-to-end package round trip meet
   the performance gates; p90, small-grid regression, memory, and startup are
@@ -894,11 +1109,12 @@ repositories.
 WP0 evidence baseline
   -> WP1 raw serial field path
      -> WP2 serial/SIMD optimization
-        -> WP3 lightweight-worker proof
-           -> WP4 production package pool
-              -> WP6 visualizer integration
-        -> WP5 embedded decision (may also consume WP4 worker results)
-              -> WP6 if an embedded mode is selected
+        -> WP2a reordered-kernel experiments
+           -> WP3 lightweight-worker proof
+              -> WP4 production package pool
+                 -> WP6 visualizer integration
+           -> WP5 embedded decision (may also consume WP4 worker results)
+                 -> WP6 if an embedded mode is selected
 WP4 + WP5 decision + WP6
   -> WP7 release hardening
 ```

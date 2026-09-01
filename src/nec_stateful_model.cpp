@@ -951,6 +951,60 @@ const nec_far_field_result& nec_stateful_model::compute_far_field(
   return m_far_field_result;
 }
 
+nec_far_field_snapshot nec_stateful_model::capture_far_field_snapshot() const
+{
+  nec_far_field_snapshot snapshot;
+  snapshot.frequency_mhz = m_frequency_mhz;
+  snapshot.model_generation = m_factorization_generation;
+  snapshot.solution_generation = m_solve_generation;
+  if (m_state != nec_model_state::solved || !m_has_port_solution)
+    return snapshot;
+
+  const c_geometry* geometry = m_context->get_geometry();
+  if (geometry == nullptr)
+    return snapshot;
+  if (geometry->m != 0) {
+    snapshot.capability = nec_far_field_snapshot_capability::surface_patches;
+    return snapshot;
+  }
+  if (m_ground.kind == nec_ground_kind::finite_reflection_coefficient ||
+      m_ground.kind == nec_ground_kind::finite_sommerfeld_norton) {
+    snapshot.capability = nec_far_field_snapshot_capability::finite_ground;
+    return snapshot;
+  }
+
+  snapshot.wavelength_m = em::get_wavelength(m_frequency_mhz * 1.0e6);
+  const nec_far_field_evaluation_input input =
+    m_context->far_field_evaluation_input(snapshot.wavelength_m, 0);
+  const size_t count = static_cast<size_t>(geometry->n_segments);
+  auto copy_real_array = [count](const real_array& values) {
+    std::vector<nec_float> copied(count);
+    for (size_t index = 0; index < count; ++index)
+      copied[index] = values[static_cast<int64_t>(index)];
+    return copied;
+  };
+  snapshot.x = copy_real_array(geometry->x);
+  snapshot.y = copy_real_array(geometry->y);
+  snapshot.z = copy_real_array(geometry->z);
+  snapshot.cab = copy_real_array(geometry->cab);
+  snapshot.sab = copy_real_array(geometry->sab);
+  snapshot.salp = copy_real_array(geometry->salp);
+  snapshot.segment_half_lengths.resize(count);
+  for (size_t index = 0; index < count; ++index) {
+    snapshot.segment_half_lengths[index] = pi() *
+      geometry->segment_length[static_cast<int64_t>(index)];
+  }
+  snapshot.air = copy_real_array(input.air);
+  snapshot.aii = copy_real_array(input.aii);
+  snapshot.bir = copy_real_array(input.bir);
+  snapshot.bii = copy_real_array(input.bii);
+  snapshot.cir = copy_real_array(input.cir);
+  snapshot.cii = copy_real_array(input.cii);
+  snapshot.perfect_ground = m_ground.kind == nec_ground_kind::perfect;
+  snapshot.capability = nec_far_field_snapshot_capability::supported;
+  return snapshot;
+}
+
 const nec_embedded_far_field_result&
 nec_stateful_model::compute_embedded_far_fields(
   const nec_far_field_grid& grid,

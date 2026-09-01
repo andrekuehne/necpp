@@ -74,7 +74,51 @@ const BUFFER = {
   embeddedEThetaImag: 22,
   embeddedEPhiReal: 23,
   embeddedEPhiImag: 24,
+  snapshotX: 25,
+  snapshotY: 26,
+  snapshotZ: 27,
+  snapshotCab: 28,
+  snapshotSab: 29,
+  snapshotSalp: 30,
+  snapshotHalfLength: 31,
+  snapshotAir: 32,
+  snapshotAii: 33,
+  snapshotBir: 34,
+  snapshotBii: 35,
+  snapshotCir: 36,
+  snapshotCii: 37,
 } as const;
+
+export type FarFieldSnapshotCapability =
+  | "supported"
+  | "no-solution"
+  | "surface-patches"
+  | "finite-ground"
+  | "unsupported-mode";
+
+export interface FarFieldEvaluationSnapshot {
+  readonly schemaVersion: 1;
+  readonly capability: FarFieldSnapshotCapability;
+  readonly frequencyMHz: number;
+  readonly wavelengthM: number;
+  readonly modelGeneration: number;
+  readonly solutionGeneration: number;
+  readonly perfectGround: boolean;
+  readonly segmentCount: number;
+  readonly x: Float64Array;
+  readonly y: Float64Array;
+  readonly z: Float64Array;
+  readonly cab: Float64Array;
+  readonly sab: Float64Array;
+  readonly salp: Float64Array;
+  readonly segmentHalfLengths: Float64Array;
+  readonly air: Float64Array;
+  readonly aii: Float64Array;
+  readonly bir: Float64Array;
+  readonly bii: Float64Array;
+  readonly cir: Float64Array;
+  readonly cii: Float64Array;
+}
 
 const textDecoder = new TextDecoder();
 
@@ -1096,6 +1140,59 @@ export class WasmNecModel implements NecModel {
       "computeFarField",
       () => this.#farFieldResult(grid, validationMs, wasmCallMs, packageStarted),
     );
+  }
+
+  /** @internal WP3 evaluator input. Unsupported modes are capability results. */
+  captureFarFieldEvaluationSnapshot(): FarFieldEvaluationSnapshot {
+    this.#assertOperation("computeFarField");
+    this.#invokeStatus(
+      "computeFarField",
+      () => this.#module._necpp_wasm_v1_capture_far_field_snapshot(this.#handle),
+    );
+    const nativeCapability =
+      this.#module._necpp_wasm_v1_far_field_snapshot_capability(this.#handle);
+    const capabilities: readonly FarFieldSnapshotCapability[] = [
+      "supported",
+      "no-solution",
+      "surface-patches",
+      "finite-ground",
+      "unsupported-mode",
+    ];
+    const capability = capabilities[nativeCapability] ?? "unsupported-mode";
+    const segmentCount =
+      this.#module._necpp_wasm_v1_far_field_snapshot_segment_count(this.#handle);
+    const copy = (kind: number): Float64Array =>
+      capability === "supported"
+        ? this.#copyBuffer(kind, segmentCount)
+        : new Float64Array();
+    return {
+      schemaVersion: 1,
+      capability,
+      frequencyMHz:
+        this.#module._necpp_wasm_v1_far_field_snapshot_frequency_mhz(this.#handle),
+      wavelengthM:
+        this.#module._necpp_wasm_v1_far_field_snapshot_wavelength_m(this.#handle),
+      modelGeneration:
+        this.#module._necpp_wasm_v1_far_field_snapshot_model_generation(this.#handle),
+      solutionGeneration:
+        this.#module._necpp_wasm_v1_far_field_snapshot_solution_generation(this.#handle),
+      perfectGround:
+        this.#module._necpp_wasm_v1_far_field_snapshot_perfect_ground(this.#handle) === 1,
+      segmentCount,
+      x: copy(BUFFER.snapshotX),
+      y: copy(BUFFER.snapshotY),
+      z: copy(BUFFER.snapshotZ),
+      cab: copy(BUFFER.snapshotCab),
+      sab: copy(BUFFER.snapshotSab),
+      salp: copy(BUFFER.snapshotSalp),
+      segmentHalfLengths: copy(BUFFER.snapshotHalfLength),
+      air: copy(BUFFER.snapshotAir),
+      aii: copy(BUFFER.snapshotAii),
+      bir: copy(BUFFER.snapshotBir),
+      bii: copy(BUFFER.snapshotBii),
+      cir: copy(BUFFER.snapshotCir),
+      cii: copy(BUFFER.snapshotCii),
+    };
   }
 
   computeEmbeddedFarFields(
