@@ -3,6 +3,8 @@
 # Produces in wasm/:
 #   nec2pp.js
 #   nec2pp.wasm
+#   necpp-field-evaluator.js
+#   necpp-field-evaluator.wasm
 #
 # Usage (from repo root or scripts/):
 #   .\scripts\build_wasm_docker.ps1
@@ -41,7 +43,9 @@ New-Item -ItemType Directory -Force -Path $WasmOutDir | Out-Null
 Remove-Item -ErrorAction SilentlyContinue `
     (Join-Path $WasmOutDir "nec2pp.js"), `
     (Join-Path $WasmOutDir "nec2pp.wasm"), `
-    (Join-Path $WasmOutDir "nec2pp.d.ts")
+    (Join-Path $WasmOutDir "nec2pp.d.ts"), `
+    (Join-Path $WasmOutDir "necpp-field-evaluator.js"), `
+    (Join-Path $WasmOutDir "necpp-field-evaluator.wasm")
 
 Write-Host "=== Building WASM via Emscripten Docker image: $WasmImage ==="
 

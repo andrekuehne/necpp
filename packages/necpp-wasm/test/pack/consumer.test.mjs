@@ -4,7 +4,7 @@ import { createServer as createNetServer } from "node:net";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { chromium } from "playwright";
+import { chromium, firefox } from "playwright";
 
 import { stopChild, waitForHttpServer } from "../http-server-process.mjs";
 
@@ -28,6 +28,11 @@ import {
 const packageJson = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 );
+const browserName = process.env.NECPP_TEST_BROWSER ?? "chromium";
+const browserType = { chromium, firefox }[browserName];
+if (browserType === undefined) {
+  throw new Error(`NECPP_TEST_BROWSER must be chromium or firefox, received ${browserName}`);
+}
 
 const skip = !hasWasmArtifacts && "WASM artifacts have not been built";
 
@@ -424,15 +429,36 @@ try {
     assert.match(mime, /application\/wasm/);
     assert.ok((await wasmResponse.arrayBuffer()).byteLength > 0);
 
-    const browser = await chromium.launch({ headless: true });
+    const browser = await browserType.launch({ headless: true });
     try {
       const page = await browser.newPage();
+      const browserWasmResponses = [];
+      page.on("response", (response) => {
+        if (response.url().includes(".wasm")) {
+          browserWasmResponses.push(response);
+        }
+      });
       await page.goto(`${preview.origin}/nested/`);
       await page.waitForFunction(() => window.__NEC_RESULT__ !== undefined);
       const result = await page.evaluate(() => window.__NEC_RESULT__);
       assert.equal(result.workerOk, true);
       assert.equal(result.fieldBackend.backend, "worker-pool");
       assert.equal(result.fieldBackend.activeWorkerCount, 2);
+      const servedWasmUrls = [];
+      for (const response of browserWasmResponses) {
+        const mime = await response.headerValue("content-type") ?? "";
+        if (response.ok() && /application\/wasm/.test(mime)) {
+          servedWasmUrls.push(response.url());
+        }
+      }
+      assert.ok(
+        servedWasmUrls.some((url) => url.includes("/nec2pp-")),
+        `${browserName} did not receive the main WASM as application/wasm`,
+      );
+      assert.ok(
+        servedWasmUrls.some((url) => url.includes("/necpp-field-evaluator-")),
+        `${browserName} did not receive the evaluator WASM as application/wasm`,
+      );
     } finally {
       await browser.close();
     }

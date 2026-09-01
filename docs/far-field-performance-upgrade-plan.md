@@ -1,6 +1,7 @@
 # NEC far-field performance upgrade plan
 
-**Status:** implementation in progress; WP0 through WP5 complete, WP6 implemented with consumer full-suite certification pending
+**Status:** WP7 release candidate prepared for `@necpp-engine/wasm` 0.4.0;
+consumer repin and full-suite certification remain post-publication follow-ups
 **Created:** 2026-08-31
 **Primary engine baseline:** `necpp` commit `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
 **Primary consumer baseline:** `PhasedArrayVisualizer-NG` commit `adf617081e8b53d08729cce57e2a1f7a3bed561c`
@@ -1206,20 +1207,63 @@ repositories.
 - Every handover block is complete enough for a new agent to reproduce the work
   without private context.
 
-### WP7 handover - fill before marking complete
+### WP7 handover
 
-- **Status:** not started
-- **Release owner / date:**
-- **Engine release commit/tag/package:**
-- **Consumer release commit:**
-- **Release benchmark artifacts:**
-- **Final performance table:**
-- **Regression commands/results:**
-- **Asset/deployment evidence:**
-- **Fallback and compatibility statement:**
-- **Known limitations:**
-- **Deferred follow-up links:**
-- **Release decision:**
+- **Status:** engine release candidate complete; merge, required GitHub checks,
+  `wasm-v0.4.0` tag publication, and consumer repin remain
+- **Release owner / date:** André Kühne / 2026-09-01
+- **Engine release commit/tag/package:** WP6 API commit `78c866a`; the WP7 merge
+  commit is pending; package `@necpp-engine/wasm` 0.4.0; required publication
+  tag `wasm-v0.4.0`. The npm registry reported 0.3.0 before this bump.
+- **Consumer release commit:** `35df28d6a08723c75da9931510968c2a92621384`;
+  replace its sibling `file:` dependency with published 0.4.0 after the tag
+  workflow succeeds
+- **Release benchmark artifacts:** WP0 baseline through WP5 final raw records
+  are under `packages/necpp-wasm/bench/evidence/far-field-wp{0,1,2,2a,3,4,5}/`;
+  curated reports are the adjacent `FAR_FIELD_WP*_RESULTS.md` files. Consumer
+  schema-v2 final evidence is
+  `PhasedArrayVisualizer-NG/docs/nec-far-field-wp6-results.json`.
+- **Final performance table:** package primary repeated far field is
+  5,321.07/5,553.84 ms serial median/p90 versus 1,583.15/2,258.04 ms with four
+  workers (3.361x median). Consumer primary repeated steering is 3,616.5 ms
+  WP0 versus 1,006.3/1,057.5 ms final median/p90 (3.59x); the 32 x 32 case is
+  1,052.4 versus 307.9 ms (3.42x). Nine rapid edits settle in 1,061.7 ms with
+  one stale job and 126 unissued tiles cancelled.
+- **Regression commands/results:** a fresh MSVC Release build followed by
+  `ctest --test-dir build-wp7-release --build-config Release
+  --output-on-failure` passed all eight native/ABI/symmetry/smoke partitions in
+  155.37 s. `npm test` passed 91 tests plus strict typecheck. Chromium and
+  Firefox each passed all five exact-tarball clean-consumer tests;
+  `npm run test:field-worker-browser` passed the non-isolated nested-worker
+  lifecycle smoke. `npm publish ... --dry-run --access public` passed.
+- **Asset/deployment evidence:** `pack:release` produced the 49-file,
+  364,273-byte `necpp-engine-wasm-0.4.0.tgz` with SHA-256
+  `a653c202f9a73bcb4f5721d451583fbf6b5ef97f038707bf5dd43f2257379083`.
+  Packed Vite builds emit content-hashed main/evaluator WASM plus outer/nested
+  workers below `/nested/`, serve both binaries as `application/wasm`, and run
+  with `crossOriginIsolated === false`. CI now preserves, size-checks, and
+  checksums both generated loader/WASM pairs and makes Firefox a publish gate.
+- **Fallback and compatibility statement:** the scalar ABI-v1 artifact remains
+  the portable release; SIMD is disabled because no arithmetic SIMD reached
+  the hot loop. Small grids, explicit one-worker mode, finite ground, missing
+  evaluator assets, and worker startup/runtime failures select documented
+  serial fallbacks. Complex field phase/layout, power, caller order, lifecycle,
+  and Node 24 minimum support remain unchanged.
+- **Known limitations:** the final consumer evidence was taken from a sibling
+  package pin. Its focused tests, production build/audit, 20-test Chromium
+  suite, and benchmark pass, but its full unit run still has 388 passes and 16
+  unrelated centralized-config failures recorded in WP6. The WP7 Firefox run
+  was on the reference Windows host; the required Ubuntu Firefox job supplies
+  the second-host gate after merge. The exact consumer initial-run timing is
+  not compared across the WP0 and schema-v2 records.
+- **Deferred follow-up links:** restore the consumer centralized-config suite,
+  repin it to npm 0.4.0, and archive the tag-workflow artifact report. The
+  optional pthread/shared-memory investigation remains explicitly deferred by
+  the follow-up section below.
+- **Release decision:** approve merge as the 0.4.0 release candidate. Publish
+  only by pushing `wasm-v0.4.0` after required branch checks pass; do not rebuild
+  or manually publish a different tarball. Complete the consumer repin after
+  npm publication.
 
 ## Dependency and execution order
 
@@ -1293,21 +1337,53 @@ This plan is complete only when:
    non-cross-origin-isolated browser contracts pass.
 8. Raw baseline/final evidence and every WP handover are complete.
 
-## Final project handover - fill when the overall plan closes
+## Final project handover
 
-- **Overall status:** proposed
-- **Final owner / date:**
-- **Engine baseline -> final:**
-- **Consumer baseline -> final:**
-- **Published package/version:**
-- **Selected serial kernel and SIMD mode:**
-- **Selected field-worker architecture/default count:**
-- **Embedded-field decision:**
-- **Primary initial/repeated/far-field/postprocess before -> after:**
-- **Secondary-grid before -> after:**
-- **Peak-memory before -> after:**
-- **Raw evidence locations:**
-- **Full verification commands:**
-- **Deployment/fallback statement:**
-- **Known limitations:**
-- **Deferred pthread/cross-origin follow-up:**
+- **Overall status:** engine 0.4.0 release candidate complete; publication and
+  consumer repin/certification pending as recorded in WP7
+- **Final owner / date:** André Kühne / 2026-09-01
+- **Engine baseline -> final:** `8e55cab124708d2f4daafd2be3080a6d9c1ae21a`
+  -> WP6 `78c866a` plus the pending WP7 release-hardening merge
+- **Consumer baseline -> final:** `adf617081e8b53d08729cce57e2a1f7a3bed561c`
+  -> `35df28d6a08723c75da9931510968c2a92621384`
+- **Published package/version:** 0.4.0 release candidate; npm remains 0.3.0
+  until the required `wasm-v0.4.0` workflow publishes the tested tarball
+- **Selected serial kernel and SIMD mode:** raw immutable sample kernel with
+  direction trigonometric caching and native/ABI output reuse; scalar
+  `-O3 -DNDEBUG -flto -fexceptions`; no `-msimd128`
+- **Selected field-worker architecture/default count:** dedicated 19,367-byte
+  evaluator WASM, ordinary workers, dynamic 512-sample tiles; auto selects four
+  workers at eight or more logical cores, two at four or more, and serial below
+  the documented work threshold
+- **Embedded-field decision:** no steering cache ships; measured break-even is
+  18/17, 59/55, and 216/211 states for 4/16/64 ports on primary/secondary grids,
+  with unacceptable 64-port warm-up and memory
+- **Primary initial/repeated/far-field/postprocess before -> after:** the WP0
+  raw browser observation recorded 4,336.8 ms initial and 3,773.2 ms repeated;
+  the accepted WP0 repeated median is 3,616.5 ms versus 1,006.3 ms final.
+  Package far field is 5,321.07 ms serial versus 1,583.15 ms pooled; final
+  postprocessing is 0.83% of the repeated median. No cross-schema initial-run
+  speed-up is claimed.
+- **Secondary-grid before -> after:** 1,052.4 -> 307.9 ms consumer repeated
+  steering (3.42x)
+- **Peak-memory before -> after:** the WP0 primary browser sample observed
+  21,043,278 bytes peak JS heap; final observed 35,524,001 bytes while retaining
+  four 73,216-byte evaluator snapshots and a 2,089,448-byte result. The increase
+  is documented and stays within the accepted consumer limit; worker WASM
+  memories are not represented by the JS-heap counter.
+- **Raw evidence locations:** engine baseline/final records under
+  `packages/necpp-wasm/bench/evidence/`; consumer final schema-v2 record and
+  summary under `PhasedArrayVisualizer-NG/docs/nec-far-field-wp6-*`
+- **Full verification commands:** the WP7 handover above records the fresh
+  native CTest, 91-test/typecheck package suite, Chromium and Firefox packed
+  suites, production pooled-browser smoke, release pack, and publish dry run
+- **Deployment/fallback statement:** the package and its nested assets work
+  under non-root ordinary hosting without cross-origin isolation. Every
+  unsupported/capability/asset failure has an explicit serial fallback and
+  diagnostics; tag CI is the only authorized npm publication path.
+- **Known limitations:** consumer full-suite centralized-config failures,
+  post-publication npm repin, and second-host CI execution remain; see the WP7
+  handover rather than treating these as hidden completion claims
+- **Deferred pthread/cross-origin follow-up:** optional only; revisit shared
+  memory/pthreads after profiling shows material headroom and a separate
+  COOP/COEP deployment mode can coexist with this GitHub Pages-compatible path

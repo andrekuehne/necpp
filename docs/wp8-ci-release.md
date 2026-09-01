@@ -42,9 +42,13 @@ Every downstream consumer uses `NECPP_WASM_TARBALL` to install that exact file:
 - a real Chromium module-worker solve.
 
 The browser tests validate impedance and complex far-field output and observe
-that the emitted WASM request is served as `application/wasm`. The artifact job
-then enforces a WASM size below 1 MiB, a generated loader below 200 KiB, and no
-source maps or debug symbols. It emits final sizes and SHA-256 checksums.
+that both emitted WASM requests are served as `application/wasm`. Chromium
+covers direct mode, the solver-owning worker, the example, and the nested
+far-field pool; Firefox independently runs the packed non-root Vite pooled
+consumer. The artifact job then enforces a main WASM size below 1 MiB, a main
+loader below 200 KiB, each evaluator artifact below 64 KiB, and no source maps
+or debug symbols. It emits final sizes and SHA-256 checksums for both artifact
+pairs and the tarball.
 
 ## Tag release
 

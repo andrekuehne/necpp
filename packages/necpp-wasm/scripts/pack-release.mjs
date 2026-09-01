@@ -69,8 +69,13 @@ const requiredFiles = new Set([
   "dist/worker.js",
   "dist/worker.d.ts",
   "dist/worker-entry.js",
+  "dist/field-evaluator-worker.js",
+  "dist/field-evaluator.js",
+  "dist/field-worker-pool.js",
   "dist/nec2pp.generated.js",
   "dist/nec2pp.wasm",
+  "dist/necpp-field-evaluator.generated.js",
+  "dist/necpp-field-evaluator.wasm",
 ]);
 const packedFiles = new Set(
   (report.files ?? []).map(({ path }) => path.replaceAll("\\", "/")),

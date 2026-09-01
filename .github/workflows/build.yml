@@ -88,7 +88,11 @@ jobs:
         run: |
           test -s wasm/nec2pp.js
           test -s wasm/nec2pp.wasm
-          sha256sum wasm/nec2pp.js wasm/nec2pp.wasm \
+          test -s wasm/necpp-field-evaluator.js
+          test -s wasm/necpp-field-evaluator.wasm
+          sha256sum \
+            wasm/nec2pp.js wasm/nec2pp.wasm \
+            wasm/necpp-field-evaluator.js wasm/necpp-field-evaluator.wasm \
             > wasm/SHA256SUMS
           ls -lh wasm
       - name: Upload raw WASM build
@@ -148,6 +152,10 @@ jobs:
         run: |
           cp wasm-artifact/nec2pp.js packages/necpp-wasm/src/nec2pp.generated.js
           cp wasm-artifact/nec2pp.wasm packages/necpp-wasm/src/nec2pp.wasm
+          cp wasm-artifact/necpp-field-evaluator.js \
+            packages/necpp-wasm/src/necpp-field-evaluator.generated.js
+          cp wasm-artifact/necpp-field-evaluator.wasm \
+            packages/necpp-wasm/src/necpp-field-evaluator.wasm
       - name: Run strict types, lifecycle, facade, and worker tests
         run: npm --prefix packages/necpp-wasm test
 
@@ -175,6 +183,10 @@ jobs:
         run: |
           cp wasm-artifact/nec2pp.js packages/necpp-wasm/src/nec2pp.generated.js
           cp wasm-artifact/nec2pp.wasm packages/necpp-wasm/src/nec2pp.wasm
+          cp wasm-artifact/necpp-field-evaluator.js \
+            packages/necpp-wasm/src/necpp-field-evaluator.generated.js
+          cp wasm-artifact/necpp-field-evaluator.wasm \
+            packages/necpp-wasm/src/necpp-field-evaluator.wasm
       - name: Pack and validate the publish allowlist
         run: >-
           npm --prefix packages/necpp-wasm run pack:release --
@@ -290,6 +302,43 @@ jobs:
           NECPP_WASM_TARBALL="$tarball" npm --prefix packages/necpp-wasm \
             run test:browser -- example
 
+  browser-firefox:
+    name: Firefox packed pooled-field integration
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: packages/necpp-wasm/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: necpp-npm-package
+          path: package-artifact
+      - run: npm --prefix packages/necpp-wasm ci
+      - name: Verify pinned Playwright and install Firefox
+        shell: bash
+        run: |
+          actual="$(node -p "require('./packages/necpp-wasm/node_modules/playwright/package.json').version")"
+          test "$actual" = "$PLAYWRIGHT_VERSION"
+          npm --prefix packages/necpp-wasm exec -- \
+            playwright install --with-deps firefox
+      - name: Run the clean non-root Vite pooled-field consumer in Firefox
+        shell: bash
+        env:
+          NECPP_TEST_BROWSER: firefox
+        run: |
+          tarball="$(find "$PWD/package-artifact" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          NECPP_WASM_TARBALL="$tarball" node \
+            --test --test-timeout=180000 --test-concurrency=1 \
+            packages/necpp-wasm/test/pack/consumer.test.mjs
+
   artifact-report:
     name: Artifact size and checksum report
     needs:
@@ -300,6 +349,7 @@ jobs:
       - package-consumer
       - browser-direct
       - browser-worker
+      - browser-firefox
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -318,12 +368,21 @@ jobs:
         run: |
           test "$(stat -c %s wasm-artifact/nec2pp.wasm)" -lt 1048576
           test "$(stat -c %s wasm-artifact/nec2pp.js)" -lt 204800
+          test "$(stat -c %s wasm-artifact/necpp-field-evaluator.wasm)" -lt 65536
+          test "$(stat -c %s wasm-artifact/necpp-field-evaluator.js)" -lt 65536
           test -z "$(find package-artifact -type f \
             \( -name '*.map' -o -name '*.debug' -o -name '*.dSYM' \) -print -quit)"
           mkdir release
           cp package-artifact/*.tgz release/
-          cp wasm-artifact/nec2pp.js wasm-artifact/nec2pp.wasm release/
-          (cd release && sha256sum *.tgz nec2pp.js nec2pp.wasm > SHA256SUMS)
+          cp \
+            wasm-artifact/nec2pp.js wasm-artifact/nec2pp.wasm \
+            wasm-artifact/necpp-field-evaluator.js \
+            wasm-artifact/necpp-field-evaluator.wasm \
+            release/
+          (cd release && sha256sum \
+            *.tgz nec2pp.js nec2pp.wasm \
+            necpp-field-evaluator.js necpp-field-evaluator.wasm \
+            > SHA256SUMS)
           {
             echo "Pinned Emscripten image: $EMSCRIPTEN_IMAGE"
             echo "Pinned TypeScript: $TYPESCRIPT_VERSION"

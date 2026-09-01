@@ -31,6 +31,7 @@ test("WP8 workflow parses and contains every required release gate", () => {
     "package-consumer",
     "browser-direct",
     "browser-worker",
+    "browser-firefox",
     "artifact-report",
     "release",
   ];
@@ -50,6 +51,7 @@ test("WP8 workflow parses and contains every required release gate", () => {
   assert.equal(workflow.jobs["package-consumer"].needs, "package");
   assert.equal(workflow.jobs["browser-direct"].needs, "package");
   assert.equal(workflow.jobs["browser-worker"].needs, "package");
+  assert.equal(workflow.jobs["browser-firefox"].needs, "package");
   assert.equal(workflow.jobs.release.needs, "artifact-report");
 
   const finalGates = new Set(workflow.jobs["artifact-report"].needs);
@@ -61,6 +63,7 @@ test("WP8 workflow parses and contains every required release gate", () => {
     "package-consumer",
     "browser-direct",
     "browser-worker",
+    "browser-firefox",
   ]) {
     assert.ok(finalGates.has(job), `artifact report does not require ${job}`);
   }
@@ -78,6 +81,14 @@ test("WP8 workflow packs once and publishes the tested tarball", () => {
   assert.match(workflowSource, /npm publish "\$tarball" --access public --provenance/);
   assert.match(workflowSource, /gh release create/);
   assert.match(workflowSource, /run test:browser -- example/);
+  assert.match(workflowSource, /playwright install --with-deps firefox/);
+  assert.match(workflowSource, /NECPP_TEST_BROWSER: firefox/);
+  for (const artifact of [
+    "necpp-field-evaluator.js",
+    "necpp-field-evaluator.wasm",
+  ]) {
+    assert.ok(workflowSource.includes(artifact), `workflow omits ${artifact}`);
+  }
 
   const wasmSteps = workflow.jobs["wasm-build"].steps;
   assert.equal(
