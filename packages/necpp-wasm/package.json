@@ -44,10 +44,12 @@
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js",
       "default": "./dist/worker.js"
-    }
+    },
+    "./fixtures/current-quadrature-v1/*": "./fixtures/current-quadrature-v1/*"
   },
   "files": [
     "dist",
+    "fixtures",
     "README.md",
     "COPYING"
   ],
@@ -62,6 +64,7 @@
     "bench:far-field-wp4": "node bench/far-field-wp4-production.mjs",
     "bench:far-field-wp5": "node --expose-gc bench/far-field-wp5-amortization.mjs",
     "bench:consumer-trace": "node bench/consumer-browser-trace.mjs",
+    "write:current-quadrature-fixtures": "node scripts/write-current-quadrature-fixtures.mjs",
     "build": "node scripts/build-dist.mjs",
     "prepack": "npm run build",
     "build:test": "node test/build.mjs",

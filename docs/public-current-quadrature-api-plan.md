@@ -135,8 +135,8 @@ interface IsolatedElementCharacterization {
 | 1 | Public exact current distributions | 0 | Complete |
 | 2 | Static prepared quadrature evaluator | 1 | Complete |
 | 3 | Isolated-element characterization | 1, 2 | Complete |
-| 4 | WASM, worker, and Rust/WASM handoff | 2, 3 | Not started |
-| 5 | Numerical and consumer validation | 4 | Not started |
+| 4 | WASM, worker, and Rust/WASM handoff | 2, 3 | Complete |
+| 5 | Numerical and consumer validation | 4 | Complete |
 | 6 | Performance, documentation, release | 5 | Not started |
 
 ## WP0 - Freeze contracts and baselines
@@ -640,34 +640,235 @@ gate.
 
 ## WP5 - Numerical and consumer validation
 
+Native, package, worker, browser, and Rust binder validation. No new public
+solve APIs. C ABI, `NecModel` methods, and worker rows stay as WP4 shipped
+them. Frozen names and layouts live in
+[`docs/current-quadrature-api.md`](current-quadrature-api.md).
+
+Visualizer production ingestion stays WP6. WP5 publishes versioned fixtures
+and a bind-once Rust contract the visualizer can pin without a necpp sibling
+checkout or package-internal imports.
+
 ### Work
 
-- Verify current coefficients and prepared samples against NEC internal evaluation.
-- Verify embedded patterns against the existing NEC API; do not reconstruct or
-  replace element patterns in the visualizer.
-- Check normalization, polarity, phase, ordering, junctions, and ground images.
-- Publish small versioned fixtures for the visualizer: geometry/ground metadata,
-  nodes/weights, currents, Z/Y, and embedded complex fields.
-- Add a `PhasedArrayVisualizer-NG` compatibility test for Rust/WASM ingestion.
+- Verify current coefficients and prepared samples against NEC internal
+  evaluation (`air`/`aii`/`bir`/`bii`/`cir`/`cii` via the far-field snapshot).
+  Do not parse NEC reports.
+- Verify embedded patterns against `compute_embedded_far_fields` /
+  `computeEmbeddedFarFields`. Do not reconstruct or replace element patterns
+  in TypeScript or the visualizer.
+- Check normalization, polarity, phase, ordering, junctions, and ground images
+  for every canonical fixture across native, direct WASM, worker, and handoff.
+- Publish small versioned fixtures: geometry/ground metadata, nodes/weights,
+  Z/Y, packed NECQ currents, and packed NECF fields.
+- Upgrade the sketch Rust binder to typed little-endian plane loads against
+  those fixtures. Optional sibling checkout of `PhasedArrayVisualizer-NG` may
+  skip.
+
+### Frozen decisions
+
+- Tag `[wp5_current]`, not `[wp5]`.
+- Canonical five fixtures from the contract doc, 4-node
+  `{-1,-1/3,1/3,1}`, physical-only, package `5×3` field grid
+  (`theta` 0/45/5, `phi` 0/90/3). Extra packed file:
+  `rooted-monopole-images`.
+- Fixtures live in-repo and in the npm pack under
+  `fixtures/current-quadrature-v1/`. Numeric planes stay binary; JSON holds
+  metadata and small Z/Y only.
+- Rust crate stays `publish = false`.
+- Test-only helpers may decode packed buffers. Production TypeScript must not
+  interpolate `I(s)` or loop samples for electromagnetics.
+- No new ABI symbols, result-buffer kinds, or `NecArraySolver` methods.
+
+### Native tests
+
+New file `src/current_quadrature_wp5_tb.cpp`, tagged
+`[wasm_api][current_quadrature][wp5_current]`. Reuse
+`current_quadrature_fixtures.h`. Use the package `5×3` grid so native
+characterization identity matches the published fixtures.
+
+Public `A/B/C` are copies of NEC `air`/`aii`/`bir`/`bii`/`cir`/`cii`. WP1
+never asserted that copy against the snapshot arrays. WP5 does, after a
+latest-solution solve, at `1e-12`. Public metres are `wavelength_m` times the
+snapshot wavelength-normalized geometry.
+
+| Case | Assert |
+|---|---|
+| All five fixtures, latest-solution | Public `A/B/C` match snapshot `air`/`aii`/… at `1e-12`; `I(0)=A+C` matches snapshot centre current; public metres = `wavelength_m` × snapshot arrays |
+| All five fixtures, unit-current | Achieved port `I = 1+j0` at `1e-7`; unit planes match a latest-solution after the same drive at `1e-12`; packed 4-node samples match `nec_evaluate_quadrature_current` at `1e-12` |
+| Characterization vs second model | Z/Y match `compute_impedance_matrix`; packed samples match WP2 scalar; fields match `compute_embedded_far_fields(..., unit_current)` at `1e-7` |
+| Rooted monopole images | Plane 0 is physical; plane 1 is `(x,y,-z)`, `(tx,ty,-tz)`, `I'=-I`; never mixed |
+| Bent multiwire | Packed identity is `tag`/`segment`; no native `icon` integers |
+| Insulated turnstile | `\|Z_01\|` vanishes vs `\|Z_00\|`; `E_0 + j E_1` matches a `[1,j]` current-drive far field at `1e-7` |
+| Connected turnstile | `\|Z_01\|` is not vanishing; same superposition check |
+| Existing suites | `[wp1_current]`, `[wp2_current]`, `[wp3_current]`, `[wp4_current]`, `[wp3]`, and `~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]` stay green |
+
+Native tests are the authority for NEC internals. Package tests do not poke
+WASM HEAP coefficient arrays.
+
+### Versioned fixture bundle
+
+Schema `current-quadrature-v1`, directory
+`packages/necpp-wasm/fixtures/current-quadrature-v1/`:
+
+```text
+manifest.json
+dipole.necq / dipole.necf
+rooted-monopole.necq / .necf
+rooted-monopole-images.necq
+bent-multiwire.necq / .necf
+turnstile-insulated.necq / .necf
+turnstile-connected.necq / .necf
+```
+
+Manifest fields: `schemaVersion: 1`, `abiVersion: 1`, engine/package versions;
+per fixture wires, ports, ground, `groundConnection`, `frequencyMHz`,
+quadrature nodes/images, field grid; `impedance`/`admittance` as
+`ComplexMatrix` JSON; byte lengths and SHA-256 of each binary; representative
+samples (feed-segment `I(0)=A+C`, one packed quadrature sample, one
+`E_theta`/`E_phi` sample); `imagePolicy` and units (`metres`, `exp(+jωt)`).
+
+Generator `packages/necpp-wasm/scripts/write-current-quadrature-fixtures.mjs`
+uses public `createNecModel().characterizeIsolatedElement(...)` only. A
+package test fails if regenerated checksums drift.
+
+Publish path: add `fixtures/` to `package.json` `files` and export
+`./fixtures/current-quadrature-v1/*`. Update the pack allowlist.
+
+### Package / worker / browser
+
+New `packages/necpp-wasm/test/current-quadrature-validation.test.mjs`. Keep
+WP4 contract/handoff tests. For every canonical fixture:
+
+- Direct vs worker: Z/Y at `1e-12`; NECQ/NECF bytes identical
+- Characterization `embeddedField` planes match
+  `computeEmbeddedFarFields({ kind: "unit-current" })` on a **second** model
+  at `1e-7` (decode NECF; do not rebuild patterns)
+- Worker handoff: client gets `IsolatedElementHandoff` metadata only;
+  consumer receives NECQ/NECF once; a follow-up `steer` does not re-transfer
+- Offline bind: load checked-in fixture files (no NEC solve) and assert
+  magics, counts, checksums, representative samples
+
+Browser: keep the live dipole handoff and add a fixture-file bind into a mock
+consumer worker. Main-thread application state still has no large
+current/pattern buffers. Insulated-turnstile superposition lives in the Node
+validation file (public APIs only).
+
+### Rust binder
+
+Upgrade `packages/necpp-wasm/rust/necq_view.rs` and `necf_view.rs`:
+
+- Zero-copy views still alias the packed bytes
+- Typed little-endian `f64` loads at the documented geometry/current/field
+  indices. NECF sample index matches `wasm-api.md`:
+  `port * samplesPerPort + phi * nTheta + theta`
+- `cargo test` loads real `current-quadrature-v1` binaries
+- Bind-once: the view does not allocate a second copy of the planes
+- Optional: if `NECPP_VISUALIZER_ROOT` or `../PhasedArrayVisualizer-NG`
+  exists, record that fact; do not fail CI when absent
+
+Do not implement array mutual-impedance integration.
+
+### Files
+
+| Path | Change |
+|---|---|
+| `src/current_quadrature_wp5_tb.cpp` | Native NEC-internal and fixture gates |
+| `tests/CMakeLists.txt` | Register the test source |
+| `packages/necpp-wasm/fixtures/current-quadrature-v1/` | Goldens |
+| `packages/necpp-wasm/scripts/write-current-quadrature-fixtures.mjs` | Generator |
+| `packages/necpp-wasm/package.json` | `files` + export map |
+| `packages/necpp-wasm/test/pack/manifest.test.mjs` | Allow `fixtures/` |
+| `packages/necpp-wasm/test/current-quadrature-validation.test.mjs` | Direct/worker/handoff/offline |
+| `packages/necpp-wasm/test/browser-current-quadrature-handoff.mjs` | Fixture-bind case |
+| `packages/necpp-wasm/rust/necq_view.rs`, `necf_view.rs` | Typed planes + fixture tests |
+| `docs/current-quadrature-api.md`, `docs/necq-rust-binder.md` | WP5 fixtures and bind |
+
+### Non-goals
+
+- New ABI symbols, result-buffer kinds, or `NecArraySolver` methods
+- Packing a second field kernel; NECF remains an envelope of
+  `EmbeddedFarFieldResult`
+- Array coupling, array factor, matching, polarization metrics
+- Replacing or reconstructing element patterns in TypeScript
+- Performance/memory gates and npm publish (WP6)
+- Editing `PhasedArrayVisualizer-NG`
+
+### Implementation sequence
+
+1. Expand this WP5 section.
+2. Native `[wp5_current]` internals and all-fixture characterization gates.
+3. Fixture generator, goldens, pack export, drift test.
+4. Typed Rust views and fixture `cargo test`.
+5. Node validation and browser fixture-bind.
+6. Docs, then fill this handover.
 
 ### Definition of Done
 
-- Dipole, rooted monopole, multiwire, multiport, and turnstile matrices pass.
+- Dipole, rooted monopole, multiwire, multiport, and turnstile matrices pass
+  at WP0 tolerances.
 - Direct, worker, and transferred-consumer results agree.
-- The visualizer consumes fixtures without a sibling checkout or internal import.
-- Rust/WASM receives positions, tangents, weighted currents, and fields with the
-  frozen units, order, polarity, and phase.
+- The visualizer consumes fixtures without a sibling checkout or internal
+  import.
+- Rust/WASM receives positions, tangents, weighted currents, and fields with
+  the frozen units, order, polarity, and phase.
 - NEC remains the sole element-pattern source.
 - Full existing native, package, Node, and browser suites pass.
 
 ### Handover
 
-- **Status / implementer / date:**
-- **Commit(s):**
+- **Status / implementer / date:** complete / WP5 implementation / 2026-09-02
+- **Commit(s):** uncommitted WP5 tree on this branch; pin after the user
+  commits.
 - **Commands and results:**
+  - `cmake --build build-wp0 --config Release --target nec2++_tests --parallel`
+  - `build-wp0\tests\Release\nec2++_tests.exe "[wp5_current]" --reporter compact`
+    — 7 test cases, 7870 assertions, all passed.
+  - `build-wp0\tests\Release\nec2++_tests.exe "~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]" --reporter compact`
+    — 128 test cases, 23394 assertions, all passed (includes WP0–WP5 current
+    tags; excludes the older WASM-API stress tags).
+  - `npm --prefix packages/necpp-wasm run typecheck` — passed (via `npm test`).
+  - `npm --prefix packages/necpp-wasm test` — 129 tests, all passed, including
+    WP5 Node validation, drift, direct/worker, handoff, and turnstile
+    superposition.
+  - `npm --prefix packages/necpp-wasm run test:pack` — 5 tests, all passed
+    (tarball includes `fixtures/current-quadrature-v1/`).
+  - `npm --prefix packages/necpp-wasm run test:current-quadrature-browser` —
+    Playwright live handoff plus published-fixture bind-once: main thread has
+    no large buffers; consumer received NECQ+NECF (`quadratureBytes` 4072,
+    `embeddedBytes` 608) from both paths.
+  - `cargo test --manifest-path packages/necpp-wasm/rust/Cargo.toml` — 8 tests
+    passed (header parse plus real fixture bind).
 - **Artifacts:**
+  - [`src/current_quadrature_wp5_tb.cpp`](../src/current_quadrature_wp5_tb.cpp)
+  - [`packages/necpp-wasm/fixtures/current-quadrature-v1/`](../packages/necpp-wasm/fixtures/current-quadrature-v1/)
+  - [`packages/necpp-wasm/scripts/write-current-quadrature-fixtures.mjs`](../packages/necpp-wasm/scripts/write-current-quadrature-fixtures.mjs)
+  - [`packages/necpp-wasm/test/current-quadrature-validation.test.mjs`](../packages/necpp-wasm/test/current-quadrature-validation.test.mjs)
+  - Typed plane loads in
+    [`packages/necpp-wasm/rust/necq_view.rs`](../packages/necpp-wasm/rust/necq_view.rs)
+  - Fixtures and bind recorded in
+    [`docs/current-quadrature-api.md`](current-quadrature-api.md) and
+    [`docs/necq-rust-binder.md`](necq-rust-binder.md)
 - **Decisions / deviations:**
+  - No new public C++/TS solve APIs. Tests use `[wp5_current]`, not `[wp5]`.
+  - Native WP5 characterization uses the package `5×3` grid (`theta` 0/45/5,
+    `phi` 0/90/3), not the WP3 native 30° grid, so goldens match published
+    fixtures.
+  - Fixtures are in the npm `files` list and export map. Numeric planes stay
+    binary; JSON is metadata plus small Z/Y.
+  - NECF sample index is theta-fast (`phi * nTheta + theta`), matching
+    `wasm-api.md`. The earlier rust-binder `theta * nPhi + phi` formula was
+    wrong and is corrected.
+  - Visualizer production ingestion and a sibling checkout remain WP6. The
+    optional `NECPP_VISUALIZER_ROOT` check skips when absent.
 - **Known risks / next WP:**
+  - WP6: characterization/transfer/bind benchmarks, docs, changelog, and an
+    exact visualizer package pin.
+  - Regenerating fixtures on a different engine revision will change packed
+    checksums (`modelGeneration` lives in the NECQ/NECF headers).
+  - Independent `get_current_distribution` + `compute_embedded_far_fields`
+    still costs `2 * nPorts` unit-current solves; only characterization
+    shares the loop.
 
 ## WP6 - Performance, documentation, and release
 

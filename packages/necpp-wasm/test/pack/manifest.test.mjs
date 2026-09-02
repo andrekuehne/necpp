@@ -45,6 +45,9 @@ test("npm pack contains only the documented publish files", { skip }, () => {
     "dist/nec2pp.wasm",
     "dist/necpp-field-evaluator.generated.js",
     "dist/necpp-field-evaluator.wasm",
+    "fixtures/current-quadrature-v1/manifest.json",
+    "fixtures/current-quadrature-v1/dipole.necq",
+    "fixtures/current-quadrature-v1/dipole.necf",
   ];
   for (const path of required) {
     assert.ok(files.has(path), `missing ${path} in packed tarball`);
@@ -54,7 +57,8 @@ test("npm pack contains only the documented publish files", { skip }, () => {
     const allowed = path === "package.json"
       || path === "README.md"
       || path === "COPYING"
-      || path.startsWith("dist/");
+      || path.startsWith("dist/")
+      || path.startsWith("fixtures/");
     assert.ok(allowed, `packed unexpected path ${path}`);
     assert.equal(path.includes(".."), false);
     assert.doesNotMatch(path, /\.map$/);

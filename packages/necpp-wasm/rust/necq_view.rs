@@ -1,8 +1,9 @@
 /*
   Copyright (C) 2026  NEC2++ contributors
 
-  Sketch only: not a published crate. Matches nec_prepared_quadrature_view
-  and the WP4 NECF envelope. Bind once; do not recopy on steering.
+  Zero-copy NECQ/NECF views. Matches nec_prepared_quadrature_view and the
+  WP4 NECF envelope. Bind once against published fixtures; do not recopy
+  on steering. Not a published crate.
 */
 #![allow(dead_code)]
 
@@ -90,6 +91,48 @@ impl<'a> NecqView<'a> {
             mode * self.n_image_planes as usize * self.n_segments as usize * self.n_nodes as usize
                 + geometry,
         )
+    }
+
+    pub fn f64_at(plane: &[u8], index: usize) -> Option<f64> {
+        let offset = index.checked_mul(8)?;
+        let bytes = plane.get(offset..offset + 8)?;
+        Some(f64::from_le_bytes(bytes.try_into().ok()?))
+    }
+
+    pub fn i32_at(plane: &[u8], index: usize) -> Option<i32> {
+        let offset = index.checked_mul(4)?;
+        let bytes = plane.get(offset..offset + 4)?;
+        Some(i32::from_le_bytes(bytes.try_into().ok()?))
+    }
+
+    pub fn position_m(&self, plane: usize, segment: usize, node: usize) -> Option<(f64, f64, f64)> {
+        let index = self.geometry_index(plane, segment, node)?;
+        Some((
+            Self::f64_at(self.x, index)?,
+            Self::f64_at(self.y, index)?,
+            Self::f64_at(self.z, index)?,
+        ))
+    }
+
+    pub fn tangent(&self, plane: usize, segment: usize, node: usize) -> Option<(f64, f64, f64)> {
+        let index = self.geometry_index(plane, segment, node)?;
+        Some((
+            Self::f64_at(self.tx, index)?,
+            Self::f64_at(self.ty, index)?,
+            Self::f64_at(self.tz, index)?,
+        ))
+    }
+
+    pub fn current(&self, mode: usize, plane: usize, segment: usize, node: usize) -> Option<(f64, f64)> {
+        let index = self.current_index(mode, plane, segment, node)?;
+        Some((
+            Self::f64_at(self.i_real, index)?,
+            Self::f64_at(self.i_imag, index)?,
+        ))
+    }
+
+    pub fn ds_weight_at(&self, plane: usize, segment: usize, node: usize) -> Option<f64> {
+        Self::f64_at(self.ds_weight, self.geometry_index(plane, segment, node)?)
     }
 }
 
@@ -278,5 +321,81 @@ mod tests {
             view_prepared_quadrature(&packed),
             Err(NecqError::BadMagic)
         ));
+    }
+
+    fn aliases_packed(packed: &[u8], plane: &[u8]) {
+        let start = packed.as_ptr() as usize;
+        let end = start + packed.len();
+        let plane_start = plane.as_ptr() as usize;
+        let plane_end = plane_start + plane.len();
+        assert!(plane_start >= start && plane_end <= end);
+    }
+
+    #[test]
+    fn dipole_fixture_binds_metres_tangents_and_weighted_currents() {
+        let packed: &[u8] = include_bytes!("../fixtures/current-quadrature-v1/dipole.necq");
+        let view = view_prepared_quadrature(packed).expect("valid dipole NECQ");
+        assert_eq!(view.n_segments, 11);
+        assert_eq!(view.n_nodes, 4);
+        assert_eq!(view.n_modes, 1);
+        assert_eq!(view.n_image_planes, 1);
+        assert!((view.frequency_mhz - 300.0).abs() < 1e-12);
+        aliases_packed(packed, view.x);
+        aliases_packed(packed, view.i_real);
+
+        let (x, y, z) = view.position_m(0, 0, 0).expect("start sample");
+        assert!((x).abs() < 1e-12);
+        assert!((y).abs() < 1e-12);
+        assert!((z + 0.25).abs() < 1e-9);
+        let (tx, ty, tz) = view.tangent(0, 0, 0).expect("tangent");
+        assert!((tx).abs() < 1e-12);
+        assert!((ty).abs() < 1e-12);
+        assert!((tz - 1.0).abs() < 1e-12);
+        let weight = view.ds_weight_at(0, 0, 0).expect("weight");
+        let length = 0.5 / 11.0;
+        assert!((weight - length / 2.0).abs() < 1e-12);
+
+        let (re, im) = view.current(0, 0, 5, 0).expect("feed sample");
+        assert!((re - 0.9984886099846924).abs() < 1e-12);
+        assert!((im + 0.012421139423889116).abs() < 1e-12);
+
+        let bound = view_prepared_quadrature(packed).expect("second bind");
+        assert_eq!(bound.x.as_ptr(), view.x.as_ptr());
+        assert_eq!(bound.i_real.as_ptr(), view.i_real.as_ptr());
+        let _steer = bound.current(0, 0, 5, 2);
+        assert_eq!(bound.i_imag.as_ptr(), view.i_imag.as_ptr());
+    }
+
+    #[test]
+    fn monopole_image_fixture_keeps_planes_separate() {
+        let packed: &[u8] =
+            include_bytes!("../fixtures/current-quadrature-v1/rooted-monopole-images.necq");
+        let view = view_prepared_quadrature(packed).expect("valid image NECQ");
+        assert_eq!(view.n_image_planes, 2);
+        assert!(view.has_images());
+        for segment in 0..view.n_segments as usize {
+            for node in 0..view.n_nodes as usize {
+                let physical = view.position_m(0, segment, node).unwrap();
+                let image = view.position_m(1, segment, node).unwrap();
+                assert!((image.0 - physical.0).abs() < 1e-12);
+                assert!((image.1 - physical.1).abs() < 1e-12);
+                assert!((image.2 + physical.2).abs() < 1e-12);
+                let physical_t = view.tangent(0, segment, node).unwrap();
+                let image_t = view.tangent(1, segment, node).unwrap();
+                assert!((image_t.2 + physical_t.2).abs() < 1e-12);
+                let physical_i = view.current(0, 0, segment, node).unwrap();
+                let image_i = view.current(0, 1, segment, node).unwrap();
+                assert!((image_i.0 + physical_i.0).abs() < 1e-12);
+                assert!((image_i.1 + physical_i.1).abs() < 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn optional_visualizer_checkout_does_not_fail_when_absent() {
+        let from_env = std::env::var_os("NECPP_VISUALIZER_ROOT");
+        let sibling = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../../PhasedArrayVisualizer-NG");
+        let _present = from_env.is_some() || sibling.exists();
     }
 }

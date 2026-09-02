@@ -4,7 +4,8 @@ Status: frozen by WP0 (2026-09-02). WP1 implemented the native exact-current
 API. WP2 implemented the native prepared-quadrature evaluator and packed NECQ
 layout. WP3 implements native isolated-element characterization. WP4 implements
 the additive C/WASM ABI, `NecModel` / `NecWorkerModel` methods, worker
-transfer, and the visualizer MessagePort handoff. This document is
+transfer, and the visualizer MessagePort handoff. WP5 publishes versioned
+fixtures and numerical/consumer validation. This document is
 the normative public contract for exact NEC current coefficients, prepared
 quadrature sampling, isolated-element characterization, and the visualizer
 handoff. Existing Z/Y, solves, fields, power, and lifecycle in
@@ -16,6 +17,8 @@ and `nec_evaluate_segment_current`. WP2 adds
 `nec_stateful_model::prepare_current_quadrature` and the packed NECQ buffer.
 WP3 adds `nec_stateful_model::characterize_isolated_element`.
 WP4 adds C ABI entry points, TypeScript façades, packed NECF, and handoff.
+WP5 publishes versioned NECQ/NECF fixtures and validates native internals,
+direct/worker/handoff agreement, and Rust bind-once ingestion.
 Names below are frozen; later WPs must not weaken the semantics.
 
 The work tracker is
@@ -610,6 +613,51 @@ The insulated turnstile z-offset of \(\pm0.001\,\mathrm{m}\) is electrical
 insulation, not a second antenna height. Orthogonal insulated dipoles have
 vanishing mutual impedance; the connected hub does not.
 
+## WP5 validation and fixtures
+
+WP5 does not add public solve APIs. It proves public currents and NEC-native
+embedded fields against NEC internals, then publishes a small versioned bundle
+the visualizer can ingest without a necpp sibling checkout or
+`packages/necpp-wasm/src/*` imports.
+
+Schema `current-quadrature-v1` lives in
+[`packages/necpp-wasm/fixtures/current-quadrature-v1/`](../packages/necpp-wasm/fixtures/current-quadrature-v1/)
+and is packed with `@necpp-engine/wasm`:
+
+```text
+@necpp-engine/wasm/fixtures/current-quadrature-v1/manifest.json
+@necpp-engine/wasm/fixtures/current-quadrature-v1/dipole.necq
+@necpp-engine/wasm/fixtures/current-quadrature-v1/dipole.necf
+…
+@necpp-engine/wasm/fixtures/current-quadrature-v1/rooted-monopole-images.necq
+```
+
+`manifest.json` holds geometry/ground/ports, the 4-node rule, the `5×3` field
+grid, isolated Z/Y, SHA-256 checksums, and representative samples. Numeric
+planes stay in the NECQ/NECF binaries. The extra
+`rooted-monopole-images.necq` file is the same monopole with an explicit PEC
+image plane; plane 0 remains physical.
+
+A non-visualizer Rust consumer binds the buffers once with
+[`packages/necpp-wasm/rust/necq_view.rs`](../packages/necpp-wasm/rust/necq_view.rs):
+decode headers, keep the `ArrayBuffer`s, load little-endian `f64` planes at
+the documented indices. NECF sample order matches [`wasm-api.md`](wasm-api.md):
+
+```text
+sampleIndex = phiIndex * thetaDeg.length + thetaIndex
+embeddedIndex = portIndex * samplesPerPort + sampleIndex
+```
+
+Regenerate goldens with:
+
+```text
+npm --prefix packages/necpp-wasm run build:test
+npm --prefix packages/necpp-wasm run write:current-quadrature-fixtures
+```
+
+A package drift test fails if the packed checksums change. Native tests are
+tagged `[wp5_current]`.
+
 ## Numerical tolerance policy
 
 This extends [`wasm-api.md`](wasm-api.md); it does not replace it.
@@ -669,7 +717,7 @@ one mode unless noted:
 | `turnstile-connected` | 20 | 2 | 2080 | 960 | 2 modes: geometry 5760 + currents 2560 |
 
 The C ABI, TypeScript methods, worker operations, and handoff are documented
-in the sections above. `abiVersion` stays 1. Rust header parsing:
+in the sections above. `abiVersion` stays 1. Rust fixture bind:
 
 ```text
 cargo test --manifest-path packages/necpp-wasm/rust/Cargo.toml

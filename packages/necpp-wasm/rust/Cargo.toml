@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 license = "GPL-2.0-or-later"
-description = "Zero-copy sketch of NECQ/NECF transfer envelopes for a visualizer binder"
+description = "Zero-copy NECQ/NECF transfer envelopes with typed plane loads"
 
 [lib]
 path = "necq_view.rs"
