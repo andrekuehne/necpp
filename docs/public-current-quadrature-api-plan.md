@@ -131,7 +131,7 @@ interface IsolatedElementCharacterization {
 
 | WP | Work | Depends on | Status |
 |---|---|---|---|
-| 0 | Contract and baselines | - | Not started |
+| 0 | Contract and baselines | - | Complete |
 | 1 | Public exact current distributions | 0 | Not started |
 | 2 | Static prepared quadrature evaluator | 1 | Not started |
 | 3 | Isolated-element characterization | 1, 2 | Not started |
@@ -158,12 +158,41 @@ interface IsolatedElementCharacterization {
 
 ### Handover
 
-- **Status / implementer / date:**
-- **Commit(s):**
+- **Status / implementer / date:** complete / WP0 implementation / 2026-09-02
+- **Commit(s):** uncommitted WP0 tree on this branch; pin after the user
+  commits.
 - **Commands and results:**
+  - `cmake --build build-wp0 --config Release --target nec2++_tests --parallel`
+  - `build-wp0\tests\Release\nec2++_tests.exe "[wp0_current]" --reporter compact`
+    — 7 test cases, 305 assertions, all passed.
+  - `npm --prefix packages/necpp-wasm run typecheck` — passed.
+  - Package Node/WASM contract tests are present and skip until `nec2pp.wasm`
+    is staged. WASM baseline command:
+    `npm --prefix packages/necpp-wasm run bench:current-quadrature -- --output-directory packages/necpp-wasm/bench/evidence/current-quadrature-wp0 --module-directory packages/necpp-wasm/dist`
 - **Artifacts:**
+  - [`docs/current-quadrature-api.md`](current-quadrature-api.md)
+  - [`packages/necpp-wasm/bench/evidence/current-quadrature-wp0/native-baseline.json`](../packages/necpp-wasm/bench/evidence/current-quadrature-wp0/native-baseline.json)
 - **Decisions / deviations:**
+  - Connected turnstile is four half-wires meeting at the origin. Two
+    through-crossing dipoles in one plane fail NEC overlap checking.
+  - Insulated turnstile z-offset is ±0.001 m. Orthogonal insulated dipoles
+    have vanishing Z_01; the connected hub does not.
+  - Feed I(0)=A+C versus port current uses `1e-4` (straight) / `1e-3`
+    (junction), not `1e-12`. Port current is the network unknown; A/B/C are
+    the interpolated expansion.
+  - Types are exported; `NecModel` methods, C ABI entry points, and
+    `state-machine.ts` rows wait for WP1–WP4.
+  - WASM package artifacts were not present on this host, so the Node
+    benchmark was not executed. Native snapshot/embedded timings and byte
+    formulas are recorded.
 - **Known risks / next WP:**
+  - WP1 must convert snapshot wavelength units to public metres and share one
+    current evaluator with the field kernel.
+  - Junction `icon1`/`icon2` decoding must stay in public identity objects so
+    native order cannot leak.
+  - Characterization must reuse the existing unit-current embedded-field basis
+    loop (one solve per port).
+  - Next: WP1 public exact current distributions.
 
 ## WP1 - Public exact current distributions
 

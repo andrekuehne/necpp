@@ -8,8 +8,11 @@ import {
   type GeometryCompletionResult,
   type ComplexMatrix,
   type FarFieldResult,
+  type IsolatedElementCharacterization,
+  type NecCurrentDistribution,
   type NecWorkerProgressEvent,
   type PortSolution,
+  type PreparedTransferHandle,
 } from "../src/worker.js";
 
 async function validWorkerConsumer(): Promise<void> {
@@ -49,6 +52,21 @@ async function validWorkerConsumer(): Promise<void> {
   solution.powerBudget.efficiencyPercent satisfies number | null;
   field.eThetaReal[0];
   events[0]?.operation;
+
+  const workerHandle: PreparedTransferHandle = {
+    schemaVersion: 1,
+    byteLength: 8,
+    buffer: new ArrayBuffer(8),
+  };
+  const workerCharacterization: IsolatedElementCharacterization = {
+    impedance: matrices,
+    admittance: matrices,
+    quadrature: workerHandle,
+    embeddedField: workerHandle,
+  };
+  const workerCurrents: NecCurrentDistribution["modeKind"] = "latest-solution";
+  workerCharacterization.quadrature.schemaVersion;
+  workerCurrents;
 
   model.cancelFarField();
   const unsubscribe = model.subscribeProgress(() => undefined);

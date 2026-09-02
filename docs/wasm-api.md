@@ -12,6 +12,11 @@ facade. Non-symmetric completion returns an empty, immutable
 `GeometryCompletionResult`; symmetric completion returns immutable copy and
 segment-count metadata in both execution modes.
 
+Isolated-element current coefficients, prepared quadrature sampling, and
+characterization are specified in
+[`current-quadrature-api.md`](current-quadrature-api.md). WP0 freezes those
+types and fixtures; methods are not yet on `NecModel`.
+
 ## Package and runtime boundary
 
 The final npm package name is **`@necpp-engine/wasm`**. The unscoped name
@@ -181,6 +186,11 @@ the model. `same` means that the operation preserves the current state.
 | `computeFarField` | — | — | — | — | same | — |
 | `computeEmbeddedFarFields` | — | — | — | same | same | — |
 | `dispose` | disposed | disposed | disposed | disposed | disposed | same |
+
+Current-distribution, prepared-quadrature, and characterization operations are
+reserved in [`current-quadrature-api.md`](current-quadrature-api.md). They are
+not in the executable `state-machine.ts` table until later work packages
+implement them.
 
 Additional lifecycle rules:
 
@@ -637,3 +647,7 @@ binary64 code path.
 Tests must reject NaN or infinity before applying a tolerance. Phase is
 compared as a wrapped complex ratio, never by subtracting printed degree
 values across a ±180° branch cut.
+
+Current-coefficient reconstruction, unit-current port normalization, and
+prepared-quadrature layout comparisons use the additional gates in
+[`current-quadrature-api.md`](current-quadrature-api.md).

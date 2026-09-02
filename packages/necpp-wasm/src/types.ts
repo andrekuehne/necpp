@@ -376,6 +376,89 @@ export interface EmbeddedFarFieldResult extends FarFieldResult {
   readonly ePhiImag: Float64Array;
 }
 
+/** Frozen by WP0. Methods are not yet on {@link NecModel}. */
+export type CurrentModeKind = "latest-solution" | "unit-current";
+
+/** Decoded segment-end connection. Native `icon1`/`icon2` integers are not public. */
+export type NecSegmentEnd =
+  | { readonly kind: "free" }
+  | { readonly kind: "ground" }
+  | {
+      readonly kind: "segment";
+      readonly tag: number;
+      readonly segment: number;
+      readonly end: "start" | "end";
+    };
+
+/** Caller-stable physical segment identity plus native index for mapping checks. */
+export interface NecSegmentIdentity {
+  readonly tag: number;
+  /** One-based segment position within the tag group. */
+  readonly segment: number;
+  /** Zero-based NEC native index. */
+  readonly nativeIndex: number;
+}
+
+/**
+ * Exact NEC `A/B/C` current coefficients and physical segment geometry.
+ *
+ * Coefficient and geometry arrays use caller wire/segment order. Unit-current
+ * planes are mode-major: `index = modeIndex * segments.length + segmentIndex`.
+ */
+export interface NecCurrentDistribution {
+  readonly schemaVersion: 1;
+  readonly frequencyMHz: number;
+  readonly wavelengthM: number;
+  readonly modeKind: CurrentModeKind;
+  readonly modeCount: number;
+  readonly segments: readonly NecSegmentIdentity[];
+  readonly startEnds: readonly NecSegmentEnd[];
+  readonly endEnds: readonly NecSegmentEnd[];
+  readonly centresM: Float64Array;
+  readonly startsM: Float64Array;
+  readonly endsM: Float64Array;
+  readonly tangents: Float64Array;
+  readonly radiiM: Float64Array;
+  readonly lengthsM: Float64Array;
+  readonly aReal: Float64Array;
+  readonly aImag: Float64Array;
+  readonly bReal: Float64Array;
+  readonly bImag: Float64Array;
+  readonly cReal: Float64Array;
+  readonly cImag: Float64Array;
+}
+
+export type PreparedQuadratureImages =
+  | "physical-only"
+  | "perfect-ground-images";
+
+/** Caller-defined normalized quadrature rule for a prepared evaluator. */
+export interface PreparedQuadratureRequest {
+  /** Nodes in [-1, 1] on every physical segment: -1 start, 0 centre, +1 end. */
+  readonly nodes: Float64Array;
+  readonly weights?: Float64Array;
+  readonly images: PreparedQuadratureImages;
+  readonly modes: CurrentModeKind;
+}
+
+/**
+ * Owned transferable packed SoA. Large arrays stay off the UI thread.
+ * `buffer` is one little-endian schema-1 `NECQ` blob.
+ */
+export interface PreparedTransferHandle {
+  readonly schemaVersion: 1;
+  readonly byteLength: number;
+  readonly buffer: ArrayBuffer;
+}
+
+/** Isolated Z/Y plus transfer handles for currents and NEC embedded fields. */
+export interface IsolatedElementCharacterization {
+  readonly impedance: ComplexMatrix;
+  readonly admittance: ComplexMatrix;
+  readonly quadrature: PreparedTransferHandle;
+  readonly embeddedField: PreparedTransferHandle;
+}
+
 export interface CreateNecModelOptions {
   /** Override the package-relative URL used to load `nec2pp.wasm`. */
   readonly wasmUrl?: string | URL;

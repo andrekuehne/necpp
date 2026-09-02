@@ -45,6 +45,7 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp2_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp3_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_symmetry_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp0_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1_c_tb.c
     ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1_tb.cpp
 )

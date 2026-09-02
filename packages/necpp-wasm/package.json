@@ -53,6 +53,7 @@
   ],
   "scripts": {
     "bench:array": "node bench/array-benchmark.mjs",
+    "bench:current-quadrature": "node bench/current-quadrature-baseline.mjs",
     "bench:far-field": "node bench/far-field-benchmark.mjs",
     "bench:far-field-overhead": "node bench/far-field-overhead.mjs",
     "bench:far-field-candidates": "node bench/far-field-candidate-matrix.mjs",

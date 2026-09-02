@@ -15,8 +15,13 @@ import {
   type ComplexMatrix,
   type FarFieldResult,
   type FullArrayDescription,
+  type IsolatedElementCharacterization,
+  type NecCurrentDistribution,
   type PortSolution,
   type PowerBudget,
+  type PreparedQuadratureImages,
+  type PreparedQuadratureRequest,
+  type PreparedTransferHandle,
 } from "../src/index.js";
 
 const typedArrayDescription: FullArrayDescription = {
@@ -116,6 +121,49 @@ async function validConsumer(): Promise<void> {
   budget.efficiencyPercent satisfies number | null;
   field.eThetaReal[0];
   model.dispose();
+
+  const currentDistribution: NecCurrentDistribution = {
+    schemaVersion: 1,
+    frequencyMHz: 300,
+    wavelengthM: 1,
+    modeKind: "unit-current",
+    modeCount: 1,
+    segments: [{ tag: 1, segment: 6, nativeIndex: 5 }],
+    startEnds: [{ kind: "free" }],
+    endEnds: [{ kind: "ground" }],
+    centresM: new Float64Array(3),
+    startsM: new Float64Array(3),
+    endsM: new Float64Array(3),
+    tangents: new Float64Array([0, 0, 1]),
+    radiiM: new Float64Array([0.001]),
+    lengthsM: new Float64Array([0.5 / 11]),
+    aReal: new Float64Array(1),
+    aImag: new Float64Array(1),
+    bReal: new Float64Array(1),
+    bImag: new Float64Array(1),
+    cReal: new Float64Array(1),
+    cImag: new Float64Array(1),
+  };
+  const quadratureRequest: PreparedQuadratureRequest = {
+    nodes: new Float64Array([-1, 0, 1]),
+    weights: new Float64Array([1, 1, 1]),
+    images: "physical-only",
+    modes: "unit-current",
+  };
+  const handle: PreparedTransferHandle = {
+    schemaVersion: 1,
+    byteLength: 8,
+    buffer: new ArrayBuffer(8),
+  };
+  const characterization: IsolatedElementCharacterization = {
+    impedance: matrices,
+    admittance: matrices,
+    quadrature: handle,
+    embeddedField: handle,
+  };
+  currentDistribution.segments[0]?.nativeIndex;
+  quadratureRequest.images satisfies PreparedQuadratureImages;
+  characterization.quadrature.byteLength;
 
   packageVersion satisfies string;
   engineVersion satisfies string;
