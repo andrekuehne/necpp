@@ -4,8 +4,11 @@ This is a compilable sketch, not a published crate. Source lives in
 [`packages/necpp-wasm/rust/`](../packages/necpp-wasm/rust/) so a visualizer
 compute worker can bind packed transfer envelopes without copying them on
 every steer. WP5 binds published `current-quadrature-v1` fixtures and typed
-little-endian planes. Visualizer production ingestion and a sibling checkout
-are WP6.
+little-endian planes. WP6 records bind-once/steer timing. Visualizer
+production ingestion stays in the visualizer; pin
+`@necpp-engine/wasm@0.5.0` and
+`@necpp-engine/wasm/fixtures/current-quadrature-v1/*`. This crate stays
+`publish = false`.
 
 ## Envelopes
 
@@ -75,7 +78,7 @@ kernel. The sample index matches [`wasm-api.md`](wasm-api.md).
 Z/Y stay small `ComplexMatrix` values on the client even in handoff mode.
 
 Do not reconstruct or replace NEC embedded patterns. Array mutual-impedance
-integration stays in the visualizer (WP6).
+integration stays in the visualizer.
 
 ## Fixtures
 

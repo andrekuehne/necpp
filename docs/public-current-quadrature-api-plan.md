@@ -137,7 +137,7 @@ interface IsolatedElementCharacterization {
 | 3 | Isolated-element characterization | 1, 2 | Complete |
 | 4 | WASM, worker, and Rust/WASM handoff | 2, 3 | Complete |
 | 5 | Numerical and consumer validation | 4 | Complete |
-| 6 | Performance, documentation, release | 5 | Not started |
+| 6 | Performance, documentation, release | 5 | Complete |
 
 ## WP0 - Freeze contracts and baselines
 
@@ -872,6 +872,16 @@ Do not implement array mutual-impedance integration.
 
 ## WP6 - Performance, documentation, and release
 
+No new public solve APIs. C ABI, `NecModel` methods, and worker rows stay as
+WP4 shipped them. Frozen names and layouts live in
+[`docs/current-quadrature-api.md`](current-quadrature-api.md).
+
+Visualizer production ingestion stays **out of this repo**. WP6 makes
+`@necpp-engine/wasm@0.5.0` pin-ready and documents the consumer flow. A sibling
+`PhasedArrayVisualizer-NG` checkout, or `NECPP_VISUALIZER_ROOT`, may be
+recorded and must not fail CI. Do not implement array mutual impedance, array
+factor, matching, or pattern metrics.
+
 ### Work
 
 - Benchmark characterization, preparation, transfer, Rust/WASM bind, memory,
@@ -879,6 +889,102 @@ Do not implement array mutual-impedance integration.
 - Verify that hot-path cost follows cached buffer size, not NEC segment setup.
 - Document current/pattern conventions, layouts, lifetime, and consumer flow.
 - Update declarations, README, examples, changelog, package tests, and release audit.
+
+### Frozen decisions
+
+- Tag `[wp6_current]`. There is no existing `[wp6]` Catch tag in this tree;
+  still avoid colliding with older far-field/worker “WP6” docs.
+- No new ABI symbols, result-buffer kinds, or `NecArraySolver` methods.
+  `abiVersion` stays `1`.
+- Package version **0.4.0 → 0.5.0**. Fixture **binary** SHA-256s stay locked;
+  only JSON `packageVersion` metadata changes. Do not `npm publish` or create
+  git tags. `npm run pack:release` must succeed.
+- Canonical benches: `dipole` and `turnstile-insulated`, 4-node
+  `{-1,-1/3,1/3,1}`, physical-only. Characterization timing uses the WP0
+  **19×37** grid. Identity/size locks also cover the published **5×3** fixtures.
+- Hot-path gates are **counters, byte formulas, and ratios**, not host
+  milliseconds. Record raw ms as evidence; do not fail CI on wall time.
+- Test-only helpers may decode packed buffers. Production TypeScript must not
+  interpolate `I(s)` or loop samples for electromagnetics.
+- Align `pack-release.mjs` with the WP5 pack-test allowlist: `fixtures/` is
+  permitted.
+
+### Performance and memory gates
+
+| Gate | Assert |
+|---|---|
+| Packed size lock | All five published fixtures plus 19×37 characterization match the WP0 formulas (dipole 4-node physical NECQ 4072 B; 5×3 NECF 608 B) |
+| Prepare vs retrieve | Native retrieve does not increment `geometry_walks`, trigonometry, interpolations, or `growing_allocations` |
+| Characterization solves | After warm Z/Y, one characterize increases `unit_current_basis_solve_count` by `nPorts`, not `2 * nPorts` |
+| Characterize vs split APIs | Split path on a second model does `2 * nPorts` unit-current solves; characterize does `nPorts` |
+| WASM retrieve | Repeated packed-handle reads do not grow RSS by packed size each time |
+| Handoff | Client `IsolatedElementHandoff` has Z/Y + `byteLength`s only; consumer receives NECQ+NECF once; steer transfers 0 current/pattern bytes |
+| Bind-once | Rust views alias fixture bytes; a simulated steer does not allocate a second copy |
+| Main thread | Browser CDP/Playwright trace of the mock consumer: no large current/pattern `ArrayBuffer`s in main-thread application state |
+
+### Native tests
+
+New file `src/current_quadrature_wp6_tb.cpp`, tagged
+`[wasm_api][current_quadrature][wp6_current]`. Reuse
+`current_quadrature_fixtures.h`. Do not parse NEC reports.
+
+| Case | Assert |
+|---|---|
+| Size lock, all five fixtures, 4-node physical | Packed NECQ bytes match `nec_prepared_quadrature_packed_bytes`; 5×3 NECF envelope `64 + (5 + 3 + 4 * nPorts * 15) * 8` |
+| Dipole + insulated turnstile, 19×37 characterize | Byte formulas; solve counter `+= nPorts`; retrieve hot path frozen |
+| Characterize vs split APIs | Second-model split path does `2 * nPorts` unit-current solves; characterize does `nPorts`; Z/Y and fields still match at existing tolerances |
+| Existing suites | `[wp1_current]`…`[wp5_current]`, `[wp3]`, `[wp4]`, and `~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]` stay green |
+
+Write native JSON evidence to
+`packages/necpp-wasm/bench/evidence/current-quadrature-wp6/native-baseline.json`.
+
+### Package / browser / Rust
+
+New Node harness `bench/current-quadrature-wp6.mjs` plus per-process case
+script, using public `createNecModel` / `createNecWorkerModel` only. Keep the
+WP0 embedded/snapshot baseline. Measure create, construct, warm Z/Y,
+characterize, packed sizes, repeated retrieve, worker handoff, mock-consumer
+bind, and simulated steer. Script: `bench:current-quadrature-wp6`.
+
+Browser: Playwright/CDP trace around live handoff + fixture bind + steer.
+Persist a compact JSON summary. Do not require the far-field visualizer app.
+
+Rust: bind-once + steer timing against published `current-quadrature-v1`
+binaries. Views must still alias.
+
+### Files
+
+| Path | Change |
+|---|---|
+| `src/current_quadrature_wp6_tb.cpp` | Native size/solve/hot-path gates |
+| `tests/CMakeLists.txt` | Register the test source |
+| `packages/necpp-wasm/bench/current-quadrature-wp6*.mjs` | Public-API harness |
+| `packages/necpp-wasm/bench/evidence/current-quadrature-wp6/` | Native + Node + browser evidence |
+| `packages/necpp-wasm/scripts/pack-release.mjs` | Allow `fixtures/` |
+| `packages/necpp-wasm/test/browser-current-quadrature-trace.mjs` | CDP transfer summary |
+| `packages/necpp-wasm/rust/necq_view.rs` | Bind-once/steer timing |
+| `examples/wasm-current-quadrature/` | Package-only + mock-consumer examples |
+| `packages/necpp-wasm/package.json`, `src/versions.ts` | 0.5.0 |
+| `docs/current-quadrature-api.md`, `docs/wasm-api.md`, `docs/necq-rust-binder.md`, README, CHANGELOG | Docs |
+
+### Non-goals
+
+- Editing `PhasedArrayVisualizer-NG`
+- `npm publish`, git tags, or changing `abiVersion`
+- New ABI / `NecArraySolver` characterization
+- Array coupling, array factor, matching, polarization metrics
+- Replacing or reconstructing element patterns in TypeScript
+- Host-absolute millisecond CI gates
+- Changing WP2 `prepare_current_quadrature` solve behavior
+
+### Implementation sequence
+
+1. Expand this WP6 section.
+2. Native `[wp6_current]` size/solve/hot-path gates and `native-baseline.json`.
+3. Node WP6 bench harness + evidence directory; fix `pack-release.mjs`.
+4. Browser trace summary; Rust bind/steer timing.
+5. Version bump 0.5.0, README/example/changelog/`wasm-api.md`, pack consumer example.
+6. Fill this handover.
 
 ### Definition of Done
 
@@ -888,14 +994,58 @@ Do not implement array mutual-impedance integration.
 - Public docs are sufficient to implement a non-visualizer Rust/WASM consumer.
 - A released package version is ready for an exact visualizer dependency pin.
 
+The visualizer pin is `@necpp-engine/wasm@0.5.0` once a human publishes. This
+WP does not publish it.
+
 ### Handover
 
-- **Status / implementer / date:**
-- **Commit(s):**
+- **Status / implementer / date:** complete / WP6 implementation / 2026-09-02
+- **Commit(s):** uncommitted WP6 tree on this branch; pin after the user
+  commits.
 - **Commands and results:**
+  - `cmake --build build-wp0 --config Release --target nec2++_tests --parallel`
+  - `build-wp0\tests\Release\nec2++_tests.exe "[wp6_current]" --reporter compact`
+    — 4 test cases, 7879 assertions, all passed.
+  - `build-wp0\tests\Release\nec2++_tests.exe "~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]" --reporter compact`
+    — 132 test cases, 31273 assertions, all passed (includes WP0–WP6 current
+    tags; excludes the older WASM-API stress tags).
+  - `npm --prefix packages/necpp-wasm test` — 130 tests, all passed, including
+    WP6 repeated packed retrieve.
+  - `npm --prefix packages/necpp-wasm run test:pack` — 6 tests, all passed
+    (tarball includes `fixtures/current-quadrature-v1/`; clean-checkout
+    current-quadrature examples).
+  - `npm --prefix packages/necpp-wasm run test:current-quadrature-trace` —
+    Playwright/CDP summary: main thread has no large buffers; steer
+    re-transfers 0 current/pattern bytes (`quadratureBytes` 4072,
+    `embeddedBytes` 608).
+  - `cargo test --manifest-path packages/necpp-wasm/rust/Cargo.toml` — 9 tests
+    passed (bind-once/steer does not clone planes).
+  - `npm --prefix packages/necpp-wasm run bench:current-quadrature-wp6 -- --output-directory bench/evidence/current-quadrature-wp6 --module-directory dist --rounds 1 --warmups 0 --fixtures dipole,turnstile-insulated --grids published --backends direct,worker`
+    — 4 cases recorded.
 - **Artifacts:**
+  - [`src/current_quadrature_wp6_tb.cpp`](../src/current_quadrature_wp6_tb.cpp)
+  - [`examples/wasm-current-quadrature/`](../examples/wasm-current-quadrature/)
+  - [`packages/necpp-wasm/bench/evidence/current-quadrature-wp6/`](../packages/necpp-wasm/bench/evidence/current-quadrature-wp6/)
+  - Pin-ready package `@necpp-engine/wasm@0.5.0` (`abiVersion` 1)
 - **Decisions / deviations:**
+  - No new public C++/TS solve APIs. Tests use `[wp6_current]`.
+  - Visualizer production ingestion was not edited. Sibling checkout remains
+    optional and does not fail CI.
+  - `npm publish` and git tags were not performed. `test:pack` is the release
+    audit; `pack-release.mjs` now allows `fixtures/`.
+  - Hot-path gates are byte formulas and counters. Host milliseconds are
+    evidence only.
+  - Bench `--module-directory` / `--output-directory` are package-relative
+    when invoked with `npm --prefix packages/necpp-wasm`.
 - **Known risks / release follow-up:**
+  - Publish `@necpp-engine/wasm@0.5.0` and pin it in
+    `PhasedArrayVisualizer-NG`.
+  - Regenerating fixtures on a different engine revision will change packed
+    checksums (`modelGeneration` lives in the NECQ/NECF headers).
+  - Independent `get_current_distribution` + `compute_embedded_far_fields`
+    still costs `2 * nPorts` unit-current solves; only characterization
+    shares the loop.
+
 
 ## Feature Definition of Done
 

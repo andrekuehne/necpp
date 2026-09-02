@@ -14,8 +14,9 @@ segment-count metadata in both execution modes.
 
 Isolated-element current coefficients, prepared quadrature sampling, and
 characterization are specified in
-[`current-quadrature-api.md`](current-quadrature-api.md). WP0 freezes those
-types and fixtures; methods are not yet on `NecModel`.
+[`current-quadrature-api.md`](current-quadrature-api.md). Those methods are on
+`NecModel` / `NecWorkerModel`. Packed `NECQ`/`NECF` fixtures ship with the
+package as `@necpp-engine/wasm/fixtures/current-quadrature-v1/*`.
 
 ## Package and runtime boundary
 
@@ -26,8 +27,9 @@ while the scoped name identifies this repository and leaves room for future
 npm scope, but the API name will not change if the package is initially
 distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
-The parallel far-field release package identity is `0.4.0`; it embeds NEC2++ `2.5.0`
-while preserving WASM ABI version `1`.
+The isolated-element current-quadrature release package identity is `0.5.0`;
+it embeds NEC2++ `2.5.0` while preserving WASM ABI version `1`. The prior
+parallel far-field release was `0.4.0`.
 
 The packed package exports three version identifiers that can be imported
 without constructing a model:

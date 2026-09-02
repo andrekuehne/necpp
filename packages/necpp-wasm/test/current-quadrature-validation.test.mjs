@@ -282,3 +282,29 @@ test("WP5 insulated turnstile superposition uses NEC embedded fields",
       }) < embeddedTolerance);
     });
   });
+
+test("WP6 repeated packed retrieve does not grow heap by packed size",
+  { skip: skipWp4 }, async () => {
+    await withModel(createNecModel, currentQuadratureFixtures.dipole, async (model) => {
+      model.computeImpedanceMatrix();
+      const characterized = model.characterizeIsolatedElement(characterizationRequest);
+      const packedBytes = characterized.quadrature.byteLength
+        + characterized.embeddedField.byteLength;
+      const before = process.memoryUsage().heapUsed;
+      let sink = 0;
+      for (let pass = 0; pass < 1000; pass += 1) {
+        sink += characterized.quadrature.byteLength;
+        sink += characterized.embeddedField.byteLength;
+        sink += new Uint8Array(characterized.quadrature.buffer, 0, 4)[0];
+        sink += new Uint8Array(characterized.embeddedField.buffer, 0, 4)[0];
+      }
+      const after = process.memoryUsage().heapUsed;
+      assert.equal(sink > 0, true);
+      assert.equal(characterized.quadrature.byteLength, 4072);
+      assert.equal(characterized.embeddedField.byteLength, 608);
+      assert.ok(
+        after - before < 50 * packedBytes,
+        `heap grew by ${after - before} bytes over 1000 retrieves of ${packedBytes} B`,
+      );
+    });
+  });

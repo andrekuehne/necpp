@@ -187,6 +187,53 @@ test("a clean Node fixture imports the tarball by name and solves a dipole", {
   }
 });
 
+test("a clean Node fixture characterizes a dipole and handoffs once", {
+  skip,
+}, () => {
+  const fixture = createCleanFixture("current-quadrature");
+  installFixture(fixture.root);
+  for (const name of ["manual-direct.mjs", "manual-worker-handoff.mjs"]) {
+    writeFixtureFile(
+      fixture.root,
+      name,
+      readFileSync(
+        new URL(`../../../../examples/wasm-current-quadrature/${name}`, import.meta.url),
+        "utf8",
+      ),
+    );
+  }
+
+  const packedLoader = readInstalledLoader(fixture.root);
+  assert.ok(
+    packedLoader.includes("_necpp_wasm_v1_characterize_isolated_element"),
+    "packed loader is missing characterizeIsolatedElement",
+  );
+
+  const direct = parseJsonLine(run("node", ["manual-direct.mjs"], {
+    cwd: fixture.root,
+    stdio: ["ignore", "pipe", "inherit"],
+  }).stdout);
+  assert.equal(direct.mode, "direct");
+  assert.equal(direct.finiteZ, true);
+  assert.ok(Number.isFinite(direct.zReal));
+  assert.equal(direct.quadratureBytes, 4072);
+  assert.equal(direct.embeddedBytes, 608);
+
+  const handoff = parseJsonLine(run("node", ["manual-worker-handoff.mjs"], {
+    cwd: fixture.root,
+    stdio: ["ignore", "pipe", "inherit"],
+  }).stdout);
+  assert.equal(handoff.mode, "worker-handoff");
+  assert.equal(handoff.clientHasQuadrature, false);
+  assert.equal(handoff.clientHasEmbedded, false);
+  assert.equal(handoff.finiteZ, true);
+  assert.equal(handoff.quadratureBytes, 4072);
+  assert.equal(handoff.embeddedBytes, 608);
+  assert.equal(handoff.consumerQuadratureBytes, 4072);
+  assert.equal(handoff.consumerEmbeddedBytes, 608);
+  assert.equal(handoff.steerRetransferred, false);
+});
+
 test("every package README TypeScript example compiles and the quick start executes", {
   skip,
 }, () => {
@@ -214,6 +261,9 @@ test("every package README TypeScript example compiles and the quick start execu
     "UNSUPPORTED_ELEMENT_PATTERN_TRANSFORM",
     "11.55x",
     "https://github.com/andrekuehne/necpp/blob/master/docs/wasm-api.md",
+    "characterizeIsolatedElement",
+    "Isolated-element currents and patterns",
+    "Do not put NECQ/NECF `ArrayBuffer`s in React state.",
   ]) {
     assert.ok(readme.includes(requiredText), `packed README is missing ${requiredText}`);
   }

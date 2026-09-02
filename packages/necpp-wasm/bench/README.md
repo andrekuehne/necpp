@@ -240,3 +240,22 @@ The command writes the versioned result to
 `bench/evidence/far-field-wp4/node/far-field-wp4-production.json`. See
 [FAR_FIELD_WP4_RESULTS.md](FAR_FIELD_WP4_RESULTS.md) for the production decision
 and gate summary.
+
+## Current-quadrature WP6 characterization
+
+`current-quadrature-wp6.mjs` measures public `characterizeIsolatedElement`,
+packed retrieve, and worker MessagePort handoff for the dipole and insulated
+turnstile. Grids are the published `5×3` fixture grid and the WP0 `19×37`
+timing grid. Hot-path gates are byte formulas and counters; wall times are
+evidence only.
+
+```powershell
+npm --prefix packages/necpp-wasm run build
+npm --prefix packages/necpp-wasm run bench:current-quadrature-wp6 -- `
+  --output-directory bench/evidence/current-quadrature-wp6 `
+  --module-directory dist
+```
+
+Native size/solve evidence is written by `[wp6_current]` to
+`bench/evidence/current-quadrature-wp6/native-baseline.json`. The browser
+handoff/steer summary is `browser-trace-summary.json`.

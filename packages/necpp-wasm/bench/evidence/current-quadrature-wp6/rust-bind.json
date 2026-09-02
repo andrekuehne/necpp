@@ -1,0 +1,8 @@
+{
+  "type": "current-quadrature-wp6-rust-bind",
+  "schemaVersion": 1,
+  "necqBytes": 4072,
+  "necfBytes": 608,
+  "steerMsPerBind": 0.000714,
+  "clonedPlanes": false
+}

@@ -392,6 +392,45 @@ mod tests {
     }
 
     #[test]
+    fn bind_once_steer_does_not_clone_planes() {
+        use std::time::Instant;
+
+        let necq: &[u8] = include_bytes!("../fixtures/current-quadrature-v1/dipole.necq");
+        let necf: &[u8] = include_bytes!("../fixtures/current-quadrature-v1/dipole.necf");
+        let current = view_prepared_quadrature(necq).expect("NECQ");
+        let field = crate::necf_view::view_embedded_field(necf).expect("NECF");
+        let current_ptr = current.i_real.as_ptr();
+        let field_ptr = field.e_theta_real.as_ptr();
+
+        let started = Instant::now();
+        let mut sink = 0.0;
+        for _ in 0..10_000 {
+            let bound = view_prepared_quadrature(necq).expect("steer NECQ");
+            let rebound = crate::necf_view::view_embedded_field(necf).expect("steer NECF");
+            assert_eq!(bound.i_real.as_ptr(), current_ptr);
+            assert_eq!(rebound.e_theta_real.as_ptr(), field_ptr);
+            let sample = bound.current(0, 0, 5, 2).expect("current");
+            let e_theta = rebound.e_theta(0, 1, 1).expect("field");
+            sink += sample.0 + e_theta.0;
+        }
+        let steer_ms = started.elapsed().as_secs_f64() * 1_000.0 / 10_000.0;
+        assert!(sink.is_finite());
+
+        let evidence = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../bench/evidence/current-quadrature-wp6/rust-bind.json");
+        if let Some(parent) = evidence.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let body = format!(
+            "{{\n  \"type\": \"current-quadrature-wp6-rust-bind\",\n  \"schemaVersion\": 1,\n  \"necqBytes\": {},\n  \"necfBytes\": {},\n  \"steerMsPerBind\": {:.6},\n  \"clonedPlanes\": false\n}}\n",
+            necq.len(),
+            necf.len(),
+            steer_ms,
+        );
+        std::fs::write(&evidence, body).expect("write rust bind evidence");
+    }
+
+    #[test]
     fn optional_visualizer_checkout_does_not_fail_when_absent() {
         let from_env = std::env::var_os("NECPP_VISUALIZER_ROOT");
         let sibling = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

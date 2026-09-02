@@ -1,0 +1,34 @@
+{
+  "type": "current-quadrature-wp6-native-baseline",
+  "schemaVersion": 1,
+  "host": "windows-msvc-release",
+  "nodes": 4,
+  "grid": { "thetaCount": 19, "phiCount": 37 },
+  "budgets": {
+    "preparedGeometryBytes": "9 * nSeg * nNodes * nImagePlanes * 8",
+    "preparedCurrentBytes": "nModes * nSeg * nNodes * nImagePlanes * 16",
+    "embeddedFieldBytes": "4 * nPorts * nTheta * nPhi * 8",
+    "necfEnvelopeBytes": "64 + (nTheta + nPhi + 4 * nPorts * nTheta * nPhi) * 8"
+  },
+  "dipole": {
+    "segmentCount": 11,
+    "portCount": 1,
+    "packedNceqBytes": 4072,
+    "expectedNecfBytes": 23008,
+    "characterizeMs": 0.2736,
+    "splitCurrentAndFieldMs": 1558.96,
+    "retrieveMs": 2.59e-05,
+    "geometryWalks": 1,
+    "growingAllocations": 1
+  },
+  "turnstile-insulated": {
+    "segmentCount": 22,
+    "portCount": 2,
+    "packedNceqBytes": 9480,
+    "expectedNecfBytes": 45504,
+    "characterizeMs": 1556.74,
+    "retrieveMs": 1.59e-05,
+    "geometryWalks": 1,
+    "growingAllocations": 1
+  }
+}

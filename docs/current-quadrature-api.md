@@ -5,7 +5,8 @@ API. WP2 implemented the native prepared-quadrature evaluator and packed NECQ
 layout. WP3 implements native isolated-element characterization. WP4 implements
 the additive C/WASM ABI, `NecModel` / `NecWorkerModel` methods, worker
 transfer, and the visualizer MessagePort handoff. WP5 publishes versioned
-fixtures and numerical/consumer validation. This document is
+fixtures and numerical/consumer validation. WP6 records performance evidence,
+docs, and the pin-ready `@necpp-engine/wasm@0.5.0` pack. This document is
 the normative public contract for exact NEC current coefficients, prepared
 quadrature sampling, isolated-element characterization, and the visualizer
 handoff. Existing Z/Y, solves, fields, power, and lifecycle in
@@ -19,6 +20,7 @@ WP3 adds `nec_stateful_model::characterize_isolated_element`.
 WP4 adds C ABI entry points, TypeScript façades, packed NECF, and handoff.
 WP5 publishes versioned NECQ/NECF fixtures and validates native internals,
 direct/worker/handoff agreement, and Rust bind-once ingestion.
+WP6 records characterization/transfer/bind evidence and the 0.5.0 pack pin.
 Names below are frozen; later WPs must not weaken the semantics.
 
 The work tracker is
@@ -657,6 +659,34 @@ npm --prefix packages/necpp-wasm run write:current-quadrature-fixtures
 
 A package drift test fails if the packed checksums change. Native tests are
 tagged `[wp5_current]`.
+
+## WP6 performance and package pin
+
+WP6 does not add public solve APIs. It records characterization, packed
+retrieve, worker handoff, and Rust bind-once evidence under
+[`packages/necpp-wasm/bench/evidence/current-quadrature-wp6/`](../packages/necpp-wasm/bench/evidence/current-quadrature-wp6/).
+Hot-path gates are byte formulas and operation counters, not host
+milliseconds.
+
+The pin-ready package is `@necpp-engine/wasm@0.5.0`. `abiVersion` stays 1.
+Visualizer production ingestion stays in the visualizer; this repository
+ships package-only and mock-consumer examples in
+[`examples/wasm-current-quadrature/`](../examples/wasm-current-quadrature/).
+
+Commands:
+
+```text
+cmake --build build-wp0 --config Release --target nec2++_tests --parallel
+build-wp0\tests\Release\nec2++_tests.exe "[wp6_current]" --reporter compact
+npm --prefix packages/necpp-wasm run bench:current-quadrature-wp6 -- --output-directory bench/evidence/current-quadrature-wp6 --module-directory dist
+npm --prefix packages/necpp-wasm run test:current-quadrature-trace
+cargo test --manifest-path packages/necpp-wasm/rust/Cargo.toml
+```
+
+Same-worker consumers copy NECQ/NECF once into Rust/WASM and retain them.
+Worker-to-worker consumers call
+`characterizeIsolatedElement(request, { destination })` and bind the
+transferred buffers once. A follow-up steer must not re-transfer them.
 
 ## Numerical tolerance policy
 
