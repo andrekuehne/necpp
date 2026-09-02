@@ -155,7 +155,48 @@ enum necpp_wasm_v1_result_buffer_kind {
   NECPP_WASM_V1_FF_SNAPSHOT_BIR = 34,
   NECPP_WASM_V1_FF_SNAPSHOT_BII = 35,
   NECPP_WASM_V1_FF_SNAPSHOT_CIR = 36,
-  NECPP_WASM_V1_FF_SNAPSHOT_CII = 37
+  NECPP_WASM_V1_FF_SNAPSHOT_CII = 37,
+  NECPP_WASM_V1_CURRENT_CENTRES = 38,
+  NECPP_WASM_V1_CURRENT_STARTS = 39,
+  NECPP_WASM_V1_CURRENT_ENDS = 40,
+  NECPP_WASM_V1_CURRENT_TANGENTS = 41,
+  NECPP_WASM_V1_CURRENT_RADII = 42,
+  NECPP_WASM_V1_CURRENT_LENGTHS = 43,
+  NECPP_WASM_V1_CURRENT_A_REAL = 44,
+  NECPP_WASM_V1_CURRENT_A_IMAG = 45,
+  NECPP_WASM_V1_CURRENT_B_REAL = 46,
+  NECPP_WASM_V1_CURRENT_B_IMAG = 47,
+  NECPP_WASM_V1_CURRENT_C_REAL = 48,
+  NECPP_WASM_V1_CURRENT_C_IMAG = 49
+};
+
+enum necpp_wasm_v1_current_mode {
+  NECPP_WASM_V1_CURRENT_LATEST_SOLUTION = 0,
+  NECPP_WASM_V1_CURRENT_UNIT_CURRENT = 1
+};
+
+enum necpp_wasm_v1_quadrature_images {
+  NECPP_WASM_V1_QUADRATURE_PHYSICAL_ONLY = 0,
+  NECPP_WASM_V1_QUADRATURE_PERFECT_GROUND_IMAGES = 1
+};
+
+enum necpp_wasm_v1_packed_buffer_kind {
+  NECPP_WASM_V1_PACKED_QUADRATURE = 0,
+  NECPP_WASM_V1_PACKED_EMBEDDED_FIELD = 1
+};
+
+enum necpp_wasm_v1_int32_result_buffer_kind {
+  NECPP_WASM_V1_CURRENT_TAG = 0,
+  NECPP_WASM_V1_CURRENT_SEGMENT = 1,
+  NECPP_WASM_V1_CURRENT_NATIVE_INDEX = 2,
+  NECPP_WASM_V1_CURRENT_START_KIND = 3,
+  NECPP_WASM_V1_CURRENT_START_TAG = 4,
+  NECPP_WASM_V1_CURRENT_START_SEGMENT = 5,
+  NECPP_WASM_V1_CURRENT_START_END = 6,
+  NECPP_WASM_V1_CURRENT_END_KIND = 7,
+  NECPP_WASM_V1_CURRENT_END_TAG = 8,
+  NECPP_WASM_V1_CURRENT_END_SEGMENT = 9,
+  NECPP_WASM_V1_CURRENT_END_END = 10
 };
 
 uint32_t necpp_wasm_v1_abi_version(void);
@@ -233,6 +274,39 @@ double necpp_wasm_v1_far_field_snapshot_solution_generation(
   const necpp_wasm_v1_model* model);
 int32_t necpp_wasm_v1_far_field_snapshot_perfect_ground(
   const necpp_wasm_v1_model* model);
+
+int32_t necpp_wasm_v1_get_current_distribution(
+  necpp_wasm_v1_model* model, int32_t mode);
+int32_t necpp_wasm_v1_prepare_current_quadrature(
+  necpp_wasm_v1_model* model,
+  const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count,
+  int32_t images,
+  int32_t modes);
+int32_t necpp_wasm_v1_characterize_isolated_element(
+  necpp_wasm_v1_model* model,
+  const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count,
+  int32_t images,
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg);
+
+size_t necpp_wasm_v1_current_segment_count(const necpp_wasm_v1_model* model);
+size_t necpp_wasm_v1_current_mode_count(const necpp_wasm_v1_model* model);
+int32_t necpp_wasm_v1_current_mode_kind(const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_current_frequency_mhz(const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_current_wavelength_m(const necpp_wasm_v1_model* model);
+
+const int32_t* necpp_wasm_v1_int32_result_buffer(
+  const necpp_wasm_v1_model* model, int32_t kind);
+size_t necpp_wasm_v1_int32_result_buffer_length(
+  const necpp_wasm_v1_model* model, int32_t kind);
+
+const uint8_t* necpp_wasm_v1_packed_buffer(
+  const necpp_wasm_v1_model* model, int32_t kind);
+size_t necpp_wasm_v1_packed_buffer_length(
+  const necpp_wasm_v1_model* model, int32_t kind);
 
 size_t necpp_wasm_v1_port_count(const necpp_wasm_v1_model* model);
 const int32_t* necpp_wasm_v1_port_tags(const necpp_wasm_v1_model* model);

@@ -12,13 +12,13 @@
     "segmentCount": 11,
     "portCount": 1,
     "snapshotBytes": 1144,
-    "embeddedUnitCurrentMs": 803.509,
-    "snapshotCaptureMs": 0.0076
+    "embeddedUnitCurrentMs": 0.3403,
+    "snapshotCaptureMs": 0.0012
   },
   "turnstile-insulated": {
     "segmentCount": 22,
     "portCount": 2,
     "snapshotBytes": 2288,
-    "embeddedUnitCurrentMs": 2827.93
+    "embeddedUnitCurrentMs": 0.9842
   }
 }

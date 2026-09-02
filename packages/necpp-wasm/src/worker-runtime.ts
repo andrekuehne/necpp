@@ -18,11 +18,14 @@ import type {
   FieldBackendDiagnostics,
   GroundModel,
   LoadDefinition,
+  IsolatedElementCharacterization,
+  IsolatedElementRequest,
   NecModel,
   NecModelState,
   NecWorkerProgressEvent,
   PortDefinition,
   PrepareOptions,
+  PreparedQuadratureRequest,
   WireDefinition,
 } from "./types.js";
 import {
@@ -33,6 +36,7 @@ import {
   type WorkerRequest,
   type WorkerResponse,
 } from "./worker-protocol.js";
+import { transferIsolatedElementCharacterization } from "./handoff.js";
 
 export interface WorkerSession {
   model: NecModel | undefined;
@@ -304,6 +308,14 @@ async function invokeModel(
       args[0] as FarFieldRequest,
       args[1] as EmbeddedFieldNormalization | undefined,
     );
+  case "getCurrentDistribution":
+    return model.getCurrentDistribution(
+      args[0] as { kind: "latest-solution" | "unit-current" },
+    );
+  case "prepareCurrentQuadrature":
+    return model.prepareCurrentQuadrature(args[0] as PreparedQuadratureRequest);
+  case "characterizeIsolatedElement":
+    return model.characterizeIsolatedElement(args[0] as IsolatedElementRequest);
   case "dispose":
     session.fieldPool?.dispose();
     delete session.fieldPool;
@@ -418,6 +430,30 @@ export async function handleWorkerRequest(
     );
     if (request.method === "dispose") {
       session.model = undefined;
+    }
+    if (
+      request.method === "characterizeIsolatedElement"
+      && request.destination !== undefined
+    ) {
+      const handoff = transferIsolatedElementCharacterization(
+        result as IsolatedElementCharacterization,
+        request.destination,
+      );
+      try {
+        request.destination.close();
+      } catch {
+        // Terminate may already have closed the transferred port.
+      }
+      return {
+        response: {
+          id: request.id,
+          kind: "ok",
+          state: model.state,
+          result: handoff,
+          transferredBufferCount: 0,
+        },
+        transfer: [],
+      };
     }
     const transfer = collectTransferables(result);
     return {

@@ -8,8 +8,10 @@ import {
   packageVersion,
   rotationalOrder,
   runDeck,
+  transferIsolatedElementCharacterization,
   type GeometryCompletionResult,
   type GeometrySymmetry,
+  type IsolatedElementHandoff,
   type SymmetryCopy,
   type SymmetryFailureClassification,
   type ComplexMatrix,
@@ -121,6 +123,42 @@ async function validConsumer(): Promise<void> {
   const budget: PowerBudget = solution.powerBudget;
   budget.efficiencyPercent satisfies number | null;
   field.eThetaReal[0];
+
+  const currents: NecCurrentDistribution = model.getCurrentDistribution({
+    kind: "unit-current",
+  });
+  currents.aReal[0];
+  const quadratureHandle: PreparedTransferHandle = model.prepareCurrentQuadrature({
+    nodes: new Float64Array([-1, -1 / 3, 1 / 3, 1]),
+    images: "physical-only",
+    modes: "unit-current",
+  });
+  quadratureHandle.buffer.byteLength;
+  const characterization: IsolatedElementCharacterization =
+    model.characterizeIsolatedElement({
+      quadrature: {
+        nodes: new Float64Array([-1, -1 / 3, 1 / 3, 1]),
+        images: "physical-only",
+        modes: "unit-current",
+      },
+      field: {
+        radiusM: 1,
+        theta: { startDeg: 0, count: 5, stepDeg: 30 },
+        phi: { startDeg: 0, count: 3, stepDeg: 90 },
+      },
+    });
+  characterization.quadrature.schemaVersion;
+  const constructedForHandoff: IsolatedElementCharacterization = {
+    impedance: model.computeImpedanceMatrix().impedance,
+    admittance: model.computeImpedanceMatrix().admittance,
+    quadrature: quadratureHandle,
+    embeddedField: characterization.embeddedField,
+  };
+  const handoff: IsolatedElementHandoff = transferIsolatedElementCharacterization(
+    constructedForHandoff,
+    new MessageChannel().port1,
+  );
+  handoff.quadratureByteLength;
   model.dispose();
 
   const currentDistribution: NecCurrentDistribution = {
@@ -164,7 +202,7 @@ async function validConsumer(): Promise<void> {
     byteLength: 8,
     buffer: new ArrayBuffer(8),
   };
-  const characterization: IsolatedElementCharacterization = {
+  const constructedCharacterization: IsolatedElementCharacterization = {
     impedance: matrices,
     admittance: matrices,
     quadrature: handle,
@@ -173,7 +211,7 @@ async function validConsumer(): Promise<void> {
   currentDistribution.segments[0]?.nativeIndex;
   quadratureRequest.images satisfies PreparedQuadratureImages;
   isolatedRequest.field.theta.count;
-  characterization.quadrature.byteLength;
+  constructedCharacterization.quadrature.byteLength;
 
   packageVersion satisfies string;
   engineVersion satisfies string;

@@ -19,7 +19,7 @@ const states = [
 const operations = Object.keys(MODEL_TRANSITIONS);
 
 test("the lifecycle table explicitly covers every operation/state pair", () => {
-  assert.equal(operations.length, 13);
+  assert.equal(operations.length, 16);
   assert.equal(states.length, 6);
 
   for (const operation of operations) {

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
-import { NecGeometryError, createNecModel } from "../.test-build/src/index.js";
+import { NecGeometryError, NecStateError, createNecModel } from "../.test-build/src/index.js";
 import { createNecWorkerModel } from "../.test-build/src/worker.js";
 import {
   currentQuadratureFieldGrid,
@@ -18,6 +18,12 @@ const generatedLoader = new URL(
 const wasmUrl = new URL("../.test-build/src/nec2pp.wasm", import.meta.url);
 const hasWasm = existsSync(generatedLoader) && existsSync(wasmUrl);
 const skip = !hasWasm && "WASM artifacts have not been built";
+const hasWp4Abi = hasWasm
+  && readFileSync(generatedLoader, "utf8").includes(
+    "_necpp_wasm_v1_get_current_distribution",
+  );
+const skipWp4 = skip
+  || (!hasWp4Abi && "WASM artifacts have not been rebuilt with WP4 ABI exports");
 
 const unitCurrentTolerance = 1e-7;
 const samePathTolerance = 1e-12;
@@ -183,6 +189,141 @@ test("WP0 dipole direct and worker Z agree within native-to-WASM tolerance",
         assert.ok(
           complexRelativeError(directZ, workerZ.impedance) < samePathTolerance,
         );
+      },
+    );
+  });
+
+const fourNodeQuadrature = Object.freeze({
+  nodes: Float64Array.of(-1, -1 / 3, 1 / 3, 1),
+  images: "physical-only",
+  modes: "unit-current",
+});
+
+function packedMagic(buffer) {
+  const bytes = new Uint8Array(buffer);
+  return String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+}
+
+test("WP4 dipole current, quadrature, and characterization are public",
+  { skip: skipWp4 }, async () => {
+    await withModel(createNecModel, currentQuadratureFixtures.dipole, async (model) => {
+      const currents = model.getCurrentDistribution({ kind: "unit-current" });
+      assert.equal(currents.schemaVersion, 1);
+      assert.equal(currents.modeKind, "unit-current");
+      assert.equal(currents.modeCount, 1);
+      assert.equal(currents.segments.length, 11);
+      assert.equal(currents.segments[5]?.tag, 1);
+      assert.equal(currents.segments[5]?.segment, 6);
+      assert.equal(currents.startEnds[0]?.kind, "free");
+      assert.equal(currents.endEnds[currents.endEnds.length - 1]?.kind, "free");
+      assert.equal(currents.aReal.length, 11);
+      assert.equal(Number.isFinite(currents.aReal[5]), true);
+
+      assert.throws(
+        () => model.getCurrentDistribution({ kind: "latest-solution" }),
+        (error) => error instanceof NecStateError && error.code === "NEC_STATE",
+      );
+
+      const prepared = model.prepareCurrentQuadrature(fourNodeQuadrature);
+      assert.equal(prepared.schemaVersion, 1);
+      assert.equal(prepared.byteLength, 4072);
+      assert.equal(packedMagic(prepared.buffer), "NECQ");
+
+      const characterization = model.characterizeIsolatedElement({
+        quadrature: fourNodeQuadrature,
+        field: currentQuadratureFieldGrid,
+      });
+      assert.equal(characterization.impedance.rows, 1);
+      assert.equal(packedMagic(characterization.quadrature.buffer), "NECQ");
+      assert.equal(packedMagic(characterization.embeddedField.buffer), "NECF");
+      assert.equal(characterization.quadrature.byteLength, prepared.byteLength);
+    });
+  });
+
+test("WP4 insulated turnstile characterization has two unit-current modes",
+  { skip: skipWp4 }, async () => {
+    await withModel(
+      createNecModel,
+      currentQuadratureFixtures["turnstile-insulated"],
+      async (model) => {
+        const characterization = model.characterizeIsolatedElement({
+          quadrature: fourNodeQuadrature,
+          field: currentQuadratureFieldGrid,
+        });
+        assert.equal(characterization.impedance.rows, 2);
+        assert.equal(packedMagic(characterization.quadrature.buffer), "NECQ");
+        const header = new DataView(characterization.quadrature.buffer);
+        assert.equal(header.getUint32(20, true), 2);
+        assert.equal(packedMagic(characterization.embeddedField.buffer), "NECF");
+        const fieldHeader = new DataView(characterization.embeddedField.buffer);
+        assert.equal(fieldHeader.getUint32(8, true), 2);
+      },
+    );
+  });
+
+test("WP4 direct and worker packed NECQ/NECF agree",
+  { skip: skipWp4 }, async () => {
+    let direct;
+    await withModel(
+      createNecModel,
+      currentQuadratureFixtures.dipole,
+      async (model) => {
+        direct = model.characterizeIsolatedElement({
+          quadrature: fourNodeQuadrature,
+          field: currentQuadratureFieldGrid,
+        });
+      },
+    );
+    await withModel(
+      createNecWorkerModel,
+      currentQuadratureFixtures.dipole,
+      async (model) => {
+        const worker = await model.characterizeIsolatedElement({
+          quadrature: fourNodeQuadrature,
+          field: currentQuadratureFieldGrid,
+        });
+        assert.equal(worker.quadrature.byteLength, direct.quadrature.byteLength);
+        assert.deepEqual(
+          new Uint8Array(worker.quadrature.buffer),
+          new Uint8Array(direct.quadrature.buffer),
+        );
+        assert.equal(
+          worker.embeddedField.byteLength,
+          direct.embeddedField.byteLength,
+        );
+        assert.deepEqual(
+          new Uint8Array(worker.embeddedField.buffer),
+          new Uint8Array(direct.embeddedField.buffer),
+        );
+        assert.ok(
+          complexRelativeError(direct.impedance, worker.impedance) < samePathTolerance,
+        );
+      },
+    );
+  });
+
+test("WP4 direct and worker current planes agree",
+  { skip: skipWp4 }, async () => {
+    let direct;
+    await withModel(
+      createNecModel,
+      currentQuadratureFixtures.dipole,
+      async (model) => {
+        direct = model.getCurrentDistribution({ kind: "unit-current" });
+      },
+    );
+    await withModel(
+      createNecWorkerModel,
+      currentQuadratureFixtures.dipole,
+      async (model) => {
+        const worker = await model.getCurrentDistribution({ kind: "unit-current" });
+        assert.deepEqual(worker.segments, direct.segments);
+        assert.deepEqual(worker.startEnds, direct.startEnds);
+        assert.deepEqual(worker.endEnds, direct.endEnds);
+        assert.equal(worker.modeCount, direct.modeCount);
+        assert.ok(relativeError(direct.aReal, worker.aReal) < samePathTolerance);
+        assert.ok(relativeError(direct.aImag, worker.aImag) < samePathTolerance);
+        assert.ok(relativeError(direct.cReal, worker.cReal) < samePathTolerance);
       },
     );
   });

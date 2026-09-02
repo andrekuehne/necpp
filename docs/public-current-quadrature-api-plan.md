@@ -583,12 +583,60 @@ gate.
 
 ### Handover
 
-- **Status / implementer / date:**
-- **Commit(s):**
+- **Status / implementer / date:** complete / WP4 implementation / 2026-09-02
+- **Commit(s):** uncommitted WP4 tree on this branch; pin after the user
+  commits.
 - **Commands and results:**
+  - `cmake --build build-wp0 --config Release --target nec2++_tests --parallel`
+  - `build-wp0\tests\Release\nec2++_tests.exe "[wp4_current]" --reporter compact`
+    — 6 test cases, 162 assertions, all passed.
+  - `build-wp0\tests\Release\nec2++_tests.exe "[wp4]" --reporter compact`
+    — 2 test cases, 63 assertions, all passed (older WASM-API suite; not
+    `[wp4_current]`).
+  - `build-wp0\tests\Release\nec2++_tests.exe "~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]" --reporter compact`
+    — 121 test cases, 15524 assertions, all passed (includes WP0–WP4 current
+    tags; excludes the older WASM-API stress tags).
+  - `npm --prefix packages/necpp-wasm run typecheck` — passed.
+  - `.\scripts\build_wasm_docker.ps1` with `emscripten/emsdk:4.0.7` — rebuilt
+    `nec2pp.wasm` / field-evaluator; smoke test passed.
+  - `npm --prefix packages/necpp-wasm test` — 108 tests, all passed, including
+    WP4 Node current/quadrature/handoff cases against the new WASM.
+  - `npm --prefix packages/necpp-wasm run test:pack` — 5 tests, all passed.
+  - `npm --prefix packages/necpp-wasm run test:current-quadrature-browser` —
+    Playwright mock-consumer bind-once: main thread has no large buffers;
+    consumer received NECQ+NECF once (`quadratureBytes` 4072, `embeddedBytes`
+    608).
+  - `cargo test --manifest-path packages/necpp-wasm/rust/Cargo.toml` — 4
+    header-parse tests passed.
 - **Artifacts:**
+  - [`src/necpp_wasm_v1.h`](../src/necpp_wasm_v1.h) / [`src/necpp_wasm_v1.cpp`](../src/necpp_wasm_v1.cpp)
+  - [`src/current_quadrature_wp4_tb.cpp`](../src/current_quadrature_wp4_tb.cpp)
+  - [`packages/necpp-wasm/src/model.ts`](../packages/necpp-wasm/src/model.ts),
+    [`worker-*.ts`](../packages/necpp-wasm/src/worker-client.ts),
+    [`handoff.ts`](../packages/necpp-wasm/src/handoff.ts)
+  - [`packages/necpp-wasm/rust/necq_view.rs`](../packages/necpp-wasm/rust/necq_view.rs)
+  - ABI, TS, NECF, worker, and handoff recorded in
+    [`docs/current-quadrature-api.md`](current-quadrature-api.md)
+  - Rust binder notes in [`docs/necq-rust-binder.md`](necq-rust-binder.md)
 - **Decisions / deviations:**
+  - `abiVersion` stays 1. New symbols are additive after snapshot kind 37.
+  - Tests use `[wp4_current]`, not `[wp4]`, so they do not collide with the
+    older ABI suite.
+  - Characterization packs NECF and syncs Z/Y kinds 0–3; it does not
+    overwrite embedded kinds 19–24.
+  - Isolated-element APIs are `NecModel` / `NecWorkerModel` only, not
+    `NecArraySolver`.
+  - Worker-to-worker handoff puts `MessagePort` on the transfer list and
+    returns compact `IsolatedElementHandoff` metadata to the client.
+  - Direct `getCurrentDistribution({ kind: "latest-solution" })` from
+    `prepared` is a synchronous `NecStateError`; the package test uses
+    `assert.throws`, not `assert.rejects`.
 - **Known risks / next WP:**
+  - WP5: versioned visualizer fixtures, sibling-checkout ingestion, and
+    numerical current/pattern checks against NEC internals.
+  - Independent `get_current_distribution` + `compute_embedded_far_fields`
+    still costs `2 * nPorts` unit-current solves; only characterization
+    shares the loop.
 
 ## WP5 - Numerical and consumer validation
 

@@ -49,6 +49,7 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp1_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp2_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp3_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp4_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1_c_tb.c
     ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1_tb.cpp
 )

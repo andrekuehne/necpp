@@ -9,6 +9,7 @@ import {
   type ComplexMatrix,
   type FarFieldResult,
   type IsolatedElementCharacterization,
+  type IsolatedElementHandoff,
   type IsolatedElementRequest,
   type NecCurrentDistribution,
   type NecWorkerProgressEvent,
@@ -55,6 +56,46 @@ async function validWorkerConsumer(): Promise<void> {
   field.eThetaReal[0];
   events[0]?.operation;
 
+  const workerCurrents: NecCurrentDistribution = await model.getCurrentDistribution({
+    kind: "unit-current",
+  });
+  workerCurrents.modeCount;
+  const workerQuadratureHandle: PreparedTransferHandle =
+    await model.prepareCurrentQuadrature({
+      nodes: new Float64Array([-1, 0, 1]),
+      images: "physical-only",
+      modes: "unit-current",
+    });
+  workerQuadratureHandle.byteLength;
+  const liveCharacterization: IsolatedElementCharacterization =
+    await model.characterizeIsolatedElement({
+      quadrature: {
+        nodes: new Float64Array([-1, 0, 1]),
+        images: "physical-only",
+        modes: "unit-current",
+      },
+      field: {
+        theta: { startDeg: 0, count: 3, stepDeg: 45 },
+        phi: { startDeg: 0, count: 2, stepDeg: 90 },
+      },
+    });
+  liveCharacterization.impedance.rows;
+  const workerHandoff: IsolatedElementHandoff = await model.characterizeIsolatedElement(
+    {
+      quadrature: {
+        nodes: new Float64Array([-1, 0, 1]),
+        images: "physical-only",
+        modes: "unit-current",
+      },
+      field: {
+        theta: { startDeg: 0, count: 3, stepDeg: 45 },
+        phi: { startDeg: 0, count: 2, stepDeg: 90 },
+      },
+    },
+    { destination: new MessageChannel().port1 },
+  );
+  workerHandoff.quadratureByteLength;
+
   const workerHandle: PreparedTransferHandle = {
     schemaVersion: 1,
     byteLength: 8,
@@ -78,10 +119,10 @@ async function validWorkerConsumer(): Promise<void> {
     quadrature: workerHandle,
     embeddedField: workerHandle,
   };
-  const workerCurrents: NecCurrentDistribution["modeKind"] = "latest-solution";
+  const constructedCurrents: NecCurrentDistribution["modeKind"] = "latest-solution";
   workerCharacterization.quadrature.schemaVersion;
   workerRequest.quadrature.modes;
-  workerCurrents;
+  constructedCurrents;
 
   model.cancelFarField();
   const unsubscribe = model.subscribeProgress(() => undefined);

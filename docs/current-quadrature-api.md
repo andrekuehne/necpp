@@ -2,8 +2,9 @@
 
 Status: frozen by WP0 (2026-09-02). WP1 implemented the native exact-current
 API. WP2 implemented the native prepared-quadrature evaluator and packed NECQ
-layout. WP3 implements native isolated-element characterization. C ABI,
-TypeScript façades, and workers remain WP4. This document is
+layout. WP3 implements native isolated-element characterization. WP4 implements
+the additive C/WASM ABI, `NecModel` / `NecWorkerModel` methods, worker
+transfer, and the visualizer MessagePort handoff. This document is
 the normative public contract for exact NEC current coefficients, prepared
 quadrature sampling, isolated-element characterization, and the visualizer
 handoff. Existing Z/Y, solves, fields, power, and lifecycle in
@@ -14,7 +15,7 @@ WP0 exports types only. WP1 adds `nec_stateful_model::get_current_distribution`
 and `nec_evaluate_segment_current`. WP2 adds
 `nec_stateful_model::prepare_current_quadrature` and the packed NECQ buffer.
 WP3 adds `nec_stateful_model::characterize_isolated_element`.
-`NecModel` / `NecWorkerModel` methods and C ABI entry points wait for WP4.
+WP4 adds C ABI entry points, TypeScript façades, packed NECF, and handoff.
 Names below are frozen; later WPs must not weaken the semantics.
 
 The work tracker is
@@ -300,8 +301,8 @@ C ABI, `NecModel` methods, and `state-machine.ts` rows wait for WP4.
 
 Implemented in
 [`src/nec_isolated_element_characterization.h`](../src/nec_isolated_element_characterization.h)
-and [`src/nec_stateful_model.h`](../src/nec_stateful_model.h). Native C++ only;
-C ABI and TypeScript methods wait for WP4.
+and [`src/nec_stateful_model.h`](../src/nec_stateful_model.h). The C ABI and
+TypeScript methods are in the WP4 sections below.
 
 ```cpp
 struct nec_isolated_element_request {
@@ -338,21 +339,116 @@ unit-current basis-solve counter increases by `nPorts`. Returned fields match
 `compute_embedded_far_fields(..., unit_current)` at the existing `1e-7`
 same-path gate and remain NEC-generated. The result is an owned snapshot,
 cacheable by geometry, frequency, ports, ground, quadrature rule, and field
-grid; WP3 does not retain it on the model.
+grid; WP3 does not retain it on `nec_stateful_model`. WP4 retains packed NECQ
+and NECF on the ABI model until `clear_calculated_results` / `dispose`.
 
-C ABI, `NecModel` methods, and `state-machine.ts` rows wait for WP4.
+## TypeScript methods
+
+On `NecModel` / `NecWorkerModel` (worker methods return `Promise<…>`). Not on
+`NecArraySolver`.
+
+```ts
+getCurrentDistribution(options: { kind: CurrentModeKind }): NecCurrentDistribution
+prepareCurrentQuadrature(request: PreparedQuadratureRequest): PreparedTransferHandle
+characterizeIsolatedElement(request: IsolatedElementRequest): IsolatedElementCharacterization
+// worker-only overload:
+characterizeIsolatedElement(
+  request: IsolatedElementRequest,
+  options: { destination: MessagePort },
+): IsolatedElementHandoff
+```
+
+Direct/Node `NecCurrentDistribution` is a JS-owned copy, like `FarFieldResult`.
+Visualizer-normal flow uses transfer handles from prepare/characterize, not
+A/B/C planes on the UI thread.
+
+Kind gates stay in the method, not extra state-machine ops:
+
+- `getCurrentDistribution({ kind: "latest-solution" })` and
+  `prepareCurrentQuadrature` with `modes: "latest-solution"` require `solved`
+  (`NecStateError` otherwise).
+- `characterizeIsolatedElement` requires `quadrature.modes === "unit-current"`
+  (`NecInputError`).
+
+`IsolatedElementRequest.field` is validated with the existing far-field grid
+rules. Quadrature nodes/weights/images/modes are validated in TypeScript
+before the native call.
+
+## C ABI (`abiVersion` stays 1)
+
+Declared in [`src/necpp_wasm_v1.h`](../src/necpp_wasm_v1.h). Borrowed pointers
+remain copy-immediately. New symbols are listed in
+`src/CMakeLists.txt` `EXPORTED_FUNCTIONS`.
+
+```c
+int32_t necpp_wasm_v1_get_current_distribution(model, int32_t mode);
+  /* 0 = latest_solution, 1 = unit_current */
+
+int32_t necpp_wasm_v1_prepare_current_quadrature(
+  model, const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count, /* null/0 = omitted */
+  int32_t images, /* 0 physical-only, 1 perfect-ground-images */
+  int32_t modes);
+
+int32_t necpp_wasm_v1_characterize_isolated_element(
+  model, const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count, int32_t images,
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg);
+  /* modes are always unit-current; no mode argument */
+```
+
+Characterization still shares WP3’s one-solve-per-port path. It syncs Z/Y into
+existing impedance kinds 0–3 and packs NECF. It does **not** overwrite
+embedded kinds 19–24. Get-current does not clear impedance.
+
+### f64 kinds 38–49 (`result_buffer`)
+
+| Kind | Name | Length |
+|---|---|---|
+| 38–41 | `CURRENT_CENTRES/STARTS/ENDS/TANGENTS` | `3 * nSeg` |
+| 42–43 | `CURRENT_RADII/LENGTHS` | `nSeg` |
+| 44–49 | `CURRENT_A/B/C_REAL/IMAG` | `nModes * nSeg` |
+
+Scalars: `current_segment_count`, `current_mode_count`, `current_mode_kind`,
+`current_frequency_mhz`, `current_wavelength_m`.
+
+### i32 identity buffers
+
+```c
+const int32_t* necpp_wasm_v1_int32_result_buffer(model, int32_t kind);
+size_t necpp_wasm_v1_int32_result_buffer_length(model, int32_t kind);
+```
+
+Kinds start at 0: `CURRENT_TAG`, `CURRENT_SEGMENT`, `CURRENT_NATIVE_INDEX`,
+then start/end `KIND/TAG/SEGMENT/END` (8 arrays). End encoding: kind
+`0=free`, `1=ground`, `2=segment`; `end` is `0=start`, `1=end`. TypeScript
+rebuilds `NecSegmentEnd` objects from these planes.
+
+### Packed byte buffers
+
+```c
+enum { PACKED_QUADRATURE = 0, PACKED_EMBEDDED_FIELD = 1 };
+const uint8_t* necpp_wasm_v1_packed_buffer(model, int32_t kind);
+size_t necpp_wasm_v1_packed_buffer_length(model, int32_t kind);
+```
+
+Packed retrieve is a pointer/length read. Native tests are tagged
+`[wasm_api][current_quadrature][wp4_current]`, not `[wp4]`.
 
 ## Ownership, invalidation, and errors
 
 | Object | Ownership | Invalidation |
 |---|---|---|
-| `NecCurrentDistribution` | Direct/Node: JS-owned copies. Worker: worker-resident | Latest-solution: next solve, configuration-changing `prepare`, or `dispose`. Unit-current modes: geometry, frequency, and port identity, not the latest consumer excitation |
-| `PreparedCurrentQuadrature` | Opaque handle; large SoA never on the UI thread | Geometry generation, frequency, mode set, node/weight rule, image mode, `dispose` |
-| `IsolatedElementCharacterization` | Compact metadata plus two transfer handles | Geometry, frequency, ports, ground, quadrature rule, field-grid identity |
+| `NecCurrentDistribution` | Direct/Node: JS-owned copies. Worker: transferred typed arrays revived on the client | Latest-solution: next solve, configuration-changing `prepare`, or `dispose`. Unit-current modes: geometry, frequency, and port identity, not the latest consumer excitation |
+| `PreparedTransferHandle` (NECQ / NECF) | Owned `ArrayBuffer`. Direct: JS copy from WASM HEAP. Worker: transferred. Handoff: transferred to the destination port, not the UI client | Geometry generation, frequency, mode set, node/weight/image rule, field grid (NECF), `dispose` of the producing model (client-owned copies stay) |
+| `IsolatedElementCharacterization` | Z/Y plus two transfer handles | Geometry, frequency, ports, ground, quadrature rule, field-grid identity |
+| `IsolatedElementHandoff` | Z/Y plus `byteLength`s only; large buffers never materialize on the client | Same identity as characterization |
 
 Reuse the existing error taxonomy. No new error class.
 
-Reserved lifecycle (not yet in `state-machine.ts`):
+Lifecycle in [`packages/necpp-wasm/src/state-machine.ts`](../packages/necpp-wasm/src/state-machine.ts):
 
 | Operation | empty | geometry-building | geometry-complete | prepared | solved | disposed |
 |---|---|---|---|---|---|---|
@@ -364,14 +460,16 @@ Reserved lifecycle (not yet in `state-machine.ts`):
 `prepareCurrentQuadrature` with `modes: "latest-solution"` requires `solved`.
 Unit-current current capture and characterization preserve a prior consumer
 solution and public generations, matching `computeEmbeddedFarFields`.
+In-progress native characterize is not interruptible. `dispose` / `terminate`
+drop ABI slots; packed `release` is idempotent.
 
 `abiVersion` stays `1`. New C functions and `necpp_wasm_v1_result_buffer_kind`
 values are additive after snapshot kinds 25–37.
 
 ## Packed transfer layout
 
-One little-endian `ArrayBuffer`, schema 1. Magic is the four ASCII bytes
-`N E C Q` at offset 0, not a host-endian integer.
+Quadrature is one little-endian `ArrayBuffer`, schema 1. Magic is the four
+ASCII bytes `N E C Q` at offset 0, not a host-endian integer.
 
 ```text
 Header (64 bytes, little-endian)
@@ -403,15 +501,84 @@ Currents, mode-major then plane then sample
 
 Geometry is **per sample**, matching the memory budget
 `9 * nSeg * nNodes * nImagePlanes * 8`. WP0 prose that said
-`nSegments * nImagePlanes` was incorrect. The embedded-field handle reuses
-existing basis-major `eTheta`/`ePhi` real/imag plus grid axes. Do not invent a
-second field packing.
+`nSegments * nImagePlanes` was incorrect.
 
-No JSON for numeric planes. Worker protocol later adds
-`getCurrentDistribution`, `prepareCurrentQuadrature`, and
-`characterizeIsolatedElement` with the same `transferredBufferCount` pattern
-as far-field arrays. The package worker may transfer the bundle to a consumer
-worker without cloning through main-thread application state.
+Embedded field is the same `PreparedTransferHandle` type but **must not** use
+NECQ magic. Pack existing basis-major planes into one little-endian envelope:
+
+```text
+Header (64 bytes)
+  0  u8[4]  magic ASCII N E C F
+  4  u32    schemaVersion = 1
+  8  u32    nPorts
+ 12  u32    nTheta
+ 16  u32    nPhi
+ 20  u32    samplesPerPort
+ 24  u32    reserved = 0
+ 28  u32    reserved = 0
+ 32  f64    frequencyMHz
+ 40  f64    radiusM
+ 48  u64    modelGeneration
+ 56  u64    reserved = 0
+Then f64 planes:
+  thetaDeg[nTheta], phiDeg[nPhi],
+  eThetaReal, eThetaImag, ePhiReal, ePhiImag
+  each length nPorts * samplesPerPort, port-major (same as EmbeddedFarFieldResult)
+```
+
+This is a transfer envelope of the existing `computeEmbeddedFarFields` layout,
+not a new field kernel. Z/Y stay `ComplexMatrix` (tiny; allowed on the client
+even in handoff mode).
+
+No JSON for numeric planes. Worker operations `getCurrentDistribution`,
+`prepareCurrentQuadrature`, and `characterizeIsolatedElement` use the same
+`transferredBufferCount` pattern as far-field arrays. Inbound `nodes` /
+`weights` clone+transfer like solve vectors. Results go through
+`collectTransferables` / `revivePreparedTransferHandle` /
+`reviveIsolatedElementCharacterization`. Inbound `MessagePort` for handoff
+sits on the transfer list, not inside structured-clone args.
+
+## Visualizer handoff
+
+Two supported embeddings:
+
+1. **Same-worker (document):** the visualizer compute worker calls
+   `createNecModel()` in-process, copies NECQ/NECF once into Rust/WASM, and
+   retains them. One bounded inter-memory copy. No MessagePort.
+2. **Worker-to-worker:** main creates a `MessageChannel`, transfers `port2` to
+   a consumer worker and `port1` into
+   `characterizeIsolatedElement(request, { destination })`. The NEC worker
+   posts one message and transfers the two large buffers. The client Promise
+   resolves to compact metadata only (Z/Y + `byteLength`s). Main never holds
+   the current/pattern `ArrayBuffer`s.
+
+Public helper on both package entries:
+
+```ts
+transferIsolatedElementCharacterization(
+  characterization: IsolatedElementCharacterization,
+  destination: MessagePort,
+): IsolatedElementHandoff
+```
+
+Handoff message (schema 1):
+
+```ts
+{
+  kind: "isolated-element-characterization",
+  schemaVersion: 1,
+  impedance, admittance,
+  quadrature: PreparedTransferHandle,   // NECQ
+  embeddedField: PreparedTransferHandle, // NECF
+}
+```
+
+The receiver binds once (keeps the buffers). A follow-up “steer” message must
+not re-transfer them. Repeat characterize with a new destination is a new bind.
+
+A compilable Rust view sketch is
+[`packages/necpp-wasm/rust/necq_view.rs`](../packages/necpp-wasm/rust/necq_view.rs)
+with notes in [`necq-rust-binder.md`](necq-rust-binder.md).
 
 ```text
 NEC package worker (native WASM -> owned ArrayBuffer)
@@ -501,26 +668,9 @@ one mode unless noted:
 | `turnstile-insulated` | 22 | 2 | 2288 | 1056 | 2 modes: geometry 6336 + currents 2816 |
 | `turnstile-connected` | 20 | 2 | 2080 | 960 | 2 modes: geometry 5760 + currents 2560 |
 
-## Additive ABI sketch
-
-Do not bump `abiVersion`. WP1+ append after kind 37. Indicative names:
-
-```text
-necpp_wasm_v1_get_current_distribution(model, mode)
-necpp_wasm_v1_prepare_current_quadrature(model, ...)
-necpp_wasm_v1_characterize_isolated_element(model, ...)
-NECPP_WASM_V1_CURRENT_* buffer kinds starting at 38
-```
-
-Borrowed result buffers remain copy-immediately, matching existing ABI
-comments.
-
-## Reserved worker operations
+The C ABI, TypeScript methods, worker operations, and handoff are documented
+in the sections above. `abiVersion` stays 1. Rust header parsing:
 
 ```text
-getCurrentDistribution
-prepareCurrentQuadrature
-characterizeIsolatedElement
+cargo test --manifest-path packages/necpp-wasm/rust/Cargo.toml
 ```
-
-These are not in `NecWorkerOperation` until WP1–WP4 implement them.

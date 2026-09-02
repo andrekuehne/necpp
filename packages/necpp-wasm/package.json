@@ -70,6 +70,7 @@
     "test:pack": "node test/require-wasm.mjs && node --test --test-timeout=180000 --test-concurrency=1 test/pack/manifest.test.mjs test/pack/consumer.test.mjs",
     "test:browser": "node test/browser-integration.mjs",
     "test:field-worker-browser": "npm run build:test && node test/browser-field-worker-production.mjs",
+    "test:current-quadrature-browser": "npm run build:test && node test/browser-current-quadrature-handoff.mjs",
     "pack:release": "node scripts/pack-release.mjs",
     "typecheck": "tsc --project tsconfig.json"
   },

@@ -25,6 +25,9 @@ export type { AppliedArrayBuildPlan } from "./array-solver.js";
 
 export type { NecErrorCode, NecErrorOptions } from "./errors.js";
 
+export { transferIsolatedElementCharacterization } from "./handoff.js";
+export type { IsolatedElementHandoffMessage } from "./handoff.js";
+
 export { createNecWorkerModel } from "./worker-client.js";
 
 export type {
@@ -62,6 +65,8 @@ export type {
   ImpedanceLoad,
   ImpedanceResult,
   IsolatedElementCharacterization,
+  IsolatedElementHandoff,
+  IsolatedElementHandoffOptions,
   IsolatedElementRequest,
   LoadDefinition,
   NecArraySolver,

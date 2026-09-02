@@ -18,6 +18,9 @@ import type {
   FarFieldResult,
   GeometryCompletionResult,
   ImpedanceResult,
+  IsolatedElementCharacterization,
+  IsolatedElementHandoff,
+  NecCurrentDistribution,
   NecModelState,
   NecWorkerOperation,
   PortDefinition,
@@ -63,6 +66,7 @@ export type WorkerRequest =
     readonly kind: "invoke";
     readonly method: WorkerMethod;
     readonly args: readonly unknown[];
+    readonly destination?: MessagePort;
   }
   | {
     readonly kind: "cancel-field";
@@ -623,6 +627,110 @@ export function reviveEmbeddedFarFieldResult(
     ports: snapshotPorts(record.ports),
     normalization,
     samplesPerPort: record.samplesPerPort,
+  };
+}
+
+function copyArrayBuffer(value: unknown, name: string): ArrayBuffer {
+  if (!isArrayBuffer(value)) {
+    throw new NecRuntimeError(`Worker result ${name} is not an ArrayBuffer`);
+  }
+  return value;
+}
+
+export function revivePreparedTransferHandle(
+  value: unknown,
+  name = "handle",
+): IsolatedElementCharacterization["quadrature"] {
+  const record = value as { schemaVersion?: unknown; byteLength?: unknown; buffer?: unknown };
+  if (
+    record === null
+    || typeof record !== "object"
+    || record.schemaVersion !== 1
+    || typeof record.byteLength !== "number"
+    || !Number.isInteger(record.byteLength)
+    || record.byteLength < 0
+  ) {
+    throw new NecRuntimeError(`Worker result ${name} is not a transfer handle`);
+  }
+  const buffer = copyArrayBuffer(record.buffer, `${name}.buffer`);
+  if (buffer.byteLength !== record.byteLength) {
+    throw new NecRuntimeError(
+      `Worker result ${name}.byteLength does not match the transferred buffer`,
+    );
+  }
+  return {
+    schemaVersion: 1,
+    byteLength: record.byteLength,
+    buffer,
+  };
+}
+
+export function reviveCurrentDistribution(value: unknown): NecCurrentDistribution {
+  const record = value as NecCurrentDistribution;
+  return {
+    schemaVersion: 1,
+    frequencyMHz: finiteWorkerNumber(record.frequencyMHz, "frequencyMHz"),
+    wavelengthM: finiteWorkerNumber(record.wavelengthM, "wavelengthM"),
+    modeKind: record.modeKind,
+    modeCount: record.modeCount,
+    segments: Object.freeze([...(record.segments ?? [])]),
+    startEnds: Object.freeze([...(record.startEnds ?? [])]),
+    endEnds: Object.freeze([...(record.endEnds ?? [])]),
+    centresM: copyFloat64(record.centresM, "centresM"),
+    startsM: copyFloat64(record.startsM, "startsM"),
+    endsM: copyFloat64(record.endsM, "endsM"),
+    tangents: copyFloat64(record.tangents, "tangents"),
+    radiiM: copyFloat64(record.radiiM, "radiiM"),
+    lengthsM: copyFloat64(record.lengthsM, "lengthsM"),
+    aReal: copyFloat64(record.aReal, "aReal"),
+    aImag: copyFloat64(record.aImag, "aImag"),
+    bReal: copyFloat64(record.bReal, "bReal"),
+    bImag: copyFloat64(record.bImag, "bImag"),
+    cReal: copyFloat64(record.cReal, "cReal"),
+    cImag: copyFloat64(record.cImag, "cImag"),
+  };
+}
+
+export function reviveIsolatedElementCharacterization(
+  value: unknown,
+): IsolatedElementCharacterization {
+  const record = value as IsolatedElementCharacterization;
+  const impedance = reviveImpedanceResult({
+    impedance: record.impedance,
+    admittance: record.admittance,
+    frequencyMHz: 0,
+    factorizationGeneration: 0,
+  });
+  return {
+    impedance: impedance.impedance,
+    admittance: impedance.admittance,
+    quadrature: revivePreparedTransferHandle(record.quadrature, "quadrature"),
+    embeddedField: revivePreparedTransferHandle(
+      record.embeddedField,
+      "embeddedField",
+    ),
+  };
+}
+
+export function reviveIsolatedElementHandoff(value: unknown): IsolatedElementHandoff {
+  const record = value as IsolatedElementHandoff;
+  const impedance = reviveImpedanceResult({
+    impedance: record.impedance,
+    admittance: record.admittance,
+    frequencyMHz: 0,
+    factorizationGeneration: 0,
+  });
+  return {
+    impedance: impedance.impedance,
+    admittance: impedance.admittance,
+    quadratureByteLength: finiteWorkerNumber(
+      record.quadratureByteLength,
+      "quadratureByteLength",
+    ),
+    embeddedFieldByteLength: finiteWorkerNumber(
+      record.embeddedFieldByteLength,
+      "embeddedFieldByteLength",
+    ),
   };
 }
 

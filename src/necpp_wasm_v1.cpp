@@ -16,6 +16,7 @@
 #include <chrono>
 #include <cmath>
 #include <complex>
+#include <cstring>
 #include <exception>
 #include <limits>
 #include <memory>
@@ -171,6 +172,98 @@ struct far_field_snapshot_buffers {
   }
 };
 
+struct current_distribution_buffers {
+  std::vector<double> centres;
+  std::vector<double> starts;
+  std::vector<double> ends;
+  std::vector<double> tangents;
+  std::vector<double> radii;
+  std::vector<double> lengths;
+  std::vector<double> a_real;
+  std::vector<double> a_imag;
+  std::vector<double> b_real;
+  std::vector<double> b_imag;
+  std::vector<double> c_real;
+  std::vector<double> c_imag;
+  std::vector<int32_t> tag;
+  std::vector<int32_t> segment;
+  std::vector<int32_t> native_index;
+  std::vector<int32_t> start_kind;
+  std::vector<int32_t> start_tag;
+  std::vector<int32_t> start_segment;
+  std::vector<int32_t> start_end;
+  std::vector<int32_t> end_kind;
+  std::vector<int32_t> end_tag;
+  std::vector<int32_t> end_segment;
+  std::vector<int32_t> end_end;
+  size_t segment_count = 0;
+  size_t mode_count = 0;
+  int32_t mode_kind = NECPP_WASM_V1_CURRENT_LATEST_SOLUTION;
+  double frequency_mhz = 0.0;
+  double wavelength_m = 0.0;
+  bool available = false;
+
+  void clear()
+  {
+    centres.clear();
+    starts.clear();
+    ends.clear();
+    tangents.clear();
+    radii.clear();
+    lengths.clear();
+    a_real.clear();
+    a_imag.clear();
+    b_real.clear();
+    b_imag.clear();
+    c_real.clear();
+    c_imag.clear();
+    tag.clear();
+    segment.clear();
+    native_index.clear();
+    start_kind.clear();
+    start_tag.clear();
+    start_segment.clear();
+    start_end.clear();
+    end_kind.clear();
+    end_tag.clear();
+    end_segment.clear();
+    end_end.clear();
+    segment_count = 0;
+    mode_count = 0;
+    mode_kind = NECPP_WASM_V1_CURRENT_LATEST_SOLUTION;
+    frequency_mhz = 0.0;
+    wavelength_m = 0.0;
+    available = false;
+  }
+};
+
+struct packed_result_buffers {
+  std::vector<uint8_t> quadrature;
+  std::vector<uint8_t> embedded_field;
+  bool quadrature_available = false;
+  bool embedded_available = false;
+
+  void clear()
+  {
+    quadrature.clear();
+    embedded_field.clear();
+    quadrature_available = false;
+    embedded_available = false;
+  }
+
+  void clear_quadrature()
+  {
+    quadrature.clear();
+    quadrature_available = false;
+  }
+
+  void clear_embedded()
+  {
+    embedded_field.clear();
+    embedded_available = false;
+  }
+};
+
 } // namespace
 
 struct necpp_wasm_v1_model {
@@ -186,6 +279,8 @@ struct necpp_wasm_v1_model {
   far_field_buffers far_field;
   embedded_buffers embedded;
   far_field_snapshot_buffers field_snapshot;
+  current_distribution_buffers current;
+  packed_result_buffers packed;
 };
 
 struct necpp_wasm_v1_deck {
@@ -329,6 +424,8 @@ void clear_calculated_results(necpp_wasm_v1_model& model)
   model.far_field.clear();
   model.embedded.clear();
   model.field_snapshot.clear();
+  model.current.clear();
+  model.packed.clear();
 }
 
 void sync_impedance(
@@ -414,6 +511,221 @@ void sync_embedded(
       : NECPP_WASM_V1_UNIT_VOLTAGE;
   next.available = true;
   model.embedded = std::move(next);
+}
+
+constexpr size_t kNecfHeaderBytes = 64;
+constexpr uint8_t kNecfMagic[4] = { 'N', 'E', 'C', 'F' };
+
+void store_u32_le(uint8_t* dest, uint32_t value)
+{
+  dest[0] = static_cast<uint8_t>(value);
+  dest[1] = static_cast<uint8_t>(value >> 8);
+  dest[2] = static_cast<uint8_t>(value >> 16);
+  dest[3] = static_cast<uint8_t>(value >> 24);
+}
+
+void store_u64_le(uint8_t* dest, uint64_t value)
+{
+  dest[0] = static_cast<uint8_t>(value);
+  dest[1] = static_cast<uint8_t>(value >> 8);
+  dest[2] = static_cast<uint8_t>(value >> 16);
+  dest[3] = static_cast<uint8_t>(value >> 24);
+  dest[4] = static_cast<uint8_t>(value >> 32);
+  dest[5] = static_cast<uint8_t>(value >> 40);
+  dest[6] = static_cast<uint8_t>(value >> 48);
+  dest[7] = static_cast<uint8_t>(value >> 56);
+}
+
+void store_f64_le(uint8_t* dest, double value)
+{
+  uint64_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  store_u64_le(dest, bits);
+}
+
+int32_t encode_end_kind(nec_segment_end_kind kind)
+{
+  switch (kind) {
+  case nec_segment_end_kind::ground:
+    return 1;
+  case nec_segment_end_kind::segment:
+    return 2;
+  case nec_segment_end_kind::free:
+  default:
+    return 0;
+  }
+}
+
+int32_t encode_end_side(nec_segment_end_side side)
+{
+  return side == nec_segment_end_side::end ? 1 : 0;
+}
+
+void encode_segment_end(
+  const nec_segment_end& end,
+  std::vector<int32_t>& kind,
+  std::vector<int32_t>& tag,
+  std::vector<int32_t>& segment,
+  std::vector<int32_t>& side)
+{
+  kind.push_back(encode_end_kind(end.kind));
+  if (end.kind == nec_segment_end_kind::segment) {
+    tag.push_back(end.tag);
+    segment.push_back(end.segment);
+    side.push_back(encode_end_side(end.end));
+  } else {
+    tag.push_back(0);
+    segment.push_back(0);
+    side.push_back(0);
+  }
+}
+
+void sync_current_distribution(
+  necpp_wasm_v1_model& model, nec_current_distribution distribution)
+{
+  current_distribution_buffers next;
+  next.centres.assign(
+    distribution.centres_m.begin(), distribution.centres_m.end());
+  next.starts.assign(distribution.starts_m.begin(), distribution.starts_m.end());
+  next.ends.assign(distribution.ends_m.begin(), distribution.ends_m.end());
+  next.tangents.assign(
+    distribution.tangents.begin(), distribution.tangents.end());
+  next.radii.assign(distribution.radii_m.begin(), distribution.radii_m.end());
+  next.lengths.assign(
+    distribution.lengths_m.begin(), distribution.lengths_m.end());
+  next.a_real.assign(distribution.a_real.begin(), distribution.a_real.end());
+  next.a_imag.assign(distribution.a_imag.begin(), distribution.a_imag.end());
+  next.b_real.assign(distribution.b_real.begin(), distribution.b_real.end());
+  next.b_imag.assign(distribution.b_imag.begin(), distribution.b_imag.end());
+  next.c_real.assign(distribution.c_real.begin(), distribution.c_real.end());
+  next.c_imag.assign(distribution.c_imag.begin(), distribution.c_imag.end());
+  const size_t n_segments = distribution.segments.size();
+  next.tag.reserve(n_segments);
+  next.segment.reserve(n_segments);
+  next.native_index.reserve(n_segments);
+  next.start_kind.reserve(n_segments);
+  next.start_tag.reserve(n_segments);
+  next.start_segment.reserve(n_segments);
+  next.start_end.reserve(n_segments);
+  next.end_kind.reserve(n_segments);
+  next.end_tag.reserve(n_segments);
+  next.end_segment.reserve(n_segments);
+  next.end_end.reserve(n_segments);
+  for (size_t index = 0; index < n_segments; ++index) {
+    next.tag.push_back(distribution.segments[index].tag);
+    next.segment.push_back(distribution.segments[index].segment);
+    next.native_index.push_back(distribution.segments[index].native_index);
+    encode_segment_end(
+      distribution.start_ends[index],
+      next.start_kind, next.start_tag, next.start_segment, next.start_end);
+    encode_segment_end(
+      distribution.end_ends[index],
+      next.end_kind, next.end_tag, next.end_segment, next.end_end);
+  }
+  next.segment_count = n_segments;
+  next.mode_count = distribution.mode_count;
+  next.mode_kind =
+    distribution.mode_kind == nec_current_mode_kind::unit_current
+      ? NECPP_WASM_V1_CURRENT_UNIT_CURRENT
+      : NECPP_WASM_V1_CURRENT_LATEST_SOLUTION;
+  next.frequency_mhz = distribution.frequency_mhz;
+  next.wavelength_m = distribution.wavelength_m;
+  next.available = true;
+  model.current = std::move(next);
+}
+
+void append_f64_plane(std::vector<uint8_t>& packed, const std::vector<nec_float>& values)
+{
+  const size_t offset = packed.size();
+  packed.resize(offset + values.size() * sizeof(double));
+  uint8_t* dest = packed.data() + offset;
+  for (size_t index = 0; index < values.size(); ++index)
+    store_f64_le(dest + index * sizeof(double), values[index]);
+}
+
+void append_split_complex_plane(
+  std::vector<uint8_t>& packed, const std::vector<nec_complex>& values, bool imag)
+{
+  const size_t offset = packed.size();
+  packed.resize(offset + values.size() * sizeof(double));
+  uint8_t* dest = packed.data() + offset;
+  for (size_t index = 0; index < values.size(); ++index) {
+    store_f64_le(
+      dest + index * sizeof(double),
+      imag ? values[index].imag() : values[index].real());
+  }
+}
+
+std::vector<uint8_t> pack_embedded_field_envelope(
+  const nec_embedded_far_field_result& field, uint64_t model_generation)
+{
+  std::vector<uint8_t> packed(kNecfHeaderBytes, 0);
+  uint8_t* bytes = packed.data();
+  bytes[0] = kNecfMagic[0];
+  bytes[1] = kNecfMagic[1];
+  bytes[2] = kNecfMagic[2];
+  bytes[3] = kNecfMagic[3];
+  store_u32_le(bytes + 4, 1);
+  store_u32_le(bytes + 8, static_cast<uint32_t>(field.ports.size()));
+  store_u32_le(bytes + 12, static_cast<uint32_t>(field.theta_deg.size()));
+  store_u32_le(bytes + 16, static_cast<uint32_t>(field.phi_deg.size()));
+  store_u32_le(bytes + 20, static_cast<uint32_t>(field.samples_per_port));
+  store_u32_le(bytes + 24, 0);
+  store_u32_le(bytes + 28, 0);
+  store_f64_le(bytes + 32, field.frequency_mhz);
+  store_f64_le(bytes + 40, field.radius_m);
+  store_u64_le(bytes + 48, model_generation);
+  store_u64_le(bytes + 56, 0);
+  append_f64_plane(packed, field.theta_deg);
+  append_f64_plane(packed, field.phi_deg);
+  append_split_complex_plane(packed, field.e_theta, false);
+  append_split_complex_plane(packed, field.e_theta, true);
+  append_split_complex_plane(packed, field.e_phi, false);
+  append_split_complex_plane(packed, field.e_phi, true);
+  return packed;
+}
+
+bool valid_quadrature_input(
+  const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count,
+  int32_t images) noexcept
+{
+  if (node_count == 0 || nodes == nullptr)
+    return false;
+  if ((weight_count == 0) != (weights == nullptr))
+    return false;
+  if (weight_count != 0 && weight_count != node_count)
+    return false;
+  if (images != NECPP_WASM_V1_QUADRATURE_PHYSICAL_ONLY &&
+      images != NECPP_WASM_V1_QUADRATURE_PERFECT_GROUND_IMAGES)
+    return false;
+  for (size_t index = 0; index < node_count; ++index) {
+    if (!finite_value(nodes[index]) || nodes[index] < -1.0 || nodes[index] > 1.0)
+      return false;
+  }
+  for (size_t index = 0; index < weight_count; ++index) {
+    if (!finite_value(weights[index]))
+      return false;
+  }
+  return true;
+}
+
+nec_prepared_quadrature_request make_quadrature_request(
+  const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count,
+  int32_t images, int32_t modes)
+{
+  nec_prepared_quadrature_request request;
+  request.nodes.assign(nodes, nodes + node_count);
+  if (weight_count != 0)
+    request.weights.assign(weights, weights + weight_count);
+  request.images = images == NECPP_WASM_V1_QUADRATURE_PERFECT_GROUND_IMAGES
+    ? nec_prepared_quadrature_images::perfect_ground_images
+    : nec_prepared_quadrature_images::physical_only;
+  request.modes = modes == NECPP_WASM_V1_CURRENT_UNIT_CURRENT
+    ? nec_current_mode_kind::unit_current
+    : nec_current_mode_kind::latest_solution;
+  return request;
 }
 
 bool valid_complex_input(
@@ -586,6 +898,78 @@ const std::vector<double>* result_buffer(
     return model->field_snapshot.available ? &model->field_snapshot.value.cir : nullptr;
   case NECPP_WASM_V1_FF_SNAPSHOT_CII:
     return model->field_snapshot.available ? &model->field_snapshot.value.cii : nullptr;
+  case NECPP_WASM_V1_CURRENT_CENTRES:
+    return model->current.available ? &model->current.centres : nullptr;
+  case NECPP_WASM_V1_CURRENT_STARTS:
+    return model->current.available ? &model->current.starts : nullptr;
+  case NECPP_WASM_V1_CURRENT_ENDS:
+    return model->current.available ? &model->current.ends : nullptr;
+  case NECPP_WASM_V1_CURRENT_TANGENTS:
+    return model->current.available ? &model->current.tangents : nullptr;
+  case NECPP_WASM_V1_CURRENT_RADII:
+    return model->current.available ? &model->current.radii : nullptr;
+  case NECPP_WASM_V1_CURRENT_LENGTHS:
+    return model->current.available ? &model->current.lengths : nullptr;
+  case NECPP_WASM_V1_CURRENT_A_REAL:
+    return model->current.available ? &model->current.a_real : nullptr;
+  case NECPP_WASM_V1_CURRENT_A_IMAG:
+    return model->current.available ? &model->current.a_imag : nullptr;
+  case NECPP_WASM_V1_CURRENT_B_REAL:
+    return model->current.available ? &model->current.b_real : nullptr;
+  case NECPP_WASM_V1_CURRENT_B_IMAG:
+    return model->current.available ? &model->current.b_imag : nullptr;
+  case NECPP_WASM_V1_CURRENT_C_REAL:
+    return model->current.available ? &model->current.c_real : nullptr;
+  case NECPP_WASM_V1_CURRENT_C_IMAG:
+    return model->current.available ? &model->current.c_imag : nullptr;
+  default:
+    return nullptr;
+  }
+}
+
+const std::vector<int32_t>* int32_result_buffer(
+  const necpp_wasm_v1_model* model, int32_t kind) noexcept
+{
+  if (model == nullptr || !model->current.available)
+    return nullptr;
+  switch (kind) {
+  case NECPP_WASM_V1_CURRENT_TAG:
+    return &model->current.tag;
+  case NECPP_WASM_V1_CURRENT_SEGMENT:
+    return &model->current.segment;
+  case NECPP_WASM_V1_CURRENT_NATIVE_INDEX:
+    return &model->current.native_index;
+  case NECPP_WASM_V1_CURRENT_START_KIND:
+    return &model->current.start_kind;
+  case NECPP_WASM_V1_CURRENT_START_TAG:
+    return &model->current.start_tag;
+  case NECPP_WASM_V1_CURRENT_START_SEGMENT:
+    return &model->current.start_segment;
+  case NECPP_WASM_V1_CURRENT_START_END:
+    return &model->current.start_end;
+  case NECPP_WASM_V1_CURRENT_END_KIND:
+    return &model->current.end_kind;
+  case NECPP_WASM_V1_CURRENT_END_TAG:
+    return &model->current.end_tag;
+  case NECPP_WASM_V1_CURRENT_END_SEGMENT:
+    return &model->current.end_segment;
+  case NECPP_WASM_V1_CURRENT_END_END:
+    return &model->current.end_end;
+  default:
+    return nullptr;
+  }
+}
+
+const std::vector<uint8_t>* packed_buffer(
+  const necpp_wasm_v1_model* model, int32_t kind) noexcept
+{
+  if (model == nullptr)
+    return nullptr;
+  switch (kind) {
+  case NECPP_WASM_V1_PACKED_QUADRATURE:
+    return model->packed.quadrature_available ? &model->packed.quadrature : nullptr;
+  case NECPP_WASM_V1_PACKED_EMBEDDED_FIELD:
+    return model->packed.embedded_available ? &model->packed.embedded_field : nullptr;
   default:
     return nullptr;
   }
@@ -1122,6 +1506,135 @@ int32_t necpp_wasm_v1_capture_far_field_snapshot(necpp_wasm_v1_model* model)
   return status;
 }
 
+int32_t necpp_wasm_v1_get_current_distribution(
+  necpp_wasm_v1_model* model, int32_t mode)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (mode != NECPP_WASM_V1_CURRENT_LATEST_SOLUTION &&
+      mode != NECPP_WASM_V1_CURRENT_UNIT_CURRENT)
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR, "Invalid current mode");
+  if (mode == NECPP_WASM_V1_CURRENT_LATEST_SOLUTION) {
+    if (!is_state(model, nec_model_state::solved))
+      return fail(model, NECPP_WASM_V1_STATE_ERROR,
+        "getCurrentDistribution latest-solution requires a consumer solution");
+  } else if (!is_prepared(model)) {
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "getCurrentDistribution requires a prepared model");
+  }
+  bool native_succeeded = false;
+  const int32_t status = invoke(model, NECPP_WASM_V1_SOLVER_ERROR, [&] {
+    nec_current_distribution distribution = model->native.get_current_distribution(
+      mode == NECPP_WASM_V1_CURRENT_UNIT_CURRENT
+        ? nec_current_mode_kind::unit_current
+        : nec_current_mode_kind::latest_solution);
+    native_succeeded = true;
+    sync_current_distribution(*model, std::move(distribution));
+  });
+  if (status != NECPP_WASM_V1_OK && native_succeeded)
+    model->current.clear();
+  else if (status != NECPP_WASM_V1_OK)
+    reconcile_consumer_results_after_failure(*model);
+  return status;
+}
+
+int32_t necpp_wasm_v1_prepare_current_quadrature(
+  necpp_wasm_v1_model* model,
+  const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count,
+  int32_t images,
+  int32_t modes)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (modes != NECPP_WASM_V1_CURRENT_LATEST_SOLUTION &&
+      modes != NECPP_WASM_V1_CURRENT_UNIT_CURRENT)
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR, "Invalid current mode");
+  if (modes == NECPP_WASM_V1_CURRENT_LATEST_SOLUTION) {
+    if (!is_state(model, nec_model_state::solved))
+      return fail(model, NECPP_WASM_V1_STATE_ERROR,
+        "prepareCurrentQuadrature latest-solution requires a consumer solution");
+  } else if (!is_prepared(model)) {
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "prepareCurrentQuadrature requires a prepared model");
+  }
+  if (!valid_quadrature_input(nodes, node_count, weights, weight_count, images))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Invalid prepared quadrature request");
+  nec_prepared_quadrature_request request;
+  try {
+    request = make_quadrature_request(
+      nodes, node_count, weights, weight_count, images, modes);
+  } catch (const std::bad_alloc& error) {
+    return set_error(model, NECPP_WASM_V1_RUNTIME_ERROR, error.what());
+  }
+  bool native_succeeded = false;
+  const int32_t status = invoke(model, NECPP_WASM_V1_INPUT_ERROR, [&] {
+    nec_prepared_current_quadrature prepared =
+      model->native.prepare_current_quadrature(request);
+    native_succeeded = true;
+    model->packed.quadrature = std::move(prepared.packed);
+    model->packed.quadrature_available = true;
+  });
+  if (status != NECPP_WASM_V1_OK && native_succeeded)
+    model->packed.clear_quadrature();
+  else if (status != NECPP_WASM_V1_OK)
+    reconcile_consumer_results_after_failure(*model);
+  return status;
+}
+
+int32_t necpp_wasm_v1_characterize_isolated_element(
+  necpp_wasm_v1_model* model,
+  const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count,
+  int32_t images,
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_prepared(model))
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "characterizeIsolatedElement requires a prepared model");
+  if (!valid_quadrature_input(nodes, node_count, weights, weight_count, images) ||
+      !valid_grid(
+        radius_m, theta_start_deg, theta_count, theta_step_deg,
+        phi_start_deg, phi_count, phi_step_deg))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Invalid isolated-element characterization request");
+  nec_isolated_element_request request;
+  try {
+    request.quadrature = make_quadrature_request(
+      nodes, node_count, weights, weight_count, images,
+      NECPP_WASM_V1_CURRENT_UNIT_CURRENT);
+    request.grid = make_grid(
+      radius_m, theta_start_deg, theta_count, theta_step_deg,
+      phi_start_deg, phi_count, phi_step_deg);
+  } catch (const std::bad_alloc& error) {
+    return set_error(model, NECPP_WASM_V1_RUNTIME_ERROR, error.what());
+  }
+  bool native_succeeded = false;
+  const int32_t status = invoke(model, NECPP_WASM_V1_INPUT_ERROR, [&] {
+    nec_isolated_element_characterization result =
+      model->native.characterize_isolated_element(request);
+    native_succeeded = true;
+    sync_impedance(*model, result.matrices);
+    model->packed.quadrature = std::move(result.quadrature.packed);
+    model->packed.quadrature_available = true;
+    model->packed.embedded_field = pack_embedded_field_envelope(
+      result.embedded_field, result.matrices.factorization_generation);
+    model->packed.embedded_available = true;
+  });
+  if (status != NECPP_WASM_V1_OK && native_succeeded) {
+    model->packed.clear_quadrature();
+    model->packed.clear_embedded();
+  } else if (status != NECPP_WASM_V1_OK) {
+    reconcile_consumer_results_after_failure(*model);
+  }
+  return status;
+}
+
 int32_t necpp_wasm_v1_far_field_snapshot_capability(
   const necpp_wasm_v1_model* model)
 {
@@ -1443,6 +1956,64 @@ size_t necpp_wasm_v1_result_buffer_length(
   const necpp_wasm_v1_model* model, int32_t kind)
 {
   const std::vector<double>* buffer = result_buffer(model, kind);
+  return buffer == nullptr ? 0 : buffer->size();
+}
+
+size_t necpp_wasm_v1_current_segment_count(const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->current.available
+    ? model->current.segment_count : 0;
+}
+
+size_t necpp_wasm_v1_current_mode_count(const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->current.available
+    ? model->current.mode_count : 0;
+}
+
+int32_t necpp_wasm_v1_current_mode_kind(const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->current.available
+    ? model->current.mode_kind : -1;
+}
+
+double necpp_wasm_v1_current_frequency_mhz(const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->current.available
+    ? model->current.frequency_mhz : 0.0;
+}
+
+double necpp_wasm_v1_current_wavelength_m(const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->current.available
+    ? model->current.wavelength_m : 0.0;
+}
+
+const int32_t* necpp_wasm_v1_int32_result_buffer(
+  const necpp_wasm_v1_model* model, int32_t kind)
+{
+  const std::vector<int32_t>* buffer = int32_result_buffer(model, kind);
+  return buffer == nullptr || buffer->empty() ? nullptr : buffer->data();
+}
+
+size_t necpp_wasm_v1_int32_result_buffer_length(
+  const necpp_wasm_v1_model* model, int32_t kind)
+{
+  const std::vector<int32_t>* buffer = int32_result_buffer(model, kind);
+  return buffer == nullptr ? 0 : buffer->size();
+}
+
+const uint8_t* necpp_wasm_v1_packed_buffer(
+  const necpp_wasm_v1_model* model, int32_t kind)
+{
+  const std::vector<uint8_t>* buffer = packed_buffer(model, kind);
+  return buffer == nullptr || buffer->empty() ? nullptr : buffer->data();
+}
+
+size_t necpp_wasm_v1_packed_buffer_length(
+  const necpp_wasm_v1_model* model, int32_t kind)
+{
+  const std::vector<uint8_t>* buffer = packed_buffer(model, kind);
   return buffer == nullptr ? 0 : buffer->size();
 }
 

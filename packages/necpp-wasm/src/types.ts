@@ -376,7 +376,7 @@ export interface EmbeddedFarFieldResult extends FarFieldResult {
   readonly ePhiImag: Float64Array;
 }
 
-/** Frozen by WP0. Methods are not yet on {@link NecModel}. */
+/** Frozen by WP0. WP4 adds methods on {@link NecModel}. */
 export type CurrentModeKind = "latest-solution" | "unit-current";
 
 /** Decoded segment-end connection. Native `icon1`/`icon2` integers are not public. */
@@ -443,7 +443,9 @@ export interface PreparedQuadratureRequest {
 
 /**
  * Owned transferable packed SoA. Large arrays stay off the UI thread.
- * `buffer` is one little-endian schema-1 `NECQ` blob.
+ * Quadrature `buffer` is one little-endian schema-1 `NECQ` blob.
+ * Embedded-field `buffer` is one little-endian schema-1 `NECF` envelope of
+ * existing basis-major `eTheta`/`ePhi` planes plus grid axes.
  */
 export interface PreparedTransferHandle {
   readonly schemaVersion: 1;
@@ -457,6 +459,19 @@ export interface IsolatedElementCharacterization {
   readonly admittance: ComplexMatrix;
   readonly quadrature: PreparedTransferHandle;
   readonly embeddedField: PreparedTransferHandle;
+}
+
+/** Compact metadata after a worker-to-worker characterization handoff. */
+export interface IsolatedElementHandoff {
+  readonly impedance: ComplexMatrix;
+  readonly admittance: ComplexMatrix;
+  readonly quadratureByteLength: number;
+  readonly embeddedFieldByteLength: number;
+}
+
+/** Send large characterization buffers to a consumer worker, not the client. */
+export interface IsolatedElementHandoffOptions {
+  readonly destination: MessagePort;
 }
 
 /** Native characterization input. `quadrature.modes` must be `"unit-current"`. */
@@ -501,6 +516,11 @@ export interface NecModel {
     request: FarFieldRequest,
     normalization?: EmbeddedFieldNormalization,
   ): EmbeddedFarFieldResult;
+  getCurrentDistribution(options: { kind: CurrentModeKind }): NecCurrentDistribution;
+  prepareCurrentQuadrature(request: PreparedQuadratureRequest): PreparedTransferHandle;
+  characterizeIsolatedElement(
+    request: IsolatedElementRequest,
+  ): IsolatedElementCharacterization;
   /** Idempotent. After disposal, every operation except `state` and `dispose` fails. */
   dispose(): void;
 }
@@ -520,6 +540,9 @@ export type NecWorkerOperation =
   | "solveCurrents"
   | "computeFarField"
   | "computeEmbeddedFarFields"
+  | "getCurrentDistribution"
+  | "prepareCurrentQuadrature"
+  | "characterizeIsolatedElement"
   | "dispose";
 
 export interface NecWorkerProgressEvent {
@@ -558,6 +581,19 @@ export interface NecWorkerModel {
     request: FarFieldRequest,
     normalization?: EmbeddedFieldNormalization,
   ): Promise<EmbeddedFarFieldResult>;
+  getCurrentDistribution(
+    options: { kind: CurrentModeKind },
+  ): Promise<NecCurrentDistribution>;
+  prepareCurrentQuadrature(
+    request: PreparedQuadratureRequest,
+  ): Promise<PreparedTransferHandle>;
+  characterizeIsolatedElement(
+    request: IsolatedElementRequest,
+  ): Promise<IsolatedElementCharacterization>;
+  characterizeIsolatedElement(
+    request: IsolatedElementRequest,
+    options: IsolatedElementHandoffOptions,
+  ): Promise<IsolatedElementHandoff>;
   /**
    * Stop assigning tiles for the active pooled far-field request. This is a
    * no-op when no pooled field is active and does not dispose the model.
