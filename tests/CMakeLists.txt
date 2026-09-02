@@ -46,6 +46,7 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp3_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_symmetry_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp0_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp1_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1_c_tb.c
     ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1_tb.cpp
 )
@@ -77,6 +78,7 @@ add_executable(nec2++_tests
     ${CMAKE_SOURCE_DIR}/src/nec_radiation_pattern.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_results.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_current_distribution.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_structure_currents.cpp
     ${CMAKE_SOURCE_DIR}/src/necpp_wasm_v1.cpp
 )

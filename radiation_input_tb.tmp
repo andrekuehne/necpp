@@ -1,0 +1,8 @@
+
+                         ----- RADIATION PATTERNS -----
+ ---- ANGLES -----     ----- POWER GAINS -----       ---- POLARIZATION ----   ---- E(THETA) ----    ----- E(PHI) ------
+  THETA      PHI       VERTC   HORIZ   TOTAL       AXIAL      TILT  SENSE   MAGNITUDE    PHASE    MAGNITUDE     PHASE
+ DEGREES   DEGREES        DB       DB       DB       RATIO   DEGREES            VOLTS/M   DEGREES     VOLTS/M   DEGREES
+   90.00      0.00   -199.34  -999.99  -199.32      0.0000      0.00         4.8333E-11   -104.93  2.5549E-12     14.10
+   89.00      0.00     -9.34   -34.22    -9.33      0.0510     -1.46 LEFT    1.5271E-01     77.57  8.7103E-03   -166.00
+

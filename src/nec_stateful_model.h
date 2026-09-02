@@ -9,6 +9,7 @@
 #pragma once
 
 #include "common.h"
+#include "nec_current_distribution.h"
 #include "nec_geometry_symmetry.h"
 #include "nec_power_budget.h"
 
@@ -312,6 +313,14 @@ public:
     nec_embedded_field_normalization normalization =
       nec_embedded_field_normalization::unit_voltage);
 
+  /*! Owned physical-segment geometry and exact NEC A/B/C coefficients.
+   *
+   * latest_solution requires a consumer solve. unit_current is allowed from
+   * prepared or solved state and preserves a prior consumer solution.
+   */
+  nec_current_distribution get_current_distribution(
+    nec_current_mode_kind kind);
+
   const std::vector<nec_port_definition>& ports() const { return m_ports; }
   const std::vector<nec_complex>& port_currents() const { return m_port_currents; }
   nec_float frequency_mhz() const { return m_frequency_mhz; }
@@ -333,6 +342,11 @@ private:
   void clear_consumer_solution();
   void execute_voltage_solve(
     const std::vector<nec_complex>& voltages,
+    std::vector<nec_complex>& achieved_voltages,
+    std::vector<nec_complex>& achieved_currents);
+  void apply_unit_current_basis(
+    size_t port_index,
+    const nec_complex_matrix& impedance,
     std::vector<nec_complex>& achieved_voltages,
     std::vector<nec_complex>& achieved_currents);
   void restore_after_internal_solves(

@@ -132,7 +132,7 @@ interface IsolatedElementCharacterization {
 | WP | Work | Depends on | Status |
 |---|---|---|---|
 | 0 | Contract and baselines | - | Complete |
-| 1 | Public exact current distributions | 0 | Not started |
+| 1 | Public exact current distributions | 0 | Complete |
 | 2 | Static prepared quadrature evaluator | 1 | Not started |
 | 3 | Isolated-element characterization | 1, 2 | Not started |
 | 4 | WASM, worker, and Rust/WASM handoff | 2, 3 | Not started |
@@ -217,12 +217,42 @@ interface IsolatedElementCharacterization {
 
 ### Handover
 
-- **Status / implementer / date:**
-- **Commit(s):**
+- **Status / implementer / date:** complete / WP1 implementation / 2026-09-02
+- **Commit(s):** uncommitted WP1 tree on this branch; pin after the user
+  commits.
 - **Commands and results:**
+  - `cmake --build build-wp0 --config Release --target nec2++_tests --parallel`
+  - `build-wp0\tests\Release\nec2++_tests.exe "[wp1_current]" --reporter compact`
+    — 9 test cases, 4564 assertions, all passed.
+  - `build-wp0\tests\Release\nec2++_tests.exe "~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]" --reporter compact`
+    — 98 test cases, 5913 assertions, all passed (includes WP0 and WP1 current
+    tags; excludes the older WASM-API stress tags).
 - **Artifacts:**
+  - [`src/nec_current_distribution.h`](../src/nec_current_distribution.h)
+  - [`src/nec_current_distribution.cpp`](../src/nec_current_distribution.cpp)
+  - [`src/current_quadrature_wp1_tb.cpp`](../src/current_quadrature_wp1_tb.cpp)
+  - Native names recorded in [`docs/current-quadrature-api.md`](current-quadrature-api.md)
 - **Decisions / deviations:**
+  - Native C++ only. `NecModel` methods, C ABI, and worker rows wait for WP4.
+  - Public metres are `wavelength_m` times frequency-scaled NEC arrays. A 150 MHz
+    dipole locks this: \(c/f \approx 1.9986\,\mathrm{m}\), not exactly 2 m.
+  - `I(0)=A+C` versus unit-current \(1+j0\) is not a 1e-4 gate. Port current is
+    the network unknown; A/B/C are the interpolated expansion (WP0). Unit-current
+    planes must match latest-solution after the same unit drive at 1e-12.
+    Voltage-drive feed \(I(0)\) versus achieved port current keeps 1e-4/1e-3.
+  - `nec_evaluate_segment_current` is the shared scalar formula. The far-field
+    kernel was not rewritten to sample \(I(s)\); it still integrates the same
+    coefficient arrays.
+  - `apply_unit_current_basis` is shared with `compute_embedded_far_fields`.
+    Currents and fields are not captured from one solve yet (WP3).
 - **Known risks / next WP:**
+  - WP2 must call `nec_evaluate_segment_current` and precompute \(s\),
+    \(\sin(ks)\), \(\cos(ks)\), and `ds * weight` at construction.
+  - Junction decode lives in `nec_decode_segment_end`; keep native `icon`
+    integers out of public order.
+  - Characterization must reuse the unit-current basis loop and capture
+    currents plus fields from the same solve.
+  - Next: WP2 static prepared quadrature evaluator.
 
 ## WP2 - Static prepared quadrature evaluator
 

@@ -101,6 +101,46 @@ size_t checked_angular_index(
   return phi_index * theta_count + theta_index;
 }
 
+void resize_current_coefficient_planes(
+  nec_current_distribution& distribution)
+{
+  const size_t values = distribution.mode_count * distribution.segment_count();
+  distribution.a_real.assign(values, 0.0);
+  distribution.a_imag.assign(values, 0.0);
+  distribution.b_real.assign(values, 0.0);
+  distribution.b_imag.assign(values, 0.0);
+  distribution.c_real.assign(values, 0.0);
+  distribution.c_imag.assign(values, 0.0);
+}
+
+void copy_current_coefficient_mode(
+  const nec_far_field_evaluation_input& input,
+  nec_current_distribution& distribution,
+  size_t mode_index)
+{
+  const size_t count = distribution.segment_count();
+  for (size_t index = 0; index < count; ++index) {
+    const int64_t native = static_cast<int64_t>(index);
+    const nec_float air = input.air[native];
+    const nec_float aii = input.aii[native];
+    const nec_float bir = input.bir[native];
+    const nec_float bii = input.bii[native];
+    const nec_float cir = input.cir[native];
+    const nec_float cii = input.cii[native];
+    if (!finite_value(air) || !finite_value(aii) ||
+        !finite_value(bir) || !finite_value(bii) ||
+        !finite_value(cir) || !finite_value(cii))
+      fail("GET CURRENT DISTRIBUTION", "ENGINE RETURNED A NONFINITE CURRENT COEFFICIENT");
+    const size_t plane = distribution.plane_index(mode_index, index);
+    distribution.a_real[plane] = air;
+    distribution.a_imag[plane] = aii;
+    distribution.b_real[plane] = bir;
+    distribution.b_imag[plane] = bii;
+    distribution.c_real[plane] = cir;
+    distribution.c_imag[plane] = cii;
+  }
+}
+
 } // namespace
 
 const nec_complex& nec_far_field_result::e_theta_at(
@@ -538,6 +578,22 @@ void nec_stateful_model::execute_voltage_solve(
         !finite_value(achieved_currents[index].imag()))
       fail("PORT VOLTAGE SOLVE", "ENGINE RETURNED A NONFINITE PORT VALUE");
   }
+}
+
+void nec_stateful_model::apply_unit_current_basis(
+  size_t port_index,
+  const nec_complex_matrix& impedance,
+  std::vector<nec_complex>& achieved_voltages,
+  std::vector<nec_complex>& achieved_currents)
+{
+  if (port_index >= m_ports.size() || port_index >= impedance.columns)
+    fail("UNIT CURRENT BASIS", "PORT INDEX IS OUT OF RANGE");
+  std::vector<nec_complex> basis_voltages(
+    m_ports.size(), nec_complex(0.0, 0.0));
+  for (size_t row = 0; row < impedance.rows; ++row)
+    basis_voltages[row] = impedance.at(row, port_index);
+  execute_voltage_solve(
+    basis_voltages, achieved_voltages, achieved_currents);
 }
 
 const nec_port_solution& nec_stateful_model::finish_consumer_solve(
@@ -1059,13 +1115,12 @@ nec_stateful_model::compute_embedded_far_fields(
         nec_complex(0.0, 0.0));
       if (normalization == nec_embedded_field_normalization::unit_voltage) {
         basis_voltages[port_index] = nec_complex(1.0, 0.0);
+        execute_voltage_solve(
+          basis_voltages, achieved_voltages, achieved_currents);
       } else {
-        for (size_t row = 0; row < impedance->rows; ++row)
-          basis_voltages[row] = impedance->at(row, port_index);
+        apply_unit_current_basis(
+          port_index, *impedance, achieved_voltages, achieved_currents);
       }
-
-      execute_voltage_solve(
-        basis_voltages, achieved_voltages, achieved_currents);
       calculate_far_field(grid, achieved_currents, basis);
       const size_t offset = port_index * samples_per_port;
       std::copy(
@@ -1088,6 +1143,75 @@ nec_stateful_model::compute_embedded_far_fields(
 
   m_embedded_far_field_result = std::move(embedded);
   return m_embedded_far_field_result;
+}
+
+nec_current_distribution nec_stateful_model::get_current_distribution(
+  nec_current_mode_kind kind)
+{
+  switch (kind) {
+  case nec_current_mode_kind::latest_solution:
+    if (m_state != nec_model_state::solved || !m_has_port_solution)
+      fail("GET CURRENT DISTRIBUTION", "MODEL IS NOT SOLVED");
+    break;
+  case nec_current_mode_kind::unit_current:
+    if (m_state != nec_model_state::prepared &&
+        m_state != nec_model_state::solved)
+      fail("GET CURRENT DISTRIBUTION", "MODEL IS NOT PREPARED");
+    break;
+  default:
+    fail("GET CURRENT DISTRIBUTION", "UNKNOWN CURRENT MODE");
+  }
+
+  const c_geometry* geometry = m_context->get_geometry();
+  if (geometry == nullptr)
+    fail("GET CURRENT DISTRIBUTION", "GEOMETRY IS UNAVAILABLE");
+
+  const nec_float wavelength_m = em::get_wavelength(m_frequency_mhz * 1.0e6);
+  nec_current_distribution distribution;
+  distribution.schema_version = 1;
+  distribution.frequency_mhz = m_frequency_mhz;
+  distribution.mode_kind = kind;
+  nec_fill_current_geometry(*geometry, wavelength_m, distribution);
+
+  auto capture_mode = [this, &distribution](size_t mode_index) {
+    const nec_far_field_evaluation_input input =
+      m_context->far_field_evaluation_input(distribution.wavelength_m, 0);
+    copy_current_coefficient_mode(input, distribution, mode_index);
+  };
+
+  if (kind == nec_current_mode_kind::latest_solution) {
+    distribution.mode_count = 1;
+    resize_current_coefficient_planes(distribution);
+    capture_mode(0);
+    return distribution;
+  }
+
+  const nec_complex_matrix& impedance =
+    compute_impedance_matrix().impedance;
+  distribution.mode_count = m_ports.size();
+  resize_current_coefficient_planes(distribution);
+
+  const bool had_solution = m_has_port_solution;
+  const nec_port_solution saved_solution = m_last_port_solution;
+  try {
+    std::vector<nec_complex> achieved_voltages;
+    std::vector<nec_complex> achieved_currents;
+    for (size_t port_index = 0; port_index < m_ports.size(); ++port_index) {
+      apply_unit_current_basis(
+        port_index, impedance, achieved_voltages, achieved_currents);
+      capture_mode(port_index);
+    }
+  } catch (...) {
+    const std::exception_ptr failure = std::current_exception();
+    try {
+      restore_after_internal_solves(had_solution, saved_solution);
+    } catch (...) {
+      // Never expose an arbitrary basis solution if restoration fails.
+    }
+    std::rethrow_exception(failure);
+  }
+  restore_after_internal_solves(had_solution, saved_solution);
+  return distribution;
 }
 
 size_t nec_stateful_model::retained_result_count() const

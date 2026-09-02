@@ -1,15 +1,17 @@
 # Isolated-element current and prepared quadrature contract
 
-Status: frozen by WP0 (2026-09-02). Implementation is WP1–WP4. This document
-is the normative public contract for exact NEC current coefficients, prepared
-quadrature sampling, isolated-element characterization, and the visualizer
-handoff. Existing Z/Y, solves, fields, power, and lifecycle in
-[`wasm-api.md`](wasm-api.md) are unchanged. Type sketches live in
+Status: frozen by WP0 (2026-09-02). WP1 implemented the native exact-current
+API. C ABI, TypeScript façades, workers, and the prepared evaluator remain
+WP2–WP4. This document is the normative public contract for exact NEC current
+coefficients, prepared quadrature sampling, isolated-element characterization,
+and the visualizer handoff. Existing Z/Y, solves, fields, power, and lifecycle
+in [`wasm-api.md`](wasm-api.md) are unchanged. Type sketches live in
 [`packages/necpp-wasm/src/types.ts`](../packages/necpp-wasm/src/types.ts).
 
-WP0 exports types only. `NecModel` / `NecWorkerModel` methods, C ABI entry
-points, and the prepared evaluator are added in later work packages. Names
-below are frozen; later WPs must not weaken the semantics.
+WP0 exports types only. WP1 adds `nec_stateful_model::get_current_distribution`
+and `nec_evaluate_segment_current`. `NecModel` / `NecWorkerModel` methods, C
+ABI entry points, and the prepared evaluator are added in later work packages.
+Names below are frozen; later WPs must not weaken the semantics.
 
 The work tracker is
 [`public-current-quadrature-api-plan.md`](public-current-quadrature-api-plan.md).
@@ -31,7 +33,8 @@ positive into the antenna, \(P=\tfrac12\operatorname{Re}(VI^*)\).
 
 Public current geometry is in metres. Do not publish the internal far-field
 snapshot units. That snapshot stores wavelength-normalized centres and
-`segment_half_lengths = π L_wavelength` for `ffld()`. WP1 converts to metres.
+`segment_half_lengths = π L_wavelength` for `ffld()`. WP1 converts to metres
+as `wavelength_m` times those scaled arrays.
 
 ## Coefficient formula
 
@@ -198,6 +201,43 @@ interface IsolatedElementCharacterization {
 Normal visualizer flow uses transfer handles only (WP4). Direct/Node copies of
 `NecCurrentDistribution` are JS-owned, like `FarFieldResult`. Worker clients
 receive metadata and handles, not A/B/C arrays, during normal operation.
+
+## Native WP1 API
+
+Implemented in [`src/nec_current_distribution.h`](../src/nec_current_distribution.h)
+and [`src/nec_stateful_model.h`](../src/nec_stateful_model.h). Layout matches
+the TypeScript names above, in snake_case.
+
+```cpp
+enum class nec_current_mode_kind { latest_solution, unit_current };
+
+nec_complex nec_evaluate_segment_current(
+  nec_complex a, nec_complex b, nec_complex c,
+  nec_float k, nec_float s);
+
+nec_segment_end nec_decode_segment_end(
+  const c_geometry& geometry, int native_index, bool start_end);
+
+void nec_fill_current_geometry(
+  const c_geometry& geometry,
+  nec_float wavelength_m,
+  nec_current_distribution& output);
+
+nec_current_distribution
+nec_stateful_model::get_current_distribution(nec_current_mode_kind kind);
+```
+
+`get_current_distribution` returns an owned value. `latest_solution` requires
+`solved`. `unit_current` is allowed from `prepared` or `solved` and restores a
+prior consumer solution and `solve_generation`, matching
+`compute_embedded_far_fields`. Geometry is `wavelength_m` times the
+frequency-scaled NEC arrays (metres). Surface patches and `PCHCON` connections
+fail with `CURRENT DISTRIBUTION: SURFACE PATCHES ARE UNSUPPORTED`.
+
+The field kernel still integrates the same `A/B/C` arrays; it is not rewritten
+to sample `I(s)`. WP2 quadrature must call `nec_evaluate_segment_current`.
+
+C ABI, `NecModel` methods, and `state-machine.ts` rows wait for WP4.
 
 ## Ownership, invalidation, and errors
 
