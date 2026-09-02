@@ -64,6 +64,7 @@ export type {
   ImpedanceLoad,
   ImpedanceResult,
   IsolatedElementCharacterization,
+  IsolatedElementRequest,
   LoadDefinition,
   NecArraySolver,
   NecCurrentDistribution,

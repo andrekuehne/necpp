@@ -117,7 +117,8 @@ void resize_current_coefficient_planes(
 void copy_current_coefficient_mode(
   const nec_far_field_evaluation_input& input,
   nec_current_distribution& distribution,
-  size_t mode_index)
+  size_t mode_index,
+  const char* operation)
 {
   const size_t count = distribution.segment_count();
   for (size_t index = 0; index < count; ++index) {
@@ -131,7 +132,7 @@ void copy_current_coefficient_mode(
     if (!finite_value(air) || !finite_value(aii) ||
         !finite_value(bir) || !finite_value(bii) ||
         !finite_value(cir) || !finite_value(cii))
-      fail("GET CURRENT DISTRIBUTION", "ENGINE RETURNED A NONFINITE CURRENT COEFFICIENT");
+      fail(operation, "ENGINE RETURNED A NONFINITE CURRENT COEFFICIENT");
     const size_t plane = distribution.plane_index(mode_index, index);
     distribution.a_real[plane] = air;
     distribution.a_imag[plane] = aii;
@@ -595,6 +596,7 @@ void nec_stateful_model::apply_unit_current_basis(
     basis_voltages[row] = impedance.at(row, port_index);
   execute_voltage_solve(
     basis_voltages, achieved_voltages, achieved_currents);
+  ++m_unit_current_basis_solve_count;
 }
 
 const nec_port_solution& nec_stateful_model::finish_consumer_solve(
@@ -1083,9 +1085,13 @@ nec_stateful_model::compute_embedded_far_fields(
       std::vector<nec_complex>().max_size() / samples_per_port)
     fail("COMPUTE EMBEDDED FAR FIELDS", "EMBEDDED SAMPLE COUNT IS TOO LARGE");
 
-  const nec_complex_matrix* impedance = nullptr;
-  if (normalization == nec_embedded_field_normalization::unit_current)
-    impedance = &compute_impedance_matrix().impedance;
+  if (normalization == nec_embedded_field_normalization::unit_current) {
+    nec_embedded_far_field_result embedded;
+    run_unit_current_basis_loop(
+      nullptr, &embedded, &grid, "COMPUTE EMBEDDED FAR FIELDS");
+    m_embedded_far_field_result = std::move(embedded);
+    return m_embedded_far_field_result;
+  }
 
   const bool had_solution = m_has_port_solution;
   const nec_port_solution saved_solution = m_last_port_solution;
@@ -1114,14 +1120,9 @@ nec_stateful_model::compute_embedded_far_fields(
       std::fill(
         basis_voltages.begin(), basis_voltages.end(),
         nec_complex(0.0, 0.0));
-      if (normalization == nec_embedded_field_normalization::unit_voltage) {
-        basis_voltages[port_index] = nec_complex(1.0, 0.0);
-        execute_voltage_solve(
-          basis_voltages, achieved_voltages, achieved_currents);
-      } else {
-        apply_unit_current_basis(
-          port_index, *impedance, achieved_voltages, achieved_currents);
-      }
+      basis_voltages[port_index] = nec_complex(1.0, 0.0);
+      execute_voltage_solve(
+        basis_voltages, achieved_voltages, achieved_currents);
       calculate_far_field(grid, achieved_currents, basis);
       const size_t offset = port_index * samples_per_port;
       std::copy(
@@ -1146,6 +1147,92 @@ nec_stateful_model::compute_embedded_far_fields(
   return m_embedded_far_field_result;
 }
 
+void nec_stateful_model::run_unit_current_basis_loop(
+  nec_current_distribution* currents_out,
+  nec_embedded_far_field_result* fields_out,
+  const nec_far_field_grid* grid,
+  const char* operation)
+{
+  if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
+    fail(operation, "MODEL IS NOT PREPARED");
+  if (currents_out == nullptr && fields_out == nullptr)
+    fail(operation, "NO UNIT-CURRENT CAPTURE TARGET");
+  if (fields_out != nullptr && grid == nullptr)
+    fail(operation, "FIELD GRID IS REQUIRED");
+
+  if (currents_out != nullptr) {
+    const c_geometry* geometry = m_context->get_geometry();
+    if (geometry == nullptr)
+      fail(operation, "GEOMETRY IS UNAVAILABLE");
+    const nec_float wavelength_m = em::get_wavelength(m_frequency_mhz * 1.0e6);
+    currents_out->schema_version = 1;
+    currents_out->frequency_mhz = m_frequency_mhz;
+    currents_out->mode_kind = nec_current_mode_kind::unit_current;
+    nec_fill_current_geometry(*geometry, wavelength_m, *currents_out);
+    currents_out->mode_count = m_ports.size();
+    resize_current_coefficient_planes(*currents_out);
+  }
+
+  size_t samples_per_port = 0;
+  if (fields_out != nullptr) {
+    samples_per_port = checked_field_sample_count(*grid, operation);
+    if (m_ports.size() >
+        std::vector<nec_complex>().max_size() / samples_per_port)
+      fail(operation, "EMBEDDED SAMPLE COUNT IS TOO LARGE");
+    fields_out->radius_m = grid->radius_m;
+    fields_out->frequency_mhz = m_frequency_mhz;
+    fields_out->ports = m_ports;
+    fields_out->normalization = nec_embedded_field_normalization::unit_current;
+    fields_out->samples_per_port = samples_per_port;
+    populate_field_axes(
+      *grid, fields_out->theta_deg, fields_out->phi_deg, operation);
+    const size_t embedded_sample_count = m_ports.size() * samples_per_port;
+    fields_out->e_theta.assign(
+      embedded_sample_count, nec_complex(0.0, 0.0));
+    fields_out->e_phi.assign(
+      embedded_sample_count, nec_complex(0.0, 0.0));
+  }
+
+  const nec_complex_matrix& impedance = compute_impedance_matrix().impedance;
+  const bool had_solution = m_has_port_solution;
+  const nec_port_solution saved_solution = m_last_port_solution;
+  try {
+    std::vector<nec_complex> achieved_voltages;
+    std::vector<nec_complex> achieved_currents;
+    nec_far_field_result basis;
+    for (size_t port_index = 0; port_index < m_ports.size(); ++port_index) {
+      apply_unit_current_basis(
+        port_index, impedance, achieved_voltages, achieved_currents);
+      if (currents_out != nullptr) {
+        const nec_far_field_evaluation_input input =
+          m_context->far_field_evaluation_input(
+            currents_out->wavelength_m, 0);
+        copy_current_coefficient_mode(
+          input, *currents_out, port_index, operation);
+      }
+      if (fields_out != nullptr) {
+        calculate_far_field(*grid, achieved_currents, basis);
+        const size_t offset = port_index * samples_per_port;
+        std::copy(
+          basis.e_theta.begin(), basis.e_theta.end(),
+          fields_out->e_theta.begin() + static_cast<std::ptrdiff_t>(offset));
+        std::copy(
+          basis.e_phi.begin(), basis.e_phi.end(),
+          fields_out->e_phi.begin() + static_cast<std::ptrdiff_t>(offset));
+      }
+    }
+  } catch (...) {
+    const std::exception_ptr failure = std::current_exception();
+    try {
+      restore_after_internal_solves(had_solution, saved_solution);
+    } catch (...) {
+      // Never expose an arbitrary basis solution if restoration fails.
+    }
+    std::rethrow_exception(failure);
+  }
+  restore_after_internal_solves(had_solution, saved_solution);
+}
+
 nec_current_distribution nec_stateful_model::get_current_distribution(
   nec_current_mode_kind kind)
 {
@@ -1163,6 +1250,13 @@ nec_current_distribution nec_stateful_model::get_current_distribution(
     fail("GET CURRENT DISTRIBUTION", "UNKNOWN CURRENT MODE");
   }
 
+  if (kind == nec_current_mode_kind::unit_current) {
+    nec_current_distribution distribution;
+    run_unit_current_basis_loop(
+      &distribution, nullptr, nullptr, "GET CURRENT DISTRIBUTION");
+    return distribution;
+  }
+
   const c_geometry* geometry = m_context->get_geometry();
   if (geometry == nullptr)
     fail("GET CURRENT DISTRIBUTION", "GEOMETRY IS UNAVAILABLE");
@@ -1173,46 +1267,69 @@ nec_current_distribution nec_stateful_model::get_current_distribution(
   distribution.frequency_mhz = m_frequency_mhz;
   distribution.mode_kind = kind;
   nec_fill_current_geometry(*geometry, wavelength_m, distribution);
-
-  auto capture_mode = [this, &distribution](size_t mode_index) {
-    const nec_far_field_evaluation_input input =
-      m_context->far_field_evaluation_input(distribution.wavelength_m, 0);
-    copy_current_coefficient_mode(input, distribution, mode_index);
-  };
-
-  if (kind == nec_current_mode_kind::latest_solution) {
-    distribution.mode_count = 1;
-    resize_current_coefficient_planes(distribution);
-    capture_mode(0);
-    return distribution;
-  }
-
-  const nec_complex_matrix& impedance =
-    compute_impedance_matrix().impedance;
-  distribution.mode_count = m_ports.size();
+  distribution.mode_count = 1;
   resize_current_coefficient_planes(distribution);
-
-  const bool had_solution = m_has_port_solution;
-  const nec_port_solution saved_solution = m_last_port_solution;
-  try {
-    std::vector<nec_complex> achieved_voltages;
-    std::vector<nec_complex> achieved_currents;
-    for (size_t port_index = 0; port_index < m_ports.size(); ++port_index) {
-      apply_unit_current_basis(
-        port_index, impedance, achieved_voltages, achieved_currents);
-      capture_mode(port_index);
-    }
-  } catch (...) {
-    const std::exception_ptr failure = std::current_exception();
-    try {
-      restore_after_internal_solves(had_solution, saved_solution);
-    } catch (...) {
-      // Never expose an arbitrary basis solution if restoration fails.
-    }
-    std::rethrow_exception(failure);
-  }
-  restore_after_internal_solves(had_solution, saved_solution);
+  const nec_far_field_evaluation_input input =
+    m_context->far_field_evaluation_input(distribution.wavelength_m, 0);
+  copy_current_coefficient_mode(
+    input, distribution, 0, "GET CURRENT DISTRIBUTION");
   return distribution;
+}
+
+nec_isolated_element_characterization
+nec_stateful_model::characterize_isolated_element(
+  const nec_isolated_element_request& request)
+{
+  if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
+    fail("CHARACTERIZE ISOLATED ELEMENT", "MODEL IS NOT PREPARED");
+  switch (request.quadrature.modes) {
+  case nec_current_mode_kind::unit_current:
+    break;
+  case nec_current_mode_kind::latest_solution:
+    fail(
+      "CHARACTERIZE ISOLATED ELEMENT",
+      "CURRENT MODES MUST BE UNIT-CURRENT");
+    break;
+  default:
+    fail("CHARACTERIZE ISOLATED ELEMENT", "UNKNOWN CURRENT MODE");
+  }
+
+  if (request.quadrature.nodes.empty())
+    fail("CHARACTERIZE ISOLATED ELEMENT", "NODE LIST IS EMPTY");
+  if (!request.quadrature.weights.empty() &&
+      request.quadrature.weights.size() != request.quadrature.nodes.size())
+    fail("CHARACTERIZE ISOLATED ELEMENT", "WEIGHT COUNT MUST MATCH NODE COUNT");
+  if (request.quadrature.images ==
+        nec_prepared_quadrature_images::perfect_ground_images &&
+      m_ground.kind != nec_ground_kind::perfect)
+    fail(
+      "CHARACTERIZE ISOLATED ELEMENT",
+      "PERFECT-GROUND IMAGES REQUIRE PERFECT GROUND");
+  for (const nec_float xi : request.quadrature.nodes) {
+    if (!finite_value(xi))
+      fail("CHARACTERIZE ISOLATED ELEMENT", "NODE VALUES MUST BE FINITE");
+    if (xi < -1.0 || xi > 1.0)
+      fail("CHARACTERIZE ISOLATED ELEMENT", "NODES MUST LIE IN [-1, 1]");
+  }
+  for (const nec_float weight : request.quadrature.weights) {
+    if (!finite_value(weight))
+      fail("CHARACTERIZE ISOLATED ELEMENT", "WEIGHT VALUES MUST BE FINITE");
+  }
+  checked_field_sample_count(request.grid, "CHARACTERIZE ISOLATED ELEMENT");
+
+  nec_isolated_element_characterization result;
+  result.matrices = compute_impedance_matrix();
+
+  nec_current_distribution currents;
+  run_unit_current_basis_loop(
+    &currents, &result.embedded_field, &request.grid,
+    "CHARACTERIZE ISOLATED ELEMENT");
+
+  const bool perfect_ground = m_ground.kind == nec_ground_kind::perfect;
+  result.quadrature = nec_prepare_current_quadrature(
+    currents, request.quadrature,
+    m_factorization_generation, m_solve_generation, perfect_ground);
+  return result;
 }
 
 nec_prepared_current_quadrature nec_stateful_model::prepare_current_quadrature(

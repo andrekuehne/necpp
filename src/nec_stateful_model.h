@@ -222,6 +222,8 @@ struct nec_impedance_result {
   uint64_t factorization_generation = 0;
 };
 
+#include "nec_isolated_element_characterization.h"
+
 enum class nec_port_drive {
   voltage,
   current,
@@ -330,11 +332,24 @@ public:
   nec_prepared_current_quadrature prepare_current_quadrature(
     const nec_prepared_quadrature_request& request);
 
+  /*! Owned isolated Z/Y, packed unit-current quadrature, and NEC embedded fields.
+   *
+   * Allowed from prepared or solved state. Captures currents and fields from
+   * one unit-current basis solve per port and preserves a prior consumer
+   * solution. quadrature.modes must be unit_current.
+   */
+  nec_isolated_element_characterization characterize_isolated_element(
+    const nec_isolated_element_request& request);
+
   const std::vector<nec_port_definition>& ports() const { return m_ports; }
   const std::vector<nec_complex>& port_currents() const { return m_port_currents; }
   nec_float frequency_mhz() const { return m_frequency_mhz; }
   uint64_t factorization_generation() const { return m_factorization_generation; }
   uint64_t solve_generation() const { return m_solve_generation; }
+  uint64_t unit_current_basis_solve_count() const
+  {
+    return m_unit_current_basis_solve_count;
+  }
 
   /*! Diagnostic used to prove result replacement stays bounded. */
   size_t retained_result_count() const;
@@ -358,6 +373,11 @@ private:
     const nec_complex_matrix& impedance,
     std::vector<nec_complex>& achieved_voltages,
     std::vector<nec_complex>& achieved_currents);
+  void run_unit_current_basis_loop(
+    nec_current_distribution* currents_out,
+    nec_embedded_far_field_result* fields_out,
+    const nec_far_field_grid* grid,
+    const char* operation);
   void restore_after_internal_solves(
     bool had_solution, const nec_port_solution& saved_solution);
   void calculate_far_field(
@@ -389,6 +409,7 @@ private:
   nec_float m_frequency_mhz = 0.0;
   uint64_t m_factorization_generation = 0;
   uint64_t m_solve_generation = 0;
+  uint64_t m_unit_current_basis_solve_count = 0;
   bool m_configuration_dirty = true;
   bool m_has_admittance_matrix = false;
   bool m_has_impedance_result = false;

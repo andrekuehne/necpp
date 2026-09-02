@@ -134,7 +134,7 @@ interface IsolatedElementCharacterization {
 | 0 | Contract and baselines | - | Complete |
 | 1 | Public exact current distributions | 0 | Complete |
 | 2 | Static prepared quadrature evaluator | 1 | Complete |
-| 3 | Isolated-element characterization | 1, 2 | Not started |
+| 3 | Isolated-element characterization | 1, 2 | Complete |
 | 4 | WASM, worker, and Rust/WASM handoff | 2, 3 | Not started |
 | 5 | Numerical and consumer validation | 4 | Not started |
 | 6 | Performance, documentation, release | 5 | Not started |
@@ -322,6 +322,10 @@ interface IsolatedElementCharacterization {
 
 ## WP3 - Isolated-element characterization
 
+Native C++ only, matching WP1/WP2. C ABI, `NecModel` methods, worker rows, and
+transfer handles wait for WP4. Frozen names and layouts live in
+[`docs/current-quadrature-api.md`](current-quadrature-api.md).
+
 ### Work
 
 - Add one operation that returns isolated Z/Y, prepared current modes, and
@@ -329,6 +333,179 @@ interface IsolatedElementCharacterization {
 - Share the existing unit-current embedded-field basis-solve loop.
 - Capture currents and fields from the same basis solve; avoid duplicate solves.
 - Preserve basis-major caller port order and prior public solution state.
+
+### Native API
+
+```cpp
+struct nec_isolated_element_request {
+  nec_prepared_quadrature_request quadrature;
+  nec_far_field_grid grid;
+};
+
+struct nec_isolated_element_characterization {
+  nec_impedance_result matrices;
+  nec_prepared_current_quadrature quadrature;
+  nec_embedded_far_field_result embedded_field;
+};
+
+nec_isolated_element_characterization
+nec_stateful_model::characterize_isolated_element(
+  const nec_isolated_element_request& request);
+
+uint64_t nec_stateful_model::unit_current_basis_solve_count() const;
+```
+
+Put the request/result structs in a new
+`src/nec_isolated_element_characterization.h` so the public header list stays
+aligned with WP1/WP2. Implementation stays in `nec_stateful_model.cpp`.
+
+Rules:
+
+- Allowed from `prepared` or `solved`. From `prepared`, the model stays
+  prepared. From `solved`, restore the prior consumer solution and public
+  `solve_generation`, matching `compute_embedded_far_fields`.
+- `quadrature.modes` must be `unit_current`. `latest_solution` fails with
+  `CHARACTERIZE ISOLATED ELEMENT: CURRENT MODES MUST BE UNIT-CURRENT`.
+- `embedded_field.normalization` is always `unit_current`. Ports, sample
+  order, units, and spherical basis match `compute_embedded_far_fields`.
+- Return an owned value. Do not retain characterization on the model. WP4
+  will retain ABI buffers.
+- Z/Y come from the existing cached `compute_impedance_matrix()`. That may
+  perform unit-voltage column solves when the cache is cold. Those are not
+  unit-current basis solves.
+- Pack quadrature with `nec_prepare_current_quadrature` from the currents
+  captured in the same loop. Do not call `get_current_distribution` or
+  `prepare_current_quadrature` from characterization.
+- Do not call `compute_embedded_far_fields` from characterization. Fields
+  are captured in the same per-port solve as the coefficients.
+- Reuse existing validation: quadrature nodes/weights/images, far-field
+  grid, perfect-ground image capability. No new error class.
+- Export `IsolatedElementRequest` from `packages/necpp-wasm/src/types.ts`
+  (`quadrature` + `field: FarFieldRequest`). Do not add `NecModel` methods.
+
+### Shared basis-solve loop
+
+Today `get_current_distribution(unit_current)` and
+`compute_embedded_far_fields(unit_current)` each loop ports, call
+`apply_unit_current_basis`, then capture only coefficients or only fields.
+Independent callers may still do that. Characterization must not.
+
+Extract one private helper used by all three:
+
+```cpp
+void run_unit_current_basis_loop(
+  nec_current_distribution* currents_out,          // nullable
+  nec_embedded_far_field_result* fields_out,       // nullable
+  const nec_far_field_grid* grid);                 // required if fields_out
+```
+
+Behaviour:
+
+1. Require `prepared` or `solved`.
+2. Take `compute_impedance_matrix().impedance` (cached after first use).
+3. Save consumer solution; restore in success and failure paths with the
+   existing `restore_after_internal_solves` try/catch pattern.
+4. Fill geometry once if `currents_out != nullptr`.
+5. For each port in `definePorts()` order: `apply_unit_current_basis`,
+   optionally copy A/B/C, optionally `calculate_far_field` into that port’s
+   basis-major slice.
+6. Do not increment public `solve_generation`.
+
+`get_current_distribution(unit_current)` passes currents only.
+`compute_embedded_far_fields(unit_current)` passes fields only.
+Characterization passes both, then packs the NECQ buffer from
+`currents_out`. Unit-voltage embedded fields stay on their own path.
+
+### Solve accounting
+
+`unit_current_basis_solve_count()` increments only inside
+`apply_unit_current_basis`. Restoration, unit-voltage Y columns, consumer
+solves, and far-field evaluation do not increment it.
+
+DoD gate: after a warm Z/Y cache, one characterization increases the
+counter by `nPorts`, not `2 * nPorts`. No WP0 fallback is recorded, so do
+not add a second unit-current pass.
+
+### Cache identity
+
+WP3 does not add an internal characterization cache. The owned result is a
+pure function of geometry/`factorization_generation`, frequency, ports,
+ground, quadrature rule, and field-grid identity. Packed NECQ already
+stores `modelGeneration`. Tests must show:
+
+- the same request on the same prepared model matches Z/Y, packed
+  quadrature, and fields within WP0 tolerances;
+- changing nodes/weights/images changes quadrature and not field identity;
+- changing the field grid changes fields and not packed current samples;
+- a new frequency or geometry invalidates by producing a different
+  `factorization_generation` and different numeric planes.
+
+WP4 may key a worker cache on those identities. Do not invent a second
+field packing; the native `nec_embedded_far_field_result` is the WP3
+object. WP4 maps it onto existing basis-major `eTheta`/`ePhi` buffers.
+
+### Tests
+
+New file `src/current_quadrature_wp3_tb.cpp`, tagged
+`[wasm_api][current_quadrature][wp3_current]`. Do not use `[wp3]`; that tag
+belongs to the older far-field suite in `nec_stateful_model_wp3_tb.cpp`.
+
+Reuse `current_quadrature_fixtures.h` and the WP2 four-node rule
+`{-1, -1/3, 1/3, 1}`. Use a modest field grid for correctness (the existing
+WP3 far-field `5×3` grid is enough). Do not parse NEC reports.
+
+| Case | Assert |
+|---|---|
+| Dipole, prepared and solved | Z/Y match `compute_impedance_matrix`; packed samples match WP2 scalar evaluator; fields match `compute_embedded_far_fields(..., unit_current)` on a second model at `1e-7`; achieved port current `1+j0` at `1e-7` |
+| Rooted monopole | Physical-only default; optional PEC image plane stays out of plane 0; NEC fields remain ground-aware |
+| Bent multiwire | Public junction identity in packed tags; no native `icon` integers |
+| Insulated turnstile | `\|Z_01\|` vanishes vs `\|Z_00\|`; two unit modes; `E_0 + j E_1` matches a `[1, j]` current-drive far field at `1e-7` |
+| Connected turnstile | `\|Z_01\|` is not vanishing; hub junctions; same superposition check |
+| Solve counter | Warm Z, characterize insulated turnstile, counter `+= 2` |
+| Restore | Pre-existing `solve_generation`, state, and port currents unchanged |
+| Cache identity | Same request matches; grid change leaves packed currents; node change leaves field axes/samples-per-port but not current bytes |
+| Errors | `latest_solution` modes, invalid grid, empty/mismatched nodes, images without perfect ground, unprepared state |
+| Existing suites | `[wp3]` far-field tests and `~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]` stay green |
+
+Compare characterization against separately solved APIs on a **second**
+model. Same-model `get_current_distribution` +
+`compute_embedded_far_fields` after characterize would hide the solve-count
+gate.
+
+### Files
+
+| Path | Change |
+|---|---|
+| `src/nec_isolated_element_characterization.h` | Request/result structs |
+| `src/nec_stateful_model.h` / `.cpp` | Method, shared loop, solve counter |
+| `src/current_quadrature_wp3_tb.cpp` | Native tests |
+| `src/CMakeLists.txt`, `tests/CMakeLists.txt` | Header + test source |
+| `packages/necpp-wasm/src/types.ts` | Export `IsolatedElementRequest` only |
+| `packages/necpp-wasm/test-d/public-api.test.ts` | Type construction |
+| `docs/current-quadrature-api.md` | Native WP3 API section |
+
+### Non-goals
+
+- C ABI entry points, result-buffer kinds, `NecModel` /
+  `NecWorkerModel` methods, `state-machine.ts` rows (WP4)
+- Packing embedded fields into a second `NECQ`-style blob (WP4 uses
+  existing embedded buffers)
+- Internal result cache or invalidation of previously returned owned
+  values
+- Array mutual impedance, array factor, or visualizer ingestion (WP4/WP5)
+- Changing WP2 `prepare_current_quadrature`; it may still call
+  `get_current_distribution` and solve on its own
+
+### Implementation sequence
+
+1. Add the solve counter and extract `run_unit_current_basis_loop`. Prove
+   existing `[wp1_current]`, `[wp2_current]`, and `[wp3]` tests still pass.
+2. Add `characterize_isolated_element` and the owned result type.
+3. Add `[wp3_current]` tests, including the `nPorts` solve-count gate and
+   turnstile superposition.
+4. Export `IsolatedElementRequest` and record the native API in
+   `docs/current-quadrature-api.md`.
+5. Fill this handover.
 
 ### Definition of Done
 
@@ -343,12 +520,44 @@ interface IsolatedElementCharacterization {
 
 ### Handover
 
-- **Status / implementer / date:**
-- **Commit(s):**
+- **Status / implementer / date:** complete / WP3 implementation / 2026-09-02
+- **Commit(s):** uncommitted WP3 tree on this branch; pin after the user
+  commits.
 - **Commands and results:**
+  - `cmake --build build-wp0 --config Release --target nec2++_tests --parallel`
+  - `build-wp0\tests\Release\nec2++_tests.exe "[wp3_current]" --reporter compact`
+    — 9 test cases, 2672 assertions, all passed.
+  - `build-wp0\tests\Release\nec2++_tests.exe "[wp1_current],[wp2_current],[wp3]" --reporter compact`
+    — 29 test cases, 11611 assertions, all passed.
+  - `build-wp0\tests\Release\nec2++_tests.exe "~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]" --reporter compact`
+    — 115 test cases, 15362 assertions, all passed (includes WP0–WP3 current
+    tags; excludes the older WASM-API stress tags).
+  - `npm --prefix packages/necpp-wasm run typecheck` — passed.
 - **Artifacts:**
+  - [`src/nec_isolated_element_characterization.h`](../src/nec_isolated_element_characterization.h)
+  - [`src/current_quadrature_wp3_tb.cpp`](../src/current_quadrature_wp3_tb.cpp)
+  - Native names recorded in [`docs/current-quadrature-api.md`](current-quadrature-api.md)
 - **Decisions / deviations:**
+  - Native C++ only. `NecModel` methods, C ABI, and worker rows wait for WP4.
+  - Tests use `[wp3_current]`, not `[wp3]`, so they do not collide with the
+    older far-field suite.
+  - `run_unit_current_basis_loop` is shared by unit-current current capture,
+    unit-current embedded fields, and characterization. Unit-voltage embedded
+    fields stay on their own path. WP2 `prepare_current_quadrature` still
+    calls `get_current_distribution`.
+  - Packed NECQ `solutionGeneration` follows the public `solve_generation`,
+    so prepared versus previously-solved models are not bitwise identical.
+    Cross-model checks compare views at `1e-12`, not raw bytes.
+  - `IsolatedElementRequest` is exported; `NecModel.characterizeIsolatedElement`
+    waits for WP4.
 - **Known risks / next WP:**
+  - WP4 must map `IsolatedElementRequest.field` onto `nec_far_field_grid` and
+    transfer Z/Y metadata plus the packed NECQ and existing embedded-field
+    buffers without a second field packing.
+  - Independent `get_current_distribution` + `compute_embedded_far_fields`
+    still costs `2 * nPorts` unit-current solves; only characterization
+    shares the loop.
+  - Next: WP4 public WASM, worker, and visualizer handoff.
 
 ## WP4 - Public WASM, worker, and visualizer handoff
 

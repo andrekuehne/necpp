@@ -16,6 +16,7 @@ import {
   type FarFieldResult,
   type FullArrayDescription,
   type IsolatedElementCharacterization,
+  type IsolatedElementRequest,
   type NecCurrentDistribution,
   type PortSolution,
   type PowerBudget,
@@ -150,6 +151,14 @@ async function validConsumer(): Promise<void> {
     images: "physical-only",
     modes: "unit-current",
   };
+  const isolatedRequest: IsolatedElementRequest = {
+    quadrature: quadratureRequest,
+    field: {
+      radiusM: 1,
+      theta: { startDeg: 0, count: 5, stepDeg: 30 },
+      phi: { startDeg: 0, count: 3, stepDeg: 90 },
+    },
+  };
   const handle: PreparedTransferHandle = {
     schemaVersion: 1,
     byteLength: 8,
@@ -163,6 +172,7 @@ async function validConsumer(): Promise<void> {
   };
   currentDistribution.segments[0]?.nativeIndex;
   quadratureRequest.images satisfies PreparedQuadratureImages;
+  isolatedRequest.field.theta.count;
   characterization.quadrature.byteLength;
 
   packageVersion satisfies string;

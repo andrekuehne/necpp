@@ -9,9 +9,11 @@ import {
   type ComplexMatrix,
   type FarFieldResult,
   type IsolatedElementCharacterization,
+  type IsolatedElementRequest,
   type NecCurrentDistribution,
   type NecWorkerProgressEvent,
   type PortSolution,
+  type PreparedQuadratureRequest,
   type PreparedTransferHandle,
 } from "../src/worker.js";
 
@@ -58,6 +60,18 @@ async function validWorkerConsumer(): Promise<void> {
     byteLength: 8,
     buffer: new ArrayBuffer(8),
   };
+  const workerQuadrature: PreparedQuadratureRequest = {
+    nodes: new Float64Array([-1, 0, 1]),
+    images: "physical-only",
+    modes: "unit-current",
+  };
+  const workerRequest: IsolatedElementRequest = {
+    quadrature: workerQuadrature,
+    field: {
+      theta: { startDeg: 0, count: 3, stepDeg: 45 },
+      phi: { startDeg: 0, count: 2, stepDeg: 90 },
+    },
+  };
   const workerCharacterization: IsolatedElementCharacterization = {
     impedance: matrices,
     admittance: matrices,
@@ -66,6 +80,7 @@ async function validWorkerConsumer(): Promise<void> {
   };
   const workerCurrents: NecCurrentDistribution["modeKind"] = "latest-solution";
   workerCharacterization.quadrature.schemaVersion;
+  workerRequest.quadrature.modes;
   workerCurrents;
 
   model.cancelFarField();

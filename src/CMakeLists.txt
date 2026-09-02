@@ -57,6 +57,7 @@ set(NECPP_PUBLIC_HEADERS
     nec_stateful_model.h
     nec_current_distribution.h
     nec_prepared_current_quadrature.h
+    nec_isolated_element_characterization.h
     nec_structure_currents.h
     necpp_wasm_v1.h
     nec_output.h

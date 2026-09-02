@@ -459,6 +459,12 @@ export interface IsolatedElementCharacterization {
   readonly embeddedField: PreparedTransferHandle;
 }
 
+/** Native characterization input. `quadrature.modes` must be `"unit-current"`. */
+export interface IsolatedElementRequest {
+  readonly quadrature: PreparedQuadratureRequest;
+  readonly field: FarFieldRequest;
+}
+
 export interface CreateNecModelOptions {
   /** Override the package-relative URL used to load `nec2pp.wasm`. */
   readonly wasmUrl?: string | URL;

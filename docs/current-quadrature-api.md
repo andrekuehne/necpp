@@ -2,7 +2,8 @@
 
 Status: frozen by WP0 (2026-09-02). WP1 implemented the native exact-current
 API. WP2 implemented the native prepared-quadrature evaluator and packed NECQ
-layout. C ABI, TypeScript façades, and workers remain WP4. This document is
+layout. WP3 implements native isolated-element characterization. C ABI,
+TypeScript façades, and workers remain WP4. This document is
 the normative public contract for exact NEC current coefficients, prepared
 quadrature sampling, isolated-element characterization, and the visualizer
 handoff. Existing Z/Y, solves, fields, power, and lifecycle in
@@ -12,6 +13,7 @@ handoff. Existing Z/Y, solves, fields, power, and lifecycle in
 WP0 exports types only. WP1 adds `nec_stateful_model::get_current_distribution`
 and `nec_evaluate_segment_current`. WP2 adds
 `nec_stateful_model::prepare_current_quadrature` and the packed NECQ buffer.
+WP3 adds `nec_stateful_model::characterize_isolated_element`.
 `NecModel` / `NecWorkerModel` methods and C ABI entry points wait for WP4.
 Names below are frozen; later WPs must not weaken the semantics.
 
@@ -193,6 +195,11 @@ interface PreparedTransferHandle {
   readonly buffer: ArrayBuffer;
 }
 
+interface IsolatedElementRequest {
+  readonly quadrature: PreparedQuadratureRequest; // modes must be "unit-current"
+  readonly field: FarFieldRequest;
+}
+
 interface IsolatedElementCharacterization {
   readonly impedance: ComplexMatrix;
   readonly admittance: ComplexMatrix;
@@ -205,6 +212,8 @@ interface IsolatedElementCharacterization {
 Normal visualizer flow uses transfer handles only (WP4). Direct/Node copies of
 `NecCurrentDistribution` are JS-owned, like `FarFieldResult`. Worker clients
 receive metadata and handles, not A/B/C arrays, during normal operation.
+WP3 exports `IsolatedElementRequest`; `NecModel.characterizeIsolatedElement`
+waits for WP4.
 
 ## Native WP1 API
 
@@ -284,6 +293,52 @@ perfect`; free space and finite ground fail with
 `PREPARED QUADRATURE: PERFECT-GROUND IMAGES REQUIRE PERFECT GROUND`.
 `release()` is idempotent. Retrieval (`data()`, `byte_length()`, view) does
 not walk geometry, evaluate trigonometry, interpolate, or grow capacity.
+
+C ABI, `NecModel` methods, and `state-machine.ts` rows wait for WP4.
+
+## Native WP3 API
+
+Implemented in
+[`src/nec_isolated_element_characterization.h`](../src/nec_isolated_element_characterization.h)
+and [`src/nec_stateful_model.h`](../src/nec_stateful_model.h). Native C++ only;
+C ABI and TypeScript methods wait for WP4.
+
+```cpp
+struct nec_isolated_element_request {
+  nec_prepared_quadrature_request quadrature;
+  nec_far_field_grid grid;
+};
+
+struct nec_isolated_element_characterization {
+  nec_impedance_result matrices;
+  nec_prepared_current_quadrature quadrature;
+  nec_embedded_far_field_result embedded_field;
+};
+
+nec_isolated_element_characterization
+nec_stateful_model::characterize_isolated_element(
+  const nec_isolated_element_request& request);
+
+uint64_t nec_stateful_model::unit_current_basis_solve_count() const;
+```
+
+Characterization is allowed from `prepared` or `solved` and restores a prior
+consumer solution, matching `compute_embedded_far_fields`.
+`quadrature.modes` must be `unit_current`. The operation:
+
+1. uses cached `compute_impedance_matrix()` for isolated Z/Y (unit-voltage
+   columns when cold; not counted as unit-current basis solves);
+2. runs one shared unit-current basis loop per port that captures A/B/C and
+   NEC embedded fields from the same solve;
+3. packs the NECQ buffer from those captured currents.
+
+Do not call `get_current_distribution`, `prepare_current_quadrature`, or
+`compute_embedded_far_fields` from this path. After a warm Z/Y cache the
+unit-current basis-solve counter increases by `nPorts`. Returned fields match
+`compute_embedded_far_fields(..., unit_current)` at the existing `1e-7`
+same-path gate and remain NEC-generated. The result is an owned snapshot,
+cacheable by geometry, frequency, ports, ground, quadrature rule, and field
+grid; WP3 does not retain it on the model.
 
 C ABI, `NecModel` methods, and `state-machine.ts` rows wait for WP4.
 
