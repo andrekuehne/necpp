@@ -12,6 +12,7 @@
 #include "nec_current_distribution.h"
 #include "nec_geometry_symmetry.h"
 #include "nec_power_budget.h"
+#include "nec_prepared_current_quadrature.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -320,6 +321,14 @@ public:
    */
   nec_current_distribution get_current_distribution(
     nec_current_mode_kind kind);
+
+  /*! Owned packed quadrature samples for the requested nodes and current modes.
+   *
+   * latest_solution requires a consumer solve. unit_current is allowed from
+   * prepared or solved state and preserves a prior consumer solution.
+   */
+  nec_prepared_current_quadrature prepare_current_quadrature(
+    const nec_prepared_quadrature_request& request);
 
   const std::vector<nec_port_definition>& ports() const { return m_ports; }
   const std::vector<nec_complex>& port_currents() const { return m_port_currents; }

@@ -1,16 +1,18 @@
 # Isolated-element current and prepared quadrature contract
 
 Status: frozen by WP0 (2026-09-02). WP1 implemented the native exact-current
-API. C ABI, TypeScript façades, workers, and the prepared evaluator remain
-WP2–WP4. This document is the normative public contract for exact NEC current
-coefficients, prepared quadrature sampling, isolated-element characterization,
-and the visualizer handoff. Existing Z/Y, solves, fields, power, and lifecycle
-in [`wasm-api.md`](wasm-api.md) are unchanged. Type sketches live in
+API. WP2 implemented the native prepared-quadrature evaluator and packed NECQ
+layout. C ABI, TypeScript façades, and workers remain WP4. This document is
+the normative public contract for exact NEC current coefficients, prepared
+quadrature sampling, isolated-element characterization, and the visualizer
+handoff. Existing Z/Y, solves, fields, power, and lifecycle in
+[`wasm-api.md`](wasm-api.md) are unchanged. Type sketches live in
 [`packages/necpp-wasm/src/types.ts`](../packages/necpp-wasm/src/types.ts).
 
 WP0 exports types only. WP1 adds `nec_stateful_model::get_current_distribution`
-and `nec_evaluate_segment_current`. `NecModel` / `NecWorkerModel` methods, C
-ABI entry points, and the prepared evaluator are added in later work packages.
+and `nec_evaluate_segment_current`. WP2 adds
+`nec_stateful_model::prepare_current_quadrature` and the packed NECQ buffer.
+`NecModel` / `NecWorkerModel` methods and C ABI entry points wait for WP4.
 Names below are frozen; later WPs must not weaken the semantics.
 
 The work tracker is
@@ -123,8 +125,10 @@ segment list.
 WP2 implements this request. Nodes \(\xi\in[-1,1]\) on every physical
 segment: \(-1\) start, \(0\) centre, \(+1\) end. Local arc length is
 \(s=\xi L/2\) metres. Optional weights \(w\) have the same length. The stored
-effective weight is \((L/2)\,w\) (`ds * w`). Empty node lists, mismatched
-weights, nonfinite values, and oversize jobs are `NecInputError`. Repeated
+effective weight is \((L/2)\,w\) (`ds * w`). Omitted weights mean \(w_i=1\),
+so `dsWeight = L/2` and `hasWeights` is clear. Empty node lists, mismatched
+weights, nonfinite values, \(\xi\) outside \([-1,1]\), free-space or finite-
+ground image requests, and oversize jobs are `NecInputError`. Repeated
 retrieval is a cached read of the packed buffer: no geometry walk,
 trigonometry, interpolation, or capacity-growing allocation.
 
@@ -235,7 +239,51 @@ frequency-scaled NEC arrays (metres). Surface patches and `PCHCON` connections
 fail with `CURRENT DISTRIBUTION: SURFACE PATCHES ARE UNSUPPORTED`.
 
 The field kernel still integrates the same `A/B/C` arrays; it is not rewritten
-to sample `I(s)`. WP2 quadrature must call `nec_evaluate_segment_current`.
+to sample `I(s)`. WP2 quadrature calls `nec_evaluate_segment_current`.
+
+## Native WP2 API
+
+Implemented in
+[`src/nec_prepared_current_quadrature.h`](../src/nec_prepared_current_quadrature.h)
+and [`src/nec_stateful_model.h`](../src/nec_stateful_model.h).
+
+```cpp
+enum class nec_prepared_quadrature_images {
+  physical_only, perfect_ground_images };
+
+struct nec_prepared_quadrature_request {
+  std::vector<nec_float> nodes;
+  std::vector<nec_float> weights;  // empty = omitted, w_i = 1
+  nec_prepared_quadrature_images images;
+  nec_current_mode_kind modes;
+};
+
+nec_complex nec_evaluate_quadrature_current(
+  const nec_current_distribution& distribution,
+  size_t mode, size_t segment, nec_float xi);
+
+nec_prepared_current_quadrature nec_prepare_current_quadrature(
+  const nec_current_distribution& distribution,
+  const nec_prepared_quadrature_request& request,
+  uint64_t model_generation, uint64_t solution_generation,
+  bool perfect_ground);
+
+nec_prepared_current_quadrature
+nec_stateful_model::prepare_current_quadrature(
+  const nec_prepared_quadrature_request& request);
+
+nec_prepared_quadrature_view nec_view_prepared_quadrature(
+  const nec_prepared_current_quadrature& prepared);
+```
+
+`prepare_current_quadrature` returns an owned packed NECQ buffer. It calls
+`get_current_distribution` once, then packs. `latest_solution` requires
+`solved`. `unit_current` is allowed from `prepared` or `solved` and restores a
+prior consumer solution. Perfect-ground images require `ground.kind ==
+perfect`; free space and finite ground fail with
+`PREPARED QUADRATURE: PERFECT-GROUND IMAGES REQUIRE PERFECT GROUND`.
+`release()` is idempotent. Retrieval (`data()`, `byte_length()`, view) does
+not walk geometry, evaluate trigonometry, interpolate, or grow capacity.
 
 C ABI, `NecModel` methods, and `state-machine.ts` rows wait for WP4.
 
@@ -267,19 +315,42 @@ values are additive after snapshot kinds 25–37.
 
 ## Packed transfer layout
 
-One little-endian `ArrayBuffer`, schema 1, magic `NECQ` (`0x4E454351`):
+One little-endian `ArrayBuffer`, schema 1. Magic is the four ASCII bytes
+`N E C Q` at offset 0, not a host-endian integer.
 
-- Header: magic, schema, flags (bit 0 = images, bit 1 = hasWeights),
-  `nSegments`, `nSamplesPerSegment`, `nModes`, `nImagePlanes` (1 or 2),
-  `frequencyMHz`, `wavelengthM`, model and solution generations.
-- Geometry SoA, length `nSegments * nImagePlanes`:
-  `x,y,z,tx,ty,tz,radiusM,lengthM,dsWeight` as `Float64`.
-- Identity, physical plane only: `tag`, `segment`, `nativeIndex` as `Int32`.
-- Currents: mode-major then sample-major, separate `iReal` / `iImag` `Float64`
-  planes. Sample index is `segmentIndex * nNodes + nodeIndex`. Physical plane
-  then optional image plane.
-- Embedded-field handle reuses existing basis-major `eTheta`/`ePhi` real/imag
-  plus grid axes. Do not invent a second field packing.
+```text
+Header (64 bytes, little-endian)
+  0  u8[4]  magic ASCII N E C Q
+  4  u32    schemaVersion = 1
+  8  u32    flags: bit0 = images, bit1 = hasWeights
+ 12  u32    nSegments
+ 16  u32    nSamplesPerSegment   // nNodes
+ 20  u32    nModes
+ 24  u32    nImagePlanes         // 1 or 2
+ 28  u32    reserved = 0
+ 32  f64    frequencyMHz
+ 40  f64    wavelengthM
+ 48  u64    modelGeneration      // factorization_generation
+ 56  u64    solutionGeneration   // 0 if never solved
+
+Identity (physical plane only), then 0–4 pad bytes to 8-byte alignment
+  tag[nSeg], segment[nSeg], nativeIndex[nSeg] as i32
+
+Geometry SoA, each plane length N = nSeg * nNodes * nImagePlanes
+  x, y, z, tx, ty, tz, radiusM, lengthM, dsWeight   // f64
+  index = (plane * nSeg + segment) * nNodes + node
+  plane 0 = physical, plane 1 = PEC image
+
+Currents, mode-major then plane then sample
+  iReal[nModes * N], iImag[nModes * N]
+  index = ((mode * nImagePlanes + plane) * nSeg + segment) * nNodes + node
+```
+
+Geometry is **per sample**, matching the memory budget
+`9 * nSeg * nNodes * nImagePlanes * 8`. WP0 prose that said
+`nSegments * nImagePlanes` was incorrect. The embedded-field handle reuses
+existing basis-major `eTheta`/`ePhi` real/imag plus grid axes. Do not invent a
+second field packing.
 
 No JSON for numeric planes. Worker protocol later adds
 `getCurrentDistribution`, `prepareCurrentQuadrature`, and

@@ -14,6 +14,7 @@
 #include "nec_exception.h"
 #include "nec_far_field.h"
 #include "nec_port_matrix.h"
+#include "nec_prepared_current_quadrature.h"
 #include "nec_results.h"
 
 #include <algorithm>
@@ -1212,6 +1213,31 @@ nec_current_distribution nec_stateful_model::get_current_distribution(
   }
   restore_after_internal_solves(had_solution, saved_solution);
   return distribution;
+}
+
+nec_prepared_current_quadrature nec_stateful_model::prepare_current_quadrature(
+  const nec_prepared_quadrature_request& request)
+{
+  switch (request.modes) {
+  case nec_current_mode_kind::latest_solution:
+    if (m_state != nec_model_state::solved || !m_has_port_solution)
+      fail("PREPARE CURRENT QUADRATURE", "MODEL IS NOT SOLVED");
+    break;
+  case nec_current_mode_kind::unit_current:
+    if (m_state != nec_model_state::prepared &&
+        m_state != nec_model_state::solved)
+      fail("PREPARE CURRENT QUADRATURE", "MODEL IS NOT PREPARED");
+    break;
+  default:
+    fail("PREPARE CURRENT QUADRATURE", "UNKNOWN CURRENT MODE");
+  }
+
+  const nec_current_distribution distribution =
+    get_current_distribution(request.modes);
+  const bool perfect_ground = m_ground.kind == nec_ground_kind::perfect;
+  return nec_prepare_current_quadrature(
+    distribution, request,
+    m_factorization_generation, m_solve_generation, perfect_ground);
 }
 
 size_t nec_stateful_model::retained_result_count() const

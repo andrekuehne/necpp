@@ -28,6 +28,7 @@ set(NECPP_LIB_SRCS
     nec_results.cpp
     nec_stateful_model.cpp
     nec_current_distribution.cpp
+    nec_prepared_current_quadrature.cpp
     nec_structure_currents.cpp
     necpp_wasm_v1.cpp
 )
@@ -55,6 +56,7 @@ set(NECPP_PUBLIC_HEADERS
     nec_results.h
     nec_stateful_model.h
     nec_current_distribution.h
+    nec_prepared_current_quadrature.h
     nec_structure_currents.h
     necpp_wasm_v1.h
     nec_output.h

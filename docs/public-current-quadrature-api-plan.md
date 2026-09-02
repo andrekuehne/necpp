@@ -133,7 +133,7 @@ interface IsolatedElementCharacterization {
 |---|---|---|---|
 | 0 | Contract and baselines | - | Complete |
 | 1 | Public exact current distributions | 0 | Complete |
-| 2 | Static prepared quadrature evaluator | 1 | Not started |
+| 2 | Static prepared quadrature evaluator | 1 | Complete |
 | 3 | Isolated-element characterization | 1, 2 | Not started |
 | 4 | WASM, worker, and Rust/WASM handoff | 2, 3 | Not started |
 | 5 | Numerical and consumer validation | 4 | Not started |
@@ -279,12 +279,46 @@ interface IsolatedElementCharacterization {
 
 ### Handover
 
-- **Status / implementer / date:**
-- **Commit(s):**
+- **Status / implementer / date:** complete / WP2 implementation / 2026-09-02
+- **Commit(s):** uncommitted WP2 tree on this branch; pin after the user
+  commits.
 - **Commands and results:**
+  - `cmake --build build-wp0 --config Release --target nec2++_tests --parallel`
+  - `build-wp0\tests\Release\nec2++_tests.exe "[wp2_current]" --reporter compact`
+    — 8 test cases, 6777 assertions, all passed.
+  - `build-wp0\tests\Release\nec2++_tests.exe "~[wp1]~[wp2]~[wp3]~[wp4]~[wp_s2]~[wp_s3]" --reporter compact`
+    — 106 test cases, 12690 assertions, all passed (includes WP0–WP2 current
+    tags; excludes the older WASM-API stress tags).
 - **Artifacts:**
+  - [`src/nec_prepared_current_quadrature.h`](../src/nec_prepared_current_quadrature.h)
+  - [`src/nec_prepared_current_quadrature.cpp`](../src/nec_prepared_current_quadrature.cpp)
+  - [`src/current_quadrature_wp2_tb.cpp`](../src/current_quadrature_wp2_tb.cpp)
+  - [`packages/necpp-wasm/bench/evidence/current-quadrature-wp2/native-baseline.json`](../packages/necpp-wasm/bench/evidence/current-quadrature-wp2/native-baseline.json)
+  - Exact packed offsets in [`docs/current-quadrature-api.md`](current-quadrature-api.md)
 - **Decisions / deviations:**
+  - Native C++ only. `NecModel` methods, C ABI, and worker rows wait for WP4.
+  - Tests use `[wp2_current]`, not `[wp2]`, so they do not collide with the
+    older port-quantity suite.
+  - Geometry SoA is per sample (`9 * nSeg * nNodes * nImagePlanes * 8`). WP0
+    prose that said `nSegments * nImagePlanes` was corrected.
+  - Magic is ASCII bytes `NECQ` at offset 0. Header is 64 bytes. Identity is
+    followed by 0–4 pad bytes to 8-byte alignment.
+  - Omitted weights store `dsWeight = L/2` (`w_i = 1`). `sum(dsWeight)` equals
+    `(L/2) * sum(w)`, which is `L` only for a rule with `sum(w) = 2`.
+  - Free-space and finite-ground image requests fail. Rooted monopoles remain
+    physical-only unless images are requested; the image plane is the geometric
+    PEC transform, not NEC’s internal image basis.
+  - 4-node physical dipole packed size is 4072 B (64 header + 132 identity +
+    4 pad + 3168 geometry + 704 currents). Retrieve is ~0.016 µs vs prepare
+    0.057 ms (dipole) / 0.16 ms (insulated turnstile) on this host.
 - **Known risks / next WP:**
+  - WP3 must capture currents and embedded fields from one unit-current basis
+    loop. WP2 may call `get_current_distribution` and therefore solve, which
+    is allowed until WP3.
+  - Junction `icon` integers stay out of packed identity; only
+    `tag`/`segment`/`nativeIndex`.
+  - Image plane must never be mixed into plane 0.
+  - Next: WP3 isolated-element characterization.
 
 ## WP3 - Isolated-element characterization
 
