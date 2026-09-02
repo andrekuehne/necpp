@@ -40,6 +40,7 @@ export type {
   ConductivityLoad,
   CreateArraySolverOptions,
   CreateNecModelOptions,
+  CurrentModeKind,
   CreateNecWorkerModelOptions,
   DeckResult,
   DistributedParallelRlcLoad,
@@ -62,10 +63,17 @@ export type {
   GroundModel,
   ImpedanceLoad,
   ImpedanceResult,
+  IsolatedElementCharacterization,
+  IsolatedElementHandoff,
+  IsolatedElementHandoffOptions,
+  IsolatedElementRequest,
   LoadDefinition,
   NecArraySolver,
+  NecCurrentDistribution,
   NecModel,
   NecModelState,
+  NecSegmentEnd,
+  NecSegmentIdentity,
   NecWorkerModel,
   NecWorkerOperation,
   NecWorkerProgressEvent,
@@ -77,6 +85,9 @@ export type {
   PowerBudget,
   PositionCanonicalization,
   PositionedArrayElement,
+  PreparedQuadratureImages,
+  PreparedQuadratureRequest,
+  PreparedTransferHandle,
   PrepareOptions,
   ReflectionPlane,
   ReflectionSymmetry,
@@ -113,6 +124,9 @@ import type {
   NecModel,
   RunDeckOptions,
 } from "./types.js";
+
+export { transferIsolatedElementCharacterization } from "./handoff.js";
+export type { IsolatedElementHandoffMessage } from "./handoff.js";
 
 /** Create an isolated stateful NEC model backed by a new WASM module instance. */
 export async function createNecModel(

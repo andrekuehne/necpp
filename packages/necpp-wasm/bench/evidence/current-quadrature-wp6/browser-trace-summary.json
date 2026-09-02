@@ -1,0 +1,23 @@
+{
+  "type": "current-quadrature-wp6-browser-trace",
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-02T19:17:47.766Z",
+  "mainThreadHasLargeBuffers": false,
+  "repeatedSteeringTransferBytes": 0,
+  "liveHandoff": {
+    "quadratureBytes": 4072,
+    "embeddedBytes": 608,
+    "clientKeys": [
+      "admittance",
+      "embeddedFieldByteLength",
+      "impedance",
+      "quadratureByteLength"
+    ],
+    "steerTransfers": 1
+  },
+  "fixtureBind": {
+    "quadratureBytes": 4072,
+    "embeddedBytes": 608,
+    "steerTransfers": 1
+  }
+}

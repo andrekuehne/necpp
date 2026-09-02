@@ -56,6 +56,62 @@ try {
 
 This complete example is executed from the packed npm tarball in CI.
 
+## Isolated-element currents and patterns
+
+`characterizeIsolatedElement()` returns isolated Z/Y, packed quadrature
+currents (`NECQ`), and NEC-native embedded patterns (`NECF`) from one
+unit-current basis loop per port. Keep the large buffers off the UI thread:
+worker handoff transfers them once onto a compute worker.
+
+```ts
+import { createNecModel } from "@necpp-engine/wasm";
+
+const model = await createNecModel();
+
+try {
+  model.addWire({
+    tag: 1,
+    segments: 11,
+    start: [0, 0, -0.25],
+    end: [0, 0, 0.25],
+    radiusM: 0.001,
+  });
+  model.completeGeometry();
+  model.definePorts([{ tag: 1, segment: 6, name: "feed" }]);
+  model.prepare({ frequencyMHz: 300 });
+
+  const characterization = model.characterizeIsolatedElement({
+    quadrature: {
+      nodes: Float64Array.of(-1, -1 / 3, 1 / 3, 1),
+      images: "physical-only",
+      modes: "unit-current",
+    },
+    field: {
+      radiusM: 1,
+      theta: { startDeg: 0, count: 5, stepDeg: 45 },
+      phi: { startDeg: 0, count: 3, stepDeg: 90 },
+    },
+  });
+
+  console.log({
+    zOhm: [characterization.impedance.real[0], characterization.impedance.imag[0]],
+    quadratureBytes: characterization.quadrature.byteLength,
+    embeddedBytes: characterization.embeddedField.byteLength,
+  });
+} finally {
+  model.dispose();
+}
+```
+
+Published goldens are importable from
+`@necpp-engine/wasm/fixtures/current-quadrature-v1/*`. A worker destination
+handoff resolves to compact `IsolatedElementHandoff` metadata (Z/Y and
+`byteLength`s). Do not put NECQ/NECF `ArrayBuffer`s in React state.
+
+The repository's
+[current-quadrature examples](https://github.com/andrekuehne/necpp/tree/master/examples/wasm-current-quadrature)
+run the direct and MessagePort-handoff paths from a packed tarball.
+
 ## Symmetric arrays and automatic optimization
 
 For array applications, `createNecArraySolver()` accepts the caller's complete
@@ -736,7 +792,7 @@ appropriate CORS header.
 import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel({
-  wasmUrl: new URL("https://cdn.example.test/necpp/0.4.0/nec2pp.wasm"),
+  wasmUrl: new URL("https://cdn.example.test/necpp/0.5.0/nec2pp.wasm"),
 });
 model.dispose();
 ```
@@ -800,6 +856,9 @@ try {
 - Use worker mode for browser responsiveness. Each worker model owns an
   isolated WebAssembly instance and memory, so dispose unused models rather
   than pooling many idle workers.
+- Isolated-element characterization packs currents and embedded patterns once.
+  Transfer those `ArrayBuffer`s to a compute worker and bind them there; do
+  not retain them in UI state or re-transfer them on steering.
 - There is no shared-memory or thread requirement. Normal cross-origin
   isolation headers are not needed for this package.
 

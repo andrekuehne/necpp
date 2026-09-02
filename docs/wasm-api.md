@@ -12,6 +12,12 @@ facade. Non-symmetric completion returns an empty, immutable
 `GeometryCompletionResult`; symmetric completion returns immutable copy and
 segment-count metadata in both execution modes.
 
+Isolated-element current coefficients, prepared quadrature sampling, and
+characterization are specified in
+[`current-quadrature-api.md`](current-quadrature-api.md). Those methods are on
+`NecModel` / `NecWorkerModel`. Packed `NECQ`/`NECF` fixtures ship with the
+package as `@necpp-engine/wasm/fixtures/current-quadrature-v1/*`.
+
 ## Package and runtime boundary
 
 The final npm package name is **`@necpp-engine/wasm`**. The unscoped name
@@ -21,8 +27,9 @@ while the scoped name identifies this repository and leaves room for future
 npm scope, but the API name will not change if the package is initially
 distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
-The parallel far-field release package identity is `0.4.0`; it embeds NEC2++ `2.5.0`
-while preserving WASM ABI version `1`.
+The isolated-element current-quadrature release package identity is `0.5.0`;
+it embeds NEC2++ `2.5.0` while preserving WASM ABI version `1`. The prior
+parallel far-field release was `0.4.0`.
 
 The packed package exports three version identifiers that can be imported
 without constructing a model:
@@ -181,6 +188,11 @@ the model. `same` means that the operation preserves the current state.
 | `computeFarField` | — | — | — | — | same | — |
 | `computeEmbeddedFarFields` | — | — | — | same | same | — |
 | `dispose` | disposed | disposed | disposed | disposed | disposed | same |
+
+Current-distribution, prepared-quadrature, and characterization operations are
+reserved in [`current-quadrature-api.md`](current-quadrature-api.md). They are
+not in the executable `state-machine.ts` table until later work packages
+implement them.
 
 Additional lifecycle rules:
 
@@ -637,3 +649,7 @@ binary64 code path.
 Tests must reject NaN or infinity before applying a tolerance. Phase is
 compared as a wrapped complex ratio, never by subtracting printed degree
 values across a ±180° branch cut.
+
+Current-coefficient reconstruction, unit-current port normalization, and
+prepared-quadrature layout comparisons use the additional gates in
+[`current-quadrature-api.md`](current-quadrature-api.md).

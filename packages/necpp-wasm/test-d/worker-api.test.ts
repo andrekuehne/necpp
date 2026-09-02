@@ -8,8 +8,14 @@ import {
   type GeometryCompletionResult,
   type ComplexMatrix,
   type FarFieldResult,
+  type IsolatedElementCharacterization,
+  type IsolatedElementHandoff,
+  type IsolatedElementRequest,
+  type NecCurrentDistribution,
   type NecWorkerProgressEvent,
   type PortSolution,
+  type PreparedQuadratureRequest,
+  type PreparedTransferHandle,
 } from "../src/worker.js";
 
 async function validWorkerConsumer(): Promise<void> {
@@ -49,6 +55,74 @@ async function validWorkerConsumer(): Promise<void> {
   solution.powerBudget.efficiencyPercent satisfies number | null;
   field.eThetaReal[0];
   events[0]?.operation;
+
+  const workerCurrents: NecCurrentDistribution = await model.getCurrentDistribution({
+    kind: "unit-current",
+  });
+  workerCurrents.modeCount;
+  const workerQuadratureHandle: PreparedTransferHandle =
+    await model.prepareCurrentQuadrature({
+      nodes: new Float64Array([-1, 0, 1]),
+      images: "physical-only",
+      modes: "unit-current",
+    });
+  workerQuadratureHandle.byteLength;
+  const liveCharacterization: IsolatedElementCharacterization =
+    await model.characterizeIsolatedElement({
+      quadrature: {
+        nodes: new Float64Array([-1, 0, 1]),
+        images: "physical-only",
+        modes: "unit-current",
+      },
+      field: {
+        theta: { startDeg: 0, count: 3, stepDeg: 45 },
+        phi: { startDeg: 0, count: 2, stepDeg: 90 },
+      },
+    });
+  liveCharacterization.impedance.rows;
+  const workerHandoff: IsolatedElementHandoff = await model.characterizeIsolatedElement(
+    {
+      quadrature: {
+        nodes: new Float64Array([-1, 0, 1]),
+        images: "physical-only",
+        modes: "unit-current",
+      },
+      field: {
+        theta: { startDeg: 0, count: 3, stepDeg: 45 },
+        phi: { startDeg: 0, count: 2, stepDeg: 90 },
+      },
+    },
+    { destination: new MessageChannel().port1 },
+  );
+  workerHandoff.quadratureByteLength;
+
+  const workerHandle: PreparedTransferHandle = {
+    schemaVersion: 1,
+    byteLength: 8,
+    buffer: new ArrayBuffer(8),
+  };
+  const workerQuadrature: PreparedQuadratureRequest = {
+    nodes: new Float64Array([-1, 0, 1]),
+    images: "physical-only",
+    modes: "unit-current",
+  };
+  const workerRequest: IsolatedElementRequest = {
+    quadrature: workerQuadrature,
+    field: {
+      theta: { startDeg: 0, count: 3, stepDeg: 45 },
+      phi: { startDeg: 0, count: 2, stepDeg: 90 },
+    },
+  };
+  const workerCharacterization: IsolatedElementCharacterization = {
+    impedance: matrices,
+    admittance: matrices,
+    quadrature: workerHandle,
+    embeddedField: workerHandle,
+  };
+  const constructedCurrents: NecCurrentDistribution["modeKind"] = "latest-solution";
+  workerCharacterization.quadrature.schemaVersion;
+  workerRequest.quadrature.modes;
+  constructedCurrents;
 
   model.cancelFarField();
   const unsubscribe = model.subscribeProgress(() => undefined);

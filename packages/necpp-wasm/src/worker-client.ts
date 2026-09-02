@@ -10,13 +10,20 @@ import type {
   GeometryCompletionResult,
   GroundModel,
   ImpedanceResult,
+  IsolatedElementCharacterization,
+  IsolatedElementHandoff,
+  IsolatedElementHandoffOptions,
+  IsolatedElementRequest,
   LoadDefinition,
+  NecCurrentDistribution,
   NecModelState,
   NecWorkerModel,
   NecWorkerProgressListener,
   PortDefinition,
   PortSolution,
   PrepareOptions,
+  PreparedQuadratureRequest,
+  PreparedTransferHandle,
   WireDefinition,
 } from "./types.js";
 import {
@@ -28,7 +35,11 @@ import {
   reviveFarFieldResult,
   reviveGeometryCompletionResult,
   reviveImpedanceResult,
+  reviveIsolatedElementCharacterization,
+  reviveIsolatedElementHandoff,
+  reviveCurrentDistribution,
   revivePortSolution,
+  revivePreparedTransferHandle,
   serializeCreateOptions,
   type SerializedCreateOptions,
   type WorkerFieldPoolOptions,
@@ -36,7 +47,7 @@ import {
 } from "./worker-protocol.js";
 
 export interface WorkerHost {
-  postMessage(data: unknown, transfer?: readonly ArrayBuffer[]): void;
+  postMessage(data: unknown, transfer?: readonly (ArrayBuffer | MessagePort)[]): void;
   subscribe(listener: (data: unknown) => void): () => void;
   subscribeError(listener: (error: unknown) => void): () => void;
   subscribeExit?(listener: (code: number) => void): () => void;
@@ -60,7 +71,10 @@ async function openWorkerHost(): Promise<WorkerHost> {
     const worker = new NodeWorker(new URL("./worker-entry.js", import.meta.url));
     return {
       postMessage(data, transfer = []) {
-        worker.postMessage(data, transfer);
+        worker.postMessage(
+          data,
+          transfer as readonly import("node:worker_threads").Transferable[],
+        );
       },
       subscribe(listener) {
         const handler = (value: unknown): void => {
@@ -275,6 +289,81 @@ class WorkerNecModel implements NecWorkerModel {
     );
   }
 
+  async getCurrentDistribution(
+    options: { kind: "latest-solution" | "unit-current" },
+  ): Promise<NecCurrentDistribution> {
+    return reviveCurrentDistribution(
+      await this.#invoke("getCurrentDistribution", [options]),
+    );
+  }
+
+  async prepareCurrentQuadrature(
+    request: PreparedQuadratureRequest,
+  ): Promise<PreparedTransferHandle> {
+    const nodes = cloneFloat64(request.nodes);
+    const transfer: ArrayBuffer[] = [nodes.buffer];
+    const payload: PreparedQuadratureRequest = request.weights === undefined
+      ? { ...request, nodes }
+      : { ...request, nodes, weights: cloneFloat64(request.weights) };
+    if (payload.weights !== undefined) {
+      transfer.push(payload.weights.buffer as ArrayBuffer);
+    }
+    return revivePreparedTransferHandle(
+      await this.#invoke(
+        "prepareCurrentQuadrature",
+        [payload],
+        transfer,
+      ),
+    );
+  }
+
+  async characterizeIsolatedElement(
+    request: IsolatedElementRequest,
+  ): Promise<IsolatedElementCharacterization>;
+  async characterizeIsolatedElement(
+    request: IsolatedElementRequest,
+    options: IsolatedElementHandoffOptions,
+  ): Promise<IsolatedElementHandoff>;
+  async characterizeIsolatedElement(
+    request: IsolatedElementRequest,
+    options?: IsolatedElementHandoffOptions,
+  ): Promise<IsolatedElementCharacterization | IsolatedElementHandoff> {
+    const nodes = cloneFloat64(request.quadrature.nodes);
+    const transfer: Array<ArrayBuffer | MessagePort> = [nodes.buffer];
+    const quadrature: PreparedQuadratureRequest =
+      request.quadrature.weights === undefined
+        ? { ...request.quadrature, nodes }
+        : {
+          ...request.quadrature,
+          nodes,
+          weights: cloneFloat64(request.quadrature.weights),
+        };
+    if (quadrature.weights !== undefined) {
+      transfer.push(quadrature.weights.buffer as ArrayBuffer);
+    }
+    const clonedRequest: IsolatedElementRequest = {
+      ...request,
+      quadrature,
+    };
+    if (options !== undefined) {
+      transfer.push(options.destination);
+      return reviveIsolatedElementHandoff(
+        await this.#request(
+          {
+            kind: "invoke",
+            method: "characterizeIsolatedElement",
+            args: [clonedRequest],
+            destination: options.destination,
+          },
+          transfer,
+        ),
+      );
+    }
+    return reviveIsolatedElementCharacterization(
+      await this.#invoke("characterizeIsolatedElement", [clonedRequest], transfer),
+    );
+  }
+
   cancelFarField(): void {
     this.#cancelField();
   }
@@ -405,8 +494,9 @@ class WorkerNecModel implements NecWorkerModel {
         readonly kind: "invoke";
         readonly method: WorkerMethod;
         readonly args: readonly unknown[];
+        readonly destination?: MessagePort;
       },
-    transfer: readonly ArrayBuffer[] = [],
+    transfer: readonly (ArrayBuffer | MessagePort)[] = [],
   ): Promise<unknown> {
     this.#assertCallable(
       body.kind === "create" ? "create" : body.method,
@@ -436,7 +526,7 @@ class WorkerNecModel implements NecWorkerModel {
   #invokeVoid(
     method: WorkerMethod,
     args: readonly unknown[],
-    transfer: readonly ArrayBuffer[] = [],
+    transfer: readonly (ArrayBuffer | MessagePort)[] = [],
   ): Promise<void> {
     return this.#invoke(method, args, transfer).then(() => undefined);
   }
@@ -444,7 +534,7 @@ class WorkerNecModel implements NecWorkerModel {
   async #invoke(
     method: WorkerMethod,
     args: readonly unknown[],
-    transfer: readonly ArrayBuffer[] = [],
+    transfer: readonly (ArrayBuffer | MessagePort)[] = [],
   ): Promise<unknown> {
     if (method !== "dispose") {
       this.#assertCallable(method);

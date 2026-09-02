@@ -8,15 +8,23 @@ import {
   packageVersion,
   rotationalOrder,
   runDeck,
+  transferIsolatedElementCharacterization,
   type GeometryCompletionResult,
   type GeometrySymmetry,
+  type IsolatedElementHandoff,
   type SymmetryCopy,
   type SymmetryFailureClassification,
   type ComplexMatrix,
   type FarFieldResult,
   type FullArrayDescription,
+  type IsolatedElementCharacterization,
+  type IsolatedElementRequest,
+  type NecCurrentDistribution,
   type PortSolution,
   type PowerBudget,
+  type PreparedQuadratureImages,
+  type PreparedQuadratureRequest,
+  type PreparedTransferHandle,
 } from "../src/index.js";
 
 const typedArrayDescription: FullArrayDescription = {
@@ -115,7 +123,95 @@ async function validConsumer(): Promise<void> {
   const budget: PowerBudget = solution.powerBudget;
   budget.efficiencyPercent satisfies number | null;
   field.eThetaReal[0];
+
+  const currents: NecCurrentDistribution = model.getCurrentDistribution({
+    kind: "unit-current",
+  });
+  currents.aReal[0];
+  const quadratureHandle: PreparedTransferHandle = model.prepareCurrentQuadrature({
+    nodes: new Float64Array([-1, -1 / 3, 1 / 3, 1]),
+    images: "physical-only",
+    modes: "unit-current",
+  });
+  quadratureHandle.buffer.byteLength;
+  const characterization: IsolatedElementCharacterization =
+    model.characterizeIsolatedElement({
+      quadrature: {
+        nodes: new Float64Array([-1, -1 / 3, 1 / 3, 1]),
+        images: "physical-only",
+        modes: "unit-current",
+      },
+      field: {
+        radiusM: 1,
+        theta: { startDeg: 0, count: 5, stepDeg: 30 },
+        phi: { startDeg: 0, count: 3, stepDeg: 90 },
+      },
+    });
+  characterization.quadrature.schemaVersion;
+  const constructedForHandoff: IsolatedElementCharacterization = {
+    impedance: model.computeImpedanceMatrix().impedance,
+    admittance: model.computeImpedanceMatrix().admittance,
+    quadrature: quadratureHandle,
+    embeddedField: characterization.embeddedField,
+  };
+  const handoff: IsolatedElementHandoff = transferIsolatedElementCharacterization(
+    constructedForHandoff,
+    new MessageChannel().port1,
+  );
+  handoff.quadratureByteLength;
   model.dispose();
+
+  const currentDistribution: NecCurrentDistribution = {
+    schemaVersion: 1,
+    frequencyMHz: 300,
+    wavelengthM: 1,
+    modeKind: "unit-current",
+    modeCount: 1,
+    segments: [{ tag: 1, segment: 6, nativeIndex: 5 }],
+    startEnds: [{ kind: "free" }],
+    endEnds: [{ kind: "ground" }],
+    centresM: new Float64Array(3),
+    startsM: new Float64Array(3),
+    endsM: new Float64Array(3),
+    tangents: new Float64Array([0, 0, 1]),
+    radiiM: new Float64Array([0.001]),
+    lengthsM: new Float64Array([0.5 / 11]),
+    aReal: new Float64Array(1),
+    aImag: new Float64Array(1),
+    bReal: new Float64Array(1),
+    bImag: new Float64Array(1),
+    cReal: new Float64Array(1),
+    cImag: new Float64Array(1),
+  };
+  const quadratureRequest: PreparedQuadratureRequest = {
+    nodes: new Float64Array([-1, 0, 1]),
+    weights: new Float64Array([1, 1, 1]),
+    images: "physical-only",
+    modes: "unit-current",
+  };
+  const isolatedRequest: IsolatedElementRequest = {
+    quadrature: quadratureRequest,
+    field: {
+      radiusM: 1,
+      theta: { startDeg: 0, count: 5, stepDeg: 30 },
+      phi: { startDeg: 0, count: 3, stepDeg: 90 },
+    },
+  };
+  const handle: PreparedTransferHandle = {
+    schemaVersion: 1,
+    byteLength: 8,
+    buffer: new ArrayBuffer(8),
+  };
+  const constructedCharacterization: IsolatedElementCharacterization = {
+    impedance: matrices,
+    admittance: matrices,
+    quadrature: handle,
+    embeddedField: handle,
+  };
+  currentDistribution.segments[0]?.nativeIndex;
+  quadratureRequest.images satisfies PreparedQuadratureImages;
+  isolatedRequest.field.theta.count;
+  constructedCharacterization.quadrature.byteLength;
 
   packageVersion satisfies string;
   engineVersion satisfies string;

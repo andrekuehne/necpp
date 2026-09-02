@@ -1,0 +1,24 @@
+{
+  "type": "current-quadrature-wp0-native-baseline",
+  "schemaVersion": 1,
+  "host": "windows-msvc-release",
+  "grid": { "thetaCount": 19, "phiCount": 37 },
+  "budgets": {
+    "internalSnapshotBytes": "13 * nSegments * 8",
+    "exactCoefficientBytesPerMode": "6 * nSegments * 8",
+    "embeddedFieldBytes": "4 * nPorts * nTheta * nPhi * 8"
+  },
+  "dipole": {
+    "segmentCount": 11,
+    "portCount": 1,
+    "snapshotBytes": 1144,
+    "embeddedUnitCurrentMs": 0.2925,
+    "snapshotCaptureMs": 0.001
+  },
+  "turnstile-insulated": {
+    "segmentCount": 22,
+    "portCount": 2,
+    "snapshotBytes": 2288,
+    "embeddedUnitCurrentMs": 0.8871
+  }
+}

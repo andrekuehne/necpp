@@ -14,7 +14,7 @@ import {
 } from "./worker-runtime.js";
 
 interface WorkerParent {
-  postMessage(value: unknown, transfer?: readonly ArrayBuffer[]): void;
+  postMessage(value: unknown, transfer?: readonly (ArrayBuffer | MessagePort)[]): void;
   onMessage(listener: (value: unknown) => void): void;
 }
 
@@ -29,7 +29,10 @@ async function connectParent(): Promise<WorkerParent> {
     }
     return {
       postMessage(value, transfer = []) {
-        parentPort.postMessage(value, transfer);
+        parentPort.postMessage(
+          value,
+          transfer as readonly import("node:worker_threads").Transferable[],
+        );
       },
       onMessage(listener) {
         parentPort.on("message", listener);

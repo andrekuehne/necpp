@@ -11,13 +11,20 @@ const skip = !hasWasmArtifacts && "WASM artifacts have not been built";
 const packageJson = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 );
+const fixtureManifest = JSON.parse(
+  readFileSync(
+    new URL("../../fixtures/current-quadrature-v1/manifest.json", import.meta.url),
+    "utf8",
+  ),
+);
 
 test("npm pack contains only the documented publish files", { skip }, () => {
   const packed = packPackage();
   assert.equal(packed.version, packageJson.version);
   const filenamePrefix = packageJson.name.slice(1).replace("/", "-");
   assert.equal(packed.filename, `${filenamePrefix}-${packageJson.version}.tgz`);
-  assert.equal(packageJson.version, "0.4.0");
+  assert.equal(packageJson.version, "0.5.0");
+  assert.equal(fixtureManifest.packageVersion, packageJson.version);
   assert.equal(packageJson.engines.node, ">=24");
   assert.deepEqual(packageJson.publishConfig, {
     access: "public",
@@ -45,6 +52,9 @@ test("npm pack contains only the documented publish files", { skip }, () => {
     "dist/nec2pp.wasm",
     "dist/necpp-field-evaluator.generated.js",
     "dist/necpp-field-evaluator.wasm",
+    "fixtures/current-quadrature-v1/manifest.json",
+    "fixtures/current-quadrature-v1/dipole.necq",
+    "fixtures/current-quadrature-v1/dipole.necf",
   ];
   for (const path of required) {
     assert.ok(files.has(path), `missing ${path} in packed tarball`);
@@ -54,7 +64,8 @@ test("npm pack contains only the documented publish files", { skip }, () => {
     const allowed = path === "package.json"
       || path === "README.md"
       || path === "COPYING"
-      || path.startsWith("dist/");
+      || path.startsWith("dist/")
+      || path.startsWith("fixtures/");
     assert.ok(allowed, `packed unexpected path ${path}`);
     assert.equal(path.includes(".."), false);
     assert.doesNotMatch(path, /\.map$/);

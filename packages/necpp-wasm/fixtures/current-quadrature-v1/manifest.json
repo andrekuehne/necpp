@@ -1,0 +1,957 @@
+{
+  "schemaVersion": 1,
+  "fixtureSchema": "current-quadrature-v1",
+  "abiVersion": 1,
+  "engineVersion": "2.5.0",
+  "packageVersion": "0.5.0",
+  "cases": [
+    {
+      "id": "dipole",
+      "geometry": {
+        "id": "dipole",
+        "wires": [
+          {
+            "tag": 1,
+            "segments": 11,
+            "start": [
+              0,
+              0,
+              -0.25
+            ],
+            "end": [
+              0,
+              0,
+              0.25
+            ],
+            "radiusM": 0.001
+          }
+        ],
+        "ports": [
+          {
+            "tag": 1,
+            "segment": 6,
+            "name": "feed"
+          }
+        ],
+        "groundConnection": "none",
+        "ground": {
+          "kind": "free-space"
+        }
+      },
+      "frequencyMHz": 300,
+      "wavelengthM": 0.9993187923090975,
+      "quadrature": {
+        "nodes": [
+          -1,
+          -0.3333333333333333,
+          0.3333333333333333,
+          1
+        ],
+        "images": "physical-only",
+        "modes": "unit-current"
+      },
+      "field": {
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 5,
+          "stepDeg": 45
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 3,
+          "stepDeg": 90
+        }
+      },
+      "impedance": {
+        "rows": 1,
+        "columns": 1,
+        "order": "row-major",
+        "real": [
+          83.84756084226959
+        ],
+        "imag": [
+          47.77112230631306
+        ]
+      },
+      "admittance": {
+        "rows": 1,
+        "columns": 1,
+        "order": "row-major",
+        "real": [
+          0.009003771124406302
+        ],
+        "imag": [
+          -0.005129788479013563
+        ]
+      },
+      "imagePolicy": "physical-only",
+      "units": {
+        "geometry": "metres",
+        "current": "ampere peak",
+        "convention": "exp(+j omega t)"
+      },
+      "quadraturePacked": {
+        "file": "dipole.necq",
+        "byteLength": 4072,
+        "sha256": "ce2e364550d60278cb97f51f473915faf188dd2fea5e5b306c3cc695d6148e41",
+        "magic": "NECQ",
+        "nSegments": 11,
+        "nNodes": 4,
+        "nModes": 1,
+        "nImagePlanes": 1
+      },
+      "embeddedPacked": {
+        "file": "dipole.necf",
+        "byteLength": 608,
+        "sha256": "1547f05030501792387e71555cecead8e2c1ac6089ab61951cfd12c6e6f1c9c1",
+        "magic": "NECF",
+        "nPorts": 1,
+        "nTheta": 5,
+        "nPhi": 3,
+        "samplesPerPort": 15
+      },
+      "samples": {
+        "feedCentreCurrent": {
+          "re": 1.000681672051142,
+          "im": -1.1102230246251565e-15
+        },
+        "quadratureFeedSample": {
+          "mode": 0,
+          "plane": 0,
+          "segmentIndex": 5,
+          "node": 0,
+          "xi": -1,
+          "current": {
+            "re": 0.9984886099846924,
+            "im": -0.012421139423889116
+          },
+          "positionM": {
+            "x": 0,
+            "y": 0,
+            "z": -0.022727272727272693
+          }
+        },
+        "fieldSample": {
+          "port": 0,
+          "thetaIndex": 1,
+          "phiIndex": 1,
+          "thetaDeg": 45,
+          "phiDeg": 90,
+          "eTheta": {
+            "re": 2.454224040091772,
+            "im": 39.95446817869104
+          },
+          "ePhi": {
+            "re": 0,
+            "im": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "rooted-monopole",
+      "geometry": {
+        "id": "rooted-monopole",
+        "wires": [
+          {
+            "tag": 1,
+            "segments": 11,
+            "start": [
+              0,
+              0,
+              0
+            ],
+            "end": [
+              0,
+              0,
+              0.25
+            ],
+            "radiusM": 0.001
+          }
+        ],
+        "ports": [
+          {
+            "tag": 1,
+            "segment": 1,
+            "name": "base"
+          }
+        ],
+        "groundConnection": "interpolate",
+        "ground": {
+          "kind": "perfect"
+        }
+      },
+      "frequencyMHz": 300,
+      "wavelengthM": 0.9993187923090975,
+      "quadrature": {
+        "nodes": [
+          -1,
+          -0.3333333333333333,
+          0.3333333333333333,
+          1
+        ],
+        "images": "physical-only",
+        "modes": "unit-current"
+      },
+      "field": {
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 5,
+          "stepDeg": 45
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 3,
+          "stepDeg": 90
+        }
+      },
+      "impedance": {
+        "rows": 1,
+        "columns": 1,
+        "order": "row-major",
+        "real": [
+          42.1660845584747
+        ],
+        "imag": [
+          24.81037810291034
+        ]
+      },
+      "admittance": {
+        "rows": 1,
+        "columns": 1,
+        "order": "row-major",
+        "real": [
+          0.017616667450976873
+        ],
+        "imag": [
+          -0.010365586109040915
+        ]
+      },
+      "imagePolicy": "physical-only",
+      "units": {
+        "geometry": "metres",
+        "current": "ampere peak",
+        "convention": "exp(+j omega t)"
+      },
+      "quadraturePacked": {
+        "file": "rooted-monopole.necq",
+        "byteLength": 4072,
+        "sha256": "fd92e1b44dd9293db8d19141e3ec7606b04b1acd1312908dad0d3d9e80041bb1",
+        "magic": "NECQ",
+        "nSegments": 11,
+        "nNodes": 4,
+        "nModes": 1,
+        "nImagePlanes": 1
+      },
+      "embeddedPacked": {
+        "file": "rooted-monopole.necf",
+        "byteLength": 608,
+        "sha256": "917dc7184dddff41ce98181bb5f99bd5631734e266fce06b715006b89de5a404",
+        "magic": "NECF",
+        "nPorts": 1,
+        "nTheta": 5,
+        "nPhi": 3,
+        "samplesPerPort": 15
+      },
+      "samples": {
+        "feedCentreCurrent": {
+          "re": 1.0006816720511509,
+          "im": 2.220446049250313e-15
+        },
+        "quadratureFeedSample": {
+          "mode": 0,
+          "plane": 0,
+          "segmentIndex": 0,
+          "node": 0,
+          "xi": -1,
+          "current": {
+            "re": 1.0010325723971836,
+            "im": 0.003349229310250834
+          },
+          "positionM": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "fieldSample": {
+          "port": 0,
+          "thetaIndex": 1,
+          "phiIndex": 1,
+          "thetaDeg": 45,
+          "phiDeg": 90,
+          "eTheta": {
+            "re": 2.3695833749177813,
+            "im": 40.09765134199102
+          },
+          "ePhi": {
+            "re": 0,
+            "im": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "bent-multiwire",
+      "geometry": {
+        "id": "bent-multiwire",
+        "wires": [
+          {
+            "tag": 1,
+            "segments": 5,
+            "start": [
+              -0.25,
+              0,
+              0.25
+            ],
+            "end": [
+              0,
+              0,
+              0
+            ],
+            "radiusM": 0.001
+          },
+          {
+            "tag": 2,
+            "segments": 5,
+            "start": [
+              0,
+              0,
+              0
+            ],
+            "end": [
+              0.25,
+              0,
+              0.25
+            ],
+            "radiusM": 0.001
+          }
+        ],
+        "ports": [
+          {
+            "tag": 1,
+            "segment": 5,
+            "name": "junction"
+          }
+        ],
+        "groundConnection": "none",
+        "ground": {
+          "kind": "free-space"
+        }
+      },
+      "frequencyMHz": 300,
+      "wavelengthM": 0.9993187923090975,
+      "quadrature": {
+        "nodes": [
+          -1,
+          -0.3333333333333333,
+          0.3333333333333333,
+          1
+        ],
+        "images": "physical-only",
+        "modes": "unit-current"
+      },
+      "field": {
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 5,
+          "stepDeg": 45
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 3,
+          "stepDeg": 90
+        }
+      },
+      "impedance": {
+        "rows": 1,
+        "columns": 1,
+        "order": "row-major",
+        "real": [
+          229.23925685079212
+        ],
+        "imag": [
+          535.5839797501972
+        ]
+      },
+      "admittance": {
+        "rows": 1,
+        "columns": 1,
+        "order": "row-major",
+        "real": [
+          0.0006754233707434289
+        ],
+        "imag": [
+          -0.0015780278730990333
+        ]
+      },
+      "imagePolicy": "physical-only",
+      "units": {
+        "geometry": "metres",
+        "current": "ampere peak",
+        "convention": "exp(+j omega t)"
+      },
+      "quadraturePacked": {
+        "file": "bent-multiwire.necq",
+        "byteLength": 3704,
+        "sha256": "7316b3d75d3385ba30d3c1392033016f8b1b59de0d25bb961d12cf48406399ab",
+        "magic": "NECQ",
+        "nSegments": 10,
+        "nNodes": 4,
+        "nModes": 1,
+        "nImagePlanes": 1
+      },
+      "embeddedPacked": {
+        "file": "bent-multiwire.necf",
+        "byteLength": 608,
+        "sha256": "1ed83e34018a2394b200cedf07a67468de33fb4979a19a81456082a07f8f4146",
+        "magic": "NECF",
+        "nPorts": 1,
+        "nTheta": 5,
+        "nPhi": 3,
+        "samplesPerPort": 15
+      },
+      "samples": {
+        "feedCentreCurrent": {
+          "re": 1.0006816720511473,
+          "im": 0
+        },
+        "quadratureFeedSample": {
+          "mode": 0,
+          "plane": 0,
+          "segmentIndex": 4,
+          "node": 0,
+          "xi": -1,
+          "current": {
+            "re": 1.031675590471962,
+            "im": -0.020603445814894927
+          },
+          "positionM": {
+            "x": -0.05000000000000002,
+            "y": 0,
+            "z": 0.05000000000000002
+          }
+        },
+        "fieldSample": {
+          "port": 0,
+          "thetaIndex": 1,
+          "phiIndex": 1,
+          "thetaDeg": 45,
+          "phiDeg": 90,
+          "eTheta": {
+            "re": 0.6369243279926899,
+            "im": 12.195041844656034
+          },
+          "ePhi": {
+            "re": -27.25379421752117,
+            "im": 91.96975226682851
+          }
+        }
+      }
+    },
+    {
+      "id": "turnstile-insulated",
+      "geometry": {
+        "id": "turnstile-insulated",
+        "wires": [
+          {
+            "tag": 1,
+            "segments": 11,
+            "start": [
+              -0.25,
+              0,
+              0.001
+            ],
+            "end": [
+              0.25,
+              0,
+              0.001
+            ],
+            "radiusM": 0.001
+          },
+          {
+            "tag": 2,
+            "segments": 11,
+            "start": [
+              0,
+              -0.25,
+              -0.001
+            ],
+            "end": [
+              0,
+              0.25,
+              -0.001
+            ],
+            "radiusM": 0.001
+          }
+        ],
+        "ports": [
+          {
+            "tag": 1,
+            "segment": 6,
+            "name": "x-feed"
+          },
+          {
+            "tag": 2,
+            "segment": 6,
+            "name": "y-feed"
+          }
+        ],
+        "groundConnection": "none",
+        "ground": {
+          "kind": "free-space"
+        }
+      },
+      "frequencyMHz": 300,
+      "wavelengthM": 0.9993187923090975,
+      "quadrature": {
+        "nodes": [
+          -1,
+          -0.3333333333333333,
+          0.3333333333333333,
+          1
+        ],
+        "images": "physical-only",
+        "modes": "unit-current"
+      },
+      "field": {
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 5,
+          "stepDeg": 45
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 3,
+          "stepDeg": 90
+        }
+      },
+      "impedance": {
+        "rows": 2,
+        "columns": 2,
+        "order": "row-major",
+        "real": [
+          83.84756084226977,
+          -2.1316282072803006e-14,
+          -1.7763568394002505e-14,
+          83.8475608422698
+        ],
+        "imag": [
+          47.77112230631311,
+          -9.769962616701378e-14,
+          -9.414691248821327e-14,
+          47.77112230631368
+        ]
+      },
+      "admittance": {
+        "rows": 2,
+        "columns": 2,
+        "order": "row-major",
+        "real": [
+          0.009003771124406288,
+          1.0385464977907956e-17,
+          9.960054996052517e-18,
+          0.009003771124406233
+        ],
+        "imag": [
+          -0.005129788479013549,
+          3.3655823939038606e-18,
+          2.9242047522607107e-18,
+          -0.005129788479013577
+        ]
+      },
+      "imagePolicy": "physical-only",
+      "units": {
+        "geometry": "metres",
+        "current": "ampere peak",
+        "convention": "exp(+j omega t)"
+      },
+      "quadraturePacked": {
+        "file": "turnstile-insulated.necq",
+        "byteLength": 9480,
+        "sha256": "0e5288118dfe7cbea3a8f4d6219d0ec5d12e6ab0676c4090203acfa18b45c354",
+        "magic": "NECQ",
+        "nSegments": 22,
+        "nNodes": 4,
+        "nModes": 2,
+        "nImagePlanes": 1
+      },
+      "embeddedPacked": {
+        "file": "turnstile-insulated.necf",
+        "byteLength": 1088,
+        "sha256": "77f6c003c34f9c9f2c5bc3da1babbc2e5e1cf6bda7992b9fb3388dcb0e61c9b3",
+        "magic": "NECF",
+        "nPorts": 2,
+        "nTheta": 5,
+        "nPhi": 3,
+        "samplesPerPort": 15
+      },
+      "samples": {
+        "feedCentreCurrent": {
+          "re": 1.0006816720511456,
+          "im": -1.5543122344752192e-15
+        },
+        "quadratureFeedSample": {
+          "mode": 0,
+          "plane": 0,
+          "segmentIndex": 5,
+          "node": 0,
+          "xi": -1,
+          "current": {
+            "re": 0.9984886098451365,
+            "im": -0.012421139313762097
+          },
+          "positionM": {
+            "x": -0.022727272727272693,
+            "y": 0,
+            "z": 0.001
+          }
+        },
+        "fieldSample": {
+          "port": 0,
+          "thetaIndex": 1,
+          "phiIndex": 1,
+          "thetaDeg": 45,
+          "phiDeg": 90,
+          "eTheta": {
+            "re": -2.6598807553447516e-8,
+            "im": 2.0414008833638497e-8
+          },
+          "ePhi": {
+            "re": 3.957914835374158,
+            "im": 64.22024557264716
+          }
+        }
+      }
+    },
+    {
+      "id": "turnstile-connected",
+      "geometry": {
+        "id": "turnstile-connected",
+        "wires": [
+          {
+            "tag": 1,
+            "segments": 5,
+            "start": [
+              -0.25,
+              0,
+              0
+            ],
+            "end": [
+              0,
+              0,
+              0
+            ],
+            "radiusM": 0.001
+          },
+          {
+            "tag": 2,
+            "segments": 5,
+            "start": [
+              0,
+              0,
+              0
+            ],
+            "end": [
+              0.25,
+              0,
+              0
+            ],
+            "radiusM": 0.001
+          },
+          {
+            "tag": 3,
+            "segments": 5,
+            "start": [
+              0,
+              -0.25,
+              0
+            ],
+            "end": [
+              0,
+              0,
+              0
+            ],
+            "radiusM": 0.001
+          },
+          {
+            "tag": 4,
+            "segments": 5,
+            "start": [
+              0,
+              0,
+              0
+            ],
+            "end": [
+              0,
+              0.25,
+              0
+            ],
+            "radiusM": 0.001
+          }
+        ],
+        "ports": [
+          {
+            "tag": 1,
+            "segment": 5,
+            "name": "x-feed"
+          },
+          {
+            "tag": 3,
+            "segment": 5,
+            "name": "y-feed"
+          }
+        ],
+        "groundConnection": "none",
+        "ground": {
+          "kind": "free-space"
+        }
+      },
+      "frequencyMHz": 300,
+      "wavelengthM": 0.9993187923090975,
+      "quadrature": {
+        "nodes": [
+          -1,
+          -0.3333333333333333,
+          0.3333333333333333,
+          1
+        ],
+        "images": "physical-only",
+        "modes": "unit-current"
+      },
+      "field": {
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 5,
+          "stepDeg": 45
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 3,
+          "stepDeg": 90
+        }
+      },
+      "impedance": {
+        "rows": 2,
+        "columns": 2,
+        "order": "row-major",
+        "real": [
+          48.722849035539106,
+          36.6169728944969,
+          36.61697289449686,
+          48.72284903553914
+        ],
+        "imag": [
+          16.728603959700877,
+          32.1003653937526,
+          32.100365393752504,
+          16.728603959700425
+        ]
+      },
+      "admittance": {
+        "rows": 2,
+        "columns": 2,
+        "order": "row-major",
+        "real": [
+          0.020224391521612234,
+          -0.011396578626556728,
+          -0.011396578626556733,
+          0.020224391521612137
+        ],
+        "imag": [
+          0.017550278977145208,
+          -0.022601297312572276,
+          -0.02260129731257222,
+          0.017550278977145416
+        ]
+      },
+      "imagePolicy": "physical-only",
+      "units": {
+        "geometry": "metres",
+        "current": "ampere peak",
+        "convention": "exp(+j omega t)"
+      },
+      "quadraturePacked": {
+        "file": "turnstile-connected.necq",
+        "byteLength": 8624,
+        "sha256": "90c55b12f10590da73b2d6b99875d12591aa4e39e20d2e8d0b5d1b641e811d81",
+        "magic": "NECQ",
+        "nSegments": 20,
+        "nNodes": 4,
+        "nModes": 2,
+        "nImagePlanes": 1
+      },
+      "embeddedPacked": {
+        "file": "turnstile-connected.necf",
+        "byteLength": 1088,
+        "sha256": "4f3d7d4a76bcbb2cd4e122d77bd2791f9c335fd05f870dced21cb957d426c3d6",
+        "magic": "NECF",
+        "nPorts": 2,
+        "nTheta": 5,
+        "nPhi": 3,
+        "samplesPerPort": 15
+      },
+      "samples": {
+        "feedCentreCurrent": {
+          "re": 1.0006816720511438,
+          "im": -1.5543122344752192e-15
+        },
+        "quadratureFeedSample": {
+          "mode": 0,
+          "plane": 0,
+          "segmentIndex": 4,
+          "node": 0,
+          "xi": -1,
+          "current": {
+            "re": 0.9690163143423416,
+            "im": -0.008051427014410084
+          },
+          "positionM": {
+            "x": -0.05000000000000002,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "fieldSample": {
+          "port": 0,
+          "thetaIndex": 1,
+          "phiIndex": 1,
+          "thetaDeg": 45,
+          "phiDeg": 90,
+          "eTheta": {
+            "re": 11.340816998219568,
+            "im": -18.33240971846499
+          },
+          "ePhi": {
+            "re": 8.444419107907354,
+            "im": 32.93005761526561
+          }
+        }
+      }
+    },
+    {
+      "id": "rooted-monopole-images",
+      "geometry": {
+        "id": "rooted-monopole",
+        "wires": [
+          {
+            "tag": 1,
+            "segments": 11,
+            "start": [
+              0,
+              0,
+              0
+            ],
+            "end": [
+              0,
+              0,
+              0.25
+            ],
+            "radiusM": 0.001
+          }
+        ],
+        "ports": [
+          {
+            "tag": 1,
+            "segment": 1,
+            "name": "base"
+          }
+        ],
+        "groundConnection": "interpolate",
+        "ground": {
+          "kind": "perfect"
+        }
+      },
+      "frequencyMHz": 300,
+      "wavelengthM": 0.9993187923090975,
+      "quadrature": {
+        "nodes": [
+          -1,
+          -0.3333333333333333,
+          0.3333333333333333,
+          1
+        ],
+        "images": "perfect-ground-images",
+        "modes": "unit-current"
+      },
+      "field": {
+        "radiusM": 1,
+        "theta": {
+          "startDeg": 0,
+          "count": 5,
+          "stepDeg": 45
+        },
+        "phi": {
+          "startDeg": 0,
+          "count": 3,
+          "stepDeg": 90
+        }
+      },
+      "impedance": {
+        "rows": 1,
+        "columns": 1,
+        "order": "row-major",
+        "real": [
+          42.1660845584747
+        ],
+        "imag": [
+          24.81037810291034
+        ]
+      },
+      "admittance": {
+        "rows": 1,
+        "columns": 1,
+        "order": "row-major",
+        "real": [
+          0.017616667450976873
+        ],
+        "imag": [
+          -0.010365586109040915
+        ]
+      },
+      "imagePolicy": "perfect-ground-images",
+      "units": {
+        "geometry": "metres",
+        "current": "ampere peak",
+        "convention": "exp(+j omega t)"
+      },
+      "quadraturePacked": {
+        "file": "rooted-monopole-images.necq",
+        "byteLength": 7944,
+        "sha256": "4a744025cd8e65bd5a8b9c0b73cad37e67ab156894cd81180cbd782fb7a7ce03",
+        "magic": "NECQ",
+        "nSegments": 11,
+        "nNodes": 4,
+        "nModes": 1,
+        "nImagePlanes": 2
+      },
+      "samples": {
+        "feedCentreCurrent": {
+          "re": 1.0006816720511509,
+          "im": 2.220446049250313e-15
+        },
+        "quadratureFeedSample": {
+          "mode": 0,
+          "plane": 0,
+          "segmentIndex": 0,
+          "node": 0,
+          "xi": -1,
+          "current": {
+            "re": 1.0010325723971836,
+            "im": 0.003349229310250834
+          },
+          "positionM": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        }
+      }
+    }
+  ]
+}

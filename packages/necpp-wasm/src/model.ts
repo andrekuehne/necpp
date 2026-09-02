@@ -24,12 +24,18 @@ import type {
   GeometryCompletionResult,
   GroundModel,
   ImpedanceResult,
+  IsolatedElementCharacterization,
+  IsolatedElementRequest,
   LoadDefinition,
+  NecCurrentDistribution,
   NecModel,
   NecModelState,
+  NecSegmentEnd,
   PortDefinition,
   PortSolution,
   PrepareOptions,
+  PreparedQuadratureRequest,
+  PreparedTransferHandle,
   SegmentSelection,
   WireDefinition,
 } from "./types.js";
@@ -47,6 +53,25 @@ const STATUS_RUNTIME = 7;
 const INT32_MAX = 2_147_483_647;
 const FLOAT64_BYTES = Float64Array.BYTES_PER_ELEMENT;
 const INT32_BYTES = Int32Array.BYTES_PER_ELEMENT;
+
+const INT32_BUFFER = {
+  currentTag: 0,
+  currentSegment: 1,
+  currentNativeIndex: 2,
+  currentStartKind: 3,
+  currentStartTag: 4,
+  currentStartSegment: 5,
+  currentStartEnd: 6,
+  currentEndKind: 7,
+  currentEndTag: 8,
+  currentEndSegment: 9,
+  currentEndEnd: 10,
+} as const;
+
+const PACKED_BUFFER = {
+  quadrature: 0,
+  embeddedField: 1,
+} as const;
 
 const BUFFER = {
   impedanceReal: 0,
@@ -87,6 +112,18 @@ const BUFFER = {
   snapshotBii: 35,
   snapshotCir: 36,
   snapshotCii: 37,
+  currentCentres: 38,
+  currentStarts: 39,
+  currentEnds: 40,
+  currentTangents: 41,
+  currentRadii: 42,
+  currentLengths: 43,
+  currentAReal: 44,
+  currentAImag: 45,
+  currentBReal: 46,
+  currentBImag: 47,
+  currentCReal: 48,
+  currentCImag: 49,
 } as const;
 
 export type FarFieldSnapshotCapability =
@@ -264,6 +301,77 @@ export function validateFarFieldGrid(
 }
 
 const validateGrid = validateFarFieldGrid;
+
+function decodeSegmentEnd(
+  kind: number,
+  tag: number,
+  segment: number,
+  end: number,
+): NecSegmentEnd {
+  if (kind === 1) {
+    return { kind: "ground" };
+  }
+  if (kind === 2) {
+    return {
+      kind: "segment",
+      tag,
+      segment,
+      end: end === 1 ? "end" : "start",
+    };
+  }
+  return { kind: "free" };
+}
+
+function validatePreparedQuadrature(
+  request: unknown,
+): {
+  readonly nodes: Float64Array;
+  readonly weights: Float64Array | undefined;
+  readonly images: 0 | 1;
+  readonly modes: 0 | 1;
+  readonly modeKind: "latest-solution" | "unit-current";
+} {
+  const record = requireRecord(request, "request");
+  const nodes = record.nodes;
+  if (!isFloat64Array(nodes) || nodes.length === 0) {
+    inputError("request.nodes must be a nonempty Float64Array");
+  }
+  for (let index = 0; index < nodes.length; index += 1) {
+    const value = nodes[index]!;
+    if (!Number.isFinite(value) || value < -1 || value > 1) {
+      inputError("request.nodes must be finite and lie in [-1, 1]");
+    }
+  }
+  let weights: Float64Array | undefined;
+  if (record.weights !== undefined) {
+    if (!isFloat64Array(record.weights) || record.weights.length !== nodes.length) {
+      inputError("request.weights must match request.nodes");
+    }
+    for (let index = 0; index < record.weights.length; index += 1) {
+      if (!Number.isFinite(record.weights[index]!)) {
+        inputError("request.weights must be finite");
+      }
+    }
+    weights = record.weights;
+  }
+  const images = record.images === "physical-only"
+    ? 0 as const
+    : record.images === "perfect-ground-images"
+      ? 1 as const
+      : inputError("request.images must be physical-only or perfect-ground-images");
+  const modes = record.modes === "latest-solution"
+    ? 0 as const
+    : record.modes === "unit-current"
+      ? 1 as const
+      : inputError("request.modes must be latest-solution or unit-current");
+  return {
+    nodes,
+    weights,
+    images,
+    modes,
+    modeKind: modes === 1 ? "unit-current" : "latest-solution",
+  };
+}
 
 function validateTarget(target: unknown): {
   readonly tag: number;
@@ -656,6 +764,121 @@ export class WasmNecModel implements NecModel {
         cause,
         details: { kind },
       });
+    }
+  }
+
+  #copyInt32Buffer(kind: number, expectedLength: number): Int32Array {
+    try {
+      const length = this.#module._necpp_wasm_v1_int32_result_buffer_length(
+        this.#handle,
+        kind,
+      );
+      const pointer = this.#module._necpp_wasm_v1_int32_result_buffer(
+        this.#handle,
+        kind,
+      );
+      if (
+        length !== expectedLength
+        || !Number.isSafeInteger(pointer)
+        || pointer < 0
+        || pointer % INT32_BYTES !== 0
+        || (length > 0 && pointer === 0)
+      ) {
+        throw new NecRuntimeError(
+          `Native int32 result buffer ${kind} has invalid dimensions`,
+          { details: { kind, expectedLength, actualLength: length, pointer } },
+        );
+      }
+      const start = pointer / INT32_BYTES;
+      const end = start + length;
+      if (start < 0 || end > this.#module.HEAP32.length) {
+        throw new NecRuntimeError(
+          `Native int32 result buffer ${kind} is out of bounds`,
+        );
+      }
+      return this.#module.HEAP32.slice(start, end);
+    } catch (cause) {
+      if (cause instanceof NecRuntimeError) {
+        throw cause;
+      }
+      throw new NecRuntimeError(
+        `Failed to copy native int32 result buffer ${kind}`,
+        { cause, details: { kind } },
+      );
+    }
+  }
+
+  #copyPackedBuffer(kind: number): ArrayBuffer {
+    try {
+      const length = this.#module._necpp_wasm_v1_packed_buffer_length(
+        this.#handle,
+        kind,
+      );
+      const pointer = this.#module._necpp_wasm_v1_packed_buffer(
+        this.#handle,
+        kind,
+      );
+      if (
+        !Number.isSafeInteger(length)
+        || length < 0
+        || !Number.isSafeInteger(pointer)
+        || pointer < 0
+        || (length > 0 && pointer === 0)
+      ) {
+        throw new NecRuntimeError(
+          `Native packed buffer ${kind} has invalid dimensions`,
+          { details: { kind, length, pointer } },
+        );
+      }
+      if (pointer + length > this.#module.HEAPU8.length) {
+        throw new NecRuntimeError(`Native packed buffer ${kind} is out of bounds`);
+      }
+      const copy = this.#module.HEAPU8.slice(pointer, pointer + length);
+      if (copy.byteOffset === 0 && copy.buffer.byteLength === length) {
+        return copy.buffer;
+      }
+      const exact = new ArrayBuffer(length);
+      new Uint8Array(exact).set(copy);
+      return exact;
+    } catch (cause) {
+      if (cause instanceof NecRuntimeError) {
+        throw cause;
+      }
+      throw new NecRuntimeError(`Failed to copy native packed buffer ${kind}`, {
+        cause,
+        details: { kind },
+      });
+    }
+  }
+
+  #withQuadratureInputs(
+    nodes: Float64Array,
+    weights: Float64Array | undefined,
+    call: (
+      nodesPointer: number,
+      nodeCount: number,
+      weightsPointer: number,
+      weightCount: number,
+    ) => number,
+  ): number {
+    let nodesPointer = 0;
+    let weightsPointer = 0;
+    try {
+      nodesPointer = this.#allocate(nodes.byteLength);
+      this.#module.HEAPF64.set(nodes, nodesPointer / FLOAT64_BYTES);
+      if (weights !== undefined) {
+        weightsPointer = this.#allocate(weights.byteLength);
+        this.#module.HEAPF64.set(weights, weightsPointer / FLOAT64_BYTES);
+      }
+      return call(
+        nodesPointer,
+        nodes.length,
+        weightsPointer,
+        weights === undefined ? 0 : weights.length,
+      );
+    } finally {
+      this.#free(weightsPointer);
+      this.#free(nodesPointer);
     }
   }
 
@@ -1270,6 +1493,237 @@ export class WasmNecModel implements NecModel {
         ports: snapshotPorts(this.#ports),
         normalization: resultNormalization,
         samplesPerPort,
+      };
+    });
+  }
+
+  getCurrentDistribution(
+    options: { kind: "latest-solution" | "unit-current" },
+  ): NecCurrentDistribution {
+    this.#assertOperation("getCurrentDistribution");
+    const record = requireRecord(options, "options");
+    const mode = record.kind === "latest-solution"
+      ? 0
+      : record.kind === "unit-current"
+        ? 1
+        : inputError("options.kind must be latest-solution or unit-current");
+    if (mode === 0 && this.#state !== "solved") {
+      throw new NecStateError(
+        "getCurrentDistribution",
+        this.#state,
+        "getCurrentDistribution latest-solution requires a consumer solution",
+      );
+    }
+    this.#invokeStatus(
+      "getCurrentDistribution",
+      () => this.#module._necpp_wasm_v1_get_current_distribution(
+        this.#handle,
+        mode,
+      ),
+    );
+    return this.#readResult("getCurrentDistribution", () => {
+      const segmentCount =
+        this.#module._necpp_wasm_v1_current_segment_count(this.#handle);
+      const modeCount =
+        this.#module._necpp_wasm_v1_current_mode_count(this.#handle);
+      const modeKind =
+        this.#module._necpp_wasm_v1_current_mode_kind(this.#handle);
+      if (
+        !Number.isSafeInteger(segmentCount)
+        || segmentCount < 1
+        || !Number.isSafeInteger(modeCount)
+        || modeCount < 1
+        || modeKind !== mode
+      ) {
+        throw new NecRuntimeError(
+          "The native current distribution has invalid metadata",
+        );
+      }
+      const tags = this.#copyInt32Buffer(INT32_BUFFER.currentTag, segmentCount);
+      const segments = this.#copyInt32Buffer(
+        INT32_BUFFER.currentSegment,
+        segmentCount,
+      );
+      const nativeIndex = this.#copyInt32Buffer(
+        INT32_BUFFER.currentNativeIndex,
+        segmentCount,
+      );
+      const startKind = this.#copyInt32Buffer(
+        INT32_BUFFER.currentStartKind,
+        segmentCount,
+      );
+      const startTag = this.#copyInt32Buffer(
+        INT32_BUFFER.currentStartTag,
+        segmentCount,
+      );
+      const startSegment = this.#copyInt32Buffer(
+        INT32_BUFFER.currentStartSegment,
+        segmentCount,
+      );
+      const startEnd = this.#copyInt32Buffer(
+        INT32_BUFFER.currentStartEnd,
+        segmentCount,
+      );
+      const endKind = this.#copyInt32Buffer(
+        INT32_BUFFER.currentEndKind,
+        segmentCount,
+      );
+      const endTag = this.#copyInt32Buffer(
+        INT32_BUFFER.currentEndTag,
+        segmentCount,
+      );
+      const endSegment = this.#copyInt32Buffer(
+        INT32_BUFFER.currentEndSegment,
+        segmentCount,
+      );
+      const endEnd = this.#copyInt32Buffer(
+        INT32_BUFFER.currentEndEnd,
+        segmentCount,
+      );
+      const identities = Array.from({ length: segmentCount }, (_, index) => ({
+        tag: tags[index]!,
+        segment: segments[index]!,
+        nativeIndex: nativeIndex[index]!,
+      }));
+      const startEnds = Array.from({ length: segmentCount }, (_, index) =>
+        decodeSegmentEnd(
+          startKind[index]!,
+          startTag[index]!,
+          startSegment[index]!,
+          startEnd[index]!,
+        ));
+      const endEnds = Array.from({ length: segmentCount }, (_, index) =>
+        decodeSegmentEnd(
+          endKind[index]!,
+          endTag[index]!,
+          endSegment[index]!,
+          endEnd[index]!,
+        ));
+      const planeLength = modeCount * segmentCount;
+      return {
+        schemaVersion: 1,
+        frequencyMHz:
+          this.#module._necpp_wasm_v1_current_frequency_mhz(this.#handle),
+        wavelengthM:
+          this.#module._necpp_wasm_v1_current_wavelength_m(this.#handle),
+        modeKind: mode === 1 ? "unit-current" : "latest-solution",
+        modeCount,
+        segments: Object.freeze(identities),
+        startEnds: Object.freeze(startEnds),
+        endEnds: Object.freeze(endEnds),
+        centresM: this.#copyBuffer(BUFFER.currentCentres, 3 * segmentCount),
+        startsM: this.#copyBuffer(BUFFER.currentStarts, 3 * segmentCount),
+        endsM: this.#copyBuffer(BUFFER.currentEnds, 3 * segmentCount),
+        tangents: this.#copyBuffer(BUFFER.currentTangents, 3 * segmentCount),
+        radiiM: this.#copyBuffer(BUFFER.currentRadii, segmentCount),
+        lengthsM: this.#copyBuffer(BUFFER.currentLengths, segmentCount),
+        aReal: this.#copyBuffer(BUFFER.currentAReal, planeLength),
+        aImag: this.#copyBuffer(BUFFER.currentAImag, planeLength),
+        bReal: this.#copyBuffer(BUFFER.currentBReal, planeLength),
+        bImag: this.#copyBuffer(BUFFER.currentBImag, planeLength),
+        cReal: this.#copyBuffer(BUFFER.currentCReal, planeLength),
+        cImag: this.#copyBuffer(BUFFER.currentCImag, planeLength),
+      };
+    });
+  }
+
+  prepareCurrentQuadrature(
+    request: PreparedQuadratureRequest,
+  ): PreparedTransferHandle {
+    this.#assertOperation("prepareCurrentQuadrature");
+    const quadrature = validatePreparedQuadrature(request);
+    if (quadrature.modes === 0 && this.#state !== "solved") {
+      throw new NecStateError(
+        "prepareCurrentQuadrature",
+        this.#state,
+        "prepareCurrentQuadrature latest-solution requires a consumer solution",
+      );
+    }
+    this.#invokeStatus(
+      "prepareCurrentQuadrature",
+      () => this.#withQuadratureInputs(
+        quadrature.nodes,
+        quadrature.weights,
+        (nodesPointer, nodeCount, weightsPointer, weightCount) =>
+          this.#module._necpp_wasm_v1_prepare_current_quadrature(
+            this.#handle,
+            nodesPointer,
+            nodeCount,
+            weightsPointer,
+            weightCount,
+            quadrature.images,
+            quadrature.modes,
+          ),
+      ),
+    );
+    return this.#readResult("prepareCurrentQuadrature", () => {
+      const buffer = this.#copyPackedBuffer(PACKED_BUFFER.quadrature);
+      return {
+        schemaVersion: 1 as const,
+        byteLength: buffer.byteLength,
+        buffer,
+      };
+    });
+  }
+
+  characterizeIsolatedElement(
+    request: IsolatedElementRequest,
+  ): IsolatedElementCharacterization {
+    this.#assertOperation("characterizeIsolatedElement");
+    const record = requireRecord(request, "request");
+    const quadrature = validatePreparedQuadrature(record.quadrature);
+    if (quadrature.modeKind !== "unit-current") {
+      inputError("CHARACTERIZE ISOLATED ELEMENT: CURRENT MODES MUST BE UNIT-CURRENT");
+    }
+    const grid = validateGrid(record.field, this.#ports.length);
+    this.#invokeStatus(
+      "characterizeIsolatedElement",
+      () => this.#withQuadratureInputs(
+        quadrature.nodes,
+        quadrature.weights,
+        (nodesPointer, nodeCount, weightsPointer, weightCount) =>
+          this.#module._necpp_wasm_v1_characterize_isolated_element(
+            this.#handle,
+            nodesPointer,
+            nodeCount,
+            weightsPointer,
+            weightCount,
+            quadrature.images,
+            grid.radiusM,
+            grid.thetaStartDeg,
+            grid.thetaCount,
+            grid.thetaStepDeg,
+            grid.phiStartDeg,
+            grid.phiCount,
+            grid.phiStepDeg,
+          ),
+      ),
+    );
+    return this.#readResult("characterizeIsolatedElement", () => {
+      const order = this.#module._necpp_wasm_v1_impedance_order(this.#handle);
+      const quadratureBuffer = this.#copyPackedBuffer(PACKED_BUFFER.quadrature);
+      const embeddedBuffer = this.#copyPackedBuffer(PACKED_BUFFER.embeddedField);
+      return {
+        impedance: this.#matrix(
+          BUFFER.impedanceReal,
+          BUFFER.impedanceImag,
+          order,
+        ),
+        admittance: this.#matrix(
+          BUFFER.admittanceReal,
+          BUFFER.admittanceImag,
+          order,
+        ),
+        quadrature: {
+          schemaVersion: 1 as const,
+          byteLength: quadratureBuffer.byteLength,
+          buffer: quadratureBuffer,
+        },
+        embeddedField: {
+          schemaVersion: 1 as const,
+          byteLength: embeddedBuffer.byteLength,
+          buffer: embeddedBuffer,
+        },
       };
     });
   }

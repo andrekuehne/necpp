@@ -76,6 +76,9 @@ const requiredFiles = new Set([
   "dist/nec2pp.wasm",
   "dist/necpp-field-evaluator.generated.js",
   "dist/necpp-field-evaluator.wasm",
+  "fixtures/current-quadrature-v1/manifest.json",
+  "fixtures/current-quadrature-v1/dipole.necq",
+  "fixtures/current-quadrature-v1/dipole.necf",
 ]);
 const packedFiles = new Set(
   (report.files ?? []).map(({ path }) => path.replaceAll("\\", "/")),
@@ -89,7 +92,8 @@ for (const path of packedFiles) {
   const allowed = path === "package.json"
     || path === "README.md"
     || path === "COPYING"
-    || path.startsWith("dist/");
+    || path.startsWith("dist/")
+    || path.startsWith("fixtures/");
   if (!allowed) {
     throw new Error(`Release tarball contains unexpected path ${path}`);
   }

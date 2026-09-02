@@ -34,6 +34,11 @@ node --version
 The package is ESM-only and requires Node 24 or newer for the build and Node
 runtime. The engine itself runs in current browsers as WebAssembly.
 
+Isolated-element current and embedded-pattern fixtures ship with the package
+at `@necpp-engine/wasm/fixtures/current-quadrature-v1/*`. Bind the NECQ/NECF
+buffers once in the compute worker; do not reconstruct element patterns.
+See [`docs/current-quadrature-api.md`](current-quadrature-api.md).
+
 ## Install
 
 In the visualizer application, install the public package from npm:

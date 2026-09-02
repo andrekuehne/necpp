@@ -1,6 +1,6 @@
 {
   "name": "@necpp-engine/wasm",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": false,
   "type": "module",
   "description": "Stateful NEC2++ electromagnetic solver and symmetric-array API for Node and browsers",
@@ -44,15 +44,19 @@
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js",
       "default": "./dist/worker.js"
-    }
+    },
+    "./fixtures/current-quadrature-v1/*": "./fixtures/current-quadrature-v1/*"
   },
   "files": [
     "dist",
+    "fixtures",
     "README.md",
     "COPYING"
   ],
   "scripts": {
     "bench:array": "node bench/array-benchmark.mjs",
+    "bench:current-quadrature": "node bench/current-quadrature-baseline.mjs",
+    "bench:current-quadrature-wp6": "node bench/current-quadrature-wp6.mjs",
     "bench:far-field": "node bench/far-field-benchmark.mjs",
     "bench:far-field-overhead": "node bench/far-field-overhead.mjs",
     "bench:far-field-candidates": "node bench/far-field-candidate-matrix.mjs",
@@ -61,6 +65,7 @@
     "bench:far-field-wp4": "node bench/far-field-wp4-production.mjs",
     "bench:far-field-wp5": "node --expose-gc bench/far-field-wp5-amortization.mjs",
     "bench:consumer-trace": "node bench/consumer-browser-trace.mjs",
+    "write:current-quadrature-fixtures": "node scripts/write-current-quadrature-fixtures.mjs",
     "build": "node scripts/build-dist.mjs",
     "prepack": "npm run build",
     "build:test": "node test/build.mjs",
@@ -69,6 +74,8 @@
     "test:pack": "node test/require-wasm.mjs && node --test --test-timeout=180000 --test-concurrency=1 test/pack/manifest.test.mjs test/pack/consumer.test.mjs",
     "test:browser": "node test/browser-integration.mjs",
     "test:field-worker-browser": "npm run build:test && node test/browser-field-worker-production.mjs",
+    "test:current-quadrature-browser": "npm run build:test && node test/browser-current-quadrature-handoff.mjs",
+    "test:current-quadrature-trace": "npm run build:test && node test/browser-current-quadrature-trace.mjs",
     "pack:release": "node scripts/pack-release.mjs",
     "typecheck": "tsc --project tsconfig.json"
   },

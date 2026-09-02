@@ -14,6 +14,9 @@ export type ModelOperation =
   | "solveCurrents"
   | "computeFarField"
   | "computeEmbeddedFarFields"
+  | "getCurrentDistribution"
+  | "prepareCurrentQuadrature"
+  | "characterizeIsolatedElement"
   | "dispose";
 
 export interface ConditionalTransition {
@@ -80,6 +83,18 @@ export const MODEL_TRANSITIONS: Readonly<Record<ModelOperation, TransitionRow>> 
     solved: "solved",
   },
   computeEmbeddedFarFields: {
+    prepared: "prepared",
+    solved: "solved",
+  },
+  getCurrentDistribution: {
+    prepared: "prepared",
+    solved: "solved",
+  },
+  prepareCurrentQuadrature: {
+    prepared: "prepared",
+    solved: "solved",
+  },
+  characterizeIsolatedElement: {
     prepared: "prepared",
     solved: "solved",
   },

@@ -25,6 +25,9 @@ export type { AppliedArrayBuildPlan } from "./array-solver.js";
 
 export type { NecErrorCode, NecErrorOptions } from "./errors.js";
 
+export { transferIsolatedElementCharacterization } from "./handoff.js";
+export type { IsolatedElementHandoffMessage } from "./handoff.js";
+
 export { createNecWorkerModel } from "./worker-client.js";
 
 export type {
@@ -42,6 +45,7 @@ export type {
   ConductivityLoad,
   CreateArraySolverOptions,
   CreateNecModelOptions,
+  CurrentModeKind,
   CreateNecWorkerModelOptions,
   DistributedParallelRlcLoad,
   DistributedSeriesRlcLoad,
@@ -60,9 +64,16 @@ export type {
   GroundModel,
   ImpedanceLoad,
   ImpedanceResult,
+  IsolatedElementCharacterization,
+  IsolatedElementHandoff,
+  IsolatedElementHandoffOptions,
+  IsolatedElementRequest,
   LoadDefinition,
   NecArraySolver,
+  NecCurrentDistribution,
   NecModelState,
+  NecSegmentEnd,
+  NecSegmentIdentity,
   NecWorkerModel,
   NecWorkerOperation,
   NecWorkerProgressEvent,
@@ -73,6 +84,9 @@ export type {
   PortSolution,
   PositionCanonicalization,
   PositionedArrayElement,
+  PreparedQuadratureImages,
+  PreparedQuadratureRequest,
+  PreparedTransferHandle,
   PrepareOptions,
   ReflectionPlane,
   ReflectionSymmetry,

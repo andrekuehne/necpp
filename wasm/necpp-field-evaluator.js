@@ -1,6 +1,6 @@
 var createNecModule = (() => {
   var _scriptName = import.meta.url;
-
+  
   return (
 async function(moduleArg = {}) {
   var moduleRtn;

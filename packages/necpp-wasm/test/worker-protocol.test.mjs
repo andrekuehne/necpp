@@ -9,8 +9,12 @@ import {
 } from "../.test-build/src/errors.js";
 import {
   collectTransferables,
+  reviveCurrentDistribution,
   reviveError,
+  reviveIsolatedElementCharacterization,
+  reviveIsolatedElementHandoff,
   revivePortSolution,
+  revivePreparedTransferHandle,
   serializeCreateOptions,
   serializeError,
 } from "../.test-build/src/worker-protocol.js";
@@ -142,5 +146,114 @@ test("create options copy wasm bytes and reject invalid overrides", () => {
   assert.throws(
     () => serializeCreateOptions({ wasmBinary: "not WASM" }),
     NecInputError,
+  );
+});
+
+test("characterization handles transfer to a MessagePort without cloning large buffers", async () => {
+  const { transferIsolatedElementCharacterization } = await import(
+    "../.test-build/src/handoff.js"
+  );
+  const quadrature = new ArrayBuffer(64);
+  new Uint8Array(quadrature).set([0x4e, 0x45, 0x43, 0x51]);
+  const embedded = new ArrayBuffer(64);
+  new Uint8Array(embedded).set([0x4e, 0x45, 0x43, 0x46]);
+  const characterization = {
+    impedance: {
+      rows: 1,
+      columns: 1,
+      order: "row-major",
+      real: Float64Array.of(50),
+      imag: Float64Array.of(0),
+    },
+    admittance: {
+      rows: 1,
+      columns: 1,
+      order: "row-major",
+      real: Float64Array.of(0.02),
+      imag: Float64Array.of(0),
+    },
+    quadrature: { schemaVersion: 1, byteLength: 64, buffer: quadrature },
+    embeddedField: { schemaVersion: 1, byteLength: 64, buffer: embedded },
+  };
+
+  const collected = collectTransferables(characterization);
+  assert.equal(collected.length, 6);
+  assert.ok(collected.includes(quadrature));
+  assert.ok(collected.includes(embedded));
+
+  const revivedHandle = revivePreparedTransferHandle({
+    schemaVersion: 1,
+    byteLength: 64,
+    buffer: new Uint8Array(quadrature).slice().buffer,
+  });
+  assert.equal(revivedHandle.byteLength, 64);
+  const revivedCharacterization = reviveIsolatedElementCharacterization({
+    ...characterization,
+    quadrature: {
+      schemaVersion: 1,
+      byteLength: 64,
+      buffer: new Uint8Array(quadrature).slice().buffer,
+    },
+    embeddedField: {
+      schemaVersion: 1,
+      byteLength: 64,
+      buffer: new Uint8Array(embedded).slice().buffer,
+    },
+  });
+  assert.equal(revivedCharacterization.quadrature.byteLength, 64);
+  const revivedHandoff = reviveIsolatedElementHandoff({
+    impedance: characterization.impedance,
+    admittance: characterization.admittance,
+    quadratureByteLength: 64,
+    embeddedFieldByteLength: 64,
+  });
+  assert.equal(revivedHandoff.quadratureByteLength, 64);
+  reviveCurrentDistribution({
+    schemaVersion: 1,
+    frequencyMHz: 300,
+    wavelengthM: 1,
+    modeKind: "unit-current",
+    modeCount: 1,
+    segments: [{ tag: 1, segment: 6, nativeIndex: 5 }],
+    startEnds: [{ kind: "free" }],
+    endEnds: [{ kind: "free" }],
+    centresM: new Float64Array(3),
+    startsM: new Float64Array(3),
+    endsM: new Float64Array(3),
+    tangents: new Float64Array([0, 0, 1]),
+    radiiM: new Float64Array([0.001]),
+    lengthsM: new Float64Array([1]),
+    aReal: new Float64Array(1),
+    aImag: new Float64Array(1),
+    bReal: new Float64Array(1),
+    bImag: new Float64Array(1),
+    cReal: new Float64Array(1),
+    cImag: new Float64Array(1),
+  });
+
+  const { port1, port2 } = new MessageChannel();
+  const received = new Promise((resolve) => {
+    port2.once("message", resolve);
+  });
+  const handoff = transferIsolatedElementCharacterization(characterization, port1);
+  const message = await received;
+  port1.close();
+  port2.close();
+
+  assert.equal(handoff.quadratureByteLength, 64);
+  assert.equal(handoff.embeddedFieldByteLength, 64);
+  assert.equal(handoff.impedance.real[0], 50);
+  assert.equal(message.kind, "isolated-element-characterization");
+  assert.equal(new Uint8Array(message.quadrature.buffer)[0], 0x4e);
+  assert.equal(new Uint8Array(message.embeddedField.buffer)[3], 0x46);
+  assert.equal(characterization.quadrature.buffer.byteLength, 0);
+  assert.equal(characterization.embeddedField.buffer.byteLength, 0);
+  assert.equal(characterization.impedance.real[0], 50);
+
+  assert.throws(
+    () => transferIsolatedElementCharacterization(characterization, {
+      postMessage() {},
+    }),
+    (error) => error instanceof NecInputError,
   );
 });

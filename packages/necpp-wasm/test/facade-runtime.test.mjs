@@ -54,7 +54,7 @@ function addDipole(model) {
 }
 
 test("package, engine, and ABI versions are exported", () => {
-  assert.equal(packageVersion, "0.4.0");
+  assert.equal(packageVersion, "0.5.0");
   assert.equal(engineVersion, "2.5.0");
   assert.equal(abiVersion, 1);
 });

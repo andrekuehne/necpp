@@ -104,6 +104,41 @@ export interface NecWasmModule {
   _necpp_wasm_v1_far_field_snapshot_solution_generation(model: number): number;
   _necpp_wasm_v1_far_field_snapshot_perfect_ground(model: number): number;
 
+  _necpp_wasm_v1_get_current_distribution(model: number, mode: number): number;
+  _necpp_wasm_v1_prepare_current_quadrature(
+    model: number,
+    nodes: number,
+    nodeCount: number,
+    weights: number,
+    weightCount: number,
+    images: number,
+    modes: number,
+  ): number;
+  _necpp_wasm_v1_characterize_isolated_element(
+    model: number,
+    nodes: number,
+    nodeCount: number,
+    weights: number,
+    weightCount: number,
+    images: number,
+    radiusM: number,
+    thetaStartDeg: number,
+    thetaCount: number,
+    thetaStepDeg: number,
+    phiStartDeg: number,
+    phiCount: number,
+    phiStepDeg: number,
+  ): number;
+  _necpp_wasm_v1_current_segment_count(model: number): number;
+  _necpp_wasm_v1_current_mode_count(model: number): number;
+  _necpp_wasm_v1_current_mode_kind(model: number): number;
+  _necpp_wasm_v1_current_frequency_mhz(model: number): number;
+  _necpp_wasm_v1_current_wavelength_m(model: number): number;
+  _necpp_wasm_v1_int32_result_buffer(model: number, kind: number): number;
+  _necpp_wasm_v1_int32_result_buffer_length(model: number, kind: number): number;
+  _necpp_wasm_v1_packed_buffer(model: number, kind: number): number;
+  _necpp_wasm_v1_packed_buffer_length(model: number, kind: number): number;
+
   _necpp_wasm_v1_impedance_order(model: number): number;
   _necpp_wasm_v1_impedance_frequency_mhz(model: number): number;
   _necpp_wasm_v1_impedance_condition_estimate(model: number): number;

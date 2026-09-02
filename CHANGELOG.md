@@ -1,3 +1,33 @@
+## 0.5.0 - 2026-09-02
+
+### Added
+
+* **Isolated-element current and pattern characterization:** `NecModel` and
+  `NecWorkerModel` expose exact NEC `A/B/C` currents, caller-defined prepared
+  quadrature (`NECQ`), and NEC-native embedded `E_theta/E_phi` (`NECF`) for
+  one isolated antenna at one frequency. `characterizeIsolatedElement()`
+  shares one unit-current basis solve per port. Worker handoff transfers the
+  packed buffers once onto a consumer `MessagePort`; the UI client keeps Z/Y
+  and byte lengths only.
+* **Versioned current-quadrature fixtures:** `fixtures/current-quadrature-v1/`
+  ships dipole, rooted-monopole, multiwire, and turnstile goldens with the
+  npm pack. A `publish = false` Rust view crate binds those bytes zero-copy.
+
+### Performance
+
+* Prepared quadrature retrieve is a cached packed-buffer read. Native dipole
+  retrieve stays far below prepare cost; characterization of the 19×37 dipole
+  is one unit-current solve rather than separate current and field passes.
+  Browser traces of the in-repo mock consumer show no large-data main-thread
+  or repeated-steering transfer.
+
+### Compatibility
+
+* WASM ABI version remains `1`. New C symbols and result-buffer kinds are
+  additive. Existing Z/Y, solves, far fields, power, and lifecycle are
+  unchanged. This WP does not publish to npm; the pin-ready version is
+  `0.5.0`.
+
 ## 0.4.0 - 2026-09-01
 
 ### Added

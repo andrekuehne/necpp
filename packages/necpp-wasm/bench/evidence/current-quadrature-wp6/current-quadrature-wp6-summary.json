@@ -1,0 +1,255 @@
+{
+  "type": "current-quadrature-wp6-baseline",
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-02T19:23:50.922Z",
+  "command": "\"C:\\\\nvm4w\\\\nodejs\\\\node.exe\" \"C:\\\\Users\\\\andre\\\\VSCode_Projects\\\\necpp\\\\packages\\\\necpp-wasm\\\\bench\\\\current-quadrature-wp6.mjs\" \"--output-directory\" \"bench/evidence/current-quadrature-wp6\" \"--module-directory\" \"dist\" \"--rounds\" \"1\" \"--warmups\" \"0\" \"--fixtures\" \"dipole,turnstile-insulated\" \"--grids\" \"published\" \"--backends\" \"direct,worker\"",
+  "configuration": {
+    "rounds": 1,
+    "warmups": 0,
+    "fixtures": [
+      "dipole",
+      "turnstile-insulated"
+    ],
+    "grids": [
+      "published"
+    ],
+    "backends": [
+      "direct",
+      "worker"
+    ],
+    "moduleDirectory": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\dist"
+  },
+  "budgets": {
+    "preparedCurrentBytes": "nModes * nSeg * nNodes * nImagePlanes * 16",
+    "preparedGeometryBytes": "9 * nSeg * nNodes * nImagePlanes * 8",
+    "embeddedFieldBytes": "4 * nPorts * nTheta * nPhi * 8",
+    "necfEnvelopeBytes": "64 + (nTheta + nPhi + 4 * nPorts * nTheta * nPhi) * 8"
+  },
+  "rawNdjson": "C:\\Users\\andre\\VSCode_Projects\\necpp\\packages\\necpp-wasm\\bench\\evidence\\current-quadrature-wp6\\current-quadrature-wp6-raw.ndjson",
+  "cases": {
+    "dipole:published-5-3:direct": {
+      "caseCount": 1,
+      "portCount": 1,
+      "wireCount": 1,
+      "quadratureBytes": 4072,
+      "embeddedBytes": 608,
+      "clientHasLargeBuffers": null,
+      "consumerReceivedBytes": null,
+      "steerRetransferred": null,
+      "timings": {
+        "createMs": {
+          "count": 1,
+          "minimum": 8.530900000000003,
+          "median": 8.530900000000003,
+          "maximum": 8.530900000000003,
+          "p90": 8.530900000000003
+        },
+        "constructionMs": {
+          "count": 1,
+          "minimum": 4.6865999999999985,
+          "median": 4.6865999999999985,
+          "maximum": 4.6865999999999985,
+          "p90": 4.6865999999999985
+        },
+        "impedanceMs": {
+          "count": 1,
+          "minimum": 4.570799999999998,
+          "median": 4.570799999999998,
+          "maximum": 4.570799999999998,
+          "p90": 4.570799999999998
+        },
+        "characterizeMs": {
+          "count": 1,
+          "minimum": 1.4521000000000015,
+          "median": 1.4521000000000015,
+          "maximum": 1.4521000000000015,
+          "p90": 1.4521000000000015
+        },
+        "retrieveMs": {
+          "count": 1,
+          "minimum": 0.00023980000000000247,
+          "median": 0.00023980000000000247,
+          "maximum": 0.00023980000000000247,
+          "p90": 0.00023980000000000247
+        }
+      },
+      "memory": {
+        "afterRssBytes": {
+          "count": 1,
+          "minimum": 60026880,
+          "median": 60026880,
+          "maximum": 60026880,
+          "p90": 60026880
+        }
+      }
+    },
+    "dipole:published-5-3:worker": {
+      "caseCount": 1,
+      "portCount": 1,
+      "wireCount": 1,
+      "quadratureBytes": 4072,
+      "embeddedBytes": 608,
+      "clientHasLargeBuffers": false,
+      "consumerReceivedBytes": 4680,
+      "steerRetransferred": true,
+      "timings": {
+        "createMs": {
+          "count": 1,
+          "minimum": 67.9666,
+          "median": 67.9666,
+          "maximum": 67.9666,
+          "p90": 67.9666
+        },
+        "constructionMs": {
+          "count": 1,
+          "minimum": 6.9162000000000035,
+          "median": 6.9162000000000035,
+          "maximum": 6.9162000000000035,
+          "p90": 6.9162000000000035
+        },
+        "impedanceMs": {
+          "count": 1,
+          "minimum": 5.593900000000005,
+          "median": 5.593900000000005,
+          "maximum": 5.593900000000005,
+          "p90": 5.593900000000005
+        },
+        "characterizeMs": {
+          "count": 1,
+          "minimum": 4.109999999999999,
+          "median": 4.109999999999999,
+          "maximum": 4.109999999999999,
+          "p90": 4.109999999999999
+        },
+        "retrieveMs": {
+          "count": 1,
+          "minimum": 0.007499999999993179,
+          "median": 0.007499999999993179,
+          "maximum": 0.007499999999993179,
+          "p90": 0.007499999999993179
+        }
+      },
+      "memory": {
+        "afterRssBytes": {
+          "count": 1,
+          "minimum": 76697600,
+          "median": 76697600,
+          "maximum": 76697600,
+          "p90": 76697600
+        }
+      }
+    },
+    "turnstile-insulated:published-5-3:direct": {
+      "caseCount": 1,
+      "portCount": 2,
+      "wireCount": 2,
+      "quadratureBytes": 9480,
+      "embeddedBytes": 1088,
+      "clientHasLargeBuffers": null,
+      "consumerReceivedBytes": null,
+      "steerRetransferred": null,
+      "timings": {
+        "createMs": {
+          "count": 1,
+          "minimum": 8.596899999999998,
+          "median": 8.596899999999998,
+          "maximum": 8.596899999999998,
+          "p90": 8.596899999999998
+        },
+        "constructionMs": {
+          "count": 1,
+          "minimum": 6.087499999999999,
+          "median": 6.087499999999999,
+          "maximum": 6.087499999999999,
+          "p90": 6.087499999999999
+        },
+        "impedanceMs": {
+          "count": 1,
+          "minimum": 6.784300000000002,
+          "median": 6.784300000000002,
+          "maximum": 6.784300000000002,
+          "p90": 6.784300000000002
+        },
+        "characterizeMs": {
+          "count": 1,
+          "minimum": 1.6591999999999985,
+          "median": 1.6591999999999985,
+          "maximum": 1.6591999999999985,
+          "p90": 1.6591999999999985
+        },
+        "retrieveMs": {
+          "count": 1,
+          "minimum": 0.0002877999999999972,
+          "median": 0.0002877999999999972,
+          "maximum": 0.0002877999999999972,
+          "p90": 0.0002877999999999972
+        }
+      },
+      "memory": {
+        "afterRssBytes": {
+          "count": 1,
+          "minimum": 60321792,
+          "median": 60321792,
+          "maximum": 60321792,
+          "p90": 60321792
+        }
+      }
+    },
+    "turnstile-insulated:published-5-3:worker": {
+      "caseCount": 1,
+      "portCount": 2,
+      "wireCount": 2,
+      "quadratureBytes": 9480,
+      "embeddedBytes": 1088,
+      "clientHasLargeBuffers": false,
+      "consumerReceivedBytes": 10568,
+      "steerRetransferred": true,
+      "timings": {
+        "createMs": {
+          "count": 1,
+          "minimum": 66.91029999999999,
+          "median": 66.91029999999999,
+          "maximum": 66.91029999999999,
+          "p90": 66.91029999999999
+        },
+        "constructionMs": {
+          "count": 1,
+          "minimum": 7.474400000000003,
+          "median": 7.474400000000003,
+          "maximum": 7.474400000000003,
+          "p90": 7.474400000000003
+        },
+        "impedanceMs": {
+          "count": 1,
+          "minimum": 7.2006000000000085,
+          "median": 7.2006000000000085,
+          "maximum": 7.2006000000000085,
+          "p90": 7.2006000000000085
+        },
+        "characterizeMs": {
+          "count": 1,
+          "minimum": 3.47290000000001,
+          "median": 3.47290000000001,
+          "maximum": 3.47290000000001,
+          "p90": 3.47290000000001
+        },
+        "retrieveMs": {
+          "count": 1,
+          "minimum": 0.008600000000001273,
+          "median": 0.008600000000001273,
+          "maximum": 0.008600000000001273,
+          "p90": 0.008600000000001273
+        }
+      },
+      "memory": {
+        "afterRssBytes": {
+          "count": 1,
+          "minimum": 76595200,
+          "median": 76595200,
+          "maximum": 76595200,
+          "p90": 76595200
+        }
+      }
+    }
+  }
+}
