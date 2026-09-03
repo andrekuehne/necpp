@@ -10,6 +10,10 @@ import {
   applyCurrentQuadratureFixture,
   unitCurrentVector,
 } from "./fixtures/current-quadrature.mjs";
+import {
+  viewEmbeddedField,
+  viewPreparedQuadrature,
+} from "./fixtures/current-quadrature-packed.mjs";
 
 const generatedLoader = new URL(
   "../.test-build/src/nec2pp.generated.js",
@@ -300,6 +304,145 @@ test("WP4 direct and worker packed NECQ/NECF agree",
         );
       },
     );
+  });
+
+const necSpeedOfLightMPerS = 1 / Math.sqrt(
+  8.854e-12 * 4 * Math.PI * 1e-7,
+);
+
+async function scaledDipoleCharacterization(factory, frequencyMHz) {
+  const wavelengthM = necSpeedOfLightMPerS / (frequencyMHz * 1e6);
+  const model = await factory();
+  try {
+    await Promise.resolve(model.addWire({
+      tag: 1,
+      segments: 11,
+      start: [0, 0, -0.25 * wavelengthM],
+      end: [0, 0, 0.25 * wavelengthM],
+      radiusM: 0.001 * wavelengthM,
+    }));
+    await Promise.resolve(model.completeGeometry());
+    await Promise.resolve(model.definePorts([{ tag: 1, segment: 6 }]));
+    await Promise.resolve(model.prepare({ frequencyMHz }));
+    return await Promise.resolve(model.characterizeIsolatedElement({
+      quadrature: {
+        nodes: Float64Array.of(-0.5, 0, 0.5),
+        weights: Float64Array.of(0.4, 1.2, 0.4),
+        images: "physical-only",
+        modes: "unit-current",
+      },
+      field: {
+        radiusM: 10 * wavelengthM,
+        theta: { startDeg: 30, count: 3, stepDeg: 30 },
+        phi: { startDeg: 0, count: 2, stepDeg: 90 },
+      },
+    }));
+  } finally {
+    await Promise.resolve(model.dispose());
+  }
+}
+
+test("frequency-scaled NECQ and NECF are invariant through direct and worker APIs",
+  { skip: skipWp4 }, async () => {
+    let reference;
+    for (const frequencyMHz of [30, 300, 1000, 10000]) {
+      const direct = await scaledDipoleCharacterization(createNecModel, frequencyMHz);
+      const worker = await scaledDipoleCharacterization(createNecWorkerModel, frequencyMHz);
+      assert.deepEqual(
+        new Uint8Array(worker.quadrature.buffer),
+        new Uint8Array(direct.quadrature.buffer),
+      );
+      assert.deepEqual(
+        new Uint8Array(worker.embeddedField.buffer),
+        new Uint8Array(direct.embeddedField.buffer),
+      );
+
+      const necq = viewPreparedQuadrature(direct.quadrature.buffer);
+      const necf = viewEmbeddedField(direct.embeddedField.buffer);
+      const feed = necq.currentIndex(0, 0, 5, 1);
+      assert.ok(Math.abs(necq.iReal[feed] - 1) < unitCurrentTolerance);
+      assert.ok(Math.abs(necq.iImag[feed]) < unitCurrentTolerance);
+      const feedGeometry = necq.geometryIndex(0, 5, 1);
+      assert.ok(Math.abs(necq.z[feedGeometry] / necq.wavelengthM) < 1e-12);
+      assert.ok(Math.abs(necq.lengthM[feedGeometry] / necq.wavelengthM - 0.5 / 11) < 1e-12);
+      assert.ok(Math.abs(necq.dsWeight[feedGeometry] / necq.wavelengthM
+        - 0.5 * (0.5 / 11) * 1.2) < 1e-12);
+
+      const normalized = {
+        impedance: Float64Array.of(
+          direct.impedance.real[0], direct.impedance.imag[0],
+        ),
+        currents: Float64Array.from([...necq.iReal, ...necq.iImag]),
+        fields: Float64Array.from([
+          ...necf.eThetaReal, ...necf.eThetaImag,
+          ...necf.ePhiReal, ...necf.ePhiImag,
+        ], (value) => value * necq.wavelengthM),
+      };
+      if (reference === undefined) {
+        reference = normalized;
+      } else {
+        assert.ok(relativeError(normalized.impedance, reference.impedance) < 1e-10);
+        assert.ok(relativeError(normalized.currents, reference.currents) < 1e-10);
+        assert.ok(relativeError(normalized.fields, reference.fields) < 1e-7);
+      }
+    }
+  });
+
+async function scaledTurnstileCurrents(factory, frequencyMHz) {
+  const wavelengthM = necSpeedOfLightMPerS / (frequencyMHz * 1e6);
+  const model = await factory();
+  try {
+    for (const wire of [
+      {
+        tag: 1,
+        start: [-0.25 * wavelengthM, 0, 0.001 * wavelengthM],
+        end: [0.25 * wavelengthM, 0, 0.001 * wavelengthM],
+      },
+      {
+        tag: 2,
+        start: [0, -0.25 * wavelengthM, -0.001 * wavelengthM],
+        end: [0, 0.25 * wavelengthM, -0.001 * wavelengthM],
+      },
+    ]) {
+      await Promise.resolve(model.addWire({
+        ...wire,
+        segments: 11,
+        radiusM: 0.001 * wavelengthM,
+      }));
+    }
+    await Promise.resolve(model.completeGeometry());
+    await Promise.resolve(model.definePorts([
+      { tag: 1, segment: 6 }, { tag: 2, segment: 6 },
+    ]));
+    await Promise.resolve(model.prepare({ frequencyMHz }));
+    return await Promise.resolve(
+      model.getCurrentDistribution({ kind: "unit-current" }),
+    );
+  } finally {
+    await Promise.resolve(model.dispose());
+  }
+}
+
+test("frequency-scaled multiport currents are normalized through direct and worker APIs",
+  { skip: skipWp4 }, async () => {
+    for (const frequencyMHz of [30, 300, 1000, 10000]) {
+      const direct = await scaledTurnstileCurrents(createNecModel, frequencyMHz);
+      const worker = await scaledTurnstileCurrents(createNecWorkerModel, frequencyMHz);
+      assert.ok(relativeError(direct.aReal, worker.aReal) < samePathTolerance);
+      assert.ok(relativeError(direct.aImag, worker.aImag) < samePathTolerance);
+      assert.ok(relativeError(direct.cReal, worker.cReal) < samePathTolerance);
+      assert.ok(relativeError(direct.cImag, worker.cImag) < samePathTolerance);
+      for (let mode = 0; mode < 2; mode += 1) {
+        for (let port = 0; port < 2; port += 1) {
+          const plane = mode * 22 + port * 11 + 5;
+          const expected = mode === port ? 1 : 0;
+          assert.ok(Math.abs(direct.aReal[plane] + direct.cReal[plane] - expected)
+            < unitCurrentTolerance);
+          assert.ok(Math.abs(direct.aImag[plane] + direct.cImag[plane])
+            < unitCurrentTolerance);
+        }
+      }
+    }
   });
 
 test("WP4 direct and worker current planes agree",

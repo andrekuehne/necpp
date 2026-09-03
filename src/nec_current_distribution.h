@@ -63,9 +63,11 @@ struct nec_segment_identity {
   int native_index = 0;
 };
 
-/*! Owned exact NEC A/B/C current coefficients and physical segment geometry.
+/*! Owned exact physical A/B/C current coefficients and segment geometry.
  *
- * Geometry is in metres. Coefficient planes are mode-major:
+ * Geometry is in metres and coefficients are in amperes. NEC's native
+ * wavelength-normalized coefficient storage is converted at capture time.
+ * Coefficient planes are mode-major:
  * index = modeIndex * nSegments + segmentIndex.
  */
 struct nec_current_distribution {

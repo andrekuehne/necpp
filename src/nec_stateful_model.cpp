@@ -121,14 +121,22 @@ void copy_current_coefficient_mode(
   const char* operation)
 {
   const size_t count = distribution.segment_count();
+  // NEC solves wire-current coefficients in its wavelength-normalized
+  // coordinate system.  The native coefficients therefore carry A/m and
+  // legacy current reporting multiplies them by wavelength to recover the
+  // physical segment current in amperes.  nec_current_distribution is the
+  // public producer boundary: its A/B/C contract is ampere-valued with s and
+  // geometry in metres, so perform the dimensional conversion here once for
+  // direct callers, NECQ packing, characterization, and worker serialization.
+  const nec_float amperes_per_native_coefficient = input.wavelength;
   for (size_t index = 0; index < count; ++index) {
     const int64_t native = static_cast<int64_t>(index);
-    const nec_float air = input.air[native];
-    const nec_float aii = input.aii[native];
-    const nec_float bir = input.bir[native];
-    const nec_float bii = input.bii[native];
-    const nec_float cir = input.cir[native];
-    const nec_float cii = input.cii[native];
+    const nec_float air = input.air[native] * amperes_per_native_coefficient;
+    const nec_float aii = input.aii[native] * amperes_per_native_coefficient;
+    const nec_float bir = input.bir[native] * amperes_per_native_coefficient;
+    const nec_float bii = input.bii[native] * amperes_per_native_coefficient;
+    const nec_float cir = input.cir[native] * amperes_per_native_coefficient;
+    const nec_float cii = input.cii[native] * amperes_per_native_coefficient;
     if (!finite_value(air) || !finite_value(aii) ||
         !finite_value(bir) || !finite_value(bii) ||
         !finite_value(cir) || !finite_value(cii))
