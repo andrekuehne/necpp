@@ -23,7 +23,7 @@ test("npm pack contains only the documented publish files", { skip }, () => {
   assert.equal(packed.version, packageJson.version);
   const filenamePrefix = packageJson.name.slice(1).replace("/", "-");
   assert.equal(packed.filename, `${filenamePrefix}-${packageJson.version}.tgz`);
-  assert.equal(packageJson.version, "0.5.0");
+  assert.equal(packageJson.version, "0.5.1");
   assert.equal(fixtureManifest.packageVersion, packageJson.version);
   assert.equal(packageJson.engines.node, ">=24");
   assert.deepEqual(packageJson.publishConfig, {
