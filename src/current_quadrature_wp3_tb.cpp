@@ -2,6 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "current_quadrature_fixtures.h"
+#include "electromag.h"
 #include "nec_exception.h"
 #include "nec_stateful_model.h"
 
@@ -265,7 +266,300 @@ void require_plane_separation(const nec_prepared_quadrature_view& view)
   }
 }
 
+std::vector<nec_wire_definition> scaled_dipole_wires(nec_float wavelength_m)
+{
+  return {{
+    1, 11,
+    0.0, 0.0, -0.25 * wavelength_m,
+    0.0, 0.0, 0.25 * wavelength_m,
+    0.001 * wavelength_m,
+  }};
+}
+
+std::vector<nec_wire_definition> scaled_turnstile_wires(nec_float wavelength_m)
+{
+  return {
+    {
+      1, 11,
+      -0.25 * wavelength_m, 0.0, 0.001 * wavelength_m,
+      0.25 * wavelength_m, 0.0, 0.001 * wavelength_m,
+      0.001 * wavelength_m,
+    },
+    {
+      2, 11,
+      0.0, -0.25 * wavelength_m, -0.001 * wavelength_m,
+      0.0, 0.25 * wavelength_m, -0.001 * wavelength_m,
+      0.001 * wavelength_m,
+    },
+  };
+}
+
+std::vector<nec_complex> wavelength_scaled(
+  const std::vector<nec_complex>& values, nec_float wavelength_m)
+{
+  std::vector<nec_complex> scaled(values);
+  for (nec_complex& value : scaled)
+    value *= wavelength_m;
+  return scaled;
+}
+
+nec_stateful_model scaled_dipole_array(
+  int rows, int columns, nec_float spacing_wavelengths,
+  nec_float frequency_mhz)
+{
+  const nec_float wavelength_m =
+    em::get_wavelength(frequency_mhz * 1.0e6);
+  nec_stateful_model model;
+  std::vector<nec_port_definition> ports;
+  int tag = 1;
+  for (int row = 0; row < rows; ++row) {
+    for (int column = 0; column < columns; ++column) {
+      const nec_float x = column * spacing_wavelengths * wavelength_m;
+      const nec_float y = row * spacing_wavelengths * wavelength_m;
+      model.add_wire({
+        tag, 11,
+        x, y, -0.25 * wavelength_m,
+        x, y, 0.25 * wavelength_m,
+        0.001 * wavelength_m,
+      });
+      ports.push_back({tag, 6});
+      ++tag;
+    }
+  }
+  model.complete_geometry(nec_ground_connection::none);
+  model.define_ports(ports);
+  model.prepare(frequency_mhz);
+  return model;
+}
+
+void require_reciprocal_and_passive(const nec_complex_matrix& impedance)
+{
+  REQUIRE(impedance.rows == impedance.columns);
+  const size_t order = impedance.rows;
+  std::vector<nec_float> resistance(order * order);
+  nec_float reciprocity_defect_squared = 0.0;
+  nec_float impedance_squared = 0.0;
+  for (size_t row = 0; row < order; ++row) {
+    for (size_t column = 0; column < order; ++column) {
+      const nec_complex forward = impedance.at(row, column);
+      const nec_complex reverse = impedance.at(column, row);
+      reciprocity_defect_squared += std::norm(forward - reverse);
+      impedance_squared += std::norm(forward);
+      resistance[row * order + column] =
+        0.5 * (forward.real() + reverse.real());
+    }
+  }
+  REQUIRE(std::sqrt(reciprocity_defect_squared) /
+    std::max(nec_float(1.0), std::sqrt(impedance_squared)) < 1.0e-5);
+  // Jacobi rotations are sufficient for these small real-symmetric matrices and
+  // keep this regression independent of the engine's matrix implementation.
+  for (size_t iteration = 0; iteration < 100 * order * order; ++iteration) {
+    size_t pivot_row = 0;
+    size_t pivot_column = 0;
+    nec_float largest_off_diagonal = 0.0;
+    for (size_t row = 0; row < order; ++row) {
+      for (size_t column = row + 1; column < order; ++column) {
+        const nec_float magnitude =
+          std::abs(resistance[row * order + column]);
+        if (magnitude > largest_off_diagonal) {
+          largest_off_diagonal = magnitude;
+          pivot_row = row;
+          pivot_column = column;
+        }
+      }
+    }
+    if (largest_off_diagonal < 1.0e-12)
+      break;
+
+    const nec_float diagonal_row =
+      resistance[pivot_row * order + pivot_row];
+    const nec_float diagonal_column =
+      resistance[pivot_column * order + pivot_column];
+    const nec_float off_diagonal =
+      resistance[pivot_row * order + pivot_column];
+    const nec_float angle = 0.5 * std::atan2(
+      2.0 * off_diagonal, diagonal_column - diagonal_row);
+    const nec_float cosine = std::cos(angle);
+    const nec_float sine = std::sin(angle);
+
+    for (size_t index = 0; index < order; ++index) {
+      if (index == pivot_row || index == pivot_column)
+        continue;
+      const nec_float row_value = resistance[index * order + pivot_row];
+      const nec_float column_value =
+        resistance[index * order + pivot_column];
+      const nec_float rotated_row = cosine * row_value - sine * column_value;
+      const nec_float rotated_column = sine * row_value + cosine * column_value;
+      resistance[index * order + pivot_row] = rotated_row;
+      resistance[pivot_row * order + index] = rotated_row;
+      resistance[index * order + pivot_column] = rotated_column;
+      resistance[pivot_column * order + index] = rotated_column;
+    }
+    resistance[pivot_row * order + pivot_row] =
+      cosine * cosine * diagonal_row -
+      2.0 * sine * cosine * off_diagonal +
+      sine * sine * diagonal_column;
+    resistance[pivot_column * order + pivot_column] =
+      sine * sine * diagonal_row +
+      2.0 * sine * cosine * off_diagonal +
+      cosine * cosine * diagonal_column;
+    resistance[pivot_row * order + pivot_column] = 0.0;
+    resistance[pivot_column * order + pivot_row] = 0.0;
+  }
+  nec_float minimum_eigenvalue = resistance[0];
+  nec_float maximum_eigenvalue = resistance[0];
+  for (size_t index = 1; index < order; ++index) {
+    minimum_eigenvalue = std::min(
+      minimum_eigenvalue, resistance[index * order + index]);
+    maximum_eigenvalue = std::max(
+      maximum_eigenvalue, resistance[index * order + index]);
+  }
+  REQUIRE(minimum_eigenvalue >= -1.0e-8 * std::max(nec_float(1.0), maximum_eigenvalue));
+}
+
 } // namespace
+
+TEST_CASE("Frequency-scaled unit-current characterization is dimensionally invariant",
+          "[wasm_api][current_quadrature][frequency_scaling]")
+{
+  constexpr nec_float frequencies_mhz[] = {
+    30.0, 300.0, 1000.0, 1379.0, 10000.0,
+  };
+  nec_complex reference_impedance;
+  std::vector<nec_complex> reference_currents;
+  std::vector<nec_complex> reference_e_theta_times_wavelength;
+  std::vector<nec_complex> reference_e_phi_times_wavelength;
+  nec_float reference_radiated_power = 0.0;
+
+  for (const nec_float frequency_mhz : frequencies_mhz) {
+    const nec_float wavelength_m =
+      em::get_wavelength(frequency_mhz * 1.0e6);
+    nec_stateful_model model;
+    build_stateful(
+      model, scaled_dipole_wires(wavelength_m), {{1, 6}},
+      nec_ground_connection::none, nec_ground_kind::free_space, frequency_mhz);
+
+    nec_isolated_element_request request;
+    request.quadrature.nodes = { -0.5, 0.0, 0.5 };
+    request.quadrature.weights = { 0.4, 1.2, 0.4 };
+    request.quadrature.images =
+      nec_prepared_quadrature_images::physical_only;
+    request.quadrature.modes = nec_current_mode_kind::unit_current;
+    request.grid = {
+      10.0 * wavelength_m,
+      30.0, 3, 30.0,
+      0.0, 2, 90.0,
+    };
+    const nec_isolated_element_characterization characterized =
+      model.characterize_isolated_element(request);
+    const nec_prepared_quadrature_view view =
+      nec_view_prepared_quadrature(characterized.quadrature);
+
+    REQUIRE(view.wavelength_m == Catch::Approx(wavelength_m));
+    REQUIRE(view.current_at(0, 0, 5, 1).real() == Catch::Approx(1.0).margin(1.0e-7));
+    REQUIRE(view.current_at(0, 0, 5, 1).imag() == Catch::Approx(0.0).margin(1.0e-7));
+    const size_t feed_geometry = view.geometry_index(0, 5, 1);
+    REQUIRE(view.length_m[feed_geometry] / wavelength_m ==
+      Catch::Approx(0.5 / 11.0));
+    REQUIRE(view.radius_m[feed_geometry] / wavelength_m ==
+      Catch::Approx(0.001));
+    REQUIRE(view.ds_weight[feed_geometry] / wavelength_m ==
+      Catch::Approx(0.5 * (0.5 / 11.0) * 1.2));
+
+    const nec_port_solution solved =
+      model.solve_port_currents({ nec_complex(1.0, 0.0) });
+    REQUIRE(relative_error(solved.currents[0], nec_complex(1.0, 0.0)) <
+      kRelativeL2UnitCurrent);
+    const nec_current_distribution latest =
+      model.get_current_distribution(nec_current_mode_kind::latest_solution);
+    REQUIRE(relative_error(
+      latest.a_at(0, 5) + latest.c_at(0, 5), solved.currents[0]) < 1.0e-7);
+
+    std::vector<nec_complex> packed_currents;
+    packed_currents.reserve(view.current_count);
+    for (size_t index = 0; index < view.current_count; ++index)
+      packed_currents.emplace_back(view.i_real[index], view.i_imag[index]);
+    const std::vector<nec_complex> e_theta_times_wavelength = wavelength_scaled(
+      characterized.embedded_field.e_theta, wavelength_m);
+    const std::vector<nec_complex> e_phi_times_wavelength = wavelength_scaled(
+      characterized.embedded_field.e_phi, wavelength_m);
+
+    if (reference_currents.empty()) {
+      reference_impedance = characterized.matrices.impedance.at(0, 0);
+      reference_currents = packed_currents;
+      reference_e_theta_times_wavelength = e_theta_times_wavelength;
+      reference_e_phi_times_wavelength = e_phi_times_wavelength;
+      reference_radiated_power = solved.power_budget.radiated_power_w;
+    } else {
+      REQUIRE(relative_error(
+        characterized.matrices.impedance.at(0, 0), reference_impedance) <
+        1.0e-10);
+      REQUIRE(relative_error(packed_currents, reference_currents) < 1.0e-10);
+      REQUIRE(relative_error(
+        e_theta_times_wavelength, reference_e_theta_times_wavelength) <
+        kRelativeL2Embedded);
+      REQUIRE(relative_error(
+        e_phi_times_wavelength, reference_e_phi_times_wavelength) <
+        kRelativeL2Embedded);
+      REQUIRE(solved.power_budget.radiated_power_w ==
+        Catch::Approx(reference_radiated_power).epsilon(1.0e-10));
+    }
+    REQUIRE(solved.power_budget.input_power_w ==
+      Catch::Approx(solved.power_budget.radiated_power_w).epsilon(1.0e-8));
+  }
+}
+
+TEST_CASE("Frequency-scaled multiport modes keep selected and idle feeds normalized",
+          "[wasm_api][current_quadrature][frequency_scaling]")
+{
+  for (const nec_float frequency_mhz : { 30.0, 300.0, 1000.0, 10000.0 }) {
+    const nec_float wavelength_m =
+      em::get_wavelength(frequency_mhz * 1.0e6);
+    nec_stateful_model model;
+    build_stateful(
+      model, scaled_turnstile_wires(wavelength_m), {{1, 6}, {2, 6}},
+      nec_ground_connection::none, nec_ground_kind::free_space, frequency_mhz);
+    const nec_current_distribution unit =
+      model.get_current_distribution(nec_current_mode_kind::unit_current);
+    REQUIRE(unit.mode_count == 2);
+    for (size_t mode = 0; mode < 2; ++mode) {
+      for (size_t port = 0; port < 2; ++port) {
+        const size_t feed_segment = port * 11 + 5;
+        const nec_complex feed = unit.a_at(mode, feed_segment) +
+          unit.c_at(mode, feed_segment);
+        const nec_complex expected = mode == port
+          ? nec_complex(1.0, 0.0)
+          : nec_complex(0.0, 0.0);
+        REQUIRE(relative_error(feed, expected) < 1.0e-7);
+      }
+    }
+  }
+}
+
+TEST_CASE("Frequency-scaled dipole arrays preserve mutual impedance passivity and reciprocity",
+          "[wasm_api][current_quadrature][frequency_scaling]")
+{
+  for (const auto dimensions : {
+         std::pair<int, int>{2, 2}, std::pair<int, int>{4, 4},
+       }) {
+    nec_complex_matrix reference;
+    const std::vector<nec_float> frequencies = dimensions.first == 2
+      ? std::vector<nec_float>{30.0, 300.0, 1000.0, 10000.0}
+      : std::vector<nec_float>{300.0, 10000.0};
+    for (const nec_float frequency_mhz : frequencies) {
+      nec_stateful_model model = scaled_dipole_array(
+        dimensions.first, dimensions.second, 0.5, frequency_mhz);
+      const nec_complex_matrix impedance =
+        model.compute_impedance_matrix().impedance;
+      require_reciprocal_and_passive(impedance);
+      if (reference.values.empty()) {
+        reference = impedance;
+      } else {
+        REQUIRE(relative_error(impedance.values, reference.values) < 1.0e-9);
+      }
+    }
+  }
+}
 
 TEST_CASE("WP3 characterization dipole matches Z/Y, quadrature, and fields",
           "[wasm_api][current_quadrature][wp3_current]")

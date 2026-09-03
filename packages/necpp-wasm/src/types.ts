@@ -400,8 +400,10 @@ export interface NecSegmentIdentity {
 }
 
 /**
- * Exact NEC `A/B/C` current coefficients and physical segment geometry.
+ * Exact ampere-valued physical `A/B/C` current coefficients and segment geometry.
  *
+ * NEC's native wavelength-normalized coefficients are converted to amperes at
+ * capture time. Geometry is in metres.
  * Coefficient and geometry arrays use caller wire/segment order. Unit-current
  * planes are mode-major: `index = modeIndex * segments.length + segmentIndex`.
  */

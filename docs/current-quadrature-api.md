@@ -48,9 +48,12 @@ as `wavelength_m` times those scaled arrays.
 
 ## Coefficient formula
 
-Public `A`, `B`, `C` are exact copies of NEC `air/aii`, `bir/bii`, `cir/cii`
-after `c_geometry::get_current_coefficients()`. Interpolation along a
-physical segment is the stored expansion
+Public `A`, `B`, `C` are ampere-valued physical current coefficients. NEC's
+native `air/aii`, `bir/bii`, `cir/cii` arrays are coefficients in its
+wavelength-normalized coordinate system and scale as A/m; capture multiplies
+all three coefficient pairs by `wavelength_m` before exposing them. This is
+the same conversion used by legacy structure-current reporting. Interpolation
+along a physical segment is the stored expansion
 
 ```text
 I(s) = A + B sin(k s) + C cos(k s)
@@ -68,6 +71,36 @@ I(s) = (A+C) + B sin(k s) + C (cos(k s) - 1)
 
 The public current evaluator and the internal field evaluator must share this
 formula. Surface patches are out of the first public current API.
+
+This conversion fixes values under the existing schema-1 contract; it does
+not change the C++ layout, C/WASM ABI, TypeScript shape, NECQ byte layout, or
+NECF byte layout. Direct current distributions and NECQ receive the corrected
+ampere-valued A/B/C samples from the same producer. NECF is generated directly
+from the corresponding native unit-current solve and is not rescaled from
+NECQ; scale-property tests therefore gate both products together and verify
+the far-zone law `E * wavelength_m = constant` when observation radius is held
+constant in wavelengths.
+
+The complete normalization path is: the port solver chooses a voltage that
+produces 1 A at the requested feed; NEC stores the resulting basis
+coefficients in wavelength-normalized form; `copy_current_coefficient_mode`
+converts those coefficients to amperes; segment-centre reconstruction and
+caller-node interpolation consume the converted planes; NECQ serializes those
+samples; and the direct and worker characterization APIs transfer the same
+packed values. The latest-solution and prepared unit-current distribution APIs
+also share this producer. NECF instead evaluates the native solved mode before
+packing its embedded fields, so it neither consumes nor duplicates the NECQ
+conversion.
+
+Before the correction, the new 30 MHz scale regression reproduced a
+feed-centre value of `0.10006816720511469 A` for a requested 1 A mode, equal to
+`1 / wavelength_m`. The pre-existing 300 MHz fixture hid the same error with
+`1.000681672051142 A` because its wavelength is close to one metre. After the
+correction, scale-property tests at 30, 300, 1000, 1379, and 10000 MHz preserve
+the 1 A feed, current shape, impedance, power, and wavelength-scaled far field;
+direct and worker NECQ/NECF results are also checked together. Two-by-two and
+four-by-four dipole-array tests additionally hold the full complex mutual-
+impedance matrix, reciprocity, and passivity invariant between scaled models.
 
 ## Ordering, identity, and junctions
 

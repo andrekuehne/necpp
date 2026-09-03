@@ -180,19 +180,23 @@ void require_matches_snapshot(
   for (size_t index = 0; index < snapshot.segment_count(); ++index) {
     REQUIRE(relative_error(
       distribution.a_at(mode, index),
-      nec_complex(snapshot.air[index], snapshot.aii[index])) < kRelativeL2SamePath);
+      wavelength_m * nec_complex(snapshot.air[index], snapshot.aii[index])) <
+      kRelativeL2SamePath);
     REQUIRE(relative_error(
       distribution.b_at(mode, index),
-      nec_complex(snapshot.bir[index], snapshot.bii[index])) < kRelativeL2SamePath);
+      wavelength_m * nec_complex(snapshot.bir[index], snapshot.bii[index])) <
+      kRelativeL2SamePath);
     REQUIRE(relative_error(
       distribution.c_at(mode, index),
-      nec_complex(snapshot.cir[index], snapshot.cii[index])) < kRelativeL2SamePath);
+      wavelength_m * nec_complex(snapshot.cir[index], snapshot.cii[index])) <
+      kRelativeL2SamePath);
     const nec_complex centre =
       distribution.a_at(mode, index) + distribution.c_at(mode, index);
     const nec_complex snapshot_centre(
       snapshot.air[index] + snapshot.cir[index],
       snapshot.aii[index] + snapshot.cii[index]);
-    REQUIRE(relative_error(centre, snapshot_centre) < kRelativeL2SamePath);
+    REQUIRE(relative_error(centre, wavelength_m * snapshot_centre) <
+      kRelativeL2SamePath);
 
     const size_t xyz = 3 * index;
     REQUIRE(distribution.centres_m[xyz] ==
