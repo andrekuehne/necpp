@@ -2,7 +2,12 @@ import {
   analyzeArraySymmetry,
   createExplicitArrayBuildPlan,
 } from "./array-symmetry.js";
-import { NecError, NecGeometryError, NecInputError } from "./errors.js";
+import {
+  NecError,
+  NecGeometryError,
+  NecInputError,
+  NecRuntimeError,
+} from "./errors.js";
 import { createNecArrayWorkerModel } from "./worker-client.js";
 import type {
   ArrayBuildPlan,
@@ -22,6 +27,7 @@ import type {
   ImpedanceResult,
   LoadDefinition,
   NecArraySolver,
+  NecCurrentDistribution,
   NecModel,
   NecModelState,
   NecWorkerModel,
@@ -336,6 +342,141 @@ export function gatherEmbeddedBasis(
   return gathered;
 }
 
+function segmentKey(tag: number, segment: number): string {
+  return `${tag}:${segment}`;
+}
+
+function remapSegmentEnd(
+  value: NecCurrentDistribution["startEnds"][number],
+  nativeTagToCallerTag: ReadonlyMap<number, number>,
+): NecCurrentDistribution["startEnds"][number] {
+  if (value.kind !== "segment") {
+    return Object.freeze({ kind: value.kind });
+  }
+  const tag = nativeTagToCallerTag.get(value.tag);
+  if (tag === undefined) {
+    throw new NecRuntimeError(
+      `Current distribution endpoint references unmapped native tag ${value.tag}`,
+    );
+  }
+  return Object.freeze({
+    kind: "segment",
+    tag,
+    segment: value.segment,
+    end: value.end,
+  });
+}
+
+function gatherSymmetricCurrentDistribution(
+  result: NecCurrentDistribution,
+  description: FullArrayDescription,
+  plan: Extract<ArrayBuildPlan, { readonly kind: "symmetric" }>,
+): NecCurrentDistribution {
+  const caller = allocateCallerModel(description);
+  const nativeSegmentByKey = new Map<string, number>();
+  for (let index = 0; index < result.segments.length; index += 1) {
+    const identity = result.segments[index]!;
+    nativeSegmentByKey.set(segmentKey(identity.tag, identity.segment), index);
+  }
+
+  const nativeTagToCallerTag = new Map<number, number>();
+  for (let callerElementIndex = 0;
+    callerElementIndex < description.elements.length;
+    callerElementIndex += 1) {
+    const mapping = plan.mappings[callerElementIndex]!;
+    const allocation = caller.allocations[callerElementIndex]!;
+    for (let wireIndex = 0; wireIndex < allocation.pattern.wires.length; wireIndex += 1) {
+      const wire = allocation.pattern.wires[wireIndex]!;
+      const nativeTag = mapping.generatedTag + wireIndex;
+      const callerTag = allocation.wireTags.get(wire.id)!;
+      nativeTagToCallerTag.set(nativeTag, callerTag);
+    }
+  }
+
+  const sourceIndices: number[] = [];
+  const segments: NecCurrentDistribution["segments"][number][] = [];
+  for (let callerElementIndex = 0;
+    callerElementIndex < description.elements.length;
+    callerElementIndex += 1) {
+    const mapping = plan.mappings[callerElementIndex]!;
+    const allocation = caller.allocations[callerElementIndex]!;
+    for (let wireIndex = 0; wireIndex < allocation.pattern.wires.length; wireIndex += 1) {
+      const wire = allocation.pattern.wires[wireIndex]!;
+      const nativeTag = mapping.generatedTag + wireIndex;
+      const callerTag = allocation.wireTags.get(wire.id)!;
+      for (let segment = 1; segment <= wire.segments; segment += 1) {
+        const source = nativeSegmentByKey.get(segmentKey(nativeTag, segment));
+        if (source === undefined) {
+          throw new NecRuntimeError(
+            `Current distribution is missing native tag ${nativeTag} segment ${segment}`,
+          );
+        }
+        sourceIndices.push(source);
+        segments.push(Object.freeze({
+          tag: callerTag,
+          segment,
+          nativeIndex: result.segments[source]!.nativeIndex,
+        }));
+      }
+    }
+  }
+  if (sourceIndices.length !== result.segments.length) {
+    throw new NecRuntimeError(
+      "Current distribution segment count does not match the symmetric array plan",
+    );
+  }
+
+  const gatherScalar = (source: Float64Array): Float64Array =>
+    Float64Array.from(sourceIndices, (index) => source[index]!);
+  const gatherTriples = (source: Float64Array, translate: boolean): Float64Array => {
+    const gathered = new Float64Array(3 * sourceIndices.length);
+    for (let target = 0; target < sourceIndices.length; target += 1) {
+      const sourceOffset = 3 * sourceIndices[target]!;
+      const targetOffset = 3 * target;
+      gathered[targetOffset] = source[sourceOffset]! + (translate ? plan.centerM[0] : 0);
+      gathered[targetOffset + 1] = source[sourceOffset + 1]!
+        + (translate ? plan.centerM[1] : 0);
+      gathered[targetOffset + 2] = source[sourceOffset + 2]!;
+    }
+    return gathered;
+  };
+  const gatherPlanes = (source: Float64Array): Float64Array => {
+    const gathered = new Float64Array(result.modeCount * sourceIndices.length);
+    for (let mode = 0; mode < result.modeCount; mode += 1) {
+      for (let target = 0; target < sourceIndices.length; target += 1) {
+        gathered[mode * sourceIndices.length + target] =
+          source[mode * result.segments.length + sourceIndices[target]!]!;
+      }
+    }
+    return gathered;
+  };
+
+  return {
+    schemaVersion: 1,
+    frequencyMHz: result.frequencyMHz,
+    wavelengthM: result.wavelengthM,
+    modeKind: result.modeKind,
+    modeCount: result.modeCount,
+    segments: Object.freeze(segments),
+    startEnds: Object.freeze(sourceIndices.map((source) =>
+      remapSegmentEnd(result.startEnds[source]!, nativeTagToCallerTag))),
+    endEnds: Object.freeze(sourceIndices.map((source) =>
+      remapSegmentEnd(result.endEnds[source]!, nativeTagToCallerTag))),
+    centresM: gatherTriples(result.centresM, true),
+    startsM: gatherTriples(result.startsM, true),
+    endsM: gatherTriples(result.endsM, true),
+    tangents: gatherTriples(result.tangents, false),
+    radiiM: gatherScalar(result.radiiM),
+    lengthsM: gatherScalar(result.lengthsM),
+    aReal: gatherPlanes(result.aReal),
+    aImag: gatherPlanes(result.aImag),
+    bReal: gatherPlanes(result.bReal),
+    bImag: gatherPlanes(result.bImag),
+    cReal: gatherPlanes(result.cReal),
+    cImag: gatherPlanes(result.cImag),
+  };
+}
+
 function rephaseArrays(
   result: FarFieldResult,
   centerM: readonly [number, number],
@@ -543,6 +684,19 @@ class WorkerNecArraySolver implements NecArraySolver {
 
   solveCurrents(currents: ComplexVector): Promise<PortSolution> {
     return this.#solve("current", currents);
+  }
+
+  async getCurrentDistribution(
+    options: { readonly kind: "latest-solution" },
+  ): Promise<NecCurrentDistribution> {
+    if (typeof options !== "object" || options === null
+        || options.kind !== "latest-solution") {
+      throw new NecInputError("options.kind must be latest-solution");
+    }
+    const result = await this.#model.getCurrentDistribution(options);
+    return this.#plan.kind === "explicit"
+      ? result
+      : gatherSymmetricCurrentDistribution(result, this.#description, this.#plan);
   }
 
   async computeFarField(request: FarFieldRequest): Promise<FarFieldResult> {

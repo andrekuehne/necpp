@@ -65,6 +65,12 @@ async function validUnbranchedArrayConsumer(
     real: new Float64Array(2),
     imag: new Float64Array(2),
   });
+  const arrayCurrents: NecCurrentDistribution = await solver.getCurrentDistribution({
+    kind: "latest-solution",
+  });
+  arrayCurrents.aImag[0];
+  // @ts-expect-error Array solvers expose only the latest consumer solution.
+  await solver.getCurrentDistribution({ kind: "unit-current" });
   await solver.computeFarField({
     theta: { startDeg: 0, count: 1, stepDeg: 0 },
     phi: { startDeg: 0, count: 1, stepDeg: 0 },

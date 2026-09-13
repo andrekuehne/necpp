@@ -1,7 +1,7 @@
 # `@necpp-engine/wasm` API and numerical contract
 
-Status: normative specification, updated through the parallel far-field release
-on 2026-09-01. The
+Status: normative specification, updated through the array-current release on
+2026-09-12. The
 stateful native layer, versioned C/WASM ABI, handwritten TypeScript facade,
 optional Web Worker entry point, and packable npm package are implemented.
 The committed TypeScript surface is in [`packages/necpp-wasm/src`](../packages/necpp-wasm/src).
@@ -27,9 +27,9 @@ while the scoped name identifies this repository and leaves room for future
 npm scope, but the API name will not change if the package is initially
 distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
-The isolated-element current-quadrature release package identity is `0.5.0`;
-it embeds NEC2++ `2.5.0` while preserving WASM ABI version `1`. The prior
-parallel far-field release was `0.4.0`.
+The array-current release package identity is `0.6.0`; it embeds NEC2++ `2.5.0`
+while preserving WASM ABI version `1`. The preceding package release was
+`0.5.1`; `0.5.0` introduced the isolated-element current-quadrature API.
 
 The packed package exports three version identifiers that can be imported
 without constructing a model:
@@ -442,6 +442,9 @@ interface NecArraySolver {
   computeImpedanceMatrix(): Promise<ImpedanceResult>;
   solveVoltages(value: ComplexVector): Promise<PortSolution>;
   solveCurrents(value: ComplexVector): Promise<PortSolution>;
+  getCurrentDistribution(
+    options: { readonly kind: "latest-solution" },
+  ): Promise<NecCurrentDistribution>;
   computeFarField(request: FarFieldRequest): Promise<FarFieldResult>;
   computeEmbeddedFarFields(
     request: FarFieldRequest,
@@ -462,14 +465,32 @@ field request as superseded. All input arrays are borrowed during their
 operation and all returned arrays are caller-owned, exactly as for the low-level
 direct and worker models.
 
+`getCurrentDistribution({ kind: "latest-solution" })` requires the `solved`
+state and returns exact ampere-valued `A/B/C` coefficients without a second
+solve. Its segment order is `description.elements`, then the selected
+`pattern.wires`, then one-based segment position. Segment tags and decoded
+endpoint references use the caller-facing tags allocated in that order;
+`nativeIndex` deliberately remains the true NEC segment index. Geometry is in
+the planner-canonicalized absolute coordinate frame, including the center
+removed while constructing a symmetric model; inspect
+`getDiagnostics().planner.canonicalizations` for any epsilon-bounded position
+adjustments. Currents receive no position-dependent phase
+rotation: the solved complex excitation is already present in the native
+coefficients. Each result buffer is caller-owned and remains valid after later
+solver operations. The array facade does not expose `"unit-current"`; use
+`NecModel` or `NecWorkerModel` for isolated-element unit-current bases.
+
 ### Representation-independent order and transforms
 
 Elements and the ports contributed by each pattern retain the order of
 `description.elements`, then `pattern.ports`. The facade scatters caller
 excitations into native copy-major order and gathers both dimensions of Z/Y,
 all achieved/requested port vectors and powers, and the outer embedded-field
-basis dimension back into caller order. Ordinary results intentionally contain
-no fundamental count, generated tag, copy index, or symmetry variant.
+basis dimension back into caller order. Current distributions gather every
+segment and all six coefficient planes into element/wire/segment order, remap
+generated tags and segment endpoint references, and restore the symmetric
+center translation without far-field-style phasor rephasing. Ordinary results
+intentionally contain no fundamental count, generated tag, copy index, or symmetry variant.
 The aggregate `powerBudget` has no port order and passes through unchanged.
 
 An accepted reflection candidate canonicalizes centered positions with sign
