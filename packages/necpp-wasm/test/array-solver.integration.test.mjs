@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import test from "node:test";
 
 import {
+  NecInputError,
+  NecStateError,
   analyzeArraySymmetry,
   applyArrayBuildPlan,
   createNecArraySolver,
@@ -70,6 +72,54 @@ function assertPowerBudgetClose(left, right, tolerance = 1e-10) {
       "power budget efficiencyPercent",
     );
   }
+}
+
+function currentDescription({ centerM = [0.173, -0.219] } = {}) {
+  const { fixture, description } = arrayDescription({ centerM });
+  description.patterns[0].wires = [
+    {
+      id: "lower",
+      segments: 3,
+      startM: [0, 0, 0.1 * fixture.wavelengthM],
+      endM: [0, 0, 0.4 * fixture.wavelengthM],
+      radiusM: fixture.radiusM,
+    },
+    {
+      id: "upper",
+      segments: 4,
+      startM: [0, 0, 0.4 * fixture.wavelengthM],
+      endM: [0, 0, 0.8 * fixture.wavelengthM],
+      radiusM: fixture.radiusM,
+    },
+  ];
+  description.patterns[0].ports = [{ wireId: "upper", segment: 1, name: "feed" }];
+  return { fixture, description };
+}
+
+async function solvedCurrentSolver(description, fixture, symmetry) {
+  const solver = await createNecArraySolver(description, symmetry === "off"
+    ? { symmetry }
+    : {
+      symmetry,
+      symmetrizer: {
+        positionEpsilonM: 1e-12,
+        allowRotation: false,
+      },
+    });
+  await solver.prepare({ frequencyMHz: fixture.frequencyMHz });
+  const count = description.elements.length;
+  const current = {
+    real: Float64Array.from({ length: count }, (_, index) => {
+      const magnitude = 0.25 + 0.11 * index;
+      return magnitude * Math.cos(0.37 * index);
+    }),
+    imag: Float64Array.from({ length: count }, (_, index) => {
+      const magnitude = 0.25 + 0.11 * index;
+      return magnitude * Math.sin(0.37 * index);
+    }),
+  };
+  await solver.solveCurrents(current);
+  return solver;
 }
 
 async function exerciseUnbranched(description, fixture, symmetry) {
@@ -194,5 +244,158 @@ test("off-origin explicit and centered symmetric complex fields prove the phase 
       relativeError(explicit.embedded[component], symmetric.embedded[component]) <= 1e-8,
       `${component} embedded bases`,
     );
+  }
+});
+
+test("array current distributions require a solved state and latest-solution kind", {
+  skip: !hasWasm && "WASM artifacts have not been built",
+}, async () => {
+  const { description, fixture } = arrayDescription();
+  const solver = await createNecArraySolver(description, { symmetry: "off" });
+  try {
+    await assert.rejects(
+      solver.getCurrentDistribution({ kind: "latest-solution" }),
+      NecStateError,
+    );
+    await assert.rejects(
+      solver.getCurrentDistribution({ kind: "unit-current" }),
+      NecInputError,
+    );
+    await solver.prepare({ frequencyMHz: fixture.frequencyMHz });
+    await assert.rejects(
+      solver.getCurrentDistribution({ kind: "latest-solution" }),
+      NecStateError,
+    );
+  } finally {
+    await solver.dispose();
+  }
+});
+
+test("array current distributions gather exact complex currents into caller geometry", {
+  skip: !hasWasm && "WASM artifacts have not been built",
+}, async () => {
+  const { description, fixture } = currentDescription();
+  const [explicit, symmetric] = await Promise.all([
+    solvedCurrentSolver(description, fixture, "off"),
+    solvedCurrentSolver(description, fixture, "require"),
+  ]);
+  try {
+    const [explicitCurrents, symmetricCurrents] = await Promise.all([
+      explicit.getCurrentDistribution({ kind: "latest-solution" }),
+      symmetric.getCurrentDistribution({ kind: "latest-solution" }),
+    ]);
+    assert.equal(explicitCurrents.modeKind, "latest-solution");
+    assert.equal(symmetricCurrents.modeKind, "latest-solution");
+    assert.equal(explicitCurrents.modeCount, 1);
+    assert.equal(symmetricCurrents.modeCount, 1);
+
+    const expectedSegments = description.elements.flatMap((_, elementIndex) => [
+      ...Array.from({ length: 3 }, (_, index) => ({
+        tag: 2 * elementIndex + 1,
+        segment: index + 1,
+      })),
+      ...Array.from({ length: 4 }, (_, index) => ({
+        tag: 2 * elementIndex + 2,
+        segment: index + 1,
+      })),
+    ]);
+    assert.deepEqual(
+      explicitCurrents.segments.map(({ tag, segment }) => ({ tag, segment })),
+      expectedSegments,
+    );
+    assert.deepEqual(
+      symmetricCurrents.segments.map(({ tag, segment }) => ({ tag, segment })),
+      expectedSegments,
+    );
+    assert.deepEqual(symmetricCurrents.startEnds, explicitCurrents.startEnds);
+    assert.deepEqual(symmetricCurrents.endEnds, explicitCurrents.endEnds);
+    assert.ok(symmetricCurrents.startEnds.some((end) => end.kind === "segment"));
+    assert.ok(symmetricCurrents.endEnds.some((end) => end.kind === "segment"));
+    for (const ends of [symmetricCurrents.startEnds, symmetricCurrents.endEnds]) {
+      for (const end of ends) {
+        if (end.kind === "segment") {
+          assert.ok(end.tag >= 1 && end.tag <= 2 * description.elements.length);
+        }
+      }
+    }
+    assert.deepEqual(
+      [...symmetricCurrents.segments].map((segment) => segment.nativeIndex).sort((a, b) => a - b),
+      Array.from({ length: expectedSegments.length }, (_, index) => index),
+    );
+    assert.ok(symmetricCurrents.segments.some(
+      (segment, index) => segment.nativeIndex !== index,
+    ));
+
+    for (const name of [
+      "centresM", "startsM", "endsM", "tangents", "radiiM", "lengthsM",
+      "aReal", "aImag", "bReal", "bImag", "cReal", "cImag",
+    ]) {
+      assert.ok(
+        relativeError(symmetricCurrents[name], explicitCurrents[name]) <= 1e-8,
+        `${name} explicit/symmetric parity`,
+      );
+    }
+    assert.ok(Math.abs(symmetricCurrents.centresM[0] - explicitCurrents.centresM[0]) < 1e-12);
+    assert.ok(Math.abs(symmetricCurrents.centresM[1] - explicitCurrents.centresM[1]) < 1e-12);
+
+    for (const solver of [explicit, symmetric]) {
+      const earlier = await solver.getCurrentDistribution({ kind: "latest-solution" });
+      const saved = earlier.aReal.slice();
+      const later = await solver.getCurrentDistribution({ kind: "latest-solution" });
+      later.aReal.fill(Number.NaN);
+      assert.deepEqual(earlier.aReal, saved);
+    }
+  } finally {
+    await Promise.all([explicit.dispose(), symmetric.dispose()]);
+  }
+});
+
+test("symmetric current geometry reports the planner-canonicalized absolute positions", {
+  skip: !hasWasm && "WASM artifacts have not been built",
+}, async () => {
+  const { description, fixture } = arrayDescription({ side: 4 });
+  const epsilon = 1e-5;
+  const jittered = structuredClone(description);
+  jittered.elements = jittered.elements.map((element, index) => ({
+    ...element,
+    positionM: [
+      element.positionM[0] + ((index % 3) - 1) * epsilon / 10,
+      element.positionM[1] + ((index % 5) - 2) * epsilon / 12,
+    ],
+  }));
+  const symmetrizer = {
+    positionEpsilonM: epsilon,
+    allowRotation: false,
+  };
+  const plan = analyzeArraySymmetry(jittered, symmetrizer);
+  assert.equal(plan.kind, "symmetric");
+  assert.equal(plan.diagnostics.exact, false);
+  assert.ok(plan.diagnostics.canonicalizations.some(({ distanceM }) => distanceM > 0));
+
+  const solver = await createNecArraySolver(jittered, {
+    symmetry: "require",
+    symmetrizer,
+  });
+  try {
+    await solver.prepare({ frequencyMHz: fixture.frequencyMHz });
+    await solver.solveCurrents({
+      real: new Float64Array(jittered.elements.length).fill(0.25),
+      imag: Float64Array.from(
+        { length: jittered.elements.length },
+        (_, index) => 0.1 * Math.sin(0.2 * index),
+      ),
+    });
+    const currents = await solver.getCurrentDistribution({ kind: "latest-solution" });
+    for (const canonicalization of plan.diagnostics.canonicalizations) {
+      const segment = canonicalization.callerElementIndex * fixture.segments;
+      assert.ok(
+        Math.abs(currents.centresM[3 * segment] - canonicalization.canonicalPositionM[0]) < 1e-12,
+      );
+      assert.ok(
+        Math.abs(currents.centresM[3 * segment + 1] - canonicalization.canonicalPositionM[1]) < 1e-12,
+      );
+    }
+  } finally {
+    await solver.dispose();
   }
 });

@@ -1,3 +1,21 @@
+## 0.6.0 - 2026-09-12
+
+### Added
+
+* **Exact solved currents from the array facade:** `NecArraySolver` now exposes
+  `getCurrentDistribution({ kind: "latest-solution" })`. Explicit and symmetric
+  representations return identical exact ampere-valued `A/B/C` coefficients,
+  physical geometry, caller-order tags, and decoded segment connections.
+  Symmetric results retain the true native segment indices while hiding
+  generated tags and copy-major ordering.
+
+### Compatibility
+
+* This is an additive TypeScript facade release. The NEC2++ engine remains
+  `2.5.0`, WASM ABI remains `1`, and no native symbols or binary result formats
+  change. Unit-current distributions remain on `NecModel` and
+  `NecWorkerModel`; the array facade exposes only its latest consumer solution.
+
 ## 0.5.0 - 2026-09-02
 
 ### Added

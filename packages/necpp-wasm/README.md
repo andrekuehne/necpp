@@ -128,6 +128,32 @@ model or `"require"` to reject a description that cannot use supported
 symmetry. All three modes use a package-supplied worker and expose the same
 asynchronous solver methods.
 
+After `solveCurrents()` or `solveVoltages()`, the same facade exposes the exact
+latest NEC segment currents:
+
+```ts
+import type { NecArraySolver } from "@necpp-engine/wasm";
+
+declare const solver: NecArraySolver;
+
+const currents = await solver.getCurrentDistribution({
+  kind: "latest-solution",
+});
+
+console.log(currents.aReal[0], currents.aImag[0]);
+```
+
+Segments are returned in caller element, pattern wire, and segment order.
+Tags and decoded endpoint references are caller-facing, while each
+`nativeIndex` retains the true NEC index for diagnostics. Symmetric geometry is
+translated into the planner-canonicalized absolute coordinate frame; inspect
+`getDiagnostics().planner.canonicalizations` for any epsilon-bounded position
+adjustments. Current coefficients are not phase-rotated because the native
+solution already includes every complex excitation. Returned numeric buffers
+are caller-owned. The array facade deliberately accepts only
+`"latest-solution"`; isolated `"unit-current"` bases remain available through
+`NecModel` and `NecWorkerModel`.
+
 ### Parallel far fields
 
 `createNecArraySolver()` also owns an optional pool of lightweight far-field
@@ -792,7 +818,7 @@ appropriate CORS header.
 import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel({
-  wasmUrl: new URL("https://cdn.example.test/necpp/0.5.1/nec2pp.wasm"),
+  wasmUrl: new URL("https://cdn.example.test/necpp/0.6.0/nec2pp.wasm"),
 });
 model.dispose();
 ```

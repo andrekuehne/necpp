@@ -791,6 +791,21 @@ export interface NecArraySolver {
   computeImpedanceMatrix(): Promise<ImpedanceResult>;
   solveVoltages(voltages: ComplexVector): Promise<PortSolution>;
   solveCurrents(currents: ComplexVector): Promise<PortSolution>;
+  /**
+   * Return exact ampere-valued coefficients for the most recent consumer
+   * solution. Segments are ordered by caller description element, then that
+   * element's pattern wire order, then one-based segment position. Tags and
+   * decoded endpoint references are the caller-facing tags allocated in that
+   * same order; `nativeIndex` remains the true zero-based NEC segment index.
+   * Geometry is in the planner-canonicalized absolute coordinate frame; any
+   * epsilon-bounded position adjustments are reported by
+   * `getDiagnostics().planner.canonicalizations`. No position phase rotation
+   * is applied. Every numeric buffer is an owned copy and remains valid after
+   * later solver calls.
+   */
+  getCurrentDistribution(
+    options: { readonly kind: "latest-solution" },
+  ): Promise<NecCurrentDistribution>;
   computeFarField(request: FarFieldRequest): Promise<FarFieldResult>;
   computeEmbeddedFarFields(
     request: FarFieldRequest,
