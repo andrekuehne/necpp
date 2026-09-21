@@ -557,6 +557,11 @@ export type NecWorkerProgressListener = (event: NecWorkerProgressEvent) => void;
 export interface CreateNecWorkerModelOptions extends CreateNecModelOptions {
   /** Invoked on the client thread at worker operation start and completion. */
   readonly onProgress?: NecWorkerProgressListener;
+  /**
+   * Cancels only pending worker creation. Once creation resolves, call
+   * `terminate()` on the returned model for immediate hard cancellation.
+   */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -775,6 +780,13 @@ export interface CreateArraySolverOptions {
    * WASM assets. The default is resolved relative to the installed package.
    */
   readonly fieldWorkerAssetBaseUrl?: string | URL;
+  /**
+   * Cancels only the pending factory operation. Aborting terminates the
+   * candidate worker immediately and rejects creation with
+   * `NecCancellationError`; it does not affect any independently owned solver.
+   * After creation resolves, use `solver.terminate()` for hard cancellation.
+   */
+  readonly signal?: AbortSignal;
 }
 
 export interface ArraySolverDiagnostics {
@@ -816,6 +828,13 @@ export interface NecArraySolver {
    * promise rejects with `NecRuntimeError` and `details.reason = "superseded"`.
    */
   cancelFarField(): void;
+  /**
+   * Immediately terminate this solver's worker and reject all outstanding and
+   * queued operations with `NecCancellationError`. Idempotent. This affects no
+   * other independently created solver; `state` is subsequently `"disposed"`.
+   */
+  terminate(): void;
+  /** Gracefully dispose native state, then release this solver's worker. */
   dispose(): Promise<void>;
   getDiagnostics(): ArraySolverDiagnostics;
 }

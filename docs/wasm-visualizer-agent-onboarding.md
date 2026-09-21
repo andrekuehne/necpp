@@ -445,11 +445,16 @@ try {
 
 Worker method calls are asynchronous and serialized for each model. If the
 user cancels a long low-level worker calculation, call `model.terminate()`;
-this immediately kills that worker and rejects outstanding operations. A
-terminated model cannot be reused, so create a new one. The higher-level
-`NecArraySolver` exposes `cancelFarField()` for generation supersession and
-`dispose()`, but not `terminate()`. Cancellation stops assigning pooled field
-tiles, rejects the active field as superseded, and leaves the solver reusable.
+this immediately kills that worker and rejects outstanding operations with
+`NecCancellationError`. A terminated model cannot be reused, so create a new
+one. The higher-level `NecArraySolver` has the same `terminate()` boundary;
+pass `signal` to `createNecArraySolver()` to cancel worker creation or geometry
+construction before the promise resolves. Each solver owns its worker, so a
+candidate can be terminated without touching independently retained ready
+solvers. `cancelFarField()` remains the reusable generation-supersession API:
+it stops assigning pooled field tiles, rejects the active field as superseded,
+and leaves the solver reusable. Direct `NecModel` work is synchronous and
+cannot be interrupted; its idempotent `dispose()` only performs cleanup.
 
 ## Numerical and ordering contract
 

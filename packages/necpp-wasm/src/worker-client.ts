@@ -1,4 +1,9 @@
-import { NecInputError, NecRuntimeError, NecStateError } from "./errors.js";
+import {
+  NecCancellationError,
+  NecInputError,
+  NecRuntimeError,
+  NecStateError,
+} from "./errors.js";
 import type {
   CompleteGeometryOptions,
   ComplexVector,
@@ -57,6 +62,10 @@ export interface WorkerHost {
 interface PendingRequest {
   readonly resolve: (value: unknown) => void;
   readonly reject: (error: unknown) => void;
+}
+
+function isAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
 }
 
 function createWebWorker(): Worker {
@@ -383,6 +392,10 @@ class WorkerNecModel implements NecWorkerModel {
   }
 
   terminate(): void {
+    this.#terminateWith(new NecCancellationError("terminated"));
+  }
+
+  #terminateWith(error: NecCancellationError): void {
     if (this.#terminated) {
       return;
     }
@@ -391,7 +404,6 @@ class WorkerNecModel implements NecWorkerModel {
     this.#unsubscribeMessage();
     this.#unsubscribeError();
     this.#unsubscribeExit();
-    const error = new NecRuntimeError("The NEC worker was terminated");
     for (const pending of this.#pending.values()) {
       pending.reject(error);
     }
@@ -503,7 +515,7 @@ class WorkerNecModel implements NecWorkerModel {
     );
     const run = this.#tail.then(() => {
       if (this.#terminated) {
-        throw new NecRuntimeError("The NEC worker was terminated");
+        throw new NecCancellationError("terminated");
       }
       return new Promise<unknown>((resolve, reject) => {
         const id = this.#nextId;
@@ -550,17 +562,39 @@ export async function createNecWorkerModelFromHost(
   options?: CreateNecWorkerModelOptions,
   fieldPool?: WorkerFieldPoolOptions,
 ): Promise<NecWorkerModel> {
+  const signal = options?.signal;
+  if (signal !== undefined
+      && (typeof signal !== "object"
+        || typeof signal.aborted !== "boolean"
+        || typeof signal.addEventListener !== "function"
+        || typeof signal.removeEventListener !== "function")) {
+    host.terminate();
+    throw new NecInputError("signal must be an AbortSignal");
+  }
+  if (isAborted(signal)) {
+    host.terminate();
+    throw new NecCancellationError("aborted");
+  }
   const model = new WorkerNecModel(
     host,
     options?.onProgress,
     fieldPool !== undefined,
   );
+  const abort = (): void => {
+    model.terminate();
+  };
+  signal?.addEventListener("abort", abort, { once: true });
   try {
     await model.initialize(options, fieldPool);
     return model;
   } catch (error) {
     model.terminate();
+    if (isAborted(signal) && error instanceof NecCancellationError) {
+      throw new NecCancellationError("aborted");
+    }
     throw error;
+  } finally {
+    signal?.removeEventListener("abort", abort);
   }
 }
 
@@ -578,7 +612,12 @@ export async function createNecWorkerModel(
 /** @internal Array facade: create an outer worker that owns evaluator children. */
 export async function createNecArrayWorkerModel(
   fieldPool: WorkerFieldPoolOptions,
+  signal?: AbortSignal,
 ): Promise<NecWorkerModel> {
   const host = await openWorkerHost();
-  return createNecWorkerModelFromHost(host, undefined, fieldPool);
+  return createNecWorkerModelFromHost(
+    host,
+    signal === undefined ? undefined : { signal },
+    fieldPool,
+  );
 }

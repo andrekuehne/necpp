@@ -27,9 +27,10 @@ while the scoped name identifies this repository and leaves room for future
 npm scope, but the API name will not change if the package is initially
 distributed as a tarball.
 The package is ESM-only and requires Node 24 or later for Node consumers.
-The array-current release package identity is `0.6.0`; it embeds NEC2++ `2.5.0`
-while preserving WASM ABI version `1`. The preceding package release was
-`0.5.1`; `0.5.0` introduced the isolated-element current-quadrature API.
+The worker-cancellation release package identity is `0.7.0`; it embeds NEC2++
+`2.5.0` while preserving WASM ABI version `1`. The preceding published npm
+release was `0.5.1`; the local/package-history predecessor was `0.6.0`, and
+`0.5.0` introduced the isolated-element current-quadrature API.
 
 The packed package exports three version identifiers that can be imported
 without constructing a model:
@@ -239,8 +240,8 @@ enumerates every operation/state pair plus both `prepare()` branches.
 | Method | Inputs and units | Output | Failures beyond illegal state |
 |---|---|---|---|
 | `createNecModel(options?)` | Optional `wasmUrl` or caller-owned WASM bytes | Promise of an `empty` model | `NecRuntimeError` for load/instantiate/version failure; `NecInputError` if both overrides are supplied |
-| `createNecWorkerModel(options?)` | Same loading overrides plus optional `onProgress` | Promise of an `empty` worker model | Same loading failures; `NecRuntimeError` if the worker cannot start or is terminated |
-| `createNecArraySolver(description, options?)` | Complete positioned-element description plus `"auto"`, `"off"`, or `"require"` policy | Promise of one worker-backed, representation-independent array solver | Input/planner errors below; ordinary native failures retain their normal taxonomy |
+| `createNecWorkerModel(options?)` | Same loading overrides plus optional `onProgress` and creation-only `signal` | Promise of an `empty` worker model | Same loading failures; `NecCancellationError` if creation is aborted; `NecRuntimeError` if the worker cannot start |
+| `createNecArraySolver(description, options?)` | Complete positioned-element description plus `"auto"`, `"off"`, or `"require"` policy and optional creation-only `signal` | Promise of one worker-backed, representation-independent array solver | Input/planner errors below; `NecCancellationError` if worker creation or geometry construction is aborted; ordinary native failures retain their normal taxonomy |
 | `addWire(wire)` | Positive integer tag/count; distinct finite endpoints and positive finite radius, all in m | `void`; copies the definition | `NecInputError` for shape/range errors; `NecGeometryError` for engine geometry limits |
 | `completeGeometry(options?)` | Ground connection plus optional finalized reflection/rotation descriptor | `GeometryCompletionResult`; `symmetry` is absent for ordinary completion | `NecInputError` for an invalid descriptor; `NecGeometryError` for intersections, invalid junctions, symmetry/ground conflicts, or a ground-incompatible structure |
 | `definePorts(ports)` | Nonempty ordered tag and one-based segment pairs | `void`; copies and freezes order | `NecPortError` for missing/duplicate ports or non-source-capable segments; `NecInputError` for malformed integers |
@@ -255,7 +256,7 @@ enumerates every operation/state pair plus both `prepare()` branches.
 | `computeEmbeddedFarFields(request, normalization?)` | Same grid plus unit-voltage (default) or unit-current normalization | Basis-major complex V/m arrays | Matrix/conditioning and far-field failures above |
 | `cancelFarField()` | Worker and array-solver models only; no input | `void`; idempotently stops assigning tiles for the active pooled field without disposing the model | The active field promise rejects with `NecRuntimeError` and `details.reason === "superseded"`; no failure when no pooled field is active |
 | `dispose()` | None | `void`; idempotent | No failure is exposed; cleanup errors are contained |
-| `terminate()` | Worker models only | `void`; kills the worker immediately | Outstanding promises reject with `NecRuntimeError` |
+| `terminate()` | Worker and array-solver models only | `void`; idempotently kills only the owned worker immediately and changes state to `disposed` | Outstanding and queued promises reject with `NecCancellationError`, `details.reason === "terminated"` |
 | `runDeck(deck, options?)` | Complete UTF-8 deck string; optional pre-start abort signal | Promise of formatted report and engine version | `NecInputError` for empty/invalid deck or pre-abort; `NecSolverError` for execution; `NecRuntimeError` for module failure |
 
 All native exceptions are contained at the C ABI. The TypeScript layer maps a
@@ -281,6 +282,13 @@ compatibility surface; documented discriminants such as
 keeps the last successfully prepared factorization and consumer solution when
 the native layer can prove they are intact; otherwise it rolls back to
 `geometry-complete` and discards prepared data.
+
+`NecCancellationError` is the intentional-cancellation refinement of
+`NecRuntimeError`; it preserves `code === "NEC_RUNTIME"` for compatibility.
+Its exported `reason` and documented `details.reason` are `"aborted"` when a
+factory's `AbortSignal` cancels candidate creation, or `"terminated"` when a
+model/solver's hard termination boundary cancels outstanding work. Callers can
+therefore ignore obsolete candidates without hiding genuine solver failures.
 
 ### Symmetry failure refinement
 
@@ -451,6 +459,7 @@ interface NecArraySolver {
     normalization?: EmbeddedFieldNormalization,
   ): Promise<EmbeddedFarFieldResult>;
   cancelFarField(): void;
+  terminate(): void;
   getDiagnostics(): ArraySolverDiagnostics;
   dispose(): Promise<void>;
 }
@@ -459,7 +468,11 @@ interface NecArraySolver {
 Its lifecycle from creation is `geometry-complete -> prepared -> solved`; the
 factory owns construction, port definition, structural-load expansion, ground
 selection, and any eligible explicit retry. Disposal is deterministic and
-idempotent. `cancelFarField()` is also idempotent and keeps the solver reusable;
+idempotent. A factory `signal` covers creation and geometry construction before
+the solver is returned. `terminate()` immediately kills only this solver's
+worker, rejects its outstanding and queued operations as typed cancellation,
+and is idempotent; independently created ready solvers are unaffected.
+`cancelFarField()` is also idempotent and keeps the solver reusable;
 it bounds stale pooled work at tile boundaries and rejects only the active
 field request as superseded. All input arrays are borrowed during their
 operation and all returned arrays are caller-owned, exactly as for the low-level
@@ -603,11 +616,14 @@ callbacks fire at coarse `start`/`complete` boundaries, including worker-only
 `create`. Large result `ArrayBuffer`s are transferred, not structured-cloned.
 Input arrays remain caller-owned.
 
-`terminate()` is the cancellation mechanism: it kills the worker, rejects
-outstanding operations with `NecRuntimeError`, and leaves the model
-`disposed`. `dispose()` destroys the native handle first, then terminates.
-The direct `createNecModel()` entry point is unchanged for Node, tests, and
-small models. Browser integration tests exercise direct, worker, and
+`terminate()` is the hard cancellation mechanism: it kills the owned worker,
+rejects outstanding and queued operations with `NecCancellationError` and
+`details.reason === "terminated"`, and leaves the model `disposed`. A creation
+`signal` uses reason `"aborted"`. `dispose()` destroys the native handle first,
+then terminates. The direct `createNecModel()` entry point is unchanged for
+Node, tests, and small models: its synchronous native calls cannot be
+preempted, and `dispose()` is cleanup rather than cancellation. Browser
+integration tests exercise direct, worker, and
 transparent example paths from the inspected release tarball. The worker client constructs
 
 ```ts

@@ -201,6 +201,42 @@ call `solver.cancelFarField()` as soon as a newer generation is known. It is a
 safe no-op without an active pooled field, retains prepared state and the last
 completed result, and bounds obsolete work to tiles that are already running.
 
+For hard candidate cancellation, pass an `AbortSignal` while the asynchronous
+factory is constructing geometry, then call `solver.terminate()` after it has
+resolved:
+
+```ts
+import {
+  createNecArraySolver,
+  NecCancellationError,
+  type FullArrayDescription,
+} from "@necpp-engine/wasm";
+
+declare const description: FullArrayDescription;
+
+const controller = new AbortController();
+const candidate = createNecArraySolver(description, {
+  symmetry: "off",
+  signal: controller.signal,
+});
+
+// Cancels create or geometry construction before `candidate` resolves.
+controller.abort();
+await candidate.catch((error) => {
+  if (!(error instanceof NecCancellationError)) throw error;
+});
+
+// For a candidate that resolves, this cancels prepare, matrix, solve, or field work.
+const solver = await createNecArraySolver(description, { symmetry: "off" });
+solver.terminate();
+```
+
+Each array solver owns an isolated worker, so terminating a candidate cannot
+destroy another ready solver. Creation abort and hard termination reject with
+`NecCancellationError` (`code === "NEC_RUNTIME"`) and stable
+`details.reason` values of `"aborted"` and `"terminated"`, respectively.
+Both boundaries are idempotent. A terminated solver cannot be reused.
+
 ### Full NxN input with automatic selection
 
 This runnable 4 x 4 example supplies all 16 XY positions in row-major order.
@@ -770,10 +806,12 @@ try {
 
 Worker calls cannot interrupt a synchronous native calculation. Use
 `model.terminate()` for immediate cancellation; it kills the worker and
-rejects outstanding operations. Create a new model to continue afterward.
-The higher-level array solver is different for eligible pooled far fields: a
-newer solve or field request cancels obsolete work between bounded tiles while
-retaining the outer solver and factorization.
+rejects outstanding operations with `NecCancellationError`. The same hard
+boundary is available as `solver.terminate()` on `NecArraySolver`; its
+`cancelFarField()` remains the reusable, field-only supersession boundary.
+Create a new model or solver after hard termination. Direct `NecModel`
+operations are synchronous and therefore cannot be preempted; `dispose()` is
+safe and idempotent but is not an interruption mechanism.
 
 ## Lifecycle and disposal
 
@@ -818,7 +856,7 @@ appropriate CORS header.
 import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel({
-  wasmUrl: new URL("https://cdn.example.test/necpp/0.6.0/nec2pp.wasm"),
+  wasmUrl: new URL("https://cdn.example.test/necpp/0.7.0/nec2pp.wasm"),
 });
 model.dispose();
 ```

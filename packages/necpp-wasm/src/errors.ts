@@ -84,3 +84,29 @@ export class NecRuntimeError extends NecError<"NEC_RUNTIME"> {
     this.name = "NecRuntimeError";
   }
 }
+
+/** Stable reasons for an intentional worker-backed cancellation boundary. */
+export type NecCancellationReason = "aborted" | "terminated";
+
+/**
+ * Intentional cancellation of worker-backed work.
+ *
+ * This remains a `NecRuntimeError` (`code === "NEC_RUNTIME"`) for backwards
+ * compatibility while providing a typed class and stable `details.reason`
+ * discriminant for callers that must separate cancellation from solver
+ * failures.
+ */
+export class NecCancellationError extends NecRuntimeError {
+  readonly reason: NecCancellationReason;
+
+  constructor(reason: NecCancellationReason, message?: string) {
+    super(
+      message ?? (reason === "aborted"
+        ? "The NEC worker creation was aborted"
+        : "The NEC worker was terminated"),
+      { details: { reason } },
+    );
+    this.name = "NecCancellationError";
+    this.reason = reason;
+  }
+}

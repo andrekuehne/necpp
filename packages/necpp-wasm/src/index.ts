@@ -1,4 +1,5 @@
 export {
+  NecCancellationError,
   NecConditioningError,
   NecError,
   NecGeometryError,
@@ -23,7 +24,11 @@ export {
 } from "./array-solver.js";
 export type { AppliedArrayBuildPlan } from "./array-solver.js";
 
-export type { NecErrorCode, NecErrorOptions } from "./errors.js";
+export type {
+  NecCancellationReason,
+  NecErrorCode,
+  NecErrorOptions,
+} from "./errors.js";
 
 export type {
   AngleSweep,

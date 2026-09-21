@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { MessageChannel } from "node:worker_threads";
 import test from "node:test";
 
-import { NecRuntimeError, NecStateError } from "../.test-build/src/errors.js";
+import {
+  NecCancellationError,
+  NecRuntimeError,
+  NecStateError,
+} from "../.test-build/src/errors.js";
 import { createNecWorkerModelFromHost } from "../.test-build/src/worker-client.js";
 import { handleWorkerRequest } from "../.test-build/src/worker-runtime.js";
 
@@ -137,6 +141,7 @@ function createLoopbackHost(createModel, options = {}) {
   const session = { model: undefined };
   let queue = Promise.resolve();
   let exitListener;
+  let terminateCount = 0;
   const calls = [];
 
   port2.on("message", (request) => {
@@ -161,6 +166,9 @@ function createLoopbackHost(createModel, options = {}) {
 
   return {
     calls,
+    get terminateCount() {
+      return terminateCount;
+    },
     simulateExit(code) {
       exitListener?.(code);
     },
@@ -182,10 +190,38 @@ function createLoopbackHost(createModel, options = {}) {
       };
     },
     terminate() {
+      terminateCount += 1;
       port1.close();
       port2.close();
     },
   };
+}
+
+async function assertRejectsPromptly(promise, validator) {
+  let timer;
+  try {
+    await Promise.race([
+      assert.rejects(promise, validator),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("cancellation did not reject within 250 ms")),
+          250,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isCancellation(reason) {
+  return (error) => (
+    error instanceof NecCancellationError
+    && error instanceof NecRuntimeError
+    && error.code === "NEC_RUNTIME"
+    && error.reason === reason
+    && error.details?.reason === reason
+  );
 }
 
 async function preparedModel(createModel = () => Promise.resolve(createFakeModel())) {
@@ -411,13 +447,167 @@ test("termination releases the worker and rejects outstanding operations", async
     phi: { startDeg: 0, count: 1, stepDeg: 0 },
   });
   model.terminate();
-  await assert.rejects(first, (error) => (
-    error instanceof NecRuntimeError && error.message.includes("terminated")
-  ));
-  await assert.rejects(second, NecRuntimeError);
+  await assertRejectsPromptly(first, isCancellation("terminated"));
+  await assertRejectsPromptly(second, isCancellation("terminated"));
   assert.equal(model.state, "disposed");
   await assert.rejects(model.prepare({ frequencyMHz: 300 }), NecStateError);
   model.terminate();
+  assert.equal(host.terminateCount, 1);
+  release();
+});
+
+test("AbortSignal promptly cancels worker creation without publishing a model", async () => {
+  let release;
+  const host = createLoopbackHost(async () => createFakeModel(), {
+    hang: {
+      filter: (request) => request.kind === "create",
+      gate: new Promise((resolve) => {
+        release = resolve;
+      }),
+    },
+  });
+  const controller = new AbortController();
+  const creation = createNecWorkerModelFromHost(host, { signal: controller.signal });
+  await new Promise((resolve) => setImmediate(resolve));
+  controller.abort();
+
+  await assertRejectsPromptly(creation, isCancellation("aborted"));
+  assert.equal(host.terminateCount, 1);
+  release();
+});
+
+const cancellablePhases = [
+  {
+    name: "geometry construction",
+    method: "addWire",
+    setup: async () => undefined,
+    start: (model) => model.addWire(dipoleWire),
+  },
+  {
+    name: "geometry completion",
+    method: "completeGeometry",
+    setup: (model) => model.addWire(dipoleWire),
+    start: (model) => model.completeGeometry(),
+  },
+  {
+    name: "prepare/factorization",
+    method: "prepare",
+    setup: async (model) => {
+      await model.addWire(dipoleWire);
+      await model.completeGeometry();
+      await model.definePorts([{ tag: 1, segment: 6 }]);
+    },
+    start: (model) => model.prepare({ frequencyMHz: 300 }),
+  },
+  {
+    name: "impedance matrix",
+    method: "computeImpedanceMatrix",
+    setup: async (model) => {
+      await model.addWire(dipoleWire);
+      await model.completeGeometry();
+      await model.definePorts([{ tag: 1, segment: 6 }]);
+      await model.prepare({ frequencyMHz: 300 });
+    },
+    start: (model) => model.computeImpedanceMatrix(),
+  },
+  {
+    name: "solve",
+    method: "solveCurrents",
+    setup: async (model) => {
+      await model.addWire(dipoleWire);
+      await model.completeGeometry();
+      await model.definePorts([{ tag: 1, segment: 6 }]);
+      await model.prepare({ frequencyMHz: 300 });
+    },
+    start: (model) => model.solveCurrents({
+      real: Float64Array.of(1),
+      imag: Float64Array.of(0),
+    }),
+  },
+  {
+    name: "field",
+    method: "computeFarField",
+    setup: async (model) => {
+      await model.addWire(dipoleWire);
+      await model.completeGeometry();
+      await model.definePorts([{ tag: 1, segment: 6 }]);
+      await model.prepare({ frequencyMHz: 300 });
+      await model.solveCurrents({
+        real: Float64Array.of(1),
+        imag: Float64Array.of(0),
+      });
+    },
+    start: (model) => model.computeFarField({
+      theta: { startDeg: 0, count: 1, stepDeg: 0 },
+      phi: { startDeg: 0, count: 1, stepDeg: 0 },
+    }),
+  },
+];
+
+for (const phase of cancellablePhases) {
+  test(`hard termination cancels ${phase.name} and queued work without stale completion`, async () => {
+    let release;
+    const host = createLoopbackHost(async () => createFakeModel(), {
+      hang: {
+        filter: (request) => request.method === phase.method,
+        gate: new Promise((resolve) => {
+          release = resolve;
+        }),
+      },
+    });
+    const model = await createNecWorkerModelFromHost(host);
+    await phase.setup(model);
+    const completions = [];
+    model.subscribeProgress((event) => {
+      if (event.phase === "complete") completions.push(event.operation);
+    });
+
+    const active = phase.start(model);
+    const queued = model.clearLoads();
+    await new Promise((resolve) => setImmediate(resolve));
+    model.terminate();
+
+    await assertRejectsPromptly(active, isCancellation("terminated"));
+    await assertRejectsPromptly(queued, isCancellation("terminated"));
+    assert.equal(model.state, "disposed");
+    assert.equal(host.terminateCount, 1);
+    release();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(!completions.includes(phase.method));
+  });
+}
+
+test("terminating one candidate leaves an independently ready worker usable", async () => {
+  let release;
+  const firstHost = createLoopbackHost(async () => createFakeModel(), {
+    hang: {
+      filter: (request) => request.method === "prepare",
+      gate: new Promise((resolve) => {
+        release = resolve;
+      }),
+    },
+  });
+  const secondHost = createLoopbackHost(async () => createFakeModel());
+  const [candidate, ready] = await Promise.all([
+    createNecWorkerModelFromHost(firstHost),
+    createNecWorkerModelFromHost(secondHost),
+  ]);
+  for (const model of [candidate, ready]) {
+    await model.addWire(dipoleWire);
+    await model.completeGeometry();
+    await model.definePorts([{ tag: 1, segment: 6 }]);
+  }
+  await ready.prepare({ frequencyMHz: 300 });
+
+  const pending = candidate.prepare({ frequencyMHz: 300 });
+  await new Promise((resolve) => setImmediate(resolve));
+  candidate.terminate();
+  await assertRejectsPromptly(pending, isCancellation("terminated"));
+
+  const matrix = await ready.computeImpedanceMatrix();
+  assert.equal(matrix.impedance.real[0], 73.1);
+  assert.equal(ready.state, "prepared");
+  await ready.dispose();
   release();
 });
 

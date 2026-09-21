@@ -1,3 +1,24 @@
+## 0.7.0 - 2026-09-21
+
+### Added
+
+* **Hard cancellation for worker-backed array candidates:**
+  `createNecArraySolver()` and `createNecWorkerModel()` accept a creation-only
+  `AbortSignal`, while `NecArraySolver` now exposes the same immediate,
+  idempotent `terminate()` boundary as `NecWorkerModel`. Cancellation rejects
+  active and queued work without affecting independently owned ready solvers.
+* **Typed intentional cancellation:** `NecCancellationError` refines
+  `NecRuntimeError` while preserving `code === "NEC_RUNTIME"`; stable
+  `details.reason` values distinguish `"aborted"` creation from
+  `"terminated"` worker work and from genuine solver failures.
+
+### Compatibility
+
+* The direct synchronous `NecModel` API, NEC2++ engine `2.5.0`, WASM ABI `1`,
+  and all numerical formats are unchanged. `cancelFarField()` remains the
+  reusable tile-boundary supersession API; hard termination disposes only the
+  selected worker-backed model or solver.
+
 ## 0.6.0 - 2026-09-12
 
 ### Added

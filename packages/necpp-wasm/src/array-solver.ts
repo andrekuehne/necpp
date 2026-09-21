@@ -3,6 +3,7 @@ import {
   createExplicitArrayBuildPlan,
 } from "./array-symmetry.js";
 import {
+  NecCancellationError,
   NecError,
   NecGeometryError,
   NecInputError,
@@ -47,6 +48,12 @@ const NEC_SPEED_OF_LIGHT_M_PER_S = 1 / Math.sqrt(
 );
 
 type ArrayModel = NecModel | NecWorkerModel;
+type ArrayWorkerFactory = (
+  fieldPool: Parameters<typeof createNecArrayWorkerModel>[0],
+  signal?: AbortSignal,
+) => Promise<NecWorkerModel>;
+
+const defaultArrayWorkerFactory: ArrayWorkerFactory = createNecArrayWorkerModel;
 
 export interface AppliedArrayBuildPlan {
   readonly completion: GeometryCompletionResult;
@@ -569,16 +576,31 @@ async function buildWorker(
   plan: ArrayBuildPlan,
   fieldWorkers: FieldWorkerSelection,
   fieldWorkerAssetBaseUrl?: string,
+  signal?: AbortSignal,
+  workerFactory: ArrayWorkerFactory = defaultArrayWorkerFactory,
 ): Promise<{ readonly model: NecWorkerModel; readonly application: AppliedArrayBuildPlan }> {
-  const model = await createNecArrayWorkerModel({
+  const model = await workerFactory({
     fieldWorkers,
     ...(fieldWorkerAssetBaseUrl === undefined ? {} : { fieldWorkerAssetBaseUrl }),
-  });
+  }, signal);
+  const abort = (): void => {
+    model.terminate();
+  };
+  signal?.addEventListener("abort", abort, { once: true });
   try {
+    if (signal?.aborted === true) {
+      model.terminate();
+      throw new NecCancellationError("aborted");
+    }
     return { model, application: await applyArrayBuildPlan(model, description, plan) };
   } catch (error) {
     await model.dispose();
+    if (signal?.aborted === true && error instanceof NecCancellationError) {
+      throw new NecCancellationError("aborted");
+    }
     throw error;
+  } finally {
+    signal?.removeEventListener("abort", abort);
   }
 }
 
@@ -590,8 +612,11 @@ class WorkerNecArraySolver implements NecArraySolver {
   readonly #mode: "auto" | "off" | "require";
   readonly #fieldWorkers: FieldWorkerSelection;
   readonly #fieldWorkerAssetBaseUrl: string | undefined;
+  readonly #workerFactory: ArrayWorkerFactory;
   #fieldDiagnostics: FieldBackendDiagnostics;
   #retried = false;
+  #terminated = false;
+  readonly #terminationController = new AbortController();
 
   constructor(
     model: NecWorkerModel,
@@ -601,6 +626,7 @@ class WorkerNecArraySolver implements NecArraySolver {
     mode: "auto" | "off" | "require",
     fieldWorkers: FieldWorkerSelection,
     fieldWorkerAssetBaseUrl?: string,
+    workerFactory: ArrayWorkerFactory = defaultArrayWorkerFactory,
   ) {
     this.#model = model;
     this.#description = description;
@@ -609,6 +635,7 @@ class WorkerNecArraySolver implements NecArraySolver {
     this.#mode = mode;
     this.#fieldWorkers = fieldWorkers;
     this.#fieldWorkerAssetBaseUrl = fieldWorkerAssetBaseUrl;
+    this.#workerFactory = workerFactory;
     this.#fieldDiagnostics = pendingFieldDiagnostics(fieldWorkers);
   }
 
@@ -620,6 +647,9 @@ class WorkerNecArraySolver implements NecArraySolver {
     try {
       await this.#model.prepare(options);
     } catch (error) {
+      if (this.#terminated && error instanceof NecCancellationError) {
+        throw new NecCancellationError("terminated");
+      }
       const failure = failureReason(error);
       if (this.#mode !== "auto" || this.#plan.kind !== "symmetric"
         || this.#retried || failure === undefined) {
@@ -628,12 +658,26 @@ class WorkerNecArraySolver implements NecArraySolver {
       this.#retried = true;
       await this.#model.dispose();
       const retryPlan = explicitRetryPlan(this.#description, this.#plan, failure);
-      const built = await buildWorker(
-        this.#description,
-        retryPlan,
-        this.#fieldWorkers,
-        this.#fieldWorkerAssetBaseUrl,
-      );
+      let built: Awaited<ReturnType<typeof buildWorker>>;
+      try {
+        built = await buildWorker(
+          this.#description,
+          retryPlan,
+          this.#fieldWorkers,
+          this.#fieldWorkerAssetBaseUrl,
+          this.#terminationController.signal,
+          this.#workerFactory,
+        );
+      } catch (retryError) {
+        if (this.#terminated && retryError instanceof NecCancellationError) {
+          throw new NecCancellationError("terminated");
+        }
+        throw retryError;
+      }
+      if (this.#terminated) {
+        built.model.terminate();
+        throw new NecCancellationError("terminated");
+      }
       this.#model = built.model;
       this.#plan = retryPlan;
       this.#application = built.application;
@@ -730,6 +774,13 @@ class WorkerNecArraySolver implements NecArraySolver {
     this.#model.cancelFarField();
   }
 
+  terminate(): void {
+    if (this.#terminated) return;
+    this.#terminated = true;
+    this.#terminationController.abort();
+    this.#model.terminate();
+  }
+
   dispose(): Promise<void> {
     return this.#model.dispose();
   }
@@ -790,13 +841,44 @@ function resolveFieldAssetBase(value: string | URL | undefined): string | undefi
   }
 }
 
+function validateAbortSignal(signal: AbortSignal | undefined): void {
+  if (signal !== undefined
+      && (typeof signal !== "object"
+        || typeof signal.aborted !== "boolean"
+        || typeof signal.addEventListener !== "function"
+        || typeof signal.removeEventListener !== "function")) {
+    throw new NecInputError("signal must be an AbortSignal");
+  }
+}
+
+function isAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
+}
+
 /** Create one asynchronous solver facade for explicit and symmetric arrays. */
 export async function createNecArraySolver(
   description: FullArrayDescription,
   options: CreateArraySolverOptions = {},
 ): Promise<NecArraySolver> {
+  return createNecArraySolverWithWorkerFactory(
+    description,
+    options,
+    defaultArrayWorkerFactory,
+  );
+}
+
+/** @internal Test seam for deterministic worker lifecycle verification. */
+export async function createNecArraySolverWithWorkerFactory(
+  description: FullArrayDescription,
+  options: CreateArraySolverOptions,
+  workerFactory: ArrayWorkerFactory,
+): Promise<NecArraySolver> {
   if (typeof options !== "object" || options === null) {
     throw new NecInputError("Array solver options must be an object");
+  }
+  validateAbortSignal(options.signal);
+  if (isAborted(options.signal)) {
+    throw new NecCancellationError("aborted");
   }
   const mode = options.symmetry ?? "auto";
   if (mode !== "auto" && mode !== "off" && mode !== "require") {
@@ -818,6 +900,9 @@ export async function createNecArraySolver(
   let plan = mode === "off"
     ? createExplicitArrayBuildPlan(description)
     : analyzeArraySymmetry(description, options.symmetrizer!);
+  if (isAborted(options.signal)) {
+    throw new NecCancellationError("aborted");
+  }
   if (mode === "require" && plan.kind !== "symmetric") {
     throw new NecGeometryError("The array cannot be represented by supported symmetry", {
       details: { reasons: plan.reasons },
@@ -829,6 +914,8 @@ export async function createNecArraySolver(
       plan,
       fieldWorkers,
       fieldWorkerAssetBaseUrl,
+      options.signal,
+      workerFactory,
     );
     return new WorkerNecArraySolver(
       built.model,
@@ -838,6 +925,7 @@ export async function createNecArraySolver(
       mode,
       fieldWorkers,
       fieldWorkerAssetBaseUrl,
+      workerFactory,
     );
   } catch (error) {
     const failure = failureReason(error);
@@ -850,6 +938,8 @@ export async function createNecArraySolver(
       plan,
       fieldWorkers,
       fieldWorkerAssetBaseUrl,
+      options.signal,
+      workerFactory,
     );
     return new WorkerNecArraySolver(
       built.model,
@@ -859,6 +949,7 @@ export async function createNecArraySolver(
       mode,
       fieldWorkers,
       fieldWorkerAssetBaseUrl,
+      workerFactory,
     );
   }
 }

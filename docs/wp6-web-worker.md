@@ -26,10 +26,12 @@ including worker-only `create`. Listeners run on the client thread.
 
 ## Cancellation
 
-An in-progress native solve is not interruptible. `terminate()` kills the
-worker immediately, rejects every outstanding promise with `NecRuntimeError`,
-and leaves `state === "disposed"`. `dispose()` asks the worker to destroy the
-native handle, then terminates the thread. Both are idempotent.
+An in-progress native solve is not interruptible in-place. `terminate()` kills
+the worker immediately, rejects every outstanding and queued promise with
+`NecCancellationError` (`details.reason === "terminated"`), and leaves
+`state === "disposed"`. A factory `signal` cancels worker creation with reason
+`"aborted"`. `dispose()` asks the worker to destroy the native handle, then
+terminates the thread. All cancellation and cleanup boundaries are idempotent.
 
 ## Verification
 
