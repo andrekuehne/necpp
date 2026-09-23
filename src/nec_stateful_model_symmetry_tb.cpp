@@ -395,6 +395,25 @@ void run_equivalence_case(
   REQUIRE(symmetric_field.phi_deg == explicit_field.phi_deg);
   require_complex_close(symmetric_field.e_theta, explicit_field.e_theta);
   require_complex_close(symmetric_field.e_phi, explicit_field.e_phi);
+
+  const nec_far_field_grid one_point{
+    1.0, 43.125, 1, 0.0, 17.75, 1, 0.0,
+  };
+  const nec_embedded_far_field_result explicit_embedded =
+    explicit_model.compute_embedded_far_fields(
+      one_point, nec_embedded_field_normalization::unit_current);
+  const nec_embedded_far_field_result symmetric_embedded =
+    symmetric_model.compute_embedded_far_fields(
+      one_point, nec_embedded_field_normalization::unit_current);
+  for (size_t native = 0; native < native_to_caller.size(); ++native) {
+    const size_t caller = native_to_caller[native];
+    require_complex_close(
+      {symmetric_embedded.e_theta_at(native, 0, 0)},
+      {explicit_embedded.e_theta_at(caller, 0, 0)});
+    require_complex_close(
+      {symmetric_embedded.e_phi_at(native, 0, 0)},
+      {explicit_embedded.e_phi_at(caller, 0, 0)});
+  }
   REQUIRE(symmetric_model.factorization_generation() == 1);
   REQUIRE(explicit_model.factorization_generation() == 1);
 }

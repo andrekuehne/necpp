@@ -235,6 +235,118 @@ TEST_CASE("WP3 current-normalized embedded fields preserve and reproduce a solut
     direct.e_phi) < 1.0e-7);
 }
 
+TEST_CASE("Retained voltage basis reproduces direct one-point current fields",
+          "[wasm_api][wp3][embedded][retained]")
+{
+  const nec_far_field_grid directions[]{
+    {1.0, 43.125, 1, 0.0, 17.75, 1, 0.0},
+    {3.25, 12.5, 2, 71.25, -31.5, 2, 131.0},
+    {1.0, 112.0, 1, 0.0, 23.0, 1, 0.0},
+  };
+  for (const nec_ground_kind ground_kind : {
+         nec_ground_kind::free_space,
+         nec_ground_kind::perfect,
+         nec_ground_kind::finite_reflection_coefficient,
+         nec_ground_kind::finite_sommerfeld_norton,
+       }) {
+    nec_stateful_model model;
+    // Two orthogonal, electrically separate ports exercise both field
+    // components and mutual coupling at arbitrary, non-grid directions.
+    model.add_wire({1, 5, 0.0, 0.0, 0.10, 0.0, 0.0, 0.60, 0.001});
+    model.add_wire({2, 5, 0.20, 0.20, 0.35, 0.70, 0.20, 0.35, 0.001});
+    model.complete_geometry();
+    model.define_ports({{2, 3}, {1, 3}});
+    if (ground_kind != nec_ground_kind::free_space)
+      model.set_ground({ground_kind, 13.0, 0.005});
+    model.prepare(kFrequencyMHz);
+    REQUIRE(model.state() == nec_model_state::prepared);
+
+    for (size_t direction_index = 0; direction_index < 3;
+         ++direction_index) {
+      const nec_far_field_grid& grid = directions[direction_index];
+      const nec_embedded_far_field_result embedded =
+        model.compute_embedded_far_fields(
+          grid, nec_embedded_field_normalization::unit_current);
+      REQUIRE(embedded.ports[0].tag == 2);
+      REQUIRE(embedded.ports[1].tag == 1);
+      REQUIRE(model.state() == (direction_index == 0
+        ? nec_model_state::prepared : nec_model_state::solved));
+      REQUIRE(model.solve_generation() == 2 * direction_index);
+      REQUIRE(model.unit_current_basis_solve_count() ==
+        (direction_index == 0 ? 0u : 2u));
+      for (size_t port = 0; port < 2; ++port) {
+        std::vector<nec_complex> currents(2, nec_complex(0.0, 0.0));
+        currents[port] = nec_complex(1.0, 0.0);
+        model.solve_port_currents(currents);
+        const nec_far_field_result direct = model.compute_far_field(grid);
+        for (size_t phi = 0; phi < direct.phi_deg.size(); ++phi) {
+          for (size_t theta = 0; theta < direct.theta_deg.size(); ++theta) {
+            const size_t index = phi * direct.theta_deg.size() + theta;
+            const nec_complex actual_theta =
+              embedded.e_theta_at(port, theta, phi);
+            const nec_complex actual_phi =
+              embedded.e_phi_at(port, theta, phi);
+            REQUIRE(std::abs(actual_theta - direct.e_theta[index]) <=
+              1.0e-8 * std::max(nec_float(1.0),
+                std::abs(direct.e_theta[index])));
+            REQUIRE(std::abs(actual_phi - direct.e_phi[index]) <=
+              1.0e-8 * std::max(nec_float(1.0),
+                std::abs(direct.e_phi[index])));
+          }
+        }
+      }
+    }
+
+    const nec_embedded_far_field_result voltage_embedded =
+      model.compute_embedded_far_fields(
+        directions[0], nec_embedded_field_normalization::unit_voltage);
+    for (size_t port = 0; port < 2; ++port) {
+      std::vector<nec_complex> voltages(2, nec_complex(0.0, 0.0));
+      voltages[port] = nec_complex(1.0, 0.0);
+      model.solve_port_voltages(voltages);
+      const nec_far_field_result direct = model.compute_far_field(directions[0]);
+      REQUIRE(std::abs(voltage_embedded.e_theta_at(port, 0, 0) -
+        direct.e_theta_at(0, 0)) <= 1.0e-8 *
+        std::max(nec_float(1.0), std::abs(direct.e_theta_at(0, 0))));
+      REQUIRE(std::abs(voltage_embedded.e_phi_at(port, 0, 0) -
+        direct.e_phi_at(0, 0)) <= 1.0e-8 *
+        std::max(nec_float(1.0), std::abs(direct.e_phi_at(0, 0))));
+    }
+
+    // The stored voltage modes remain valid across consumer solves and are
+    // replaced when a frequency change invalidates the prepared matrix.
+    const uint64_t generation = model.factorization_generation();
+    model.prepare(310.0);
+    REQUIRE(model.factorization_generation() == generation + 1);
+    REQUIRE(model.state() == nec_model_state::prepared);
+    const nec_embedded_far_field_result changed =
+      model.compute_embedded_far_fields(
+        directions[0], nec_embedded_field_normalization::unit_current);
+    REQUIRE(changed.frequency_mhz == 310.0);
+    model.solve_port_currents({nec_complex(1.0, 0.0), nec_complex(0.0, 0.0)});
+    const nec_far_field_result direct = model.compute_far_field(directions[0]);
+    REQUIRE(std::abs(changed.e_theta_at(0, 0, 0) - direct.e_theta_at(0, 0)) <=
+      1.0e-8 * std::max(nec_float(1.0),
+        std::abs(direct.e_theta_at(0, 0))));
+
+    model.add_load({
+      nec_load_kind::impedance, 1, 3, 3, 12.0, 0.0, 0.0,
+    });
+    REQUIRE(model.state() == nec_model_state::geometry_complete);
+    model.prepare(310.0);
+    const nec_embedded_far_field_result loaded =
+      model.compute_embedded_far_fields(
+        directions[0], nec_embedded_field_normalization::unit_current);
+    model.solve_port_currents({nec_complex(1.0, 0.0), nec_complex(0.0, 0.0)});
+    const nec_far_field_result loaded_direct =
+      model.compute_far_field(directions[0]);
+    REQUIRE(std::abs(loaded.e_theta_at(0, 0, 0) -
+      loaded_direct.e_theta_at(0, 0)) <= 1.0e-8 *
+      std::max(nec_float(1.0),
+        std::abs(loaded_direct.e_theta_at(0, 0))));
+  }
+}
+
 TEST_CASE("WP3 exact-zero excitation returns finite exact-zero fields",
           "[wasm_api][wp3][far_field][zero]")
 {

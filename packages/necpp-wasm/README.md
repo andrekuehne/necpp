@@ -720,6 +720,14 @@ Do not superpose embedded fields in JavaScript for this normal path.
 `computeEmbeddedFarFields()` returns one complex basis pattern per port.
 Unit-current normalization makes array beamforming a direct weighted sum. The
 arrays are basis-major, followed by the normal theta-fast sample layout.
+At a prepared frequency, the solver retains voltage-basis current coefficients
+while extracting the admittance matrix. One-point field requests evaluate the
+requested angle from those coefficients and convert to the one-ampere basis
+with the impedance matrix, without repeating the port solves. Larger grids
+use the established serial path. A one-point request uses `count: 1` on both
+axes and accepts any valid theta and phi
+values. The retained basis has a 64 MiB allocation budget; larger models use
+the serial extraction path.
 
 ```ts
 import type {
@@ -856,7 +864,7 @@ appropriate CORS header.
 import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel({
-  wasmUrl: new URL("https://cdn.example.test/necpp/0.7.0/nec2pp.wasm"),
+  wasmUrl: new URL("https://cdn.example.test/necpp/0.7.1/nec2pp.wasm"),
 });
 model.dispose();
 ```
@@ -911,6 +919,10 @@ try {
 - Keep a prepared model alive while changing excitations or angular grids.
   Recreating it discards the expensive factorization.
 - Prefer embedded fields when exploring many array weights at one frequency.
+- The retained voltage field basis uses memory proportional to ports times
+  segments. For an ordinary 256-port, five-segment wire array it occupies
+  about 23 MiB in native coefficient arrays. It is cleared by any model or
+  frequency change that invalidates the prepared matrix.
 - Field storage scales with `theta.count * phi.count`; embedded storage also
   multiplies by port count and by four `Float64Array` components. A full
   181 x 361 field is about 2 MiB for the four component arrays; four embedded

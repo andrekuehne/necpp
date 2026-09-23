@@ -13,6 +13,7 @@
 #include "nec_geometry_symmetry.h"
 #include "nec_power_budget.h"
 #include "nec_prepared_current_quadrature.h"
+#include "math_util.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -21,6 +22,7 @@
 #include <vector>
 
 class nec_context;
+struct nec_far_field_evaluation_input;
 enum class nec_model_state {
   empty,
   geometry_building,
@@ -355,6 +357,11 @@ public:
   size_t retained_result_count() const;
 
 private:
+  struct retained_voltage_field_mode {
+    real_array air, aii, bir, bii, cir, cii;
+    complex_array current_vector;
+  };
+
   void require_state(nec_model_state expected, const char* operation) const;
   void require_configurable(const char* operation) const;
   void invalidate_factorization();
@@ -363,6 +370,12 @@ private:
   void validate_symmetry_ground(
     const nec_ground_definition& ground, const char* operation) const;
   void clear_matrix_cache();
+  bool can_retain_voltage_field_basis() const;
+  void compute_embedded_from_retained_basis(
+    const nec_far_field_grid& grid,
+    nec_embedded_field_normalization normalization,
+    const nec_complex_matrix* impedance,
+    nec_embedded_far_field_result& output);
   void clear_consumer_solution();
   void execute_voltage_solve(
     const std::vector<nec_complex>& voltages,
@@ -383,7 +396,8 @@ private:
   void calculate_far_field(
     const nec_far_field_grid& grid,
     const std::vector<nec_complex>& currents,
-    nec_far_field_result& output);
+    nec_far_field_result& output,
+    const nec_far_field_evaluation_input* retained_input = nullptr);
   const nec_port_solution& finish_consumer_solve(
     nec_port_drive drive,
     const std::vector<nec_complex>& requested,
@@ -398,6 +412,7 @@ private:
   std::vector<int> m_absolute_port_segments;
   std::vector<nec_complex> m_port_currents;
   nec_complex_matrix m_admittance_matrix;
+  std::vector<retained_voltage_field_mode> m_retained_voltage_field_basis;
   nec_impedance_result m_impedance_result;
   nec_port_solution m_last_port_solution;
   nec_far_field_result m_far_field_result;

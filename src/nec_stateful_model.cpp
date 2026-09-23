@@ -224,8 +224,35 @@ void nec_stateful_model::clear_matrix_cache()
 {
   m_admittance_matrix = {};
   m_impedance_result = {};
+  m_retained_voltage_field_basis.clear();
   m_has_admittance_matrix = false;
   m_has_impedance_result = false;
+}
+
+bool nec_stateful_model::can_retain_voltage_field_basis() const
+{
+  // The cache is six real wire coefficient planes and, for patch geometry,
+  // one complex patch-current plane per voltage mode. Bound it independently
+  // of the returned field grid so a large array cannot exhaust WASM memory.
+  constexpr size_t max_basis_bytes = 64u * 1024u * 1024u;
+  const c_geometry* geometry = m_context->get_geometry();
+  if (geometry == nullptr || geometry->n_segments < 0 || geometry->m < 0)
+    return false;
+  const size_t segments = static_cast<size_t>(geometry->n_segments);
+  const size_t patches = static_cast<size_t>(geometry->m);
+  // safe_array reserves 1.5 times the requested length. Work in that
+  // logical budget and divide before multiplying to avoid size overflow.
+  const size_t logical_budget = max_basis_bytes / 3u * 2u;
+  const size_t wire_bytes = 6 * sizeof(nec_float) + sizeof(nec_complex);
+  const size_t patch_bytes = 3 * sizeof(nec_complex);
+  if (segments > logical_budget / wire_bytes)
+    return false;
+  const size_t wire_total = segments * wire_bytes;
+  if (patches > (logical_budget - wire_total) / patch_bytes)
+    return false;
+  const size_t bytes_per_mode = wire_total + patches * patch_bytes;
+  return bytes_per_mode > 0 &&
+    m_ports.size() <= logical_budget / bytes_per_mode;
 }
 
 void nec_stateful_model::clear_consumer_solution()
@@ -722,6 +749,9 @@ const nec_complex_matrix& nec_stateful_model::compute_admittance_matrix()
   admittance.rows = order;
   admittance.columns = order;
   admittance.values.assign(order * order, nec_complex(0.0, 0.0));
+  std::vector<retained_voltage_field_mode> retained_basis;
+  if (can_retain_voltage_field_basis())
+    retained_basis.resize(order);
 
   try {
     std::vector<nec_complex> basis_voltages(order, nec_complex(0.0, 0.0));
@@ -734,6 +764,21 @@ const nec_complex_matrix& nec_stateful_model::compute_admittance_matrix()
         basis_voltages, achieved_voltages, achieved_currents);
       for (size_t row = 0; row < order; ++row)
         admittance.values[row * order + column] = achieved_currents[row];
+      if (!retained_basis.empty()) {
+        const nec_float wavelength =
+          em::get_wavelength(m_frequency_mhz * 1.0e6);
+        const nec_far_field_evaluation_input input =
+          m_context->far_field_evaluation_input(wavelength, 0);
+        retained_voltage_field_mode& mode = retained_basis[column];
+        mode.air.copy(input.air);
+        mode.aii.copy(input.aii);
+        mode.bir.copy(input.bir);
+        mode.bii.copy(input.bii);
+        mode.cir.copy(input.cir);
+        mode.cii.copy(input.cii);
+        if (input.geometry.m > 0)
+          mode.current_vector.copy(input.current_vector);
+      }
     }
   } catch (...) {
     const std::exception_ptr failure = std::current_exception();
@@ -748,6 +793,7 @@ const nec_complex_matrix& nec_stateful_model::compute_admittance_matrix()
   restore_after_internal_solves(had_solution, saved_solution);
 
   m_admittance_matrix = std::move(admittance);
+  m_retained_voltage_field_basis = std::move(retained_basis);
   m_has_admittance_matrix = true;
   return m_admittance_matrix;
 }
@@ -822,7 +868,8 @@ const nec_port_solution& nec_stateful_model::last_port_solution() const
 void nec_stateful_model::calculate_far_field(
   const nec_far_field_grid& grid,
   const std::vector<nec_complex>& currents,
-  nec_far_field_result& copied)
+  nec_far_field_result& copied,
+  const nec_far_field_evaluation_input* retained_input)
 {
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
   const auto total_started = std::chrono::steady_clock::now();
@@ -862,7 +909,7 @@ void nec_stateful_model::calculate_far_field(
     std::chrono::duration<nec_float, std::milli>(
       std::chrono::steady_clock::now() - phase_started).count();
 #endif
-  const bool zero_excitation = std::all_of(
+  const bool zero_excitation = retained_input == nullptr && std::all_of(
     currents.begin(), currents.end(),
     [](nec_complex current) { return current == nec_complex(0.0, 0.0); });
   if (zero_excitation) {
@@ -875,11 +922,13 @@ void nec_stateful_model::calculate_far_field(
   }
 
   const nec_float wavelength = em::get_wavelength(m_frequency_mhz * 1.0e6);
-  nec_far_field_evaluation_input input =
+  nec_far_field_evaluation_input context_input =
     m_context->far_field_evaluation_input(wavelength, 0);
 #ifdef NECPP_FAR_FIELD_CACHE_SEGMENTS
-  input.segment_half_lengths = &m_far_field_segment_half_lengths;
+  context_input.segment_half_lengths = &m_far_field_segment_half_lengths;
 #endif
+  const nec_far_field_evaluation_input& input =
+    retained_input == nullptr ? context_input : *retained_input;
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
   std::chrono::steady_clock::duration raw_duration{};
   uint64_t raw_timing_samples = 0;
@@ -1094,11 +1143,31 @@ nec_stateful_model::compute_embedded_far_fields(
     fail("COMPUTE EMBEDDED FAR FIELDS", "EMBEDDED SAMPLE COUNT IS TOO LARGE");
 
   if (normalization == nec_embedded_field_normalization::unit_current) {
+    const nec_complex_matrix& impedance = compute_impedance_matrix().impedance;
+    if (samples_per_port == 1 &&
+        m_retained_voltage_field_basis.size() == m_ports.size()) {
+      nec_embedded_far_field_result embedded;
+      compute_embedded_from_retained_basis(
+        grid, normalization, &impedance, embedded);
+      m_embedded_far_field_result = std::move(embedded);
+      return m_embedded_far_field_result;
+    }
     nec_embedded_far_field_result embedded;
     run_unit_current_basis_loop(
       nullptr, &embedded, &grid, "COMPUTE EMBEDDED FAR FIELDS");
     m_embedded_far_field_result = std::move(embedded);
     return m_embedded_far_field_result;
+  }
+
+  if (can_retain_voltage_field_basis()) {
+    compute_admittance_matrix();
+    if (m_retained_voltage_field_basis.size() == m_ports.size()) {
+      nec_embedded_far_field_result embedded;
+      compute_embedded_from_retained_basis(
+        grid, normalization, nullptr, embedded);
+      m_embedded_far_field_result = std::move(embedded);
+      return m_embedded_far_field_result;
+    }
   }
 
   const bool had_solution = m_has_port_solution;
@@ -1153,6 +1222,65 @@ nec_stateful_model::compute_embedded_far_fields(
 
   m_embedded_far_field_result = std::move(embedded);
   return m_embedded_far_field_result;
+}
+
+void nec_stateful_model::compute_embedded_from_retained_basis(
+  const nec_far_field_grid& grid,
+  nec_embedded_field_normalization normalization,
+  const nec_complex_matrix* impedance,
+  nec_embedded_far_field_result& output)
+{
+  const size_t samples_per_port =
+    checked_field_sample_count(grid, "COMPUTE EMBEDDED FAR FIELDS");
+  const size_t order = m_ports.size();
+  output.radius_m = grid.radius_m;
+  output.frequency_mhz = m_frequency_mhz;
+  output.ports = m_ports;
+  output.normalization = normalization;
+  output.samples_per_port = samples_per_port;
+  populate_field_axes(
+    grid, output.theta_deg, output.phi_deg,
+    "COMPUTE EMBEDDED FAR FIELDS");
+  output.e_theta.assign(order * samples_per_port, nec_complex(0.0, 0.0));
+  output.e_phi.assign(order * samples_per_port, nec_complex(0.0, 0.0));
+
+  const nec_float wavelength = em::get_wavelength(m_frequency_mhz * 1.0e6);
+  const nec_far_field_evaluation_input context_input =
+    m_context->far_field_evaluation_input(wavelength, 0);
+  nec_far_field_result voltage_field;
+  for (size_t source = 0; source < order; ++source) {
+    const retained_voltage_field_mode& mode =
+      m_retained_voltage_field_basis[source];
+    nec_far_field_evaluation_input input{
+      context_input.geometry, context_input.ground,
+      mode.air, mode.aii, mode.bir, mode.bii, mode.cir, mode.cii,
+      mode.current_vector, context_input.ifar, context_input.wavelength,
+    };
+#ifdef NECPP_FAR_FIELD_CACHE_SEGMENTS
+    input.segment_half_lengths = &m_far_field_segment_half_lengths;
+#endif
+    calculate_far_field(grid, {}, voltage_field, &input);
+    if (impedance == nullptr) {
+      const size_t offset = source * samples_per_port;
+      std::copy(voltage_field.e_theta.begin(), voltage_field.e_theta.end(),
+        output.e_theta.begin() + static_cast<std::ptrdiff_t>(offset));
+      std::copy(voltage_field.e_phi.begin(), voltage_field.e_phi.end(),
+        output.e_phi.begin() + static_cast<std::ptrdiff_t>(offset));
+    } else {
+      // E(V_i = 1) is a row of the linear field map L. Since V = Z I,
+      // each one-ampere embedded field is the corresponding column of L Z.
+      for (size_t target = 0; target < order; ++target) {
+        const nec_complex voltage = impedance->at(source, target);
+        const size_t offset = target * samples_per_port;
+        for (size_t sample = 0; sample < samples_per_port; ++sample) {
+          output.e_theta[offset + sample] +=
+            voltage_field.e_theta[sample] * voltage;
+          output.e_phi[offset + sample] +=
+            voltage_field.e_phi[sample] * voltage;
+        }
+      }
+    }
+  }
 }
 
 void nec_stateful_model::run_unit_current_basis_loop(

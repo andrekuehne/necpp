@@ -1,3 +1,21 @@
+## 0.7.1 - 2026-09-23
+
+### Improved
+
+* `computeEmbeddedFarFields()` retains the complete per-port voltage field
+  coefficients while extracting admittance. One-point current-normalized
+  fields now evaluate the requested direction from that basis and apply `Z`,
+  avoiding a second series of NEC solves. Larger grids keep the established
+  serial path. Arbitrary directions, both field components, and every
+  supported ground model retain the native NEC field calculation.
+* The retained basis is invalidated with the prepared matrix and limited to
+  64 MiB. Larger models use the existing serial extraction path.
+
+### Compatibility
+
+* The public API, NEC2++ engine `2.5.0`, WASM ABI `1`, physical one-ampere
+  normalization, and packed data formats are unchanged.
+
 ## 0.7.0 - 2026-09-21
 
 ### Added
