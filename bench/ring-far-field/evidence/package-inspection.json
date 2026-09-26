@@ -1,0 +1,21 @@
+{
+  "type": "far-field-wasm-simd-inspection",
+  "schemaVersion": 1,
+  "generatedJs": "/home/andre/Projects/necpp/packages/necpp-wasm/src/nec2pp.generated.js",
+  "wat": "/tmp/ring-package.wat",
+  "publicExport": "_necpp_wasm_v1_compute_far_field",
+  "minifiedExport": "Ka",
+  "rootFunction": 840,
+  "module": {
+    "functionCount": 960,
+    "simdFunctionCount": 0,
+    "simdInstructionLines": 0
+  },
+  "farFieldCallGraph": {
+    "reachableFunctionCount": 7,
+    "simdReachableFunctionCount": 0,
+    "simdInstructionLines": 0,
+    "simdOperations": [],
+    "simdFunctionIds": []
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-26T23:41:03+0200",
+  "commit": "09e4d413d835285a6631216baf8b2172f08651e5",
+  "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+  "node": "v24.20.0",
+  "g++": "g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "rounds": 3,
+  "nativeSha256": "b4349498d658a6b18ecdbe96f83136a6317d15d587261437f301ef7848f7e3d7",
+  "benchWasmSha256": "0ecce8df6570e5e42de0d61276f6da0a4dc75c26f9f4522e88a3385372f517bb",
+  "packageWasmSha256": "745631fc178b541c5eca44688d95fee72fdafac306227931f7f4669335106b90",
+  "wasmCompiler": "Emscripten 4.0.10; see build.py for exact flags",
+  "protocol": "3 fresh models; one cold + one retained voltage RHS per model; scalar; explicit geometry; serial execution; module/process startup excluded"
+}
