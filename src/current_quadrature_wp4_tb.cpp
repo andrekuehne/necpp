@@ -295,7 +295,7 @@ TEST_CASE("WP4 ABI rooted-monopole images stay out of plane 0",
   nec_stateful_model native;
   build_stateful(
     native, monopole_wires(), {{1, 1}},
-    nec_ground_connection::interpolate, nec_ground_kind::perfect);
+    nec_model_ground_connection::interpolate, nec_ground_kind::perfect);
   nec_prepared_quadrature_request request;
   request.nodes.assign(std::begin(kFourNodes), std::end(kFourNodes));
   request.images = nec_prepared_quadrature_images::perfect_ground_images;

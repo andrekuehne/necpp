@@ -4,6 +4,8 @@
 #include "electromag.h"
 #include "nec_exception.h"
 #include "nec_stateful_model.h"
+// Also compile the public headers in the reverse order (C++ before C).
+#include "libnecpp.h"
 
 #include <algorithm>
 #include <cmath>
@@ -441,7 +443,7 @@ TEST_CASE("WP3 ground-skipped angles have deterministic zero field entries",
     0.0, 0.0, 0.25,
     0.001,
   });
-  model.complete_geometry(nec_ground_connection::interpolate);
+  model.complete_geometry(nec_model_ground_connection::interpolate);
   model.define_ports({{1, kFeedSegment}});
   model.set_ground({nec_ground_kind::perfect, 0.0, 0.0});
   model.prepare(kFrequencyMHz);
@@ -486,7 +488,7 @@ TEST_CASE("WP3 native power budgets agree with converged field flux",
       0.0, 0.0, 0.25,
       0.001,
     });
-    model.complete_geometry(nec_ground_connection::interpolate);
+    model.complete_geometry(nec_model_ground_connection::interpolate);
     model.define_ports({{1, 2}});
     model.set_ground({nec_ground_kind::perfect, 0.0, 0.0});
     model.prepare(kFrequencyMHz);
@@ -506,7 +508,7 @@ TEST_CASE("WP3 native power budgets agree with converged field flux",
 TEST_CASE("WP3 signed ground connections retain distinct NEC GE semantics",
           "[wasm_api][wp3][ground][connection]")
 {
-  const auto rooted_impedance = [](nec_ground_connection connection) {
+  const auto rooted_impedance = [](nec_model_ground_connection connection) {
     nec_stateful_model model;
     model.add_wire({
       1, kSegments,
@@ -523,16 +525,16 @@ TEST_CASE("WP3 signed ground connections retain distinct NEC GE semantics",
   };
 
   const nec_complex interpolated =
-    rooted_impedance(nec_ground_connection::interpolate);
+    rooted_impedance(nec_model_ground_connection::interpolate);
   const nec_complex zero_current =
-    rooted_impedance(nec_ground_connection::zero_current);
+    rooted_impedance(nec_model_ground_connection::zero_current);
   REQUIRE(std::abs(interpolated - zero_current) > 1.0e-6);
 
   nec_stateful_model missing_ground;
   missing_ground.add_wire({
     1, kSegments, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.001,
   });
-  missing_ground.complete_geometry(nec_ground_connection::zero_current);
+  missing_ground.complete_geometry(nec_model_ground_connection::zero_current);
   missing_ground.define_ports({{1, 2}});
   REQUIRE_THROWS_AS(missing_ground.prepare(kFrequencyMHz), nec_exception);
 }
@@ -540,9 +542,9 @@ TEST_CASE("WP3 signed ground connections retain distinct NEC GE semantics",
 TEST_CASE("WP3 both signed ground modes reject invalid ground-plane geometry",
           "[wasm_api][wp3][ground][validation]")
 {
-  for (const nec_ground_connection connection : {
-         nec_ground_connection::interpolate,
-         nec_ground_connection::zero_current,
+  for (const nec_model_ground_connection connection : {
+         nec_model_ground_connection::interpolate,
+         nec_model_ground_connection::zero_current,
        }) {
     nec_stateful_model below;
     below.add_wire({

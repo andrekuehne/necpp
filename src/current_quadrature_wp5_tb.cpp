@@ -43,22 +43,22 @@ struct Fixture {
   const char* id;
   std::vector<nec_wire_definition> wires;
   std::vector<nec_port_definition> ports;
-  nec_ground_connection connection;
+  nec_model_ground_connection connection;
   nec_ground_kind ground;
 };
 
 const Fixture kFixtures[] = {
   { "dipole", dipole_wires(), {{1, 6}},
-    nec_ground_connection::none, nec_ground_kind::free_space },
+    nec_model_ground_connection::none, nec_ground_kind::free_space },
   { "rooted-monopole", monopole_wires(), {{1, 1}},
-    nec_ground_connection::interpolate, nec_ground_kind::perfect },
+    nec_model_ground_connection::interpolate, nec_ground_kind::perfect },
   { "bent-multiwire", bent_wires(), {{1, kArmSegments}},
-    nec_ground_connection::none, nec_ground_kind::free_space },
+    nec_model_ground_connection::none, nec_ground_kind::free_space },
   { "turnstile-insulated", insulated_turnstile_wires(), {{1, 6}, {2, 6}},
-    nec_ground_connection::none, nec_ground_kind::free_space },
+    nec_model_ground_connection::none, nec_ground_kind::free_space },
   { "turnstile-connected", connected_turnstile_wires(),
     {{1, kArmSegments}, {3, kArmSegments}},
-    nec_ground_connection::none, nec_ground_kind::free_space },
+    nec_model_ground_connection::none, nec_ground_kind::free_space },
 };
 
 void build_fixture(nec_stateful_model& model, const Fixture& fixture)
@@ -477,7 +477,7 @@ TEST_CASE("WP5 rooted monopole image plane stays out of plane 0",
   nec_stateful_model model;
   build_stateful(
     model, monopole_wires(), {{1, 1}},
-    nec_ground_connection::interpolate, nec_ground_kind::perfect);
+    nec_model_ground_connection::interpolate, nec_ground_kind::perfect);
   const auto physical = characterization_request();
   const nec_isolated_element_characterization characterized =
     model.characterize_isolated_element(physical);

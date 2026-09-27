@@ -264,7 +264,7 @@ TEST_CASE("WP1 current distribution rooted monopole stays physical-only",
   nec_stateful_model model;
   build_stateful(
     model, monopole_wires(), {{1, 1}},
-    nec_ground_connection::interpolate, nec_ground_kind::perfect);
+    nec_model_ground_connection::interpolate, nec_ground_kind::perfect);
   const nec_port_solution solution =
     model.solve_port_voltages_detailed({ nec_complex(1.0, 0.0) });
 
@@ -391,7 +391,7 @@ TEST_CASE("WP1 current distribution converts snapshot units to metres at 150 MHz
   constexpr nec_float frequency_mhz = 150.0;
   nec_stateful_model model;
   build_stateful(model, dipole_wires(), {{1, 6}},
-    nec_ground_connection::none, nec_ground_kind::free_space, frequency_mhz);
+    nec_model_ground_connection::none, nec_ground_kind::free_space, frequency_mhz);
   model.solve_port_currents({ nec_complex(1.0, 0.0) });
 
   const nec_current_distribution latest =
