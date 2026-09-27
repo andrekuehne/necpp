@@ -3,7 +3,7 @@
   "fixtureSchema": "current-quadrature-v1",
   "abiVersion": 1,
   "engineVersion": "2.5.0",
-  "packageVersion": "0.7.1",
+  "packageVersion": "0.8.0",
   "cases": [
     {
       "id": "dipole",

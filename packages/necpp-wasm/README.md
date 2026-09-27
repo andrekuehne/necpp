@@ -864,7 +864,7 @@ appropriate CORS header.
 import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel({
-  wasmUrl: new URL("https://cdn.example.test/necpp/0.7.1/nec2pp.wasm"),
+  wasmUrl: new URL("https://cdn.example.test/necpp/0.8.0/nec2pp.wasm"),
 });
 model.dispose();
 ```

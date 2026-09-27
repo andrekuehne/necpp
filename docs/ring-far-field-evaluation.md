@@ -517,8 +517,9 @@ The implementation on `feat/ring-far-field-evaluator` promotes the shared C++
 kernel behind an additive opt-in selection. The original tables above remain
 archival evidence from the bench-only commit `970d1ed`; the tables below measure
 the production integration using **Emscripten 4.0.7**, the repository's pinned
-release compiler. No package version, published artifact, visualizer dependency,
-exact default, or NEC golden is changed by this integration.
+release compiler. The package now targets **0.8.0**; the measurements below were
+recorded before the metadata-only version bump. No published artifact, visualizer
+dependency, exact default, or NEC golden is changed by this integration.
 
 **Go for opt-in integration.** The large-array stateful WASM comparisons improve
 by 6.76× (regular 16×16) and 8.91× (256-element sunflower); the two-worker
