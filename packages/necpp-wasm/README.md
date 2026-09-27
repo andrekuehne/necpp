@@ -969,3 +969,73 @@ containing them, review and satisfy the GPL's corresponding-source, license,
 and notice requirements for your distribution. This README is a technical
 notice, not legal advice. Consult qualified counsel for a product-specific
 licensing decision.
+
+### Opt-in ring far fields
+
+The default evaluator remains `"exact"`. For a complete, periodic, uniformly
+sampled azimuth grid, opt into the ring evaluator once when creating a model,
+worker model, or array solver:
+
+```ts
+import {
+  createNecArraySolver,
+  type FullArrayDescription,
+  type FarFieldRequest,
+  type ComplexVector,
+} from "@necpp-engine/wasm";
+
+declare const description: FullArrayDescription;
+declare const grid: FarFieldRequest;
+declare const voltages: ComplexVector;
+
+const solver = await createNecArraySolver(description, {
+  symmetry: "off",
+  fieldWorkers: "auto",
+  farFieldEvaluator: "ring",
+});
+try {
+  await solver.prepare({ frequencyMHz: 300 });
+  await solver.solveVoltages(voltages);
+  const field = await solver.computeFarField(grid);
+  const reference = await solver.computeFarField({ ...grid, evaluator: "exact" });
+} finally {
+  await solver.dispose();
+}
+```
+
+The request's `evaluator` overrides the factory's `farFieldEvaluator`. The same
+selection applies to `computeEmbeddedFarFields` and to `field` inside
+`characterizeIsolatedElement`. Unit-voltage and unit-current normalization,
+port ordering, and retained factorization behavior are unchanged. `runDeck`
+continues to use the exact evaluator.
+
+`"ring"` is an approximation with an engineering target of `1e-7` component
+error relative to the requested grid's global vector-field peak. Its fixed
+analytical truncation budget is much tighter; that bound excludes floating-point
+roundoff and differences between the two existing exact kernels. It is **not**
+the exact-binary64 evaluator. Free space and perfect ground with ordinary wires
+are supported. Other models, nonperiodic grids, unsafe numerical budgets, and
+rings estimated to cost more than direct evaluation use the existing direct path.
+No requested samples are removed or moved. Periodic grids use `phi.stepDeg =
+360 / phi.count`, without a duplicate endpoint.
+
+Ring requests include optional `fieldEvaluation` provenance:
+
+- `evaluator`: `"ring-bandlimited-v1"`;
+- `execution`: `"ring"`, `"mixed"`, or `"exact"` after fallbacks;
+- `interpolatedRings`, `directRings`, and `evaluatedDirections` (including scouts);
+- `truncationBound`: absolute field bound in V/m, excluding roundoff;
+- `fallbackReason`, when applicable.
+
+For embedded results, counts sum over port bases and the bound is the maximum
+per-basis bound. `fieldBackend` continues to describe worker execution separately.
+Worker jobs process complete rings, so its tile counts refer to rings for this
+method; an in-flight ring finishes before its stale result is discarded on
+cancellation. Automatic scheduling chooses active workers using the planned
+sparse work, while retaining the configured pool for reuse.
+
+Packed NECF buffers retain schema version 1. Characterization and handoff results
+carry provenance alongside the buffer; persist that sidecar if saving approximate
+fields. Existing exact requests, packed goldens, and default result shapes remain
+unchanged. Override with `evaluator: "exact"` for a comparison or rollback without
+recreating or resolving the model.

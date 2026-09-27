@@ -116,3 +116,5 @@ export type {
   SymmetryCandidateDiagnostics,
   WireDefinition,
 } from "./types.js";
+
+export type { FarFieldEvaluator, FieldEvaluationDiagnostics } from "./types.js";

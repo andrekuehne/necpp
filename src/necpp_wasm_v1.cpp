@@ -279,6 +279,7 @@ struct necpp_wasm_v1_model {
   far_field_buffers far_field;
   embedded_buffers embedded;
   far_field_snapshot_buffers field_snapshot;
+  nec_ring::Stats ring_evaluation;
   current_distribution_buffers current;
   packed_result_buffers packed;
 };
@@ -787,6 +788,23 @@ nec_far_field_grid make_grid(
   grid.phi_start_deg = phi_start_deg;
   grid.phi_count = phi_count;
   grid.phi_step_deg = phi_step_deg;
+  return grid;
+}
+
+nec_far_field_grid make_ring_grid(
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg)
+{
+  nec_far_field_grid grid;
+  grid.radius_m = radius_m;
+  grid.theta_start_deg = theta_start_deg;
+  grid.theta_count = theta_count;
+  grid.theta_step_deg = theta_step_deg;
+  grid.phi_start_deg = phi_start_deg;
+  grid.phi_count = phi_count;
+  grid.phi_step_deg = phi_step_deg;
+  grid.ring = true;
   return grid;
 }
 
@@ -1490,6 +1508,164 @@ int32_t necpp_wasm_v1_compute_embedded_far_fields(
   return status;
 }
 
+int32_t necpp_wasm_v1_compute_far_field_ring(
+  necpp_wasm_v1_model* model,
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_state(model, nec_model_state::solved))
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "computeFarField requires a consumer solution");
+  if (!valid_grid(
+        radius_m, theta_start_deg, theta_count, theta_step_deg,
+        phi_start_deg, phi_count, phi_step_deg))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Invalid far-field grid");
+  bool native_succeeded = false;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+  const auto native_abi_started = std::chrono::steady_clock::now();
+#endif
+  const int32_t status = invoke(model, NECPP_WASM_V1_SOLVER_ERROR, [&] {
+    const nec_far_field_result& result = model->native.compute_far_field(
+      make_ring_grid(
+        radius_m, theta_start_deg, theta_count, theta_step_deg,
+        phi_start_deg, phi_count, phi_step_deg));
+    native_succeeded = true;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+    const auto abi_copy_started = std::chrono::steady_clock::now();
+#endif
+    sync_far_field(*model, result);
+    model->ring_evaluation = result.evaluation;
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+    model->far_field.abi_result_copy_ms =
+      std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - abi_copy_started).count();
+    model->far_field.native_abi_total_ms =
+      std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - native_abi_started).count();
+#endif
+  });
+  if (status != NECPP_WASM_V1_OK && native_succeeded)
+    model->far_field.clear();
+  return status;
+}
+
+int32_t necpp_wasm_v1_compute_embedded_far_fields_ring(
+  necpp_wasm_v1_model* model,
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg,
+  int32_t normalization)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_prepared(model))
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "computeEmbeddedFarFields requires a prepared model");
+  if (!valid_grid(
+        radius_m, theta_start_deg, theta_count, theta_step_deg,
+        phi_start_deg, phi_count, phi_step_deg) ||
+      (normalization != NECPP_WASM_V1_UNIT_VOLTAGE &&
+       normalization != NECPP_WASM_V1_UNIT_CURRENT))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Invalid embedded far-field request");
+  const size_t sample_count =
+    static_cast<size_t>(theta_count) * static_cast<size_t>(phi_count);
+  if (!model->port_tags.empty() &&
+      sample_count > std::numeric_limits<size_t>::max() / model->port_tags.size())
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Embedded field sample count overflows");
+  const size_t embedded_sample_count = sample_count * model->port_tags.size();
+  if (embedded_sample_count > std::vector<nec_complex>().max_size())
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Embedded field sample count is too large");
+  if (normalization == NECPP_WASM_V1_UNIT_CURRENT) {
+    const int32_t matrix_status = ensure_impedance(model);
+    if (matrix_status != NECPP_WASM_V1_OK)
+      return matrix_status;
+  }
+  bool native_succeeded = false;
+  const int32_t status = invoke(model, NECPP_WASM_V1_SOLVER_ERROR, [&] {
+    const nec_embedded_far_field_result& result =
+      model->native.compute_embedded_far_fields(
+        make_ring_grid(
+          radius_m, theta_start_deg, theta_count, theta_step_deg,
+          phi_start_deg, phi_count, phi_step_deg),
+        static_cast<nec_embedded_field_normalization>(normalization));
+    native_succeeded = true;
+    sync_embedded(*model, result);
+    model->ring_evaluation = result.evaluation;
+  });
+  if (status != NECPP_WASM_V1_OK && native_succeeded) {
+    model->embedded.clear();
+  } else if (status != NECPP_WASM_V1_OK) {
+    reconcile_consumer_results_after_failure(*model);
+  }
+  return status;
+}
+
+int32_t necpp_wasm_v1_characterize_isolated_element_ring(
+  necpp_wasm_v1_model* model,
+  const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count,
+  int32_t images,
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_prepared(model))
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "characterizeIsolatedElement requires a prepared model");
+  if (!valid_quadrature_input(nodes, node_count, weights, weight_count, images) ||
+      !valid_grid(
+        radius_m, theta_start_deg, theta_count, theta_step_deg,
+        phi_start_deg, phi_count, phi_step_deg))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Invalid isolated-element characterization request");
+  nec_isolated_element_request request;
+  try {
+    request.quadrature = make_quadrature_request(
+      nodes, node_count, weights, weight_count, images,
+      NECPP_WASM_V1_CURRENT_UNIT_CURRENT);
+    request.grid = make_ring_grid(
+      radius_m, theta_start_deg, theta_count, theta_step_deg,
+      phi_start_deg, phi_count, phi_step_deg);
+  } catch (const std::bad_alloc& error) {
+    return set_error(model, NECPP_WASM_V1_RUNTIME_ERROR, error.what());
+  }
+  bool native_succeeded = false;
+  const int32_t status = invoke(model, NECPP_WASM_V1_INPUT_ERROR, [&] {
+    nec_isolated_element_characterization result =
+      model->native.characterize_isolated_element(request);
+    native_succeeded = true;
+    sync_impedance(*model, result.matrices);
+    model->ring_evaluation = result.embedded_field.evaluation;
+    model->packed.quadrature = std::move(result.quadrature.packed);
+    model->packed.quadrature_available = true;
+    model->packed.embedded_field = pack_embedded_field_envelope(
+      result.embedded_field, result.matrices.factorization_generation);
+    model->packed.embedded_available = true;
+  });
+  if (status != NECPP_WASM_V1_OK && native_succeeded) {
+    model->packed.clear_quadrature();
+    model->packed.clear_embedded();
+  } else if (status != NECPP_WASM_V1_OK) {
+    reconcile_consumer_results_after_failure(*model);
+  }
+  return status;
+}
+
+double necpp_wasm_v1_ring_diagnostic(const necpp_wasm_v1_model* model, int32_t index) {
+  if (!model) return 0;
+  const auto& s=model->ring_evaluation;
+  switch(index) { case 0:return s.directions;case 1:return s.rings;
+    case 2:return s.direct_rings;case 3:return s.bound;case 4:return s.reason;default:return 0; }
+}
 int32_t necpp_wasm_v1_capture_far_field_snapshot(necpp_wasm_v1_model* model)
 {
   if (model == nullptr)

@@ -1,11 +1,16 @@
-# Ring far-field evaluation: analysis and bench prototype
+# Ring far-field evaluation: analysis and opt-in integration
 
-This is an opt-in **bench-only** experiment. No production source, package API,
-WASM asset, version, or golden is changed. The branch is
-`bench/ring-far-field-evaluation`; the source baseline is
+The current, unreleased implementation is described under
+[Production integration](#production-integration-unreleased). It adds an opt-in
+ring evaluator while preserving exact defaults and goldens.
+
+The sections below through “Original analysis reproduction” record the original
+**bench-only** experiment committed as `970d1ed` on
+`bench/ring-far-field-evaluation`. That commit changed no production source,
+package API, WASM asset, version, or golden. Its source baseline was
 `09e4d413d835285a6631216baf8b2172f08651e5` (package 0.7.1).
 
-## Decision
+## Original analysis decision
 
 **Go for an opt-in approximate evaluator; retain the current exact paths.**
 On the four requested PEC arrays, far-field work is **99.37–99.96% of
@@ -423,7 +428,7 @@ raw direct/ring values; no claim is made about the unavailable visualizer's
 number formatting. Existing power-budget outputs are never recomputed or
 modified by this prototype.
 
-## Proposed integration, with no implementation in this change
+## Original integration proposal (bench-only commit)
 
 Expose a separate, explicit opt-in evaluator identity, for example
 `ring-bandlimited-binary64-v1`, with an approximation tolerance and reported
@@ -454,7 +459,11 @@ the π constants is a separate compatibility decision and is not necessary
 for this optimization. Validate the actual consumer auto-grid, current-drive
 setup costs, browser behavior and worker scheduling before shipping.
 
-## Reproduction
+## Original analysis reproduction
+
+These commands reproduce the bench-only analysis at commit `970d1ed`. For the
+current source tree, use the production integration commands below; the current
+harness calls the shared production kernel.
 
 Prerequisites: Python 3, g++, Node ≥24, an Emscripten 4.0.10 SDK, and the
 repository's already-built 0.7.1 package for the initial package probe.
@@ -501,3 +510,222 @@ python3 bench/ring-far-field/summarize.py \
 One-case smoke commands: `/tmp/ring-native/bench tilted4 1` and
 `node /tmp/ring-wasm/bench.js regular4 1`. All changes live in this report
 and `bench/ring-far-field/`; there is no production build-system hook.
+
+## Production integration (unreleased)
+
+The implementation on `feat/ring-far-field-evaluator` promotes the shared C++
+kernel behind an additive opt-in selection. The original tables above remain
+archival evidence from the bench-only commit `970d1ed`; the tables below measure
+the production integration using **Emscripten 4.0.7**, the repository's pinned
+release compiler. No package version, published artifact, visualizer dependency,
+exact default, or NEC golden is changed by this integration.
+
+**Go for opt-in integration.** The large-array stateful WASM comparisons improve
+by 6.76× (regular 16×16) and 8.91× (256-element sunflower); the two-worker
+comparisons improve by 5.64× and 7.54×. All 154 scalar, worker, embedded, and
+packed-field comparisons meet the `1e-7` target. Their largest observed component
+error relative to the reference field peak is `5.389e-10`. All 84 scalar
+radiated-power closure comparisons agree to nine decimal places. This supports
+the explicit approximation option while leaving the exact contract intact.
+
+### Compatibility and implementation
+
+Set `farFieldEvaluator: "ring"` on `createNecModel`, `createNecWorkerModel`, or
+`createNecArraySolver`; use `evaluator: "exact"` on any field request to override
+it. Existing options and exact ABI entry points continue to select the existing
+code. Request axes, radius, complex-array ownership, theta-fast order, basis-major
+embedded layout, port order, and normalization are preserved. The array facade
+applies its symmetry-origin phase once, independently of the ring kernel's own
+horizontal centroid phase.
+
+The policy covers ordinary fields, both embedded normalizations, and embedded
+fields produced by isolated-element characterization. Unit-current modes are
+formed before evaluation, so an impedance-matrix multiplication cannot amplify
+already interpolated voltage-basis errors. Internal basis solves restore the
+consumer state and retain the factorization. The packed NECF/NECQ schemas and
+quadrature values are unchanged. Evaluator provenance travels alongside NECF
+buffers, including MessagePort handoffs; applications saving bare buffers should
+also save the sidecar.
+
+`fieldEvaluation` identifies `ring-bandlimited-v1`, reports actual `ring`, `mixed`,
+or `exact` execution, counts interpolated/direct rings and direct directions
+(including scouts), and reports an absolute analytical truncation bound. This is
+separate from `fieldBackend`. The bound excludes floating-point error and the
+legacy-versus-tile kernel discrepancy described above. Embedded counts sum across
+bases; their bound is the largest per-basis bound. Exact requests retain their
+previous result shape.
+
+The dedicated WASM ABI creates a geometry context, creates a deterministic plan,
+and evaluates one ring at a time. The full model uses the same kernel and caches
+geometry by factorization generation. Both reuse centered coordinates and
+interpolation scratch; the native serial path also caches theta trigonometry.
+Current norms, scout peaks, and cutoffs are recomputed for every solution/basis.
+The exact kernels and their differing pi constants have not been altered.
+
+Workers receive complete rings and scatter results back into the original array
+layout. One shared plan makes results independent of worker count and assignment.
+Generation fencing, restart, current-only snapshot updates, and cancellation
+remain supported. Cancellation cannot interrupt synchronous WASM within a ring;
+its stale result is discarded. Automatic scheduling limits active workers using
+the planned sparse contribution count, though startup still provisions the
+existing configured pool size. Embedded basis solves remain sequential.
+
+### Changes from the research prototype
+
+The mathematical bound and `L_seg` derivation above still apply. Production uses
+up to 9 × 8 **distinct requested-grid nodes** for scouts, making the measured peak
+a lower bound on the requested grid's peak, including partial theta sweeps.
+Only x/y are recentered. Cutoff searches stop before allocating an order larger
+than the requested azimuth grid. Nonperiodic grids, unsupported models, invalid
+numerical budgets, and rings without a useful reduction fall back to the original
+backend's direct evaluator. Invalid public inputs still produce input errors.
+
+A deterministic cost filter additionally requires
+`segments * images * (P-M) > M*(M+P)/8` before interpolation. This is a conservative
+work estimate, not an accuracy condition or a hardware-dependent timing fit.
+A preliminary minimum-order check avoids scouting when no ring could pass it.
+A separate roundoff-scale screen falls back when
+`32*epsilon_binary64*(1 + 2*pi*coordinateScale + angleScale)*W/P0 > 1e-8`.
+It guards extreme translations/angle arguments and cancellation; it is not a
+proof of total binary64 error. The fixed engineering acceptance target remains
+`1e-7`, with the much tighter analytical budget from the derivation.
+
+### Production measurements
+
+Evidence is in `bench/ring-far-field/evidence/production/`. The native/WASM harness
+runs the same seven geometries, three fresh models and two drive states per model,
+serially. Its `ringMs` measures the shared standalone kernel; `integratedRingMs`
+also includes the stateful adapter and geometry-cache behavior. The integrated
+result is checked against the shared kernel for every observation. Preparation,
+module/process startup, and snapshot capture are excluded from field timings.
+
+The package worker comparison uses the full original grids and two workers;
+worker startup and initial snapshot broadcast are excluded from the reported
+field wall times. Embedded comparisons use the same geometries on a compact
+3 × 181 grid (theta 0/45/90 degrees, phi starting at 13 degrees). This keeps the
+256-port basis output practical while exercising all normalized bases and both
+polarizations. Those timings include the existing basis-solving/matrix work;
+they are not isolated interpolation timings. Characterization checks compare
+packed fields and require identical quadrature bytes.
+
+<!-- BEGIN production -->
+**NATIVE: retained-drive median field times (ms).**
+
+| Case | Stateful exact | Stateful ring | Speedup | Tile exact | Ring kernel | Speedup |
+| --- | --- | --- | --- | --- | --- | --- |
+| regular4 | 68.451 | 19.985 | 3.43× | 59.441 | 20.124 | 2.95× |
+| regular8 | 1167.102 | 229.504 | 5.09× | 1007.467 | 230.198 | 4.38× |
+| regular16 | 19404.755 | 2793.899 | 6.95× | 16751.557 | 2798.107 | 5.99× |
+| sunflower256 | 27428.972 | 3045.507 | 9.01× | 23809.683 | 3054.729 | 7.79× |
+| free4 | 34.229 | 10.826 | 3.16× | 29.491 | 11.062 | 2.67× |
+| heights4 | 68.764 | 20.065 | 3.43× | 59.625 | 20.270 | 2.94× |
+| tilted4 | 69.186 | 23.006 | 3.01× | 59.606 | 23.108 | 2.58× |
+
+**WASM: retained-drive median field times (ms).**
+
+| Case | Stateful exact | Stateful ring | Speedup | Tile exact | Ring kernel | Speedup |
+| --- | --- | --- | --- | --- | --- | --- |
+| regular4 | 74.716 | 22.392 | 3.34× | 64.421 | 22.566 | 2.85× |
+| regular8 | 1296.709 | 278.561 | 4.66× | 1958.165 | 260.923 | 7.50× |
+| regular16 | 22335.282 | 3303.754 | 6.76× | 19509.232 | 3282.690 | 5.94× |
+| sunflower256 | 31242.041 | 3504.962 | 8.91× | 27182.913 | 3507.652 | 7.75× |
+| free4 | 37.269 | 12.505 | 2.98× | 32.467 | 12.464 | 2.60× |
+| heights4 | 74.853 | 23.209 | 3.23× | 64.767 | 22.493 | 2.88× |
+| tilted4 | 74.728 | 25.151 | 2.97× | 65.057 | 25.118 | 2.59× |
+
+**Accuracy and work counts across both runtimes and both drive states.**
+
+| Case | Segments | Output directions | Direct contributions | Ring directions incl. scouts | Ring contributions | Max ΔEθ / peak | Max ΔEφ / peak | Max closure change | Worst ring θ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| regular4 | 176 | 38×148=5,624 | 1,979,648 | 1,756–1,760 | 618,112–619,520 | 2.817e-11 | 0.000e+00 | 1.272e-11 | 87.5676° |
+| regular8 | 704 | 78×308=24,024 | 33,825,792 | 5,256–5,274 | 7,400,448–7,425,792 | 2.514e-11 | 0.000e+00 | 1.952e-11 | 46.7532° |
+| regular16 | 2816 | 159×629=100,011 | 563,261,952 | 16,299–16,299 | 91,795,968–91,795,968 | 3.215e-11 | 0.000e+00 | 2.367e-11 | 19.3671° |
+| sunflower256 | 2816 | 187×741=138,567 | 780,409,344 | 17,387–17,391 | 97,923,584–97,946,112 | 2.919e-11 | 0.000e+00 | 1.372e-11 | 19.3548° |
+| free4 | 176 | 38×148=5,624 | 989,824 | 1,756–1,756 | 309,056–309,056 | 2.865e-11 | 0.000e+00 | 1.970e-11 | 55.9459° |
+| heights4 | 176 | 38×148=5,624 | 1,979,648 | 1,762–1,766 | 620,224–621,632 | 3.290e-11 | 0.000e+00 | 1.547e-11 | 87.5676° |
+| tilted4 | 176 | 38×148=5,624 | 1,979,648 | 1,960–1,960 | 689,920–689,920 | 2.752e-11 | 3.854e-11 | 2.475e-11 | 63.2432° |
+
+All 84 closure comparisons agree to nine decimal places.
+
+**Packaged WASM, two workers: median field wall times (ms), full grids.**
+
+| Case | Exact pool | Ring pool | Speedup | Ring directions | Max component error / peak |
+| --- | --- | --- | --- | --- | --- |
+| regular4 | 36.653 | 16.039 | 2.29× | 1756 | 2.089e-15 |
+| regular8 | 591.469 | 159.390 | 3.71× | 5256 | 2.665e-15 |
+| regular16 | 9903.456 | 1755.462 | 5.64× | 16299 | 4.029e-15 |
+| sunflower256 | 16320.025 | 2163.884 | 7.54× | 17387 | 4.574e-15 |
+| free4 | 21.077 | 9.135 | 2.31× | 1756 | 2.709e-15 |
+| heights4 | 49.905 | 19.181 | 2.60× | 1762 | 2.517e-15 |
+| tilted4 | 44.673 | 24.004 | 1.86× | 1960 | 2.854e-15 |
+
+**Packaged embedded fields: median total call times (ms), compact 3×181 grid.**
+
+| Case | Unit V exact | Unit V ring | Unit I exact | Unit I ring | Bases | Max error incl. packed fields |
+| --- | --- | --- | --- | --- | --- | --- |
+| regular4 | 115.717 | 26.077 | 119.053 | 29.240 | 16 | 1.330e-10 |
+| regular8 | 1868.828 | 554.879 | 1978.829 | 652.987 | 64 | 2.767e-10 |
+| regular16 | 35210.020 | 18042.270 | 35258.228 | 18092.234 | 256 | 5.389e-10 |
+| sunflower256 | 35328.823 | 16996.094 | 35501.681 | 17064.309 | 256 | 4.869e-10 |
+| free4 | 56.991 | 14.520 | 60.207 | 17.779 | 16 | 1.441e-10 |
+| heights4 | 114.702 | 25.638 | 118.699 | 28.665 | 16 | 1.323e-10 |
+| tilted4 | 119.486 | 30.408 | 124.394 | 33.602 | 16 | 1.239e-10 |
+
+All seven characterization comparisons preserved quadrature bytes and consumer solution generation.
+<!-- END production -->
+
+### Verification and reproduction
+
+The implementation passed all eight native CTest groups, all 160 package tests,
+TypeScript checking, and all six tarball-consumer tests (including compilation of
+the README examples). Browser checks passed for ring workers, exact workers, and
+packed characterization transfer without cross-origin isolation. The dedicated
+evaluator WASM is 43,793 bytes and its loader is 13,171 bytes, within the existing
+64 KiB budgets. Existing goldens and recorded quadrature baselines are unchanged.
+
+The regression gates cover unchanged exact/default behavior and goldens;
+free/PEC fields; arbitrary and prime phi counts; nonzero phi origins; partial and
+full theta domains; zero and very small currents; tilted and varying-height wires;
+translated symmetry; both embedded normalizations and superposition; state
+restoration; geometry-cache invalidation; unsupported-ground and missing-ABI
+fallback; worker count determinism, restart, cancellation, and current-only
+updates; packed provenance and transfer; tarball consumers; and browser workers
+without cross-origin isolation.
+
+Build the package artifacts with the existing pinned Docker build:
+
+```sh
+scripts/build_wasm_docker.sh
+npm --prefix packages/necpp-wasm run build
+npm --prefix packages/necpp-wasm test
+npm --prefix packages/necpp-wasm run test:pack
+npm --prefix packages/necpp-wasm run test:ring-browser
+npm --prefix packages/necpp-wasm run test:field-worker-browser
+npm --prefix packages/necpp-wasm run test:current-quadrature-browser
+
+cmake -S . -B /tmp/necpp-ring-native -DBUILD_SHARED_LIBS=OFF -DNECPP_BUILD_TESTS=ON
+cmake --build /tmp/necpp-ring-native -j3
+ctest --test-dir /tmp/necpp-ring-native --output-on-failure
+```
+
+For the same scalar paired harness measurements, activate Emscripten **4.0.7**
+and run these commands sequentially, with no other builds or benchmarks running:
+
+```sh
+python3 bench/ring-far-field/build.py --out /tmp/ring-production-native --jobs 3
+python3 bench/ring-far-field/build.py --compiler em++ --wasm \
+  --out /tmp/ring-production-wasm --jobs 3
+python3 bench/ring-far-field/run.py \
+  --native /tmp/ring-production-native/bench \
+  --wasm /tmp/ring-production-wasm/bench.js \
+  --out bench/ring-far-field/evidence/production --rounds 3
+node bench/ring-far-field/package-production.mjs workers 3 \
+  > bench/ring-far-field/evidence/production/workers.ndjson
+node bench/ring-far-field/package-production.mjs embedded 3 \
+  > bench/ring-far-field/evidence/production/embedded.ndjson
+python3 bench/ring-far-field/summarize-production.py
+```
+
+No default flip or golden rebaseline is proposed. Publication and updating the
+visualizer's vendored tarball are separate rollout steps; a consumer can opt in
+with one configuration field and override any comparison request back to exact.

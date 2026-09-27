@@ -70,6 +70,12 @@ int main(int argc,char**argv){
    pDirect*=scale*(ground?1:2);pRing*=scale*(ground?1:2);
    const double closureDelta=(pRing-pDirect)/solution.power_budget.radiated_power_w;
    if(!std::isfinite(errT)||!std::isfinite(errP)||errT>1e-7*peak||errP>1e-7*peak||std::abs(closureDelta)>1e-7)throw std::runtime_error("accuracy gate failed");
+   const auto contributions=exact.diagnostics.segment_direction_contributions;
+   auto ringGrid=grid;ringGrid.ring=true;
+   t=Clock::now();const auto& integrated=model.compute_far_field(ringGrid);const double integratedMs=ms(t);
+   for(size_t i=0;i<integrated.sample_count();++i)
+    if(std::abs(integrated.e_theta[i]-ring.field.theta(i))>1e-7*peak ||
+       std::abs(integrated.e_phi[i]-ring.field.phi(i))>1e-7*peak)throw std::runtime_error("integrated ring gate failed");
    std::cout
      << std::setprecision(17)
      << "{\"case\":\""
@@ -85,7 +91,7 @@ int main(int argc,char**argv){
      << ",\"np\":"
      << np
      << ",\"contributions\":"
-     << exact.diagnostics.segment_direction_contributions
+     << contributions
      << ",\"prepareMs\":"
      << prepare
      << ",\"fillMs\":"
@@ -100,6 +106,8 @@ int main(int argc,char**argv){
      << tileMs
      << ",\"ringMs\":"
      << ringMs
+     << ",\"integratedRingMs\":"
+     << integratedMs
      << ",\"ringDirections\":"
      << ring.directions
      << ",\"fallbackRings\":"

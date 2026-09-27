@@ -88,6 +88,7 @@ const requiredDistFiles = [
   "worker-entry.js",
   "field-evaluator-worker.js",
   "field-evaluator.js",
+  "field-selection.js",
   "field-worker-pool.js",
   "nec2pp.generated.js",
   "nec2pp.wasm",

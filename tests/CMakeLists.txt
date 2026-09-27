@@ -41,6 +41,7 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/nec2cpp_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/radiation_input_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/wasm_api_contract_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_ring_field_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp2_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp3_tb.cpp
@@ -77,6 +78,8 @@ add_executable(nec2++_tests
     ${CMAKE_SOURCE_DIR}/src/nec_context.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_exception.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_far_field.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_field_evaluator_wasm.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_ring_field.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_ground.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_output.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_port_matrix.cpp

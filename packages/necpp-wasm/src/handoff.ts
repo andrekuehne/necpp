@@ -8,6 +8,7 @@ export const ISOLATED_ELEMENT_HANDOFF_KIND =
   "isolated-element-characterization" as const;
 
 export interface IsolatedElementHandoffMessage {
+  readonly fieldEvaluation?: IsolatedElementCharacterization["fieldEvaluation"];
   readonly kind: typeof ISOLATED_ELEMENT_HANDOFF_KIND;
   readonly schemaVersion: 1;
   readonly impedance: IsolatedElementCharacterization["impedance"];
@@ -55,6 +56,7 @@ export function transferIsolatedElementCharacterization(
   const message: IsolatedElementHandoffMessage = {
     kind: ISOLATED_ELEMENT_HANDOFF_KIND,
     schemaVersion: 1,
+    ...(characterization.fieldEvaluation === undefined ? {} : { fieldEvaluation: characterization.fieldEvaluation }),
     impedance: characterization.impedance,
     admittance: characterization.admittance,
     quadrature: characterization.quadrature,
@@ -62,6 +64,7 @@ export function transferIsolatedElementCharacterization(
   };
   destination.postMessage(message, [quadratureBuffer, embeddedBuffer]);
   return {
+    ...(characterization.fieldEvaluation === undefined ? {} : { fieldEvaluation: characterization.fieldEvaluation }),
     impedance: characterization.impedance,
     admittance: characterization.admittance,
     quadratureByteLength: characterization.quadrature.byteLength,

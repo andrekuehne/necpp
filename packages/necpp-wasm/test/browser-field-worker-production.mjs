@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { extname, resolve } from "node:path";
 import { chromium } from "playwright";
 
+const ring = process.env.NECPP_TEST_RING === "1";
 const root = resolve(import.meta.dirname, "../.test-build/src");
 const server = createServer((request, response) => {
   const url = new URL(request.url, "http://localhost");
@@ -22,7 +23,7 @@ const server = createServer((request, response) => {
       };
       const solver = await createNecArraySolver(
         description,
-        { symmetry: "off", fieldWorkers: 2 },
+        { symmetry: "off", fieldWorkers: 2, farFieldEvaluator: ${JSON.stringify(ring ? "ring" : "exact")} },
       );
       try {
         await solver.prepare({ frequencyMHz: 300 });
@@ -30,9 +31,21 @@ const server = createServer((request, response) => {
         const field = await solver.computeFarField({
           radiusM: 1,
           theta: { startDeg: 0, count: 31, stepDeg: 3 },
-          phi: { startDeg: 0, count: 40, stepDeg: 9 },
+          phi: { startDeg: 0, count: ${ring ? 181 : 40}, stepDeg: ${ring ? 360/181 : 9} },
         });
+        const reference = await solver.computeFarField({
+          evaluator: "exact", radiusM: 1,
+          theta: {startDeg:0,count:31,stepDeg:3},
+          phi: {startDeg:0,count:${ring ? 181 : 40},stepDeg:${ring ? 360/181 : 9}},
+        });
+        let peak=0,error=0;
+        for(let i=0;i<field.eThetaReal.length;++i) {
+          peak=Math.max(peak,Math.hypot(reference.eThetaReal[i],reference.eThetaImag[i],reference.ePhiReal[i],reference.ePhiImag[i]));
+          error=Math.max(error,Math.hypot(field.eThetaReal[i]-reference.eThetaReal[i],field.eThetaImag[i]-reference.eThetaImag[i]),Math.hypot(field.ePhiReal[i]-reference.ePhiReal[i],field.ePhiImag[i]-reference.ePhiImag[i]));
+        }
         window.result = {
+          execution: field.fieldEvaluation?.execution,
+          relativeError:error/peak,
           isolated: globalThis.crossOriginIsolated,
           samples: field.eThetaReal.length,
           finite: field.eThetaReal.every(Number.isFinite),
@@ -42,7 +55,7 @@ const server = createServer((request, response) => {
           snapshotBytes: field.fieldBackend.snapshotBytesPerWorker,
         };
       } catch (error) {
-        window.result = { error: error?.stack ?? String(error) };
+        window.result = { error: error?.stack || String(error) };
       } finally {
         await solver.dispose();
         window.disposed = true;
@@ -51,7 +64,7 @@ const server = createServer((request, response) => {
       window.startTeardownProbe = async () => {
         const active = await createNecArraySolver(
           description,
-          { symmetry: "off", fieldWorkers: 2 },
+          { symmetry: "off", fieldWorkers: 2, farFieldEvaluator: ${JSON.stringify(ring ? "ring" : "exact")} },
         );
         await active.prepare({ frequencyMHz: 300 });
         await active.solveVoltages({ real: Float64Array.of(1), imag: Float64Array.of(0) });
@@ -86,14 +99,15 @@ try {
   await cdp.send("Target.setDiscoverTargets", { discover: true });
   const page = await browser.newPage();
   page.on("console", (message) => process.stderr.write(`${message.text()}\n`));
-  page.on("pageerror", (error) => process.stderr.write(`${error.stack ?? error}\n`));
+  page.on("pageerror", (error) => process.stderr.write(`${error.stack || error.message}\n`));
   await page.goto(`http://127.0.0.1:${address.port}/`);
   await page.waitForFunction(() => window.result !== undefined);
   await page.waitForFunction(() => window.disposed === true);
   const result = await page.evaluate(() => window.result);
-  if (result.isolated !== false || result.samples !== 1240
+  if (result.isolated !== false || result.samples !== 31*(ring?181:40)
       || result.finite !== true || result.backend !== "worker-pool"
-      || result.workers !== 2 || result.tileSize !== 512
+      || result.workers !== 2 || result.tileSize !== (ring?181:512)
+      || result.relativeError>1e-7 || (ring && result.execution!=="ring")
       || result.snapshotBytes !== 11 * 13 * 8) {
     throw new Error(`Unexpected production browser result ${JSON.stringify(result)}`);
   }

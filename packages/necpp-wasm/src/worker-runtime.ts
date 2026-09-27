@@ -1,3 +1,4 @@
+import { selectEvaluator } from "./field-selection.js";
 import { NecRuntimeError, NecStateError } from "./errors.js";
 import {
   FarFieldWorkerPool,
@@ -41,6 +42,7 @@ import { transferIsolatedElementCharacterization } from "./handoff.js";
 export interface WorkerSession {
   model: NecModel | undefined;
   fieldWorkers?: "auto" | number;
+  farFieldEvaluator?: "exact" | "ring";
   fieldWorkerAssetBaseUrl?: string;
   fieldPool?: FarFieldWorkerPool;
   wireSegmentCount?: number;
@@ -136,6 +138,7 @@ async function pooledField(
   model: NecModel,
   request: FarFieldRequest,
 ): Promise<FarFieldResult> {
+  request = { ...request, evaluator: selectEvaluator(request?.evaluator,session.farFieldEvaluator) };
   const requestGeneration = session.fieldCancellationGeneration ?? 0;
   const requested = session.fieldWorkers ?? 1;
   if (requested === 1) {
@@ -146,6 +149,7 @@ async function pooledField(
   }
   const grid = validateFarFieldGrid(request);
   request = {
+    evaluator: request.evaluator!,
     radiusM: grid.radiusM,
     theta: {
       startDeg: grid.thetaStartDeg,
@@ -198,13 +202,14 @@ async function pooledField(
     if ((session.fieldCancellationGeneration ?? 0) !== requestGeneration) {
       throw new StaleFarFieldJobError();
     }
-    const field = await pool.computeFarField(request);
+    const field = await pool.computeFarField(request, requested === "auto");
     const diagnostics = field.poolDiagnostics;
     const dispatchMs = Math.max(
       0,
       diagnostics.dispatchComputeTransferMs - diagnostics.kernelMs,
     );
     return {
+      ...(field.fieldEvaluation === undefined ? {} : { fieldEvaluation: field.fieldEvaluation }),
       radiusM: field.radiusM,
       frequencyMHz: field.frequencyMHz,
       thetaDeg: field.thetaDeg,
@@ -241,7 +246,7 @@ async function pooledField(
     if (error instanceof StaleFarFieldJobError
         || (session.fieldCancellationGeneration ?? 0) !== requestGeneration) {
       throw new NecRuntimeError("Far-field request was superseded", {
-        details: { reason: "superseded", boundedTileSize: FIELD_TILE_SIZE },
+        details: { reason: "superseded", boundedTileSize: request.evaluator === "ring" ? request.phi.count : FIELD_TILE_SIZE },
       });
     }
     pool?.dispose();
@@ -378,6 +383,7 @@ export async function handleWorkerRequest(
         () => deps.createModel(toCreateNecModelOptions(request.options)),
       );
       session.model = model;
+      session.farFieldEvaluator = selectEvaluator(request.options?.farFieldEvaluator);
       if (fieldWorkers === undefined) delete session.fieldWorkers;
       else session.fieldWorkers = fieldWorkers;
       const assetBaseUrl = request.options?.fieldWorkerAssetBaseUrl;

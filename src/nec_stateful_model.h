@@ -9,6 +9,7 @@
 #pragma once
 
 #include "common.h"
+#include "nec_ring_field.h"
 #include "nec_current_distribution.h"
 #include "nec_geometry_symmetry.h"
 #include "nec_power_budget.h"
@@ -94,6 +95,7 @@ struct nec_far_field_grid {
   nec_float phi_start_deg = 0.0;
   int phi_count = 1;
   nec_float phi_step_deg = 0.0;
+  bool ring = false;
 };
 
 enum class nec_far_field_snapshot_capability {
@@ -166,6 +168,7 @@ struct nec_far_field_result {
   std::vector<nec_float> phi_deg;
   std::vector<nec_complex> e_theta;
   std::vector<nec_complex> e_phi;
+  nec_ring::Stats evaluation;
   nec_far_field_phase_diagnostics diagnostics;
 
   size_t sample_count() const { return e_theta.size(); }
@@ -195,6 +198,7 @@ struct nec_embedded_far_field_result {
   size_t samples_per_port = 0;
   std::vector<nec_complex> e_theta;
   std::vector<nec_complex> e_phi;
+  nec_ring::Stats evaluation;
 
   const nec_complex& e_theta_at(
     size_t port_index, size_t theta_index, size_t phi_index) const;
@@ -357,6 +361,10 @@ public:
   size_t retained_result_count() const;
 
 private:
+  std::vector<double> m_ring_planes[13];
+  uint64_t m_ring_geometry_generation = 0;
+  std::unique_ptr<nec_ring::Geometry> m_ring_geometry;
+  nec_ring::Workspace m_ring_workspace;
   struct retained_voltage_field_mode {
     real_array air, aii, bir, bii, cir, cii;
     complex_array current_vector;

@@ -6,7 +6,9 @@ out=pathlib.Path(a.out);out.mkdir(parents=True,exist_ok=True)
 root=pathlib.Path(__file__).resolve().parents[2]
 def command(*args):return subprocess.check_output(args,text=True).strip()
 def sha(path):return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
-meta={'date':time.strftime('%Y-%m-%dT%H:%M:%S%z'),'commit':command('git','rev-parse','HEAD'),'platform':platform.platform(),'cpu':next(x.split(':')[1].strip() for x in pathlib.Path('/proc/cpuinfo').read_text().splitlines() if x.startswith('model name')),'node':command('node','--version'),'g++':command('g++','--version').splitlines()[0],'rounds':a.rounds,'nativeSha256':sha(a.native),'benchWasmSha256':sha(pathlib.Path(a.wasm).with_suffix('.wasm')),'packageWasmSha256':sha(root/'packages/necpp-wasm/dist/nec2pp.wasm'),'wasmCompiler':'Emscripten 4.0.10; see build.py for exact flags','protocol':'3 fresh models; one cold + one retained voltage RHS per model; scalar; explicit geometry; serial execution; module/process startup excluded'}
+meta={'date':time.strftime('%Y-%m-%dT%H:%M:%S%z'),'commit':command('git','rev-parse','HEAD'),'platform':platform.platform(),'cpu':next(x.split(':')[1].strip() for x in pathlib.Path('/proc/cpuinfo').read_text().splitlines() if x.startswith('model name')),'node':command('node','--version'),'g++':command('g++','--version').splitlines()[0],'rounds':a.rounds,'nativeSha256':sha(a.native),'benchWasmSha256':sha(pathlib.Path(a.wasm).with_suffix('.wasm')),'packageWasmSha256':sha(root/'packages/necpp-wasm/dist/nec2pp.wasm'),'wasmCompiler':'Emscripten 4.0.7; see build.py for exact flags','protocol':'3 fresh models; one cold + one retained voltage RHS per model; scalar; explicit geometry; serial execution; module/process startup excluded'}
+meta['workingTreeDirty']=bool(command('git','status','--porcelain'))
+meta['sourceSha256']={str(p.relative_to(root)):sha(p) for p in sorted((root/'src').glob('nec*field*')) if p.suffix in ['.h','.cpp']}
 (out/'metadata.json').write_text(json.dumps(meta,indent=2)+'\n')
 for runtime,cmd in [('native',[a.native]),('wasm',['node',a.wasm])]:
  with (out/(runtime+'.ndjson')).open('w') as f:

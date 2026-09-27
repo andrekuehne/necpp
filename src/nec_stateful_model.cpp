@@ -883,6 +883,7 @@ void nec_stateful_model::calculate_far_field(
     (copied.e_theta.capacity() < sample_count ? 1u : 0u) +
     (copied.e_phi.capacity() < sample_count ? 1u : 0u);
   copied.diagnostics = {};
+  copied.evaluation = {};
   copied.radius_m = grid.radius_m;
   copied.frequency_mhz = m_frequency_mhz;
   populate_field_axes(
@@ -913,6 +914,7 @@ void nec_stateful_model::calculate_far_field(
     currents.begin(), currents.end(),
     [](nec_complex current) { return current == nec_complex(0.0, 0.0); });
   if (zero_excitation) {
+    if (grid.ring) { copied.evaluation.direct_rings = grid.theta_count; copied.evaluation.reason = 3; }
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
     copied.diagnostics.native_total_ms =
       std::chrono::duration<nec_float, std::milli>(
@@ -929,6 +931,75 @@ void nec_stateful_model::calculate_far_field(
 #endif
   const nec_far_field_evaluation_input& input =
     retained_input == nullptr ? context_input : *retained_input;
+  if (grid.ring) {
+    nec_far_field_grid exact_grid = grid; exact_grid.ring = false;
+    if (input.geometry.m != 0 || (m_ground.kind != nec_ground_kind::free_space &&
+        m_ground.kind != nec_ground_kind::perfect)) {
+      calculate_far_field(exact_grid, currents, copied, retained_input);
+      copied.evaluation = {double(sample_count), 0, double(grid.theta_count), 0, 2};
+      return;
+    }
+    // Capture from the actual basis input, not the public consumer solution.
+    const size_t n = input.geometry.n_segments;
+    auto& planes=m_ring_planes;
+    const bool refresh_geometry=!m_ring_geometry || m_ring_geometry_generation!=m_factorization_generation
+      || planes[0].size()!=n;
+    const real_array* arrays[] = {&input.geometry.x,&input.geometry.y,&input.geometry.z,
+      &input.geometry.cab,&input.geometry.sab,&input.geometry.salp,nullptr,
+      &input.air,&input.aii,&input.bir,&input.bii,&input.cir,&input.cii};
+    for (int a=0;a<13;++a) {
+      if(a<7 && !refresh_geometry)continue;
+      planes[a].resize(n);
+      for(size_t i=0;i<n;++i) planes[a][i] = a==6
+        ? pi()*input.geometry.segment_length[i] : (*arrays[a])[i];
+    }
+    nec_ring::Input view={n,m_ground.kind==nec_ground_kind::perfect,wavelength,
+      planes[0].data(),planes[1].data(),planes[2].data(),planes[3].data(),
+      planes[4].data(),planes[5].data(),planes[6].data(),planes[7].data(),
+      planes[8].data(),planes[9].data(),planes[10].data(),planes[11].data(),planes[12].data()};
+    nec_ring::Grid rg={grid.radius_m,grid.theta_start_deg,grid.theta_count,grid.theta_step_deg,
+      grid.phi_start_deg,grid.phi_count,grid.phi_step_deg};
+    if(refresh_geometry) {
+      m_ring_geometry=std::make_unique<nec_ring::Geometry>(view);
+      m_ring_geometry_generation=m_factorization_generation;
+    }
+    const auto plan=nec_ring::plan(view,rg,m_ring_geometry.get(),&m_ring_workspace);
+    if (!plan.stats.rings) {
+      calculate_far_field(exact_grid,currents,copied,retained_input);
+    } else {
+      for(int t=0;t<grid.theta_count;++t) {
+        if(plan.samples[t]>=grid.phi_count) {
+          nec_far_field_grid one=exact_grid;
+          one.theta_start_deg=grid.theta_start_deg+t*grid.theta_step_deg;
+          one.theta_count=1;one.theta_step_deg=0;
+          nec_far_field_result row;
+          calculate_far_field(one,currents,row,retained_input);
+          for(int j=0;j<grid.phi_count;++j) {
+            copied.e_theta[size_t(j)*grid.theta_count+t]=row.e_theta[j];
+            copied.e_phi[size_t(j)*grid.theta_count+t]=row.e_phi[j];
+          }
+        } else {
+          nec_ring::Field row(grid.phi_count);
+          if(nec_ring::ring(view,rg,t,plan.samples[t],plan.cx,plan.cy,row,m_ring_geometry.get(),&m_ring_workspace))
+            fail("COMPUTE FAR FIELD", "RING EVALUATION FAILED");
+          for(int j=0;j<grid.phi_count;++j) {
+            copied.e_theta[size_t(j)*grid.theta_count+t]=row.theta(j);
+            copied.e_phi[size_t(j)*grid.theta_count+t]=row.phi(j);
+          }
+        }
+      }
+    }
+    copied.evaluation=plan.stats;
+    copied.diagnostics.evaluated_directions=uint64_t(plan.stats.directions);
+    copied.diagnostics.segment_direction_contributions=uint64_t(plan.stats.directions)*n*
+      (view.perfect_ground?2:1);
+#ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
+    copied.diagnostics.native_total_ms=std::chrono::duration<nec_float,std::milli>(
+      std::chrono::steady_clock::now()-total_started).count();
+#endif
+    return;
+  }
+
 #ifdef NECPP_ENABLE_PERFORMANCE_DIAGNOSTICS
   std::chrono::steady_clock::duration raw_duration{};
   uint64_t raw_timing_samples = 0;
@@ -1144,7 +1215,7 @@ nec_stateful_model::compute_embedded_far_fields(
 
   if (normalization == nec_embedded_field_normalization::unit_current) {
     const nec_complex_matrix& impedance = compute_impedance_matrix().impedance;
-    if (samples_per_port == 1 &&
+    if (!grid.ring && samples_per_port == 1 &&
         m_retained_voltage_field_basis.size() == m_ports.size()) {
       nec_embedded_far_field_result embedded;
       compute_embedded_from_retained_basis(
@@ -1201,6 +1272,7 @@ nec_stateful_model::compute_embedded_far_fields(
       execute_voltage_solve(
         basis_voltages, achieved_voltages, achieved_currents);
       calculate_far_field(grid, achieved_currents, basis);
+      embedded.evaluation.add(basis.evaluation);
       const size_t offset = port_index * samples_per_port;
       std::copy(
         basis.e_theta.begin(), basis.e_theta.end(),
@@ -1260,6 +1332,7 @@ void nec_stateful_model::compute_embedded_from_retained_basis(
     input.segment_half_lengths = &m_far_field_segment_half_lengths;
 #endif
     calculate_far_field(grid, {}, voltage_field, &input);
+    output.evaluation.add(voltage_field.evaluation);
     if (impedance == nullptr) {
       const size_t offset = source * samples_per_port;
       std::copy(voltage_field.e_theta.begin(), voltage_field.e_theta.end(),
@@ -1348,6 +1421,7 @@ void nec_stateful_model::run_unit_current_basis_loop(
       }
       if (fields_out != nullptr) {
         calculate_far_field(*grid, achieved_currents, basis);
+        fields_out->evaluation.add(basis.evaluation);
         const size_t offset = port_index * samples_per_port;
         std::copy(
           basis.e_theta.begin(), basis.e_theta.end(),

@@ -1,3 +1,4 @@
+import { selectEvaluator } from "./field-selection.js";
 export {
   NecCancellationError,
   NecConditioningError,
@@ -137,8 +138,9 @@ export type { IsolatedElementHandoffMessage } from "./handoff.js";
 export async function createNecModel(
   options?: CreateNecModelOptions,
 ): Promise<NecModel> {
+  const evaluator = selectEvaluator(options?.farFieldEvaluator);
   const module = await instantiateNecModule(options);
-  return createModelFromModule(module);
+  return createModelFromModule(module, evaluator);
 }
 
 /** Compatibility escape hatch for complete NEC text decks. */
@@ -155,3 +157,5 @@ export async function runDeck(
   const module = await instantiateNecModule(options);
   return runDeckWithModule(module, deck, options);
 }
+
+export type { FarFieldEvaluator, FieldEvaluationDiagnostics, WasmAssetOptions } from "./types.js";
