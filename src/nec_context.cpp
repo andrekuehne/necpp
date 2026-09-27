@@ -1157,6 +1157,16 @@ void nec_context::simulate(bool far_field_flag) {
 
   activate_medium_parameters();
 
+  /* NEC-2 Part 3: a positive or negative GE I1 only modifies the geometry
+     for a ground; it does not include a ground in the calculation. The
+     ground parameters must be specified on a GN card. Refuse to run a
+     ground-connection geometry without a ground model instead of silently
+     simulating free space. */
+  if ( (m_geometry->ground_connection() != 0) && (false == ground.present()) ) {
+    throw nec_exception(
+      "GEOMETRY DATA ERROR--GROUND CONNECTION SPECIFIED WITHOUT A GROUND MODEL (GN CARD)");
+  }
+
   /* Allocate the normalization buffer */
   if ( iped )
     fnorm.resize(nfrq,4);

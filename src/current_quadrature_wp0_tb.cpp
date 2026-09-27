@@ -1,6 +1,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+// Keep the legacy C header compatible with the stateful C++ headers in this order.
+#include "libnecpp.h"
 #include "c_geometry.h"
 #include "current_quadrature_fixtures.h"
 #include "electromag.h"
@@ -173,7 +175,7 @@ TEST_CASE("WP0 current-quadrature rooted monopole uses interpolate ground",
   nec_stateful_model model;
   build_stateful(
     model, monopole_wires(), {{1, 1}},
-    nec_ground_connection::interpolate, nec_ground_kind::perfect);
+    nec_model_ground_connection::interpolate, nec_ground_kind::perfect);
   const nec_port_solution solution =
     model.solve_port_voltages_detailed({ nec_complex(1.0, 0.0) });
   REQUIRE(solution.currents[0].real() > 0.0);
@@ -373,4 +375,3 @@ TEST_CASE("WP0 current-quadrature native baseline JSON is recorded",
     << "}\n";
   REQUIRE(output.good());
 }
-

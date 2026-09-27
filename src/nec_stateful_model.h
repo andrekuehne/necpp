@@ -44,7 +44,7 @@ struct nec_wire_definition {
   nec_float radius_m = 0.0;
 };
 
-enum class nec_ground_connection {
+enum class nec_model_ground_connection {
   none = 0,
   interpolate = 1,
   zero_current = 2,
@@ -271,12 +271,12 @@ public:
 
   /*! Complete ordinary geometry while preserving the pre-symmetry API. */
   void complete_geometry(
-    nec_ground_connection connection = nec_ground_connection::none);
+    nec_model_ground_connection connection = nec_model_ground_connection::none);
 
   /*! Generate the final symmetry copies, complete geometry, and retain metadata. */
   const nec_geometry_completion_result& complete_geometry(
     const nec_geometry_symmetry& symmetry,
-    nec_ground_connection connection = nec_ground_connection::none);
+    nec_model_ground_connection connection = nec_model_ground_connection::none);
 
   /*! Read immutable metadata for successfully completed geometry. */
   const nec_geometry_completion_result& geometry_completion() const;
@@ -428,7 +428,7 @@ private:
   nec_embedded_far_field_result m_embedded_far_field_result;
   std::vector<nec_float> m_far_field_segment_half_lengths;
   nec_ground_definition m_ground;
-  nec_ground_connection m_ground_connection = nec_ground_connection::none;
+  nec_model_ground_connection m_ground_connection = nec_model_ground_connection::none;
   nec_float m_frequency_mhz = 0.0;
   uint64_t m_factorization_generation = 0;
   uint64_t m_solve_generation = 0;

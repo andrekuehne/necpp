@@ -284,32 +284,32 @@ void nec_stateful_model::add_wire(const nec_wire_definition& wire)
   m_state = nec_model_state::geometry_building;
 }
 
-void nec_stateful_model::complete_geometry(nec_ground_connection connection)
+void nec_stateful_model::complete_geometry(nec_model_ground_connection connection)
 {
   static_cast<void>(complete_geometry(nec_geometry_symmetry{}, connection));
 }
 
 const nec_geometry_completion_result& nec_stateful_model::complete_geometry(
   const nec_geometry_symmetry& symmetry,
-  nec_ground_connection connection)
+  nec_model_ground_connection connection)
 {
   require_state(nec_model_state::geometry_building, "COMPLETE GEOMETRY");
   int flag = 0;
   switch (connection) {
-  case nec_ground_connection::none:
+  case nec_model_ground_connection::none:
     flag = 0;
     break;
-  case nec_ground_connection::interpolate:
+  case nec_model_ground_connection::interpolate:
     flag = 1;
     break;
-  case nec_ground_connection::zero_current:
+  case nec_model_ground_connection::zero_current:
     flag = -1;
     break;
   default:
     fail("COMPLETE GEOMETRY", "UNKNOWN GROUND CONNECTION MODE");
   }
 
-  if (connection != nec_ground_connection::none &&
+  if (connection != nec_model_ground_connection::none &&
       symmetry.kind == nec_geometry_symmetry_kind::reflection &&
       (symmetry.reflection_plane_mask & nec_reflection_plane_z) != 0u)
     fail_geometry(
@@ -552,7 +552,7 @@ void nec_stateful_model::prepare(nec_float frequency_mhz)
     fail("PREPARE", "PORTS HAVE NOT BEEN DEFINED");
   if (!finite_value(frequency_mhz) || !(frequency_mhz > 0.0))
     fail("PREPARE", "FREQUENCY MUST BE POSITIVE AND FINITE");
-  if (m_ground_connection != nec_ground_connection::none &&
+  if (m_ground_connection != nec_model_ground_connection::none &&
       m_ground.kind == nec_ground_kind::free_space)
     fail_geometry(
       "PREPARE", "A GROUND CONNECTION REQUIRES A GROUND MODEL");

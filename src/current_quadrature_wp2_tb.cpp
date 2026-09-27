@@ -247,7 +247,7 @@ TEST_CASE("WP2 prepared quadrature rooted monopole images are explicit",
   nec_stateful_model model;
   build_stateful(
     model, monopole_wires(), {{1, 1}},
-    nec_ground_connection::interpolate, nec_ground_kind::perfect);
+    nec_model_ground_connection::interpolate, nec_ground_kind::perfect);
   const nec_current_distribution distribution =
     model.get_current_distribution(nec_current_mode_kind::unit_current);
 

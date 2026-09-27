@@ -1130,7 +1130,7 @@ int32_t necpp_wasm_v1_complete_geometry(
       "Unknown ground connection");
   return invoke(model, NECPP_WASM_V1_GEOMETRY_ERROR, [&] {
     model->native.complete_geometry(
-      static_cast<nec_ground_connection>(ground_connection));
+      static_cast<nec_model_ground_connection>(ground_connection));
     model->geometry_completion = model->native.geometry_completion();
     model->geometry_completion_available = true;
     clear_calculated_results(*model);
@@ -1176,7 +1176,7 @@ int32_t necpp_wasm_v1_complete_geometry_symmetric(
 
   return invoke(model, NECPP_WASM_V1_GEOMETRY_ERROR, [&] {
     model->geometry_completion = model->native.complete_geometry(
-      symmetry, static_cast<nec_ground_connection>(ground_connection));
+      symmetry, static_cast<nec_model_ground_connection>(ground_connection));
     model->geometry_completion_available = true;
     clear_calculated_results(*model);
   });

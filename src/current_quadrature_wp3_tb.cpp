@@ -326,7 +326,7 @@ nec_stateful_model scaled_dipole_array(
       ++tag;
     }
   }
-  model.complete_geometry(nec_ground_connection::none);
+  model.complete_geometry(nec_model_ground_connection::none);
   model.define_ports(ports);
   model.prepare(frequency_mhz);
   return model;
@@ -437,7 +437,7 @@ TEST_CASE("Frequency-scaled unit-current characterization is dimensionally invar
     nec_stateful_model model;
     build_stateful(
       model, scaled_dipole_wires(wavelength_m), {{1, 6}},
-      nec_ground_connection::none, nec_ground_kind::free_space, frequency_mhz);
+      nec_model_ground_connection::none, nec_ground_kind::free_space, frequency_mhz);
 
     nec_isolated_element_request request;
     request.quadrature.nodes = { -0.5, 0.0, 0.5 };
@@ -518,7 +518,7 @@ TEST_CASE("Frequency-scaled multiport modes keep selected and idle feeds normali
     nec_stateful_model model;
     build_stateful(
       model, scaled_turnstile_wires(wavelength_m), {{1, 6}, {2, 6}},
-      nec_ground_connection::none, nec_ground_kind::free_space, frequency_mhz);
+      nec_model_ground_connection::none, nec_ground_kind::free_space, frequency_mhz);
     const nec_current_distribution unit =
       model.get_current_distribution(nec_current_mode_kind::unit_current);
     REQUIRE(unit.mode_count == 2);
@@ -603,11 +603,11 @@ TEST_CASE("WP3 characterization rooted monopole keeps images off plane 0",
   nec_stateful_model model;
   build_stateful(
     model, monopole_wires(), {{1, 1}},
-    nec_ground_connection::interpolate, nec_ground_kind::perfect);
+    nec_model_ground_connection::interpolate, nec_ground_kind::perfect);
   nec_stateful_model reference;
   build_stateful(
     reference, monopole_wires(), {{1, 1}},
-    nec_ground_connection::interpolate, nec_ground_kind::perfect);
+    nec_model_ground_connection::interpolate, nec_ground_kind::perfect);
   const auto physical = characterization_request();
   const nec_isolated_element_characterization characterized =
     model.characterize_isolated_element(physical);

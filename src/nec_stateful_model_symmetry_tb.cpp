@@ -594,7 +594,7 @@ TEST_CASE("WP-S2 rejects only ground that conflicts with structural symmetry",
     REQUIRE_THROWS_AS(
       model.complete_geometry(
         reflection(nec_reflection_plane_z),
-        nec_ground_connection::interpolate),
+        nec_model_ground_connection::interpolate),
       nec_exception);
     REQUIRE(model.state() == nec_model_state::geometry_building);
   }

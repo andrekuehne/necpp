@@ -88,7 +88,7 @@ inline void build_stateful(
   nec_stateful_model& model,
   const std::vector<nec_wire_definition>& wires,
   const std::vector<nec_port_definition>& ports,
-  nec_ground_connection connection = nec_ground_connection::none,
+  nec_model_ground_connection connection = nec_model_ground_connection::none,
   nec_ground_kind ground = nec_ground_kind::free_space,
   nec_float frequency_mhz = kFrequencyMHz)
 {

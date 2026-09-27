@@ -51,23 +51,23 @@ struct Fixture {
   const char* id;
   std::vector<nec_wire_definition> wires;
   std::vector<nec_port_definition> ports;
-  nec_ground_connection connection;
+  nec_model_ground_connection connection;
   nec_ground_kind ground;
   size_t segment_count;
 };
 
 const Fixture kFixtures[] = {
   { "dipole", dipole_wires(), {{1, 6}},
-    nec_ground_connection::none, nec_ground_kind::free_space, 11 },
+    nec_model_ground_connection::none, nec_ground_kind::free_space, 11 },
   { "rooted-monopole", monopole_wires(), {{1, 1}},
-    nec_ground_connection::interpolate, nec_ground_kind::perfect, 11 },
+    nec_model_ground_connection::interpolate, nec_ground_kind::perfect, 11 },
   { "bent-multiwire", bent_wires(), {{1, kArmSegments}},
-    nec_ground_connection::none, nec_ground_kind::free_space, 10 },
+    nec_model_ground_connection::none, nec_ground_kind::free_space, 10 },
   { "turnstile-insulated", insulated_turnstile_wires(), {{1, 6}, {2, 6}},
-    nec_ground_connection::none, nec_ground_kind::free_space, 22 },
+    nec_model_ground_connection::none, nec_ground_kind::free_space, 22 },
   { "turnstile-connected", connected_turnstile_wires(),
     {{1, kArmSegments}, {3, kArmSegments}},
-    nec_ground_connection::none, nec_ground_kind::free_space, 20 },
+    nec_model_ground_connection::none, nec_ground_kind::free_space, 20 },
 };
 
 void build_fixture(nec_stateful_model& model, const Fixture& fixture)
