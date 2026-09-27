@@ -1,3 +1,4 @@
+import { selectEvaluator, reviveEvaluation } from "./field-selection.js";
 import {
   NecConditioningError,
   NecError,
@@ -43,6 +44,7 @@ export function isNodeRuntime(): boolean {
 export type WorkerMethod = Exclude<NecWorkerOperation, "create">;
 
 export interface SerializedCreateOptions {
+  readonly farFieldEvaluator?: "exact" | "ring";
   readonly wasmUrl?: string;
   readonly wasmBinary?: ArrayBuffer;
   /** Internal array-facade configuration; not exposed by createNecWorkerModel. */
@@ -474,6 +476,7 @@ export function reviveImpedanceResult(value: unknown): ImpedanceResult {
 export function reviveFarFieldResult(value: unknown): FarFieldResult {
   const record = value as FarFieldResult;
   const result: FarFieldResult = {
+    ...reviveEvaluation(record.fieldEvaluation),
     radiusM: record.radiusM,
     frequencyMHz: record.frequencyMHz,
     thetaDeg: copyFloat64(record.thetaDeg, "thetaDeg"),
@@ -702,6 +705,7 @@ export function reviveIsolatedElementCharacterization(
     factorizationGeneration: 0,
   });
   return {
+    ...reviveEvaluation(record.fieldEvaluation),
     impedance: impedance.impedance,
     admittance: impedance.admittance,
     quadrature: revivePreparedTransferHandle(record.quadrature, "quadrature"),
@@ -721,6 +725,7 @@ export function reviveIsolatedElementHandoff(value: unknown): IsolatedElementHan
     factorizationGeneration: 0,
   });
   return {
+    ...reviveEvaluation(record.fieldEvaluation),
     impedance: impedance.impedance,
     admittance: impedance.admittance,
     quadratureByteLength: finiteWorkerNumber(
@@ -751,12 +756,14 @@ export function serializeCreateOptions(
     return { transfer: [] };
   }
   const payload: {
+    farFieldEvaluator?: "exact" | "ring";
     wasmUrl?: string;
     wasmBinary?: ArrayBuffer;
     fieldWorkers?: "auto" | number;
     fieldWorkerAssetBaseUrl?: string;
   } = {};
   const transfer: ArrayBuffer[] = [];
+  if (options?.farFieldEvaluator !== undefined) payload.farFieldEvaluator = selectEvaluator(options.farFieldEvaluator);
 
   if (options?.wasmUrl !== undefined && options.wasmBinary !== undefined) {
     throw new NecInputError("wasmUrl and wasmBinary cannot both be supplied");
@@ -796,7 +803,7 @@ export function serializeCreateOptions(
   }
 
   if (payload.wasmUrl === undefined && payload.wasmBinary === undefined
-      && payload.fieldWorkers === undefined) {
+      && payload.fieldWorkers === undefined && payload.farFieldEvaluator === undefined) {
     return { transfer };
   }
   return { payload, transfer };
@@ -809,10 +816,10 @@ export function toCreateNecModelOptions(
     return undefined;
   }
   if (options.wasmBinary !== undefined) {
-    return { wasmBinary: options.wasmBinary };
+    return { wasmBinary: options.wasmBinary, ...(options.farFieldEvaluator === undefined ? {} : { farFieldEvaluator: selectEvaluator(options.farFieldEvaluator) }) };
   }
   if (options.wasmUrl !== undefined) {
-    return { wasmUrl: options.wasmUrl };
+    return { wasmUrl: options.wasmUrl, ...(options.farFieldEvaluator === undefined ? {} : { farFieldEvaluator: selectEvaluator(options.farFieldEvaluator) }) };
   }
-  return undefined;
+  return options.farFieldEvaluator === undefined ? undefined : { farFieldEvaluator: selectEvaluator(options.farFieldEvaluator) };
 }

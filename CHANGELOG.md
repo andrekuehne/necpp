@@ -1,3 +1,28 @@
+## 0.8.0 - 2026-09-27
+
+### Added
+
+* Opt-in ring band-limited far-field evaluation for ordinary fields, both
+  embedded normalizations, and isolated-element characterization. Select
+  `farFieldEvaluator: "ring"` at model or array-solver creation, or override
+  individual requests with `evaluator: "ring"` or `"exact"`.
+* A shared C++ evaluator supports free space and perfect ground, with
+  deterministic sparse sampling, interpolation, and direct fallback. Worker
+  pools schedule complete rings and preserve the existing output layout.
+* `fieldEvaluation` metadata identifies the approximation, execution mode,
+  direct-evaluation counts, analytical truncation bound, and fallback reason.
+  Packed characterization handoffs carry this provenance alongside the buffers.
+* Reproducible native/WASM profiling, accuracy, and integration benchmarks in
+  `docs/ring-far-field-evaluation.md`. The large-array stateful WASM cases improve
+  by 6.76–8.91×; all 154 comparisons meet the 1e-7 relative-error target.
+
+### Compatibility
+
+* Exact evaluation remains the default. Existing exact ABI entry points,
+  numerical goldens, normalization, packed NECQ/NECF formats, and retained
+  factorization behavior are preserved. NEC2++ remains `2.5.0`, and WASM ABI
+  remains `1`; ring entry points are additive.
+
 ## 0.7.1 - 2026-09-23
 
 ### Improved

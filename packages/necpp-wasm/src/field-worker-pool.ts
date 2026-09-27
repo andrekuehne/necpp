@@ -1,3 +1,4 @@
+import { evaluationMetadata, ringReasons } from "./field-selection.js";
 import type { FarFieldEvaluationSnapshot } from "./model.js";
 import { tileRequest, validateFarFieldSnapshot, type FarFieldTileResult } from "./field-evaluator.js";
 import type { FarFieldRequest, FarFieldResult } from "./types.js";
@@ -317,15 +318,60 @@ export class FarFieldWorkerPool {
     return replacement;
   }
 
-  async computeFarField(request: FarFieldRequest): Promise<PooledFarFieldResult> {
+  async computeFarField(request: FarFieldRequest, automatic = false): Promise<PooledFarFieldResult> {
     const snapshot = this.#snapshot;
     if (snapshot === undefined) throw new Error("Evaluator pool has no snapshot");
     const totalStarted = performance.now();
     const generation = ++this.#activeGeneration;
     const totalSamples = request.theta.count * request.phi.count;
+    let plan: Float64Array | undefined;
+    let planMs = 0;
+    if (request.evaluator === "ring") {
+      // Register planning as part of the job so cancellation is observable
+      // even before the first ring has been dispatched.
+      this.#activeJob = { generation, totalTiles: request.theta.count,
+        completedTiles: 0, dispatchedTiles: 0 };
+      try {
+        const started = performance.now();
+        let slot = this.#slots[0]!;
+        const message = { kind: "plan-ring", tile: tileRequest(request,0,1,generation,snapshot.solutionGeneration) };
+        try { plan = await slot.request(message) as Float64Array; }
+        catch {
+          if (generation !== this.#activeGeneration) throw new StaleFarFieldJobError();
+          slot = await this.#restart(0);
+          plan = await slot.request(message) as Float64Array;
+        }
+        if (generation !== this.#activeGeneration) throw new StaleFarFieldJobError();
+        if (!(plan instanceof Float64Array) || plan.length !== request.theta.count + 7
+            || !plan.every(Number.isFinite)
+            || !plan.subarray(2, 5).every(value => Number.isSafeInteger(value) && value >= 0)
+            || plan[3]! + plan[4]! !== request.theta.count || plan[5]! < 0
+            || !Number.isInteger(plan[6]) || plan[6]! < 0 || plan[6]! >= ringReasons.length
+            || !plan.subarray(7).every(m => Number.isInteger(m) && m > 0
+              && m <= request.phi.count && (m === request.phi.count || m % 2 === 1))) {
+          throw new Error("Invalid evaluator ring plan");
+        }
+        const sampledDirections = plan.subarray(7).reduce((sum, m) => sum + m, 0);
+        const interpolatedRings = plan.subarray(7).filter(m => m < request.phi.count).length;
+        if (plan[3] !== interpolatedRings || plan[2]! < sampledDirections
+            || plan[2]! > sampledDirections + 72) {
+          throw new Error("Inconsistent evaluator ring plan");
+        }
+        planMs = performance.now()-started;
+      } finally {
+        if (this.#activeJob?.generation === generation) this.#activeJob = undefined;
+      }
+    }
+    const activeWorkers = automatic && plan !== undefined
+      ? Math.max(1,Math.min(this.workerCount,request.theta.count,
+          Math.ceil(plan[2]! * snapshot.segmentCount * (snapshot.perfectGround?2:1)/250_000)))
+      : this.workerCount;
     const tiles = [] as Array<{ start: number; count: number }>;
-    for (let start = 0; start < totalSamples; start += this.tileSize) {
-      tiles.push({ start, count: Math.min(this.tileSize, totalSamples - start) });
+    if (plan !== undefined) {
+      for(let start=0;start<request.theta.count;++start) tiles.push({start,count:request.phi.count});
+    } else {
+      for (let start = 0; start < totalSamples; start += this.tileSize)
+        tiles.push({ start, count: Math.min(this.tileSize, totalSamples - start) });
     }
     const eThetaReal = new Float64Array(totalSamples);
     const eThetaImag = new Float64Array(totalSamples);
@@ -349,7 +395,8 @@ export class FarFieldWorkerPool {
         const tile = tiles[tileIndex];
         if (tile === undefined) return;
         activeJob.dispatchedTiles += 1;
-        const message = { kind: "evaluate", tile: tileRequest(
+        const message = { kind: plan === undefined ? "evaluate" : "evaluate-ring",
+          ...(plan === undefined ? {} : { samples: plan[7+tile.start], cx: plan[0], cy: plan[1] }), tile: tileRequest(
           request, tile.start, tile.count, generation, snapshot.solutionGeneration,
         ) };
         let result: FarFieldTileResult;
@@ -379,16 +426,24 @@ export class FarFieldWorkerPool {
         workerComputeMs += result.computeMs;
         computeByWorker[slot.index] = (computeByWorker[slot.index] ?? 0)
           + result.computeMs;
+        if (plan === undefined) {
         eThetaReal.set(result.eThetaReal, result.start);
         eThetaImag.set(result.eThetaImag, result.start);
         ePhiReal.set(result.ePhiReal, result.start);
         ePhiImag.set(result.ePhiImag, result.start);
+        } else {
+          for(let j=0;j<request.phi.count;++j) {
+            const index=j*request.theta.count+result.start;
+            eThetaReal[index]=result.eThetaReal[j]!;eThetaImag[index]=result.eThetaImag[j]!;
+            ePhiReal[index]=result.ePhiReal[j]!;ePhiImag[index]=result.ePhiImag[j]!;
+          }
+        }
         activeJob.completedTiles += 1;
       }
       throw new StaleFarFieldJobError();
     };
     try {
-      await Promise.all(this.#slots.map(run));
+      await Promise.all(this.#slots.slice(0,activeWorkers).map(run));
       if (generation !== this.#activeGeneration) throw new StaleFarFieldJobError();
     } finally {
       if (this.#activeJob?.generation === generation) this.#activeJob = undefined;
@@ -409,16 +464,17 @@ export class FarFieldWorkerPool {
     const geometryBytesPerWorker = snapshot.segmentCount * 7 * 8;
     const currentBytesPerWorker = snapshot.segmentCount * 6 * 8;
     return {
+      ...(plan === undefined ? {} : { fieldEvaluation: evaluationMetadata(plan[2]!,plan[3]!,plan[4]!,plan[5]!,ringReasons[plan[6]!]) }),
       radiusM: request.radiusM ?? 1,
       frequencyMHz: snapshot.frequencyMHz,
       thetaDeg, phiDeg, eThetaReal, eThetaImag, ePhiReal, ePhiImag,
       poolDiagnostics: {
-        workers: this.workerCount, tileSize: this.tileSize, tiles: tiles.length,
+        workers: activeWorkers, tileSize: plan === undefined ? this.tileSize : request.phi.count, tiles: tiles.length,
         snapshotBroadcastMs: this.#snapshotBroadcastMs,
-        dispatchComputeTransferMs, mergeMs,
+        dispatchComputeTransferMs: dispatchComputeTransferMs + planMs, mergeMs,
         totalMs: performance.now() - totalStarted,
         workerComputeMs,
-        kernelMs: Math.max(...computeByWorker),
+        kernelMs: planMs + Math.max(...computeByWorker),
         completedTiles: activeJob.completedTiles,
         cancelledTiles: this.#cancelledTiles,
         cancelledJobs: this.#cancelledJobs,

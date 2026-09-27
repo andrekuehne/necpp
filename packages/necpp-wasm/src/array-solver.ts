@@ -1,3 +1,5 @@
+import { selectEvaluator } from "./field-selection.js";
+import type { FarFieldEvaluator } from "./types.js";
 import {
   analyzeArraySymmetry,
   createExplicitArrayBuildPlan,
@@ -613,6 +615,7 @@ class WorkerNecArraySolver implements NecArraySolver {
   readonly #fieldWorkers: FieldWorkerSelection;
   readonly #fieldWorkerAssetBaseUrl: string | undefined;
   readonly #workerFactory: ArrayWorkerFactory;
+  readonly #evaluator: FarFieldEvaluator;
   #fieldDiagnostics: FieldBackendDiagnostics;
   #retried = false;
   #terminated = false;
@@ -627,7 +630,9 @@ class WorkerNecArraySolver implements NecArraySolver {
     fieldWorkers: FieldWorkerSelection,
     fieldWorkerAssetBaseUrl?: string,
     workerFactory: ArrayWorkerFactory = defaultArrayWorkerFactory,
+    evaluator: FarFieldEvaluator = "exact",
   ) {
+    this.#evaluator = selectEvaluator(evaluator);
     this.#model = model;
     this.#description = description;
     this.#plan = plan;
@@ -744,7 +749,7 @@ class WorkerNecArraySolver implements NecArraySolver {
   }
 
   async computeFarField(request: FarFieldRequest): Promise<FarFieldResult> {
-    const result = await this.#model.computeFarField(request);
+    const result = await this.#model.computeFarField({ ...request, evaluator: selectEvaluator(request?.evaluator,this.#evaluator) });
     if (result.fieldBackend !== undefined) {
       this.#fieldDiagnostics = result.fieldBackend;
     }
@@ -756,7 +761,7 @@ class WorkerNecArraySolver implements NecArraySolver {
     request: FarFieldRequest,
     normalization?: EmbeddedFieldNormalization,
   ): Promise<EmbeddedFarFieldResult> {
-    const result = await this.#model.computeEmbeddedFarFields(request, normalization);
+    const result = await this.#model.computeEmbeddedFarFields({ ...request, evaluator: selectEvaluator(request?.evaluator,this.#evaluator) }, normalization);
     const scatter = this.#application.scatterCallerToNative;
     const gathered: EmbeddedFarFieldResult = {
       ...result,
@@ -876,6 +881,7 @@ export async function createNecArraySolverWithWorkerFactory(
   if (typeof options !== "object" || options === null) {
     throw new NecInputError("Array solver options must be an object");
   }
+  const evaluator = selectEvaluator(options.farFieldEvaluator);
   validateAbortSignal(options.signal);
   if (isAborted(options.signal)) {
     throw new NecCancellationError("aborted");
@@ -926,6 +932,7 @@ export async function createNecArraySolverWithWorkerFactory(
       fieldWorkers,
       fieldWorkerAssetBaseUrl,
       workerFactory,
+      evaluator,
     );
   } catch (error) {
     const failure = failureReason(error);
@@ -950,6 +957,7 @@ export async function createNecArraySolverWithWorkerFactory(
       fieldWorkers,
       fieldWorkerAssetBaseUrl,
       workerFactory,
+      evaluator,
     );
   }
 }

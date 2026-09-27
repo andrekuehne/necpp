@@ -1,3 +1,5 @@
+import { selectEvaluator, evaluationMetadata, ringReasons } from "./field-selection.js";
+import type { FarFieldEvaluator, FieldEvaluationDiagnostics } from "./types.js";
 import {
   NecConditioningError,
   NecGeometryError,
@@ -452,7 +454,9 @@ export class WasmNecModel implements NecModel {
   #maximumWireTag = 0;
   #geometrySymmetry: ValidatedGeometrySymmetry | undefined;
 
-  constructor(module: NecWasmModule, handle: number) {
+  readonly #evaluator: FarFieldEvaluator;
+  constructor(module: NecWasmModule, handle: number, evaluator: FarFieldEvaluator = "exact") {
+    this.#evaluator = selectEvaluator(evaluator);
     this.#moduleStorage = module;
     this.#handle = handle;
     try {
@@ -1344,15 +1348,26 @@ export class WasmNecModel implements NecModel {
     };
   }
 
+  #evaluation(ring: boolean, available: boolean, grid: ValidatedGrid, bases = 1): { fieldEvaluation?: FieldEvaluationDiagnostics } {
+    if (!ring) return {};
+    if (!available) return { fieldEvaluation: evaluationMetadata(grid.sampleCount*bases,0,grid.thetaCount*bases,0,"ring-capability-unavailable") };
+    const v = (index: number) => this.#module._necpp_wasm_v1_ring_diagnostic!(this.#handle,index);
+    return { fieldEvaluation: evaluationMetadata(v(0),v(1),v(2),v(3),ringReasons[v(4)]) };
+  }
+
   computeFarField(request: FarFieldRequest): FarFieldResult {
     const packageStarted = performance.now();
     this.#assertOperation("computeFarField");
     const grid = validateGrid(request);
+    const ring = selectEvaluator(request.evaluator, this.#evaluator) === "ring";
+    const available = typeof this.#module._necpp_wasm_v1_compute_far_field_ring === "function"
+      && typeof this.#module._necpp_wasm_v1_ring_diagnostic === "function";
+    const compute = ring && available ? this.#module._necpp_wasm_v1_compute_far_field_ring! : this.#module._necpp_wasm_v1_compute_far_field;
     const validationMs = performance.now() - packageStarted;
     const wasmCallStarted = performance.now();
     this.#invokeStatus(
       "computeFarField",
-      () => this.#module._necpp_wasm_v1_compute_far_field(
+      () => compute(
         this.#handle,
         grid.radiusM,
         grid.thetaStartDeg,
@@ -1366,7 +1381,7 @@ export class WasmNecModel implements NecModel {
     const wasmCallMs = performance.now() - wasmCallStarted;
     return this.#readResult(
       "computeFarField",
-      () => this.#farFieldResult(grid, validationMs, wasmCallMs, packageStarted),
+      () => ({ ...this.#farFieldResult(grid, validationMs, wasmCallMs, packageStarted), ...this.#evaluation(ring,available,grid) }),
     );
   }
 
@@ -1432,6 +1447,10 @@ export class WasmNecModel implements NecModel {
   ): EmbeddedFarFieldResult {
     this.#assertOperation("computeEmbeddedFarFields");
     const grid = validateGrid(request, this.#ports.length);
+    const ring = selectEvaluator(request.evaluator, this.#evaluator) === "ring";
+    const available = typeof this.#module._necpp_wasm_v1_compute_embedded_far_fields_ring === "function"
+      && typeof this.#module._necpp_wasm_v1_ring_diagnostic === "function";
+    const compute = ring && available ? this.#module._necpp_wasm_v1_compute_embedded_far_fields_ring! : this.#module._necpp_wasm_v1_compute_embedded_far_fields;
     const record = requireRecord(normalization, "normalization");
     const nativeNormalization = record.kind === "unit-voltage"
       && record.valueV === 1
@@ -1441,7 +1460,7 @@ export class WasmNecModel implements NecModel {
         : inputError("normalization must request exactly one volt or one ampere");
     this.#invokeStatus(
       "computeEmbeddedFarFields",
-      () => this.#module._necpp_wasm_v1_compute_embedded_far_fields(
+      () => compute(
         this.#handle,
         grid.radiusM,
         grid.thetaStartDeg,
@@ -1481,6 +1500,7 @@ export class WasmNecModel implements NecModel {
           ? Object.freeze({ kind: "unit-voltage", valueV: 1 })
           : Object.freeze({ kind: "unit-current", valueA: 1 });
       return {
+        ...this.#evaluation(ring,available,grid,this.#ports.length),
         radiusM: this.#module._necpp_wasm_v1_embedded_radius_m(this.#handle),
         frequencyMHz:
           this.#module._necpp_wasm_v1_embedded_frequency_mhz(this.#handle),
@@ -1676,13 +1696,17 @@ export class WasmNecModel implements NecModel {
       inputError("CHARACTERIZE ISOLATED ELEMENT: CURRENT MODES MUST BE UNIT-CURRENT");
     }
     const grid = validateGrid(record.field, this.#ports.length);
+    const ring = selectEvaluator(request.field.evaluator, this.#evaluator) === "ring";
+    const available = typeof this.#module._necpp_wasm_v1_characterize_isolated_element_ring === "function"
+      && typeof this.#module._necpp_wasm_v1_ring_diagnostic === "function";
+    const compute = ring && available ? this.#module._necpp_wasm_v1_characterize_isolated_element_ring! : this.#module._necpp_wasm_v1_characterize_isolated_element;
     this.#invokeStatus(
       "characterizeIsolatedElement",
       () => this.#withQuadratureInputs(
         quadrature.nodes,
         quadrature.weights,
         (nodesPointer, nodeCount, weightsPointer, weightCount) =>
-          this.#module._necpp_wasm_v1_characterize_isolated_element(
+          compute(
             this.#handle,
             nodesPointer,
             nodeCount,
@@ -1704,6 +1728,7 @@ export class WasmNecModel implements NecModel {
       const quadratureBuffer = this.#copyPackedBuffer(PACKED_BUFFER.quadrature);
       const embeddedBuffer = this.#copyPackedBuffer(PACKED_BUFFER.embeddedField);
       return {
+        ...this.#evaluation(ring,available,grid,this.#ports.length),
         impedance: this.#matrix(
           BUFFER.impedanceReal,
           BUFFER.impedanceImag,
@@ -1748,7 +1773,7 @@ export class WasmNecModel implements NecModel {
   }
 }
 
-export function createModelFromModule(module: NecWasmModule): NecModel {
+export function createModelFromModule(module: NecWasmModule, evaluator: FarFieldEvaluator = "exact"): NecModel {
   let handle: number;
   try {
     handle = module._necpp_wasm_v1_model_create();
@@ -1759,7 +1784,7 @@ export function createModelFromModule(module: NecWasmModule): NecModel {
     throw new NecRuntimeError("Failed to create the native NEC model");
   }
   try {
-    return new WasmNecModel(module, handle);
+    return new WasmNecModel(module, handle, evaluator);
   } catch (error) {
     try {
       module._necpp_wasm_v1_model_delete(handle);

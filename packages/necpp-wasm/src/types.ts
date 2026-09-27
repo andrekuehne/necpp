@@ -278,7 +278,22 @@ export interface AngleSweep {
   readonly stepDeg: number;
 }
 
+export type FarFieldEvaluator = "exact" | "ring";
+
+/** Provenance for an opt-in approximation; the bound excludes floating-point error. */
+export interface FieldEvaluationDiagnostics {
+  readonly evaluator: "ring-bandlimited-v1";
+  readonly execution: "ring" | "mixed" | "exact";
+  readonly interpolatedRings: number;
+  readonly directRings: number;
+  readonly evaluatedDirections: number;
+  readonly truncationBound: number;
+  readonly fallbackReason?: string;
+}
+
 export interface FarFieldRequest {
+  /** Overrides the model's evaluator. The default is exact. */
+  readonly evaluator?: FarFieldEvaluator;
   /** Defaults to 1 metre and must be finite and greater than zero. */
   readonly radiusM?: number;
   readonly theta: AngleSweep;
@@ -313,6 +328,7 @@ export interface FarFieldDiagnostics {
 }
 
 export interface FarFieldResult {
+  readonly fieldEvaluation?: FieldEvaluationDiagnostics;
   readonly radiusM: number;
   readonly frequencyMHz: number;
   readonly thetaDeg: Float64Array;
@@ -457,6 +473,7 @@ export interface PreparedTransferHandle {
 
 /** Isolated Z/Y plus transfer handles for currents and NEC embedded fields. */
 export interface IsolatedElementCharacterization {
+  readonly fieldEvaluation?: FieldEvaluationDiagnostics;
   readonly impedance: ComplexMatrix;
   readonly admittance: ComplexMatrix;
   readonly quadrature: PreparedTransferHandle;
@@ -465,6 +482,7 @@ export interface IsolatedElementCharacterization {
 
 /** Compact metadata after a worker-to-worker characterization handoff. */
 export interface IsolatedElementHandoff {
+  readonly fieldEvaluation?: FieldEvaluationDiagnostics;
   readonly impedance: ComplexMatrix;
   readonly admittance: ComplexMatrix;
   readonly quadratureByteLength: number;
@@ -482,14 +500,18 @@ export interface IsolatedElementRequest {
   readonly field: FarFieldRequest;
 }
 
-export interface CreateNecModelOptions {
+export interface WasmAssetOptions {
   /** Override the package-relative URL used to load `nec2pp.wasm`. */
   readonly wasmUrl?: string | URL;
   /** Caller-owned WASM bytes. The factory does not retain or mutate this buffer. */
   readonly wasmBinary?: ArrayBuffer | Uint8Array;
 }
 
-export interface RunDeckOptions extends CreateNecModelOptions {
+export interface CreateNecModelOptions extends WasmAssetOptions {
+  readonly farFieldEvaluator?: FarFieldEvaluator;
+}
+
+export interface RunDeckOptions extends WasmAssetOptions {
   /** Abort before starting; an in-progress synchronous native solve is not interruptible. */
   readonly signal?: AbortSignal;
 }
@@ -765,6 +787,7 @@ export type ArrayBuildPlan =
     };
 
 export interface CreateArraySolverOptions {
+  readonly farFieldEvaluator?: FarFieldEvaluator;
   /** Defaults to `"auto"`. */
   readonly symmetry?: "auto" | "off" | "require";
   readonly symmetrizer?: SymmetrizerOptions;

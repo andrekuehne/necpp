@@ -1,6 +1,6 @@
 {
   "name": "@necpp-engine/wasm",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": false,
   "type": "module",
   "description": "Stateful NEC2++ electromagnetic solver and symmetric-array API for Node and browsers",
@@ -73,6 +73,7 @@
     "test:wasm": "node test/require-wasm.mjs && npm test && npm run test:pack",
     "test:pack": "node test/require-wasm.mjs && node --test --test-timeout=180000 --test-concurrency=1 test/pack/manifest.test.mjs test/pack/consumer.test.mjs",
     "test:browser": "node test/browser-integration.mjs",
+    "test:ring-browser": "npm run build:test && NECPP_TEST_RING=1 node test/browser-field-worker-production.mjs",
     "test:field-worker-browser": "npm run build:test && node test/browser-field-worker-production.mjs",
     "test:current-quadrature-browser": "npm run build:test && node test/browser-current-quadrature-handoff.mjs",
     "test:current-quadrature-trace": "npm run build:test && node test/browser-current-quadrature-trace.mjs",

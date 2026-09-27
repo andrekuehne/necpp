@@ -1,5 +1,10 @@
 export interface FieldEvaluatorWasmModule {
   HEAPF64: Float64Array;
+  _necpp_field_evaluator_ring_v1_create?(...args: number[]): number;
+  _necpp_field_evaluator_ring_v1_delete?(handle: number): void;
+  _necpp_field_evaluator_ring_v1_version?(): number;
+  _necpp_field_evaluator_ring_v1_plan?(...args: number[]): number;
+  _necpp_field_evaluator_ring_v1_evaluate?(...args: number[]): number;
   _malloc(bytes: number): number;
   _free(pointer: number): void;
   _necpp_field_evaluator_v1_version(): number;

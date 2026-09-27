@@ -17,6 +17,9 @@ type EvaluatorRequest =
       readonly cir: Float64Array; readonly cii: Float64Array }
   | { readonly id: number; readonly kind: "evaluate";
       readonly tile: FarFieldTileRequest }
+  | { readonly id: number; readonly kind: "plan-ring"; readonly tile: FarFieldTileRequest }
+  | { readonly id: number; readonly kind: "evaluate-ring"; readonly tile: FarFieldTileRequest;
+      readonly samples: number; readonly cx: number; readonly cy: number }
   | { readonly id: number; readonly kind: "dispose" }
   | { readonly id: number; readonly kind: "crash-for-test" };
 
@@ -71,6 +74,7 @@ if (wasm._necpp_field_evaluator_v1_version() !== 1) {
 let snapshot: FarFieldEvaluationSnapshot | undefined;
 const pointers = new Map<string, number>();
 let outputCapacity = 0;
+let ringContext = 0;
 
 const snapshotNames = [
   "x", "y", "z", "cab", "sab", "salp", "segmentHalfLengths",
@@ -79,6 +83,8 @@ const snapshotNames = [
 const outputNames = ["eThetaReal", "eThetaImag", "ePhiReal", "ePhiImag"] as const;
 
 function releasePointers(): void {
+  if(ringContext)wasm._necpp_field_evaluator_ring_v1_delete!(ringContext);
+  ringContext=0;
   for (const pointer of pointers.values()) wasm._free(pointer);
   pointers.clear();
   outputCapacity = 0;
@@ -102,6 +108,9 @@ function configure(next: FarFieldEvaluationSnapshot): void {
 }
 
 function ensureOutputs(count: number): void {
+  if (!Number.isSafeInteger(count) || count < 1 || count > 0x7fffffff / 8) {
+    throw new Error("Evaluator output exceeds the WASM addressable size");
+  }
   if (count <= outputCapacity) return;
   for (const name of outputNames) {
     const old = pointers.get(name);
@@ -119,13 +128,45 @@ function pointer(name: string): number {
   return value;
 }
 
-function evaluate(tile: FarFieldTileRequest): FarFieldTileResult {
+function ringArguments(tile: FarFieldTileRequest): number[] {
+  const current = snapshot;
+  if (current === undefined || tile.solutionGeneration !== current.solutionGeneration)
+    throw new Error("Evaluator ring is stale or not configured");
+  // Keep the default exact worker path free of ring-only allocations.
+  if (!ringContext) {
+    if (wasm._necpp_field_evaluator_ring_v1_create === undefined)
+      throw new Error("Ring evaluator capability unavailable");
+    ringContext = wasm._necpp_field_evaluator_ring_v1_create(current.segmentCount,
+      ...["x", "y", "cab", "sab", "segmentHalfLengths"].map(pointer));
+    if (!ringContext) throw new Error("Unable to allocate ring geometry");
+  }
+  return [ringContext,current.segmentCount, current.perfectGround ? 1 : 0, current.wavelengthM,
+    tile.radiusM,tile.thetaStartDeg,tile.thetaCount,tile.thetaStepDeg,
+    tile.phiStartDeg,tile.phiCount,tile.phiStepDeg,...snapshotNames.map(pointer)];
+}
+function planRing(tile: FarFieldTileRequest): Float64Array {
+  if (wasm._necpp_field_evaluator_ring_v1_version?.() !== 1 ||
+      wasm._necpp_field_evaluator_ring_v1_plan === undefined)
+    throw new Error("Ring evaluator capability unavailable");
+  const args = ringArguments(tile);
+  const count = tile.thetaCount + 7;
+  if (!Number.isSafeInteger(count) || count < 8 || count > 0x7fffffff / 8)
+    throw new Error("Ring plan exceeds the WASM addressable size");
+  const output = wasm._malloc(count * 8);
+  if (!output) throw new Error("Unable to allocate ring plan");
+  try {
+    if (wasm._necpp_field_evaluator_ring_v1_plan(...args, output)) throw new Error("Invalid ring plan");
+    return wasm.HEAPF64.slice(output / 8, output / 8 + count);
+  } finally { wasm._free(output); }
+}
+
+function evaluate(tile: FarFieldTileRequest, ring?: { samples: number; cx: number; cy: number }): FarFieldTileResult {
   const current = snapshot;
   if (current === undefined || tile.solutionGeneration !== current.solutionGeneration)
     throw new Error("Evaluator tile is stale or not configured");
   ensureOutputs(tile.count);
   const started = performance.now();
-  const status = wasm._necpp_field_evaluator_v1_evaluate(
+  const status = ring === undefined ? wasm._necpp_field_evaluator_v1_evaluate(
     current.segmentCount, current.perfectGround ? 1 : 0,
     current.wavelengthM, tile.radiusM,
     tile.thetaStartDeg, tile.thetaCount, tile.thetaStepDeg,
@@ -137,7 +178,8 @@ function evaluate(tile: FarFieldTileRequest): FarFieldTileResult {
     pointer("cir"), pointer("cii"),
     pointer("eThetaReal"), pointer("eThetaImag"),
     pointer("ePhiReal"), pointer("ePhiImag"),
-  );
+  ) : wasm._necpp_field_evaluator_ring_v1_evaluate!(...ringArguments(tile),
+    tile.start,ring.samples,ring.cx,ring.cy,...outputNames.map(pointer));
   if (status !== 0) throw new Error(`Dedicated evaluator rejected tile (${status})`);
   const copy = (name: string) => {
     const start = pointer(name) / Float64Array.BYTES_PER_ELEMENT;
@@ -189,9 +231,13 @@ const handleMessage = (message: unknown): void => {
       host.post({ id: request.id, kind: "ok" });
       return;
     }
-    if (request.kind === "evaluate") {
+    if (request.kind === "plan-ring") {
+      host.post({id: request.id, kind: "plan", result: planRing(request.tile)});
+      return;
+    }
+    if (request.kind === "evaluate" || request.kind === "evaluate-ring") {
       if (snapshot === undefined) throw new Error("Evaluator is not configured");
-      const result = evaluate(request.tile);
+      const result = evaluate(request.tile, request.kind === "evaluate-ring" ? request : undefined);
       const transfer: ArrayBuffer[] = [
         result.eThetaReal.buffer as ArrayBuffer,
         result.eThetaImag.buffer as ArrayBuffer,

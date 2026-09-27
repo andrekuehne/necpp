@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-27T08:31:01+0200",
+  "commit": "970d1ed0663e2ed8ad759723f37e3e2a32163ee0",
+  "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+  "cpu": "13th Gen Intel(R) Core(TM) i7-1355U",
+  "node": "v24.20.0",
+  "g++": "g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "rounds": 3,
+  "nativeSha256": "fa11aada1c5213ce8e6e02f0027da63172c817711b7dd21c8c41211e1a8c5bd3",
+  "benchWasmSha256": "39dbb0340caf5d0c831246884bac62b77aeef1280de53d57c7904fe9aad962e9",
+  "packageWasmSha256": "786be0c083068471e552f5ad9ad0ee2c689da05871991f16370d0cac8e881c7d",
+  "wasmCompiler": "Emscripten 4.0.7 (8dc91db45bf96c174531006839472a3924d105aa); scalar -O3 -flto; see build.py",
+  "protocol": "3 fresh models; one cold + one retained voltage RHS per model; scalar; explicit geometry; serial execution; module/process startup excluded",
+  "workingTreeDirty": true,
+  "sourceSha256": {
+    "src/nec_ring_field.h": "d4e00c2e2bc89d29bf0abb14b904814341949d8e661b3ea3e943a9a9ba632d10",
+    "src/nec_ring_field.cpp": "9023ead218b320f6320206c60eb6c6a10d4166b30d7ce6763a9686cc6ff0de45",
+    "src/nec_field_evaluator_wasm.cpp": "e2bd9ad2eec274908027b3d7313a52d19931be771e20657d66d11216beb5227c",
+    "src/nec_field_evaluator.h": "2fd0b3559e06906e3473d552956a55fc9ca82cc4285667eec3d1be6add330e46",
+    "src/nec_stateful_model.h": "3e07f652a72506fc1cf064d2dffbfc8be3e6dda9cbc23fb4047593e4799fd7be",
+    "src/nec_stateful_model.cpp": "1bf803c1280e6a0b99bae39fdeba523e8e9606e1038e40950880325050b5aabe",
+    "src/necpp_wasm_v1.h": "e0ac15f12968e5101c0ec77f14d116736ca0c8cd811eb4b4f33d467014b78ec0",
+    "src/necpp_wasm_v1.cpp": "26e41d34b3d6e2dfaf8c61125488a44fec626739490e60add9290773f3e50a6b"
+  },
+  "evidenceRevision": "Uncommitted implementation on feat/ring-far-field-evaluator, based on 970d1ed0663e2ed8ad759723f37e3e2a32163ee0; source and binary hashes identify the measured build.",
+  "packageAssetSha256": {
+    "packages/necpp-wasm/src/necpp-field-evaluator.wasm": "957781b0dc9ade4616f069d7309c6c890b2a71d8373de21499bd5a7f8cf0e0eb",
+    "packages/necpp-wasm/src/nec2pp.wasm": "786be0c083068471e552f5ad9ad0ee2c689da05871991f16370d0cac8e881c7d"
+  }
+}

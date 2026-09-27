@@ -71,6 +71,7 @@ const requiredFiles = new Set([
   "dist/worker-entry.js",
   "dist/field-evaluator-worker.js",
   "dist/field-evaluator.js",
+  "dist/field-selection.js",
   "dist/field-worker-pool.js",
   "dist/nec2pp.generated.js",
   "dist/nec2pp.wasm",

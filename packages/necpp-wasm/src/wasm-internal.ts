@@ -1,5 +1,9 @@
 /** Handwritten private view of the stable v1 ABI. Never exported publicly. */
 export interface NecWasmModule {
+  _necpp_wasm_v1_compute_far_field_ring?: NecWasmModule["_necpp_wasm_v1_compute_far_field"];
+  _necpp_wasm_v1_compute_embedded_far_fields_ring?: NecWasmModule["_necpp_wasm_v1_compute_embedded_far_fields"];
+  _necpp_wasm_v1_characterize_isolated_element_ring?: NecWasmModule["_necpp_wasm_v1_characterize_isolated_element"];
+  _necpp_wasm_v1_ring_diagnostic?(handle: number,index: number): number;
   HEAPU8: Uint8Array;
   HEAP32: Int32Array;
   HEAPF64: Float64Array;

@@ -257,6 +257,26 @@ int32_t necpp_wasm_v1_compute_embedded_far_fields(
   double theta_start_deg, int32_t theta_count, double theta_step_deg,
   double phi_start_deg, int32_t phi_count, double phi_step_deg,
   int32_t normalization);
+int32_t necpp_wasm_v1_compute_far_field_ring(
+  necpp_wasm_v1_model* model,
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg);
+int32_t necpp_wasm_v1_compute_embedded_far_fields_ring(
+  necpp_wasm_v1_model* model,
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg,
+  int32_t normalization);
+int32_t necpp_wasm_v1_characterize_isolated_element_ring(
+  necpp_wasm_v1_model* model,
+  const double* nodes, size_t node_count,
+  const double* weights, size_t weight_count,
+  int32_t images,
+  double radius_m,
+  double theta_start_deg, int32_t theta_count, double theta_step_deg,
+  double phi_start_deg, int32_t phi_count, double phi_step_deg);
+double necpp_wasm_v1_ring_diagnostic(const necpp_wasm_v1_model*, int32_t index);
 int32_t necpp_wasm_v1_capture_far_field_snapshot(necpp_wasm_v1_model* model);
 int32_t necpp_wasm_v1_far_field_snapshot_capability(
   const necpp_wasm_v1_model* model);
