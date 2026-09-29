@@ -444,12 +444,10 @@ jobs:
           (cd release && sha256sum --check SHA256SUMS)
       - name: Publish the exact tested tarball
         shell: bash
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           tarball="$(find "$PWD/release" -maxdepth 1 -name '*.tgz' -print -quit)"
           test -n "$tarball"
-          npm publish "$tarball" --access public --provenance
+          npm publish "$tarball" --access public
       - name: Attach tarball and checksums to the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
