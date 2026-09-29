@@ -447,7 +447,7 @@ jobs:
         run: |
           tarball="$(find "$PWD/release" -maxdepth 1 -name '*.tgz' -print -quit)"
           test -n "$tarball"
-          npm publish "$tarball" --access public
+          npm publish "$tarball" --access public --provenance
       - name: Attach tarball and checksums to the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
