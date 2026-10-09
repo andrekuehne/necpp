@@ -1,0 +1,10 @@
+NECPP_PROBE stage=antenna_env ms=0.023 n=704 heap=21037056 used=12149416
+NECPP_PROBE stage=fill ms=165.051 n=704 heap=21037056 used=12149416
+NECPP_PROBE stage=factor ms=280.976 n=704 heap=21037056 used=12149416
+NECPP_PROBE stage=admittance_solves ms=203.659 n=64 heap=21037056 used=15500600
+NECPP_PROBE stage=admittance_restore ms=0.239 n=0 heap=21037056 used=15495296
+NECPP_PROBE stage=impedance_invert ms=39.364 n=64 heap=21037056 used=15560840
+NECPP_PROBE stage=embedded_uc_solves ms=196.927 n=64 heap=25296896 used=18849216
+NECPP_PROBE stage=embedded_uc_fields ms=7888.514 n=1368 heap=25296896 used=18849216
+NECPP_PROBE stage=embedded_uc_solves ms=200.295 n=64 heap=99221504 used=92409336
+NECPP_PROBE stage=embedded_uc_fields ms=189638.525 n=34038 heap=99221504 used=92409336

@@ -1,0 +1,103 @@
+total sampled ms=48263
+  20961.8 ms  43.4%  Eigen::internal::general_matrix_vector_product<long, std::__2::complex<double>, Eigen::internal::const_blas_data_mapper<std::__2::complex<double>, long, 0>, 0, false, std::__2::co
+  15626.8 ms  32.4%  Eigen::internal::gebp_kernel<std::__2::complex<double>, std::__2::complex<double>, long, Eigen::internal::blas_data_mapper<std::__2::complex<double>, long, 0, 0, 1>, 1, 4, false, 
+   2877.5 ms   6.0%  Eigen::JacobiSVD<Eigen::Matrix<std::__2::complex<double>, -1, -1, 0, -1, -1>, 0>& Eigen::JacobiSVD<Eigen::Matrix<std::__2::complex<double>, -1, -1, 0, -1, -1>, 0>::compute_impl<Ei
+   1094.8 ms   2.3%  nec_context::structure_segment_loading() [wasm]
+   1041.4 ms   2.2%  Eigen::internal::apply_rotation_in_the_plane_selector<std::__2::complex<double>, std::__2::complex<double>, -1, 0, false>::run(std::__2::complex<double>*, long, std::__2::complex<
+    727.2 ms   1.5%  nec_context::efld_compute(double, double, double, double, double, bool, std::__2::complex<double>*) [wasm]
+    648.3 ms   1.3%  Eigen::internal::triangular_solver_selector<Eigen::Map<Eigen::Matrix<std::__2::complex<double>, -1, -1, 0, -1, -1>, 0, Eigen::OuterStride<-1>>, Eigen::Map<Eigen::Matrix<std::__2::
+    321.4 ms   0.7%  __rem_pio2 [wasm]
+    315.0 ms   0.7%  wasm-to-js [wasm]
+    296.6 ms   0.6%  nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&) [wasm]
+    240.7 ms   0.5%  Eigen::internal::partial_lu_impl<std::__2::complex<double>, 0, int, -1>::blocked_lu(long, long, std::__2::complex<double>*, long, int*, int&, long) [wasm]
+    237.3 ms   0.5%  __sin [wasm]
+    235.0 ms   0.5%  lu_decompose(nec_output_file&, long long, safe_array<std::__2::complex<double>>&, safe_array<int>&, long long) [wasm]
+    229.6 ms   0.5%  Eigen::internal::triangular_solver_selector<Eigen::Map<Eigen::Matrix<std::__2::complex<double>, -1, -1, 0, -1, -1>, 0, Eigen::OuterStride<-1>>, Eigen::Map<Eigen::Matrix<std::__2::
+    229.4 ms   0.5%  nec_context::efld(double, double, double, double, bool) [wasm]
+    192.6 ms   0.4%  __divdc3 [wasm]
+    172.4 ms   0.4%  c_geometry::tbf(int, int) [wasm]
+    154.7 ms   0.3%  fmt_fp [wasm]
+    138.0 ms   0.3%  hypot [wasm]
+    133.1 ms   0.3%  __cos [wasm]
+    127.1 ms   0.3%  sin [wasm]
+     99.2 ms   0.2%  c_geometry::get_current_coefficients(double, safe_array<std::__2::complex<double>>&, safe_array<double>&, safe_array<double>&, safe_array<double>&, safe_array<double>&, safe_array
+     93.8 ms   0.2%  std::__2::basic_streambuf<char, std::__2::char_traits<char>>::xsputn(char const*, long) [wasm]
+     85.6 ms   0.2%  printf_core [wasm]
+     83.5 ms   0.2%  cos [wasm]
+     76.7 ms   0.2%  invoke_viddddi nec2pp.generated.js
+     76.4 ms   0.2%  __vfprintf_internal [wasm]
+     61.8 ms   0.1%  Eigen::internal::gemm_pack_lhs<std::__2::complex<double>, long, Eigen::internal::const_blas_data_mapper<std::__2::complex<double>, long, 0>, 1, 1, std::__2::complex<double>, 0, fa
+     61.1 ms   0.1%  std::__2::ostreambuf_iterator<char, std::__2::char_traits<char>> std::__2::__pad_and_output[abi:ne190106]<char, std::__2::char_traits<char>>(std::__2::ostreambuf_iterator<char, st
+     60.5 ms   0.1%  log [wasm]
+     58.6 ms   0.1%  sq [wasm]
+     54.8 ms   0.1%  (garbage collector) 
+     54.0 ms   0.1%  c_geometry::geometry_complete(nec_context*, int) [wasm]
+     50.8 ms   0.1%  Eigen::internal::triangular_solve_matrix<std::__2::complex<double>, long, 1, 5, false, 0, 0, 1>::run(long, long, std::__2::complex<double> const*, long, std::__2::complex<double>*
+     50.3 ms   0.1%  Eigen::internal::gebp_kernel<std::__2::complex<double>, std::__2::complex<double>, long, Eigen::internal::blas_data_mapper<std::__2::complex<double>, long, 0, 0, 1>, 1, 4, true, f
+     49.0 ms   0.1%  invoke_iii nec2pp.generated.js
+     48.8 ms   0.1%  nec_context::intx(double, double, double, int, double*, double*) [wasm]
+     41.7 ms   0.1%  std::__2::num_put<char, std::__2::ostreambuf_iterator<char, std::__2::char_traits<char>>>::do_put(std::__2::ostreambuf_iterator<char, std::__2::char_traits<char>>, std::__2::ios_b
+     39.9 ms   0.1%  emscripten_stack_get_current [wasm]
+     39.6 ms   0.1%  std::__2::__num_put<char>::__widen_and_group_float(char*, char*, char*, char*, char*&, char*&, std::__2::locale const&) [wasm]
+
+inclusive (selected):
+  48263.4 ms 100.0%  (root) 
+  48113.5 ms  99.7%  (anon) model.js
+  48113.5 ms  99.7%  js-to-wasm 
+  48109.0 ms  99.7%  wasm-to-js [wasm]
+  48108.9 ms  99.7%  #invokeStatus model.js
+  48061.8 ms  99.6%  (anon) full-nec-audit-case.mjs
+  48058.4 ms  99.6%  runCase full-nec-audit-case.mjs
+  48058.4 ms  99.6%  timed full-nec-audit-case.mjs
+  24093.4 ms  49.9%  invoke_viiii nec2pp.generated.js
+  24091.7 ms  49.9%  nec_stateful_model::execute_voltage_solve(std::__2::vector<std::__2::complex<double>, std::__2::allocator<std::__2::complex<double>>> const&, std::__2::vector<std::__2::complex<do
+  24081.7 ms  49.9%  nec_context::excitation_process_inner(int) [wasm]
+  21961.0 ms  45.5%  invoke_viii nec2pp.generated.js
+  21959.9 ms  45.5%  invoke_viiijjjjjji nec2pp.generated.js
+  21956.5 ms  45.5%  solves(safe_array<std::__2::complex<double>>&, safe_array<int>&, safe_array<std::__2::complex<double>>&, long long, long long, long long, long long, long long, long long, long lon
+  21954.3 ms  45.5%  solve(long long, safe_array<std::__2::complex<double>>&, safe_array<int>&, safe_array<std::__2::complex<double>>&, long long) [wasm]
+  21954.3 ms  45.5%  invoke_vjiiij nec2pp.generated.js
+  20961.8 ms  43.4%  Eigen::internal::general_matrix_vector_product<long, std::__2::complex<double>, Eigen::internal::const_blas_data_mapper<std::__2::complex<double>, long, 0>, 0, false, std::__2::co
+  19240.2 ms  39.9%  necpp_wasm_v1_prepare [wasm]
+  19240.2 ms  39.9%  prepare model.js
+  19240.2 ms  39.9%  prepare full-nec-audit-case.mjs
+  19240.0 ms  39.9%  invoke_vi nec2pp.generated.js
+  19234.3 ms  39.9%  nec_context::structure_segment_loading() [wasm]
+  16686.3 ms  34.6%  invoke_iiii nec2pp.generated.js
+  16574.3 ms  34.3%  computeEmbeddedFarFields model.js
+  16574.3 ms  34.3%  computeEmbeddedFarFields full-nec-audit-case.mjs
+  16573.1 ms  34.3%  necpp_wasm_v1_compute_embedded_far_fields [wasm]
+  16572.0 ms  34.3%  nec_stateful_model::compute_embedded_far_fields(nec_far_field_grid const&, nec_embedded_field_normalization) [wasm]
+  16437.3 ms  34.1%  lu_decompose(nec_output_file&, long long, safe_array<std::__2::complex<double>>&, safe_array<int>&, long long) [wasm]
+  16088.8 ms  33.3%  Eigen::internal::partial_lu_impl<std::__2::complex<double>, 0, int, -1>::blocked_lu(long, long, std::__2::complex<double>*, long, int*, int&, long) [wasm]
+  16088.8 ms  33.3%  invoke_iiiiiiii nec2pp.generated.js
+  15626.8 ms  32.4%  Eigen::internal::gebp_kernel<std::__2::complex<double>, std::__2::complex<double>, long, Eigen::internal::blas_data_mapper<std::__2::complex<double>, long, 0, 0, 1>, 1, 4, false, 
+  14516.0 ms  30.1%  invoke_viiiiiiiiiddi nec2pp.generated.js
+  14463.4 ms  30.0%  Eigen::internal::general_matrix_matrix_product<long, std::__2::complex<double>, 0, false, std::__2::complex<double>, 0, false, 0, 1>::run(long, long, long, std::__2::complex<doubl
+  11779.2 ms  24.4%  invoke_ii nec2pp.generated.js
+  11722.4 ms  24.3%  computeImpedanceMatrix model.js
+  11722.4 ms  24.3%  computeImpedanceMatrix full-nec-audit-case.mjs
+  11722.3 ms  24.3%  (anonymous namespace)::ensure_impedance(necpp_wasm_v1_model*) [wasm]
+  11720.6 ms  24.3%  necpp_wasm_v1_compute_impedance [wasm]
+  11391.1 ms  23.6%  Eigen::internal::triangular_solver_selector<Eigen::Map<Eigen::Matrix<std::__2::complex<double>, -1, -1, 0, -1, -1>, 0, Eigen::OuterStride<-1>>, Eigen::Map<Eigen::Matrix<std::__2::
+  10533.9 ms  21.8%  Eigen::internal::triangular_solver_selector<Eigen::Map<Eigen::Matrix<std::__2::complex<double>, -1, -1, 0, -1, -1>, 0, Eigen::OuterStride<-1>>, Eigen::Map<Eigen::Matrix<std::__2::
+   8427.9 ms  17.5%  invoke_viiiii nec2pp.generated.js
+   7901.8 ms  16.4%  nec_stateful_model::run_unit_current_basis_loop(nec_current_distribution*, nec_embedded_far_field_result*, nec_far_field_grid const*, char const*) [wasm]
+   7763.1 ms  16.1%  nec_stateful_model::apply_unit_current_basis(unsigned long, nec_complex_matrix const&, std::__2::vector<std::__2::complex<double>, std::__2::allocator<std::__2::complex<double>>>&
+   7649.9 ms  15.9%  nec_stateful_model::compute_admittance_matrix() [wasm]
+   4707.9 ms   9.8%  invoke_iii nec2pp.generated.js
+   4067.8 ms   8.4%  nec_stateful_model::compute_impedance_matrix() [wasm]
+   3977.8 ms   8.2%  Eigen::JacobiSVD<Eigen::Matrix<std::__2::complex<double>, -1, -1, 0, -1, -1>, 0>& Eigen::JacobiSVD<Eigen::Matrix<std::__2::complex<double>, -1, -1, 0, -1, -1>, 0>::compute_impl<Ei
+   1674.0 ms   3.5%  invoke_vii nec2pp.generated.js
+   1657.5 ms   3.4%  nec_antenna_input::write_to_file(std::__2::basic_ostream<char, std::__2::char_traits<char>>&) [wasm]
+   1656.2 ms   3.4%  invoke_viddddi nec2pp.generated.js
+   1584.2 ms   3.3%  invoke_viiiiiii nec2pp.generated.js
+   1569.0 ms   3.3%  nec_context::efld(double, double, double, double, bool) [wasm]
+   1339.6 ms   2.8%  nec_context::efld_compute(double, double, double, double, double, bool, std::__2::complex<double>*) [wasm]
+   1292.6 ms   2.7%  Eigen::internal::triangular_solve_matrix<std::__2::complex<double>, long, 1, 5, false, 0, 0, 1>::run(long, long, std::__2::complex<double> const*, long, std::__2::complex<double>*
+   1191.9 ms   2.5%  invoke_iid nec2pp.generated.js
+   1166.3 ms   2.4%  std::__2::basic_ostream<char, std::__2::char_traits<char>>::operator<<(double) [wasm]
+   1041.4 ms   2.2%  Eigen::internal::apply_rotation_in_the_plane_selector<std::__2::complex<double>, std::__2::complex<double>, -1, 0, false>::run(std::__2::complex<double>*, long, std::__2::complex<
+    993.1 ms   2.1%  invoke_iiiiid nec2pp.generated.js
+    976.3 ms   2.0%  std::__2::num_put<char, std::__2::ostreambuf_iterator<char, std::__2::char_traits<char>>>::put[abi:ne190106](std::__2::ostreambuf_iterator<char, std::__2::char_traits<char>>, std:
+    944.6 ms   2.0%  std::__2::num_put<char, std::__2::ostreambuf_iterator<char, std::__2::char_traits<char>>>::do_put(std::__2::ostreambuf_iterator<char, std::__2::char_traits<char>>, std::__2::ios_b

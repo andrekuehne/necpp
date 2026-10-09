@@ -1,0 +1,138 @@
+clean dipole sunflower n=64 perfect N=704 P=64 backend=solver workers=auto rep=explicit
+  create    168.8  prepare    514.2  Z    216.2  solve(med)      4.2  currents      9.0  dispose      3.9  peakRSS 623 MiB
+  field 19x72    exact r0    143.0 ms [worker-pool w=2 kernel=68 warm=55 snap=0.8+1.9]
+  field 19x72    exact r1     61.4 ms [worker-pool w=2 kernel=59 warm=55 snap=0.1+0.0]
+  field 19x72    ring  r0     71.1 ms [worker-pool w=2 kernel=63 warm=55 snap=0.2+0.0] exec=mixed dirs=1215 fb=no-sample-reduction relErr=9.12e-16
+  field 19x72    ring  r1     74.2 ms [worker-pool w=2 kernel=69 warm=55 snap=0.2+0.0] exec=mixed dirs=1215 fb=no-sample-reduction relErr=9.12e-16
+  field 91x181   exact r0    717.7 ms [worker-pool w=2 kernel=703 warm=55 snap=0.2+0.0]
+  field 91x181   exact r1    593.6 ms [worker-pool w=2 kernel=580 warm=55 snap=0.2+0.0]
+  field 91x181   ring  r0    285.9 ms [worker-pool w=2 kernel=262 warm=55 snap=0.1+0.0] exec=ring dirs=6135 relErr=1.24e-15
+  field 91x181   ring  r1    234.7 ms [worker-pool w=2 kernel=220 warm=55 snap=0.2+0.0] exec=ring dirs=6135 relErr=1.24e-15
+  field 93x366   exact r0   1228.8 ms [worker-pool w=2 kernel=1207 warm=55 snap=0.2+0.0]
+  field 93x366   exact r1   1217.4 ms [worker-pool w=2 kernel=1193 warm=55 snap=0.1+0.0]
+  field 93x366   ring  r0    282.0 ms [worker-pool w=2 kernel=260 warm=55 snap=0.2+0.0] exec=ring dirs=6273 relErr=1.69e-15
+  field 93x366   ring  r1    375.5 ms [worker-pool w=2 kernel=351 warm=55 snap=0.2+0.0] exec=ring dirs=6273 relErr=1.69e-15
+  field 181x360  exact r0   2592.5 ms [worker-pool w=2 kernel=2545 warm=55 snap=0.2+0.0]
+  field 181x360  exact r1   2686.4 ms [worker-pool w=2 kernel=2624 warm=55 snap=0.1+0.0]
+  field 181x360  ring  r0    693.0 ms [worker-pool w=2 kernel=629 warm=55 snap=0.1+0.0] exec=ring dirs=12167 relErr=1.43e-15
+  field 181x360  ring  r1    466.6 ms [worker-pool w=2 kernel=431 warm=55 snap=0.2+0.0] exec=ring dirs=12167 relErr=1.43e-15
+  embedded 1x1      unit-current     10.1 ms
+  embedded 1x1      unit-voltage      5.2 ms
+  embedded 19x72    unit-current   7632.2 ms
+  embedded 19x72    unit-voltage   7201.0 ms
+  embedded 93x366   unit-current 181765.3 ms
+  embedded 93x366   unit-voltage 190736.9 ms
+clean dipole sunflower n=128 perfect N=1408 P=128 backend=solver workers=auto rep=explicit
+  create    192.2  prepare   2863.7  Z   1413.2  solve(med)      8.9  currents     12.4  dispose      4.1  peakRSS 222 MiB
+  field 19x72    exact r0    334.5 ms [worker-pool w=2 kernel=265 warm=58 snap=0.5+3.1]
+  field 19x72    exact r1    163.3 ms [worker-pool w=2 kernel=160 warm=58 snap=0.2+0.0]
+  field 19x72    ring  r0    150.3 ms [worker-pool w=2 kernel=144 warm=58 snap=0.2+0.0] exec=mixed dirs=1269 fb=no-sample-reduction relErr=1.31e-15
+  field 19x72    ring  r1    170.2 ms [worker-pool w=2 kernel=164 warm=58 snap=0.2+0.0] exec=mixed dirs=1269 fb=no-sample-reduction relErr=1.31e-15
+  field 91x181   exact r0   1364.1 ms [worker-pool w=2 kernel=1353 warm=58 snap=0.2+0.0]
+  field 91x181   exact r1   1197.8 ms [worker-pool w=2 kernel=1183 warm=58 snap=0.2+0.0]
+  field 91x181   ring  r0    689.9 ms [worker-pool w=2 kernel=665 warm=58 snap=0.2+0.0] exec=ring dirs=7257 relErr=1.44e-15
+  field 91x181   ring  r1    643.0 ms [worker-pool w=2 kernel=614 warm=58 snap=0.2+0.0] exec=ring dirs=7257 relErr=1.44e-15
+  field 134x529  exact r0   5561.2 ms [worker-pool w=2 kernel=5498 warm=58 snap=0.2+0.0]
+  field 134x529  exact r1   5529.0 ms [worker-pool w=2 kernel=5478 warm=58 snap=0.2+0.0]
+  field 134x529  ring  r0    840.5 ms [worker-pool w=2 kernel=803 warm=58 snap=0.2+0.0] exec=ring dirs=10680 relErr=2.22e-15
+  field 134x529  ring  r1   1155.5 ms [worker-pool w=2 kernel=1110 warm=58 snap=0.2+0.0] exec=ring dirs=10680 relErr=2.22e-15
+  field 181x360  exact r0   4768.4 ms [worker-pool w=2 kernel=4722 warm=58 snap=0.3+0.0]
+  field 181x360  exact r1   5193.0 ms [worker-pool w=2 kernel=5139 warm=58 snap=0.3+0.0]
+  field 181x360  ring  r0   1389.2 ms [worker-pool w=2 kernel=1300 warm=58 snap=0.2+0.0] exec=ring dirs=14409 relErr=1.70e-15
+  field 181x360  ring  r1   1359.0 ms [worker-pool w=2 kernel=1305 warm=58 snap=0.2+0.0] exec=ring dirs=14409 relErr=1.70e-15
+  embedded 1x1      unit-current     23.2 ms
+  embedded 1x1      unit-voltage     18.4 ms
+  embedded 19x72    unit-current  29488.9 ms
+  embedded 19x72    unit-voltage  28797.4 ms
+clean dipole sunflower n=256 perfect N=2816 P=256 backend=solver workers=auto rep=explicit
+  create    210.7  prepare  18404.5  Z  11176.6  solve(med)     31.5  currents     22.6  dispose      3.5  peakRSS 348 MiB
+  field 19x72    exact r0    545.7 ms [worker-pool w=2 kernel=473 warm=55 snap=0.7+6.2]
+  field 19x72    exact r1    226.5 ms [worker-pool w=2 kernel=223 warm=55 snap=0.2+0.0]
+  field 19x72    ring  r0    218.8 ms [worker-pool w=2 kernel=212 warm=55 snap=0.2+0.0] exec=mixed dirs=1303 fb=no-sample-reduction relErr=1.25e-15
+  field 19x72    ring  r1    282.2 ms [worker-pool w=2 kernel=275 warm=55 snap=0.5+0.0] exec=mixed dirs=1303 fb=no-sample-reduction relErr=1.25e-15
+  field 91x181   exact r0   2868.2 ms [worker-pool w=2 kernel=2855 warm=55 snap=0.4+0.0]
+  field 91x181   exact r1   2639.9 ms [worker-pool w=2 kernel=2623 warm=55 snap=0.2+0.0]
+  field 91x181   ring  r0   1405.2 ms [worker-pool w=2 kernel=1377 warm=55 snap=0.4+0.0] exec=ring dirs=8699 relErr=2.10e-15
+  field 91x181   ring  r1   1490.3 ms [worker-pool w=2 kernel=1453 warm=55 snap=0.3+0.0] exec=ring dirs=8699 relErr=2.10e-15
+  field 187x742  exact r0  22692.8 ms [worker-pool w=2 kernel=22568 warm=55 snap=0.3+0.0]
+  field 187x742  exact r1  20123.4 ms [worker-pool w=2 kernel=20000 warm=55 snap=0.6+0.0]
+  field 187x742  ring  r0   2597.2 ms [worker-pool w=2 kernel=2530 warm=55 snap=0.3+0.0] exec=ring dirs=17857 relErr=2.42e-15
+  field 187x742  ring  r1   2881.4 ms [worker-pool w=2 kernel=2816 warm=55 snap=0.2+0.0] exec=ring dirs=17857 relErr=2.42e-15
+  field 181x360  exact r0  10067.8 ms [worker-pool w=2 kernel=10010 warm=55 snap=0.2+0.0]
+  field 181x360  exact r1   9350.3 ms [worker-pool w=2 kernel=9305 warm=55 snap=0.3+0.0]
+  field 181x360  ring  r0   2691.9 ms [worker-pool w=2 kernel=2639 warm=55 snap=0.4+0.0] exec=ring dirs=17291 relErr=2.29e-15
+  field 181x360  ring  r1   3027.7 ms [worker-pool w=2 kernel=2973 warm=55 snap=0.2+0.0] exec=ring dirs=17291 relErr=2.29e-15
+  embedded 1x1      unit-current   8591.8 ms
+  embedded 1x1      unit-voltage   8401.9 ms
+  embedded 19x72    unit-current 128016.5 ms
+  embedded 19x72    unit-voltage 124960.2 ms
+clean crossed sunflower n=136 perfect N=2992 P=272 backend=solver workers=auto rep=explicit
+  create    192.8  prepare  21331.8  Z  13162.7  solve(med)     37.7  currents     28.5  dispose      3.4  peakRSS 361 MiB
+  field 19x72    exact r0    642.2 ms [worker-pool w=2 kernel=574 warm=52 snap=0.7+5.2]
+  field 19x72    exact r1    256.0 ms [worker-pool w=2 kernel=253 warm=52 snap=0.3+0.0]
+  field 19x72    ring  r0    204.7 ms [worker-pool w=2 kernel=198 warm=52 snap=0.2+0.0] exec=mixed dirs=1272 fb=no-sample-reduction relErr=1.17e-15
+  field 19x72    ring  r1    254.2 ms [worker-pool w=2 kernel=245 warm=52 snap=0.3+0.0] exec=mixed dirs=1272 fb=no-sample-reduction relErr=1.17e-15
+  field 135x535  exact r0  10897.6 ms [worker-pool w=2 kernel=10827 warm=52 snap=0.3+0.0]
+  field 135x535  exact r1  11112.1 ms [worker-pool w=2 kernel=11056 warm=52 snap=0.2+0.0]
+  field 135x535  ring  r0   1741.7 ms [worker-pool w=2 kernel=1699 warm=52 snap=0.3+0.0] exec=ring dirs=10955 relErr=1.98e-15
+  field 135x535  ring  r1   1969.5 ms [worker-pool w=2 kernel=1925 warm=52 snap=0.3+0.0] exec=ring dirs=10955 relErr=1.98e-15
+  embedded 1x1      unit-current  10700.3 ms
+  embedded 1x1      unit-voltage   9827.2 ms
+  embedded 19x72    unit-current 137185.2 ms
+  embedded 19x72    unit-voltage 136032.4 ms
+clean dipole rect n=256 perfect N=2816 P=256 backend=solver workers=auto rep=explicit
+  create    198.6  prepare  19314.3  Z  11674.9  solve(med)     33.8  currents     23.3  dispose      2.4  peakRSS 334 MiB
+  field 19x72    exact r0    606.0 ms [worker-pool w=2 kernel=540 warm=49 snap=0.8+5.9]
+  field 19x72    exact r1    241.3 ms [worker-pool w=2 kernel=238 warm=49 snap=0.3+0.0]
+  field 19x72    ring  r0    230.7 ms [worker-pool w=2 kernel=224 warm=49 snap=0.3+0.0] exec=mixed dirs=1316 fb=no-sample-reduction relErr=5.48e-16
+  field 19x72    ring  r1    252.2 ms [worker-pool w=2 kernel=246 warm=49 snap=0.4+0.0] exec=mixed dirs=1316 fb=no-sample-reduction relErr=5.48e-16
+  field 159x629  exact r0  14612.9 ms [worker-pool w=2 kernel=14509 warm=49 snap=0.2+0.0]
+  field 159x629  exact r1  14107.6 ms [worker-pool w=2 kernel=14026 warm=49 snap=0.3+0.0]
+  field 159x629  ring  r0   2587.3 ms [worker-pool w=2 kernel=2532 warm=49 snap=0.3+0.0] exec=ring dirs=16555 relErr=2.33e-15
+  field 159x629  ring  r1   2688.9 ms [worker-pool w=2 kernel=2625 warm=49 snap=0.3+0.0] exec=ring dirs=16555 relErr=2.33e-15
+  embedded 1x1      unit-current   7799.7 ms
+  embedded 1x1      unit-voltage   7055.0 ms
+  embedded 19x72    unit-current 121907.0 ms
+  embedded 19x72    unit-voltage 117873.1 ms
+clean dipole sunflower n=64 free N=704 P=64 backend=solver workers=auto rep=explicit
+  create    140.7  prepare    342.1  Z    186.0  solve(med)      3.4  currents      6.9  dispose      3.3  peakRSS 152 MiB
+  field 19x72    exact r0     99.2 ms [worker-pool w=2 kernel=37 warm=53 snap=0.6+1.6]
+  field 19x72    exact r1     29.1 ms [worker-pool w=2 kernel=27 warm=53 snap=0.2+0.0]
+  field 19x72    ring  r0     30.2 ms [worker-pool w=2 kernel=25 warm=53 snap=0.1+0.0] exec=mixed dirs=1215 fb=no-sample-reduction relErr=1.24e-15
+  field 19x72    ring  r1     27.3 ms [worker-pool w=2 kernel=24 warm=53 snap=0.1+0.0] exec=mixed dirs=1215 fb=no-sample-reduction relErr=1.24e-15
+  field 93x366   exact r0    580.3 ms [worker-pool w=2 kernel=561 warm=53 snap=0.1+0.0]
+  field 93x366   exact r1    586.3 ms [worker-pool w=2 kernel=569 warm=53 snap=0.1+0.0]
+  field 93x366   ring  r0    166.9 ms [worker-pool w=2 kernel=146 warm=53 snap=0.1+0.0] exec=ring dirs=6257 relErr=2.03e-15
+  field 93x366   ring  r1    146.0 ms [worker-pool w=2 kernel=130 warm=53 snap=0.1+0.0] exec=ring dirs=6257 relErr=2.03e-15
+  embedded 1x1      unit-current      6.1 ms
+  embedded 1x1      unit-voltage      3.2 ms
+  embedded 19x72    unit-current   3483.8 ms
+  embedded 19x72    unit-voltage   3336.6 ms
+clean dipole sunflower n=256 free N=2816 P=256 backend=solver workers=auto rep=explicit
+  create    192.1  prepare  16619.2  Z  10227.3  solve(med)     32.2  currents     22.5  dispose      2.5  peakRSS 364 MiB
+  field 19x72    exact r0    292.5 ms [worker-pool w=2 kernel=222 warm=52 snap=0.7+8.6]
+  field 19x72    exact r1    118.5 ms [worker-pool w=2 kernel=115 warm=52 snap=0.3+0.0]
+  field 19x72    ring  r0    123.3 ms [worker-pool w=2 kernel=117 warm=52 snap=0.3+0.0] exec=mixed dirs=1303 fb=no-sample-reduction relErr=2.32e-15
+  field 19x72    ring  r1    115.3 ms [worker-pool w=2 kernel=110 warm=52 snap=0.2+0.0] exec=mixed dirs=1303 fb=no-sample-reduction relErr=2.32e-15
+  field 187x742  exact r0   9778.4 ms [worker-pool w=2 kernel=9673 warm=52 snap=0.3+0.0]
+  field 187x742  exact r1   9665.7 ms [worker-pool w=2 kernel=9574 warm=52 snap=0.7+0.0]
+  field 187x742  ring  r0   1341.4 ms [worker-pool w=2 kernel=1282 warm=52 snap=0.2+0.0] exec=ring dirs=17821 relErr=3.28e-15
+  field 187x742  ring  r1   1323.9 ms [worker-pool w=2 kernel=1276 warm=52 snap=0.2+0.0] exec=ring dirs=17821 relErr=3.28e-15
+  embedded 1x1      unit-current   7248.7 ms
+  embedded 1x1      unit-voltage   7074.9 ms
+  embedded 19x72    unit-current  64596.4 ms
+  embedded 19x72    unit-voltage  64659.9 ms
+clean helix sunflower n=32 perfect N=1632 P=32 backend=solver workers=auto rep=explicit
+  create    256.0  prepare   4165.4  Z    313.5  solve(med)      9.3  currents     15.4  dispose      5.9  peakRSS 178 MiB
+  field 19x72    exact r0    429.0 ms [worker-pool w=2 kernel=353 warm=63 snap=0.6+2.8]
+  field 19x72    exact r1    140.1 ms [worker-pool w=2 kernel=135 warm=63 snap=0.4+0.0]
+  field 19x72    ring  r0    146.7 ms [worker-pool w=2 kernel=140 warm=63 snap=0.2+0.0] exec=mixed dirs=1183 fb=no-sample-reduction relErr=1.99e-15
+  field 19x72    ring  r1    154.7 ms [worker-pool w=2 kernel=149 warm=63 snap=0.3+0.0] exec=mixed dirs=1183 fb=no-sample-reduction relErr=1.99e-15
+  field 73x288   exact r0   1732.1 ms [worker-pool w=2 kernel=1714 warm=63 snap=0.3+0.0]
+  field 73x288   exact r1   1972.3 ms [worker-pool w=2 kernel=1955 warm=63 snap=0.2+0.0]
+  field 73x288   ring  r0    457.9 ms [worker-pool w=2 kernel=440 warm=63 snap=0.2+0.0] exec=ring dirs=4591 relErr=3.04e-15
+  field 73x288   ring  r1    408.5 ms [worker-pool w=2 kernel=395 warm=63 snap=0.2+0.0] exec=ring dirs=4591 relErr=3.04e-15
+  embedded 1x1      unit-current     10.2 ms
+  embedded 1x1      unit-voltage      5.6 ms
+  embedded 19x72    unit-current   8101.9 ms
+  embedded 19x72    unit-voltage   8605.5 ms

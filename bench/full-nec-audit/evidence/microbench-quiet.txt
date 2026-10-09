@@ -1,0 +1,92 @@
+fp32_fill_fp64_lu: rel_err_vs_double=4.808e-05 (ms=121.8)
+n=704 rhs=64 rcond=1.656e-04 file=/home/user/build/matrices/dipole64.bin
+lu_double_ms=119.9 lu_float_ms=46.9 ratio=2.56
+solve_double_single_rhs_total_ms=42.01 per_rhs_ms=0.656 solve_double_blocked_ms=25.87 per_rhs_ms=0.404 speedup=1.62
+solve_float_blocked_ms=12.67
+refine_iters=2 refine_total_ms=72.3 (per iter 36.2)
+residual_double=2.274e-14 residual_float=1.165e-05 residual_refined=4.685e-14
+rel_err_float_vs_double=5.185e-05 rel_err_refined_vs_double=3.038e-13
+mixed_total_ms=119.2 (float LU + refine) vs double_ms=119.9
+
+fp32_fill_fp64_lu: rel_err_vs_double=6.326e-05 (ms=975.0)
+n=1408 rhs=128 rcond=1.667e-04 file=/home/user/build/matrices/dipole128.bin
+lu_double_ms=938.2 lu_float_ms=357.4 ratio=2.62
+solve_double_single_rhs_total_ms=404.79 per_rhs_ms=3.162 solve_double_blocked_ms=223.15 per_rhs_ms=1.743 speedup=1.81
+solve_float_blocked_ms=94.18
+refine_iters=2 refine_total_ms=584.5 (per iter 292.2)
+residual_double=3.025e-14 residual_float=1.509e-05 residual_refined=8.886e-14
+rel_err_float_vs_double=6.534e-05 rel_err_refined_vs_double=5.225e-13
+mixed_total_ms=941.9 (float LU + refine) vs double_ms=938.2
+
+fp32_fill_fp64_lu: rel_err_vs_double=9.239e-05 (ms=6842.9)
+n=2816 rhs=256 rcond=5.158e-05 file=/home/user/build/matrices/dipole256.bin
+lu_double_ms=5813.1 lu_float_ms=2944.9 ratio=1.97
+solve_double_single_rhs_total_ms=3026.16 per_rhs_ms=11.821 solve_double_blocked_ms=1399.57 per_rhs_ms=5.467 speedup=2.16
+solve_float_blocked_ms=720.55
+refine_iters=2 refine_total_ms=4497.0 (per iter 2248.5)
+residual_double=3.864e-14 residual_float=2.063e-05 residual_refined=3.124e-13
+rel_err_float_vs_double=1.073e-04 rel_err_refined_vs_double=2.082e-12
+mixed_total_ms=7441.9 (float LU + refine) vs double_ms=5813.1
+
+p=64 jacobi_svd_ms=19.7 cond=1.315e+02 | lu_inverse_ms=0.7 1/rcond=7.672e+02 | bdc_svd_ms=3.7 cond=1.315e+02 | max|Zlu-Zsvd|/max|Z|=1.14e-14 max|Zbdc-Zsvd|/max|Z|=1.10e-14
+p=128 jacobi_svd_ms=216.5 cond=1.934e+02 | lu_inverse_ms=4.6 1/rcond=2.045e+03 | bdc_svd_ms=21.0 cond=1.934e+02 | max|Zlu-Zsvd|/max|Z|=2.49e-14 max|Zbdc-Zsvd|/max|Z|=2.88e-14
+p=256 jacobi_svd_ms=2172.2 cond=6.126e+02 | lu_inverse_ms=24.3 1/rcond=9.609e+03 | bdc_svd_ms=104.1 cond=6.126e+02 | max|Zlu-Zsvd|/max|Z|=7.25e-14 max|Zbdc-Zsvd|/max|Z|=7.28e-14
+p=272 jacobi_svd_ms=1845.0 cond=1.127e+03 | lu_inverse_ms=28.7 1/rcond=1.542e+04 | bdc_svd_ms=121.2 cond=1.127e+03 | max|Zlu-Zsvd|/max|Z|=1.44e-13 max|Zbdc-Zsvd|/max|Z|=4.39e-14
+== wasm scalar dipole64
+fp32_fill_fp64_lu: rel_err_vs_double=4.757e-05 (ms=269.6)
+n=704 rhs=64 rcond=1.656e-04 file=/home/user/build/matrices/dipole64.bin
+lu_double_ms=218.9 lu_float_ms=363.7 ratio=0.60
+solve_double_single_rhs_total_ms=76.56 per_rhs_ms=1.196 solve_double_blocked_ms=72.73 per_rhs_ms=1.136 speedup=1.05
+solve_float_blocked_ms=87.79
+refine_iters=2 refine_total_ms=248.2 (per iter 124.1)
+residual_double=4.420e-14 residual_float=1.214e-05 residual_refined=7.883e-14
+rel_err_float_vs_double=5.299e-05 rel_err_refined_vs_double=3.481e-13
+mixed_total_ms=611.9 (float LU + refine) vs double_ms=218.9
+== wasm scalar dipole128
+fp32_fill_fp64_lu: rel_err_vs_double=6.307e-05 (ms=2169.9)
+n=1408 rhs=128 rcond=1.667e-04 file=/home/user/build/matrices/dipole128.bin
+lu_double_ms=1997.4 lu_float_ms=1643.6 ratio=1.22
+solve_double_single_rhs_total_ms=613.73 per_rhs_ms=4.795 solve_double_blocked_ms=414.14 per_rhs_ms=3.235 speedup=1.48
+solve_float_blocked_ms=680.37
+refine_iters=2 refine_total_ms=1774.2 (per iter 887.1)
+residual_double=5.300e-14 residual_float=1.504e-05 residual_refined=1.058e-13
+rel_err_float_vs_double=6.411e-05 rel_err_refined_vs_double=5.314e-13
+mixed_total_ms=3417.8 (float LU + refine) vs double_ms=1997.4
+== wasm simd dipole64
+fp32_fill_fp64_lu: rel_err_vs_double=4.757e-05 (ms=424.4)
+n=704 rhs=64 rcond=1.656e-04 file=/home/user/build/matrices/dipole64.bin
+lu_double_ms=241.1 lu_float_ms=213.4 ratio=1.13
+solve_double_single_rhs_total_ms=75.04 per_rhs_ms=1.173 solve_double_blocked_ms=52.91 per_rhs_ms=0.827 speedup=1.42
+solve_float_blocked_ms=56.93
+refine_iters=2 refine_total_ms=218.4 (per iter 109.2)
+residual_double=4.420e-14 residual_float=1.214e-05 residual_refined=7.883e-14
+rel_err_float_vs_double=5.299e-05 rel_err_refined_vs_double=3.481e-13
+mixed_total_ms=431.8 (float LU + refine) vs double_ms=241.1
+== wasm simd dipole128
+fp32_fill_fp64_lu: rel_err_vs_double=6.307e-05 (ms=2511.2)
+n=1408 rhs=128 rcond=1.667e-04 file=/home/user/build/matrices/dipole128.bin
+lu_double_ms=1859.5 lu_float_ms=1530.8 ratio=1.21
+solve_double_single_rhs_total_ms=581.76 per_rhs_ms=4.545 solve_double_blocked_ms=446.36 per_rhs_ms=3.487 speedup=1.30
+solve_float_blocked_ms=475.34
+refine_iters=2 refine_total_ms=1563.7 (per iter 781.8)
+residual_double=5.300e-14 residual_float=1.504e-05 residual_refined=1.058e-13
+rel_err_float_vs_double=6.411e-05 rel_err_refined_vs_double=5.314e-13
+mixed_total_ms=3094.4 (float LU + refine) vs double_ms=1859.5
+== wasm scalar dipole256 (LU only matters)
+fp32_fill_fp64_lu: rel_err_vs_double=9.270e-05 (ms=15719.8)
+n=2816 rhs=64 rcond=5.158e-05 file=/home/user/build/matrices/dipole256.bin
+lu_double_ms=14466.6 lu_float_ms=13178.9 ratio=1.10
+solve_double_single_rhs_total_ms=1535.34 per_rhs_ms=23.990 solve_double_blocked_ms=870.13 per_rhs_ms=13.596 speedup=1.76
+solve_float_blocked_ms=963.68
+refine_iters=2 refine_total_ms=3492.5 (per iter 1746.3)
+residual_double=6.735e-14 residual_float=2.053e-05 residual_refined=3.160e-13
+rel_err_float_vs_double=1.061e-04 rel_err_refined_vs_double=2.137e-12
+mixed_total_ms=16671.4 (float LU + refine) vs double_ms=14466.6
+== wasm gemm scalar
+m=512 n=512 k=256 eigen_ms=108.8 (4.93 GF/s) split_scalar_ms=203.3 (2.64 GF/s, err 5.0e-14) split_simd_ms=-1.0 (0.00 GF/s, err 0.0e+00)
+m=1024 n=1024 k=128 eigen_ms=223.2 (4.81 GF/s) split_scalar_ms=394.8 (2.72 GF/s, err 2.9e-14) split_simd_ms=-1.0 (0.00 GF/s, err 0.0e+00)
+== wasm gemm simd
+m=512 n=512 k=256 eigen_ms=153.5 (3.50 GF/s) split_scalar_ms=112.9 (4.76 GF/s, err 5.0e-14) split_simd_ms=139.6 (3.84 GF/s, err 5.0e-14)
+m=1024 n=1024 k=128 eigen_ms=244.5 (4.39 GF/s) split_scalar_ms=236.1 (4.55 GF/s, err 2.9e-14) split_simd_ms=206.1 (5.21 GF/s, err 2.9e-14)
+== native gemm
+m=512 n=512 k=256 eigen_ms=42.7 (12.56 GF/s) split_scalar_ms=57.2 (9.39 GF/s, err 6.1e-14) split_simd_ms=-1.0 (0.00 GF/s, err 0.0e+00)

@@ -1,0 +1,4 @@
+p=64 jacobi_svd_ms=23.5 cond=1.315e+02 | lu_inverse_ms=0.8 1/rcond=7.672e+02 | bdc_svd_ms=4.3 cond=1.315e+02 | max|Zlu-Zsvd|/max|Z|=1.14e-14 max|Zbdc-Zsvd|/max|Z|=1.10e-14
+p=128 jacobi_svd_ms=233.8 cond=1.934e+02 | lu_inverse_ms=3.4 1/rcond=2.045e+03 | bdc_svd_ms=17.4 cond=1.934e+02 | max|Zlu-Zsvd|/max|Z|=2.49e-14 max|Zbdc-Zsvd|/max|Z|=2.88e-14
+p=256 jacobi_svd_ms=2260.5 cond=6.126e+02 | lu_inverse_ms=24.5 1/rcond=9.609e+03 | bdc_svd_ms=106.2 cond=6.126e+02 | max|Zlu-Zsvd|/max|Z|=7.25e-14 max|Zbdc-Zsvd|/max|Z|=7.28e-14
+p=272 jacobi_svd_ms=2004.8 cond=1.127e+03 | lu_inverse_ms=37.8 1/rcond=1.542e+04 | bdc_svd_ms=124.6 cond=1.127e+03 | max|Zlu-Zsvd|/max|Z|=1.44e-13 max|Zbdc-Zsvd|/max|Z|=4.39e-14

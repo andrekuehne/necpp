@@ -1,0 +1,27 @@
+n=704 rhs=64 rcond=1.656e-04 file=/home/user/build/matrices/dipole64.bin
+lu_double_ms=105.5 lu_float_ms=59.0 ratio=1.79
+solve_double_single_rhs_total_ms=49.46 per_rhs_ms=0.773 solve_double_blocked_ms=34.42 per_rhs_ms=0.538 speedup=1.44
+solve_float_blocked_ms=17.41
+refine_iters=2 refine_total_ms=102.9 (per iter 51.5)
+residual_double=2.274e-14 residual_float=1.165e-05 residual_refined=4.685e-14
+rel_err_float_vs_double=5.185e-05 rel_err_refined_vs_double=3.038e-13
+mixed_total_ms=162.0 (float LU + refine) vs double_ms=105.5
+
+n=1408 rhs=128 rcond=1.667e-04 file=/home/user/build/matrices/dipole128.bin
+lu_double_ms=879.8 lu_float_ms=403.2 ratio=2.18
+solve_double_single_rhs_total_ms=370.83 per_rhs_ms=2.897 solve_double_blocked_ms=235.49 per_rhs_ms=1.840 speedup=1.57
+solve_float_blocked_ms=115.36
+refine_iters=2 refine_total_ms=694.6 (per iter 347.3)
+residual_double=3.025e-14 residual_float=1.509e-05 residual_refined=8.886e-14
+rel_err_float_vs_double=6.534e-05 rel_err_refined_vs_double=5.225e-13
+mixed_total_ms=1097.8 (float LU + refine) vs double_ms=879.8
+
+n=2816 rhs=256 rcond=5.158e-05 file=/home/user/build/matrices/dipole256.bin
+lu_double_ms=6679.8 lu_float_ms=2957.3 ratio=2.26
+solve_double_single_rhs_total_ms=4010.61 per_rhs_ms=15.666 solve_double_blocked_ms=1597.83 per_rhs_ms=6.242 speedup=2.51
+solve_float_blocked_ms=841.09
+refine_iters=2 refine_total_ms=4860.9 (per iter 2430.5)
+residual_double=3.864e-14 residual_float=2.063e-05 residual_refined=3.124e-13
+rel_err_float_vs_double=1.073e-04 rel_err_refined_vs_double=2.082e-12
+mixed_total_ms=7818.2 (float LU + refine) vs double_ms=6679.8
+

@@ -1,0 +1,8 @@
+== wasm scalar
+m=512 n=512 k=256 eigen_ms=113.2 (4.74 GF/s) split_scalar_ms=197.5 (2.72 GF/s, err 5.0e-14) split_simd_ms=-1.0 (0.00 GF/s, err 0.0e+00)
+m=1024 n=1024 k=128 eigen_ms=239.0 (4.49 GF/s) split_scalar_ms=394.4 (2.72 GF/s, err 2.9e-14) split_simd_ms=-1.0 (0.00 GF/s, err 0.0e+00)
+== wasm simd
+m=512 n=512 k=256 eigen_ms=113.0 (4.75 GF/s) split_scalar_ms=132.8 (4.04 GF/s, err 5.0e-14) split_simd_ms=131.6 (4.08 GF/s, err 5.0e-14)
+m=1024 n=1024 k=128 eigen_ms=231.6 (4.64 GF/s) split_scalar_ms=233.2 (4.61 GF/s, err 2.9e-14) split_simd_ms=207.6 (5.17 GF/s, err 2.9e-14)
+== native
+m=512 n=512 k=256 eigen_ms=42.9 (12.52 GF/s) split_scalar_ms=56.5 (9.50 GF/s, err 6.1e-14) split_simd_ms=-1.0 (0.00 GF/s, err 0.0e+00)

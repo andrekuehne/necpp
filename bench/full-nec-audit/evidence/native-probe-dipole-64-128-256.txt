@@ -1,0 +1,18 @@
+NECPP_PROBE stage=fill ms=114.760 n=704 heap=0 used=352192
+NECPP_PROBE stage=factor ms=110.482 n=704 heap=0 used=352192
+NECPP_PROBE stage=admittance_solves ms=56.086 n=64 heap=0 used=3713600
+NECPP_PROBE stage=impedance_invert ms=17.089 n=64 heap=0 used=3778112
+STAGE prepare ms=244.976
+STAGE impedance ms=73.361 order=64 cond=33.2963
+NECPP_PROBE stage=fill ms=503.075 n=1408 heap=0 used=543760
+NECPP_PROBE stage=factor ms=779.188 n=1408 heap=0 used=543760
+NECPP_PROBE stage=admittance_solves ms=437.440 n=128 heap=0 used=13876912
+NECPP_PROBE stage=impedance_invert ms=172.144 n=128 heap=0 used=14130816
+STAGE prepare ms=1415.132
+STAGE impedance ms=610.054 order=128 cond=55.7939
+NECPP_PROBE stage=fill ms=2234.221 n=2816 heap=0 used=977920
+NECPP_PROBE stage=factor ms=5824.534 n=2816 heap=0 used=977920
+NECPP_PROBE stage=admittance_solves ms=4097.700 n=256 heap=0 used=2058640
+NECPP_PROBE stage=impedance_invert ms=1838.524 n=256 heap=0 used=3088720
+STAGE prepare ms=8623.444
+STAGE impedance ms=5937.604 order=256 cond=92.956

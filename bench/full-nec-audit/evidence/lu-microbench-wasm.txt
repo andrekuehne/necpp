@@ -1,0 +1,40 @@
+== scalar dipole64
+fp32_fill_fp64_lu: rel_err_vs_double=4.757e-05 (ms=302.2)
+n=704 rhs=64 rcond=1.656e-04 file=/home/user/build/matrices/dipole64.bin
+lu_double_ms=328.8 lu_float_ms=256.5 ratio=1.28
+solve_double_single_rhs_total_ms=89.84 per_rhs_ms=1.404 solve_double_blocked_ms=59.10 per_rhs_ms=0.923 speedup=1.52
+solve_float_blocked_ms=94.31
+refine_iters=2 refine_total_ms=234.3 (per iter 117.1)
+residual_double=4.420e-14 residual_float=1.214e-05 residual_refined=7.883e-14
+rel_err_float_vs_double=5.299e-05 rel_err_refined_vs_double=3.481e-13
+mixed_total_ms=490.8 (float LU + refine) vs double_ms=328.8
+== scalar dipole128
+fp32_fill_fp64_lu: rel_err_vs_double=6.307e-05 (ms=2305.9)
+n=1408 rhs=128 rcond=1.667e-04 file=/home/user/build/matrices/dipole128.bin
+lu_double_ms=1839.5 lu_float_ms=1718.1 ratio=1.07
+solve_double_single_rhs_total_ms=639.06 per_rhs_ms=4.993 solve_double_blocked_ms=458.26 per_rhs_ms=3.580 speedup=1.39
+solve_float_blocked_ms=413.24
+refine_iters=2 refine_total_ms=1880.5 (per iter 940.3)
+residual_double=5.300e-14 residual_float=1.504e-05 residual_refined=1.058e-13
+rel_err_float_vs_double=6.411e-05 rel_err_refined_vs_double=5.314e-13
+mixed_total_ms=3598.6 (float LU + refine) vs double_ms=1839.5
+== simd dipole64
+fp32_fill_fp64_lu: rel_err_vs_double=4.757e-05 (ms=329.9)
+n=704 rhs=64 rcond=1.656e-04 file=/home/user/build/matrices/dipole64.bin
+lu_double_ms=355.3 lu_float_ms=252.2 ratio=1.41
+solve_double_single_rhs_total_ms=94.09 per_rhs_ms=1.470 solve_double_blocked_ms=62.08 per_rhs_ms=0.970 speedup=1.52
+solve_float_blocked_ms=62.69
+refine_iters=2 refine_total_ms=228.7 (per iter 114.3)
+residual_double=4.420e-14 residual_float=1.214e-05 residual_refined=7.883e-14
+rel_err_float_vs_double=5.299e-05 rel_err_refined_vs_double=3.481e-13
+mixed_total_ms=480.8 (float LU + refine) vs double_ms=355.3
+== simd dipole128
+fp32_fill_fp64_lu: rel_err_vs_double=6.307e-05 (ms=2447.2)
+n=1408 rhs=128 rcond=1.667e-04 file=/home/user/build/matrices/dipole128.bin
+lu_double_ms=2212.2 lu_float_ms=2130.2 ratio=1.04
+solve_double_single_rhs_total_ms=598.86 per_rhs_ms=4.679 solve_double_blocked_ms=475.49 per_rhs_ms=3.715 speedup=1.26
+solve_float_blocked_ms=503.82
+refine_iters=2 refine_total_ms=2263.3 (per iter 1131.6)
+residual_double=5.300e-14 residual_float=1.504e-05 residual_refined=1.058e-13
+rel_err_float_vs_double=6.411e-05 rel_err_refined_vs_double=5.314e-13
+mixed_total_ms=4393.5 (float LU + refine) vs double_ms=2212.2

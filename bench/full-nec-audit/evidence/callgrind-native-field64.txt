@@ -1,0 +1,77 @@
+--------------------------------------------------------------------------------
+Ir                      
+--------------------------------------------------------------------------------
+79,217,662,195 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                       file:function
+--------------------------------------------------------------------------------
+79,217,662,195 (100.0%)  ???:0x000000000001f540 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+79,215,601,464 (100.0%)  ???:(below main) [/home/user/build/native-driver]
+79,215,601,452 (100.0%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+79,215,601,209 (100.0%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+79,215,601,145 (100.0%)  /home/user/necpp/bench/full-nec-audit/native-driver.cpp:main
+79,215,544,201 (100.0%)  bench/full-nec-audit/native-driver.cpp:main [/home/user/build/native-driver]
+75,528,873,012 (95.34%)  src/nec_stateful_model.cpp:nec_stateful_model::calculate_far_field(nec_far_field_grid const&, std::vector<std::complex<double>, std::allocator<std::complex<double> > > const&,
+75,114,280,721 (94.82%)  /home/user/necpp/src/nec_far_field.cpp:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&)
+74,126,716,867 (93.57%)  /home/user/necpp/src/necpp_wasm_v1.cpp:necpp_wasm_v1_compute_embedded_far_fields
+74,126,716,852 (93.57%)  src/necpp_wasm_v1.cpp:necpp_wasm_v1_compute_embedded_far_fields [/home/user/build/native-driver]
+74,122,862,786 (93.57%)  /home/user/necpp/src/nec_stateful_model.cpp:nec_stateful_model::compute_embedded_far_fields(nec_far_field_grid const&, nec_embedded_field_normalization)
+74,122,862,738 (93.57%)  src/nec_stateful_model.cpp:nec_stateful_model::compute_embedded_far_fields(nec_far_field_grid const&, nec_embedded_field_normalization) [/home/user/build/native-driver]
+68,399,251,459 (86.34%)  src/nec_stateful_model.cpp:nec_stateful_model::run_unit_current_basis_loop(nec_current_distribution*, nec_embedded_far_field_result*, nec_far_field_grid const*, char const*) [
+48,426,924,934 (61.13%)  src/nec_far_field.cpp:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&) [/home/user/build/native-driver]
+23,844,073,547 (30.10%)  ???:0x000000000010d7e0 [???]
+23,040,486,263 (29.09%)  ./math/../sysdeps/ieee754/dbl-64/s_sin.c:__sin_fma [/usr/lib/x86_64-linux-gnu/libm.so.6]
+19,206,237,090 (24.24%)  ???:0x000000000010d970 [???]
+18,926,731,362 (23.89%)  ./math/../sysdeps/ieee754/dbl-64/s_sincos.c:__sincos_fma [/usr/lib/x86_64-linux-gnu/libm.so.6]
+15,533,739,879 (19.61%)  src/eigen/Eigen/src/Core/CoreEvaluators.h:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&)
+11,114,125,374 (14.03%)  ./math/../sysdeps/ieee754/dbl-64/s_sin.c:__sincos_fma
+ 5,723,610,879 ( 7.23%)  src/nec_stateful_model.cpp:nec_stateful_model::compute_embedded_from_retained_basis(nec_far_field_grid const&, nec_embedded_field_normalization, nec_complex_matrix const*, nec
+ 5,275,887,310 ( 6.66%)  /usr/include/c++/13/complex:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&)
+ 4,921,457,662 ( 6.21%)  src/safe_array.h:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&)
+ 4,017,936,411 ( 5.07%)  ./math/../sysdeps/x86/fpu/fenv_private.h:__sin_fma
+ 2,340,170,755 ( 2.95%)  /home/user/necpp/src/necpp_wasm_v1.cpp:necpp_wasm_v1_prepare
+ 2,340,170,749 ( 2.95%)  src/necpp_wasm_v1.cpp:necpp_wasm_v1_prepare [/home/user/build/native-driver]
+ 2,340,170,394 ( 2.95%)  /home/user/necpp/src/nec_stateful_model.cpp:nec_stateful_model::prepare(double)
+ 2,340,170,382 ( 2.95%)  src/nec_stateful_model.cpp:nec_stateful_model::prepare(double) [/home/user/build/native-driver]
+ 2,340,170,069 ( 2.95%)  /home/user/necpp/src/nec_context.cpp:nec_context::stateful_prepare_frequency(double)
+ 2,340,169,601 ( 2.95%)  src/nec_context.cpp:nec_context::stateful_prepare_frequency(double) [/home/user/build/native-driver]
+ 2,340,126,471 ( 2.95%)  src/nec_context.cpp:nec_context::structure_segment_loading() [/home/user/build/native-driver]
+ 1,955,713,868 ( 2.47%)  /home/user/necpp/src/nec_stateful_model.cpp:nec_stateful_model::compute_far_field(nec_far_field_grid const&)
+ 1,955,713,868 ( 2.47%)  src/nec_stateful_model.cpp:nec_stateful_model::compute_far_field(nec_far_field_grid const&) [/home/user/build/native-driver]
+ 1,537,281,502 ( 1.94%)  ./math/../sysdeps/x86/fpu/fenv_private.h:__sincos_fma
+ 1,258,588,201 ( 1.59%)  /home/user/necpp/src/matrix_algebra.cpp:factrs(nec_output_file&, long, long, safe_array<std::complex<double> >&, safe_array<int>&)
+
+--------------------------------------------------------------------------------
+Ir                      
+--------------------------------------------------------------------------------
+79,217,662,195 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                       file:function
+--------------------------------------------------------------------------------
+19,022,549,852 (24.01%)  ./math/../sysdeps/ieee754/dbl-64/s_sin.c:__sin_fma [/usr/lib/x86_64-linux-gnu/libm.so.6]
+15,385,845,095 (19.42%)  src/nec_far_field.cpp:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&) [/home/user/build/native-driver]
+11,114,125,374 (14.03%)  ./math/../sysdeps/ieee754/dbl-64/s_sin.c:__sincos_fma
+ 6,275,324,486 ( 7.92%)  ./math/../sysdeps/ieee754/dbl-64/s_sincos.c:__sincos_fma [/usr/lib/x86_64-linux-gnu/libm.so.6]
+ 6,147,452,912 ( 7.76%)  src/eigen/Eigen/src/Core/CoreEvaluators.h:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&)
+ 5,275,887,310 ( 6.66%)  /usr/include/c++/13/complex:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&)
+ 4,921,457,662 ( 6.21%)  src/safe_array.h:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&)
+ 4,017,936,411 ( 5.07%)  ./math/../sysdeps/x86/fpu/fenv_private.h:__sin_fma
+ 1,537,281,502 ( 1.94%)  ./math/../sysdeps/x86/fpu/fenv_private.h:__sincos_fma
+   984,074,548 ( 1.24%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::gebp_kernel<std::complex<double>, std::complex<double>, long, Eigen::internal::blas_data_mapper<std::comp
+   956,270,936 ( 1.21%)  src/math_util.h:nec_evaluate_far_field_sample(nec_far_field_evaluation_input const&, nec_far_field_direction const&)
+   803,587,284 ( 1.01%)  ???:0x000000000010d7e0 [???]
+   685,024,080 ( 0.86%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::general_matrix_vector_product<long, std::complex<double>, Eigen::internal::const_blas_data_mapper<std::co
+   279,505,728 ( 0.35%)  ???:0x000000000010d970 [???]
+   179,206,394 ( 0.23%)  src/nec_context.cpp:nec_context::efld_compute(double, double, double, double, double, bool, std::complex<double>*) [/home/user/build/native-driver]
+   119,654,804 ( 0.15%)  /usr/include/c++/13/complex:nec_context::efld_compute(double, double, double, double, double, bool, std::complex<double>*)
+   110,291,177 ( 0.14%)  src/nec_field_evaluator_wasm.cpp:necpp_field_evaluator_v1_evaluate [/home/user/build/native-driver]
+   101,016,624 ( 0.13%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::gebp_kernel<std::complex<double>, std::complex<double>, long, Eigen::internal::blas_data_mapper<std::comp
+    90,202,112 ( 0.11%)  /usr/include/c++/13/complex:nec_context::efld(double, double, double, double, bool)
+    75,333,632 ( 0.10%)  src/nec_context.cpp:nec_context::efld(double, double, double, double, bool) [/home/user/build/native-driver]
+    68,812,012 ( 0.09%)  /usr/include/c++/13/complex:Eigen::internal::svd_precondition_2x2_block_to_be_real<Eigen::Matrix<std::complex<double>, -1, -1, 0, -1, -1>, 0, true>::run(Eigen::Matrix<std::com
+    52,636,740 ( 0.07%)  src/eigen/Eigen/src/Core/products/GeneralMatrixVector.h:Eigen::internal::general_matrix_vector_product<long, std::complex<double>, Eigen::internal::const_blas_data_mapper<std:
+    51,987,372 ( 0.07%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::svd_precondition_2x2_block_to_be_real<Eigen::Matrix<std::complex<double>, -1, -1, 0, -1, -1>, 0, true>::r
+    44,531,365 ( 0.06%)  ./math/../sysdeps/ieee754/dbl-64/e_hypot.c:hypot@@GLIBC_2.35 [/usr/lib/x86_64-linux-gnu/libm.so.6]
+    43,175,832 ( 0.05%)  ./stdio-common/./stdio-common/printf_fp.c:__printf_fp_buffer_1.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]

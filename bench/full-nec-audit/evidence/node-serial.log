@@ -1,0 +1,46 @@
+serial dipole sunflower n=64 perfect N=704 P=64 backend=solver workers=1 rep=explicit
+  create    140.3  prepare    542.2  Z    212.8  solve(med)      3.8  currents      7.9  dispose      2.6  peakRSS 596 MiB
+  field 19x72    exact r0    105.9 ms [serial w=1 kernel=102 warm=0 snap=0.0+0.0]
+  field 19x72    exact r1    116.6 ms [serial w=1 kernel=116 warm=0 snap=0.0+0.0]
+  field 19x72    ring  r0     88.0 ms [serial w=1 kernel=87 warm=0 snap=0.0+0.0] exec=mixed dirs=1215 fb=no-sample-reduction relErr=1.27e-11
+  field 19x72    ring  r1     84.9 ms [serial w=1 kernel=84 warm=0 snap=0.0+0.0] exec=mixed dirs=1215 fb=no-sample-reduction relErr=1.27e-11
+  field 91x181   exact r0   1369.7 ms [serial w=1 kernel=1368 warm=0 snap=0.0+0.0]
+  field 91x181   exact r1   1387.6 ms [serial w=1 kernel=1386 warm=0 snap=0.0+0.0]
+  field 91x181   ring  r0    420.0 ms [serial w=1 kernel=419 warm=0 snap=0.0+0.0] exec=ring dirs=6135 relErr=1.29e-11
+  field 91x181   ring  r1    463.1 ms [serial w=1 kernel=462 warm=0 snap=0.0+0.0] exec=ring dirs=6135 relErr=1.29e-11
+  field 93x366   exact r0   2854.7 ms [serial w=1 kernel=2852 warm=0 snap=0.0+0.0]
+  field 93x366   exact r1   2708.3 ms [serial w=1 kernel=2707 warm=0 snap=0.0+0.0]
+  field 93x366   ring  r0    431.1 ms [serial w=1 kernel=429 warm=0 snap=0.0+0.0] exec=ring dirs=6273 relErr=1.35e-11
+  field 93x366   ring  r1    451.9 ms [serial w=1 kernel=450 warm=0 snap=0.0+0.0] exec=ring dirs=6273 relErr=1.35e-11
+  field 181x360  exact r0   5409.1 ms [serial w=1 kernel=5407 warm=0 snap=0.0+0.0]
+  field 181x360  exact r1   5538.8 ms [serial w=1 kernel=5536 warm=0 snap=0.0+0.0]
+  field 181x360  ring  r0    872.4 ms [serial w=1 kernel=870 warm=0 snap=0.0+0.0] exec=ring dirs=12167 relErr=1.34e-11
+  field 181x360  ring  r1   1093.1 ms [serial w=1 kernel=1091 warm=0 snap=0.0+0.0] exec=ring dirs=12167 relErr=1.34e-11
+  embedded 1x1      unit-current      6.9 ms
+  embedded 1x1      unit-voltage      6.1 ms
+  embedded 19x72    unit-current   8174.1 ms
+  embedded 19x72    unit-voltage   7769.8 ms
+  embedded 93x366   unit-current 179869.9 ms
+  embedded 93x366   unit-voltage 171408.1 ms
+serial dipole sunflower n=256 perfect N=2816 P=256 backend=solver workers=1 rep=explicit
+  create    190.9  prepare  19079.8  Z  11954.7  solve(med)     35.6  currents     25.5  dispose      2.0  peakRSS 322 MiB
+  field 19x72    exact r0    461.6 ms [serial w=1 kernel=458 warm=0 snap=0.0+0.0]
+  field 19x72    exact r1    448.0 ms [serial w=1 kernel=447 warm=0 snap=0.0+0.0]
+  field 19x72    ring  r0    431.0 ms [serial w=1 kernel=430 warm=0 snap=0.0+0.0] exec=mixed dirs=1303 fb=no-sample-reduction relErr=9.90e-12
+  field 19x72    ring  r1    443.8 ms [serial w=1 kernel=443 warm=0 snap=0.0+0.0] exec=mixed dirs=1303 fb=no-sample-reduction relErr=9.90e-12
+  field 91x181   exact r0   5616.8 ms [serial w=1 kernel=5615 warm=0 snap=0.0+0.0]
+  field 91x181   exact r1   5408.6 ms [serial w=1 kernel=5407 warm=0 snap=0.0+0.0]
+  field 91x181   ring  r0   2357.2 ms [serial w=1 kernel=2356 warm=0 snap=0.0+0.0] exec=ring dirs=8699 relErr=1.89e-11
+  field 91x181   ring  r1   2631.4 ms [serial w=1 kernel=2630 warm=0 snap=0.0+0.0] exec=ring dirs=8699 relErr=1.89e-11
+  field 187x742  exact r0  45908.9 ms [serial w=1 kernel=45904 warm=0 snap=0.0+0.0]
+  field 187x742  exact r1  46112.0 ms [serial w=1 kernel=46108 warm=0 snap=0.0+0.0]
+  field 187x742  ring  r0   5133.6 ms [serial w=1 kernel=5129 warm=0 snap=0.0+0.0] exec=ring dirs=17857 relErr=1.88e-11
+  field 187x742  ring  r1   5457.4 ms [serial w=1 kernel=5452 warm=0 snap=0.0+0.0] exec=ring dirs=17857 relErr=1.88e-11
+  field 181x360  exact r0  21500.8 ms [serial w=1 kernel=21499 warm=0 snap=0.0+0.0]
+  field 181x360  exact r1  22198.7 ms [serial w=1 kernel=22197 warm=0 snap=0.0+0.0]
+  field 181x360  ring  r0   5062.0 ms [serial w=1 kernel=5060 warm=0 snap=0.0+0.0] exec=ring dirs=17291 relErr=1.88e-11
+  field 181x360  ring  r1   5068.2 ms [serial w=1 kernel=5066 warm=0 snap=0.0+0.0] exec=ring dirs=17291 relErr=1.88e-11
+  embedded 1x1      unit-current   9093.1 ms
+  embedded 1x1      unit-voltage   7931.7 ms
+  embedded 19x72    unit-current 126727.8 ms
+  embedded 19x72    unit-voltage 128893.7 ms

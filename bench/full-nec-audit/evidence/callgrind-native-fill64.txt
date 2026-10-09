@@ -1,0 +1,97 @@
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+3,135,977,493 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+3,135,977,493 (100.0%)  ???:0x000000000001f540 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+3,133,912,365 (99.93%)  ???:(below main) [/home/user/build/native-driver]
+3,133,912,353 (99.93%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+3,133,912,110 (99.93%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+3,133,901,103 (99.93%)  /home/user/necpp/bench/full-nec-audit/native-driver.cpp:main
+3,133,851,041 (99.93%)  bench/full-nec-audit/native-driver.cpp:main [/home/user/build/native-driver]
+2,340,172,049 (74.62%)  /home/user/necpp/src/necpp_wasm_v1.cpp:necpp_wasm_v1_prepare
+2,340,172,043 (74.62%)  src/necpp_wasm_v1.cpp:necpp_wasm_v1_prepare [/home/user/build/native-driver]
+2,340,171,688 (74.62%)  /home/user/necpp/src/nec_stateful_model.cpp:nec_stateful_model::prepare(double)
+2,340,171,676 (74.62%)  src/nec_stateful_model.cpp:nec_stateful_model::prepare(double) [/home/user/build/native-driver]
+2,340,171,363 (74.62%)  /home/user/necpp/src/nec_context.cpp:nec_context::stateful_prepare_frequency(double)
+2,340,170,895 (74.62%)  src/nec_context.cpp:nec_context::stateful_prepare_frequency(double) [/home/user/build/native-driver]
+2,340,127,757 (74.62%)  src/nec_context.cpp:nec_context::structure_segment_loading() [/home/user/build/native-driver]
+1,258,588,201 (40.13%)  /home/user/necpp/src/matrix_algebra.cpp:factrs(nec_output_file&, long, long, safe_array<std::complex<double> >&, safe_array<int>&)
+1,258,588,201 (40.13%)  src/matrix_algebra.cpp:factrs(nec_output_file&, long, long, safe_array<std::complex<double> >&, safe_array<int>&) [/home/user/build/native-driver]
+1,258,588,168 (40.13%)  src/matrix_algebra.cpp:lu_decompose(nec_output_file&, long, safe_array<std::complex<double> >&, safe_array<int>&, long) [/home/user/build/native-driver]
+1,255,606,019 (40.04%)  src/eigen/Eigen/src/LU/PartialPivLU.h:lu_decompose(nec_output_file&, long, safe_array<std::complex<double> >&, safe_array<int>&, long)
+1,255,606,014 (40.04%)  src/eigen/Eigen/src/LU/PartialPivLU.h:Eigen::PartialPivLU<Eigen::Map<Eigen::Matrix<std::complex<double>, -1, -1, 0, -1, -1>, 0, Eigen::OuterStride<-1> >, int>::compute() [/home
+1,223,031,422 (39.00%)  src/eigen/Eigen/src/LU/PartialPivLU.h:Eigen::internal::partial_lu_impl<std::complex<double>, 0, int, -1>::blocked_lu(long, long, std::complex<double>*, long, int*, int&, long) 
+1,081,522,011 (34.49%)  src/nec_context.cpp:nec_context::cmset(long, safe_array<std::complex<double> >&, double) [/home/user/build/native-driver]
+1,076,629,650 (34.33%)  src/nec_context.cpp:nec_context::cmww(int, int, int, safe_array<std::complex<double> >&, long, safe_array<std::complex<double> >&, long, int) [/home/user/build/native-driver]
+1,023,507,749 (32.64%)  src/eigen/Eigen/src/Core/products/GeneralMatrixMatrix.h:Eigen::internal::general_matrix_matrix_product<long, std::complex<double>, 0, false, std::complex<double>, 0, false, 0, 
+1,016,151,854 (32.40%)  /home/user/necpp/src/eigen/Eigen/src/Core/products/GeneralBlockPanelKernel.h:Eigen::internal::gebp_kernel<std::complex<double>, std::complex<double>, long, Eigen::internal::bla
+  984,074,548 (31.38%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::gebp_kernel<std::complex<double>, std::complex<double>, long, Eigen::internal::blas_data_mapper<std::compl
+  971,360,530 (30.97%)  src/nec_context.cpp:nec_context::efld(double, double, double, double, bool) [/home/user/build/native-driver]
+  910,246,072 (29.03%)  src/eigen/Eigen/src/Core/products/GeneralMatrixMatrix.h:Eigen::internal::partial_lu_impl<std::complex<double>, 0, int, -1>::blocked_lu(long, long, std::complex<double>*, long, 
+  804,337,938 (25.65%)  src/nec_context.cpp:nec_context::efld_compute(double, double, double, double, double, bool, std::complex<double>*) [/home/user/build/native-driver]
+  747,351,020 (23.83%)  src/necpp_wasm_v1.cpp:(anonymous namespace)::ensure_impedance(necpp_wasm_v1_model*) [/home/user/build/native-driver]
+  747,176,875 (23.83%)  /home/user/necpp/src/necpp_wasm_v1.cpp:necpp_wasm_v1_compute_impedance
+  747,176,875 (23.83%)  src/necpp_wasm_v1.cpp:necpp_wasm_v1_compute_impedance [/home/user/build/native-driver]
+  521,354,623 (16.62%)  src/nec_stateful_model.cpp:nec_stateful_model::execute_voltage_solve(std::vector<std::complex<double>, std::allocator<std::complex<double> > > const&, std::vector<std::complex<
+  521,131,105 (16.62%)  /home/user/necpp/src/nec_context.cpp:nec_context::stateful_solve_voltage_sources(std::vector<int, std::allocator<int> > const&, std::vector<std::complex<double>, std::allocator
+  521,091,567 (16.62%)  src/nec_context.cpp:nec_context::stateful_solve_voltage_sources(std::vector<int, std::allocator<int> > const&, std::vector<std::complex<double>, std::allocator<std::complex<dou
+  520,986,072 (16.61%)  src/nec_context.cpp:nec_context::excitation_process_inner(int) [/home/user/build/native-driver]
+  520,578,457 (16.60%)  src/nec_context.cpp:nec_context::netwk(safe_array<std::complex<double> >&, safe_array<int>&, safe_array<std::complex<double> >&) [/home/user/build/native-driver]
+  513,825,475 (16.38%)  /home/user/necpp/src/nec_stateful_model.cpp:nec_stateful_model::compute_admittance_matrix()
+  439,466,651 (14.01%)  src/nec_context.cpp:nec_context::netwk_compute_currents(safe_array<std::complex<double> >&, safe_array<int>&, safe_array<std::complex<double> >&, nec_context::netwk_state&) [/h
+  379,411,916 (12.10%)  /home/user/necpp/src/matrix_algebra.cpp:solves(safe_array<std::complex<double> >&, safe_array<int>&, safe_array<std::complex<double> >&, long, long, long, long, long, long, lon
+  379,382,110 (12.10%)  src/matrix_algebra.cpp:solves(safe_array<std::complex<double> >&, safe_array<int>&, safe_array<std::complex<double> >&, long, long, long, long, long, long, long, safe_array<std
+  379,377,235 (12.10%)  src/matrix_algebra.cpp:solve(long, safe_array<std::complex<double> >&, safe_array<int>&, safe_array<std::complex<double> >&, long) [/home/user/build/native-driver]
+  377,901,987 (12.05%)  src/eigen/Eigen/src/Core/SolveTriangular.h:solve(long, safe_array<std::complex<double> >&, safe_array<int>&, safe_array<std::complex<double> >&, long)
+  369,904,860 (11.80%)  /home/user/necpp/src/eigen/Eigen/src/Core/products/GeneralMatrixVector.h:Eigen::internal::general_matrix_vector_product<long, std::complex<double>, Eigen::internal::const_blas_
+  342,512,040 (10.92%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::general_matrix_vector_product<long, std::complex<double>, Eigen::internal::const_blas_data_mapper<std::com
+  300,111,557 ( 9.57%)  ???:0x000000000010d9b0 [???]
+  295,890,177 ( 9.44%)  ./math/../sysdeps/ieee754/dbl-64/s_sincos.c:__sincos_fma [/usr/lib/x86_64-linux-gnu/libm.so.6]
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+3,135,977,493 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+984,074,548 (31.38%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::gebp_kernel<std::complex<double>, std::complex<double>, long, Eigen::internal::blas_data_mapper<std::complex
+342,512,040 (10.92%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::general_matrix_vector_product<long, std::complex<double>, Eigen::internal::const_blas_data_mapper<std::compl
+179,566,562 ( 5.73%)  ./math/../sysdeps/ieee754/dbl-64/s_sin.c:__sincos_fma
+179,206,394 ( 5.71%)  src/nec_context.cpp:nec_context::efld_compute(double, double, double, double, double, bool, std::complex<double>*) [/home/user/build/native-driver]
+119,654,804 ( 3.82%)  /usr/include/c++/13/complex:nec_context::efld_compute(double, double, double, double, double, bool, std::complex<double>*)
+101,016,624 ( 3.22%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::gebp_kernel<std::complex<double>, std::complex<double>, long, Eigen::internal::blas_data_mapper<std::complex
+ 93,106,025 ( 2.97%)  ./math/../sysdeps/ieee754/dbl-64/s_sincos.c:__sincos_fma [/usr/lib/x86_64-linux-gnu/libm.so.6]
+ 90,202,112 ( 2.88%)  /usr/include/c++/13/complex:nec_context::efld(double, double, double, double, bool)
+ 75,333,632 ( 2.40%)  src/nec_context.cpp:nec_context::efld(double, double, double, double, bool) [/home/user/build/native-driver]
+ 68,812,012 ( 2.19%)  /usr/include/c++/13/complex:Eigen::internal::svd_precondition_2x2_block_to_be_real<Eigen::Matrix<std::complex<double>, -1, -1, 0, -1, -1>, 0, true>::run(Eigen::Matrix<std::comple
+ 54,793,088 ( 1.75%)  ./math/../sysdeps/ieee754/dbl-64/s_sin.c:__sin_fma [/usr/lib/x86_64-linux-gnu/libm.so.6]
+ 51,987,372 ( 1.66%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::svd_precondition_2x2_block_to_be_real<Eigen::Matrix<std::complex<double>, -1, -1, 0, -1, -1>, 0, true>::run(
+ 44,356,114 ( 1.41%)  ./math/../sysdeps/ieee754/dbl-64/e_hypot.c:hypot@@GLIBC_2.35 [/usr/lib/x86_64-linux-gnu/libm.so.6]
+ 34,173,781 ( 1.09%)  /usr/include/c++/13/complex:nec_invert_port_matrix(std::vector<std::complex<double>, std::allocator<std::complex<double> > > const&, unsigned long, double)
+ 32,935,936 ( 1.05%)  /usr/include/c++/13/complex:nec_context::cmww(int, int, int, safe_array<std::complex<double> >&, long, safe_array<std::complex<double> >&, long, int)
+ 30,753,038 ( 0.98%)  /usr/include/c++/13/complex:nec_context::eksc(double, double, double, double, int, std::complex<double>*, std::complex<double>*, std::complex<double>*, std::complex<double>*, std
+ 29,049,856 ( 0.93%)  src/nec_context.cpp:nec_context::cmww(int, int, int, safe_array<std::complex<double> >&, long, safe_array<std::complex<double> >&, long, int) [/home/user/build/native-driver]
+ 28,857,294 ( 0.92%)  src/nec_context.cpp:nec_context::intx(double, double, double, int, double*, double*) [/home/user/build/native-driver]
+ 27,459,348 ( 0.88%)  src/eigen/Eigen/src/Jacobi/Jacobi.h:nec_invert_port_matrix(std::vector<std::complex<double>, std::allocator<std::complex<double> > > const&, unsigned long, double)
+ 26,318,370 ( 0.84%)  src/eigen/Eigen/src/Core/products/GeneralMatrixVector.h:Eigen::internal::general_matrix_vector_product<long, std::complex<double>, Eigen::internal::const_blas_data_mapper<std::co
+ 26,207,330 ( 0.84%)  src/nec_context.cpp:nec_context::gf(double, double*, double*) [/home/user/build/native-driver]
+ 23,217,590 ( 0.74%)  ./math/../sysdeps/x86/fpu/fenv_private.h:__sincos_fma
+ 21,595,200 ( 0.69%)  src/safe_array.h:nec_context::cmww(int, int, int, safe_array<std::complex<double> >&, long, safe_array<std::complex<double> >&, long, int)
+ 20,482,212 ( 0.65%)  src/eigen/Eigen/src/Core/products/GeneralBlockPanelKernel.h:Eigen::internal::gebp_kernel<std::complex<double>, std::complex<double>, long, Eigen::internal::blas_data_mapper<std::
+ 19,701,440 ( 0.63%)  src/eigen/Eigen/src/Core/CoreEvaluators.h:nec_context::cmww(int, int, int, safe_array<std::complex<double> >&, long, safe_array<std::complex<double> >&, long, int)
+ 17,137,104 ( 0.55%)  src/eigen/Eigen/src/Core/products/GeneralBlockPanelKernel.h:Eigen::internal::gebp_kernel<std::complex<double>, std::complex<double>, long, Eigen::internal::blas_data_mapper<std::
+ 16,410,814 ( 0.52%)  src/nec_context.cpp:nec_context::eksc(double, double, double, double, int, std::complex<double>*, std::complex<double>*, std::complex<double>*, std::complex<double>*, std::comple
+ 16,110,346 ( 0.51%)  ./stdio-common/./stdio-common/printf_fp.c:__printf_fp_buffer_1.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 15,924,480 ( 0.51%)  src/c_geometry.cpp:c_geometry::tbf(int, int) [/home/user/build/native-driver]
+ 15,634,416 ( 0.50%)  src/eigen/Eigen/src/Core/AssignEvaluator.h:Eigen::internal::svd_precondition_2x2_block_to_be_real<Eigen::Matrix<std::complex<double>, -1, -1, 0, -1, -1>, 0, true>::run(Eigen::Mat
+ 15,359,877 ( 0.49%)  src/electromag.cpp:em::impedance() [/home/user/build/native-driver]
+ 15,281,760 ( 0.49%)  src/eigen/Eigen/src/Jacobi/Jacobi.h:Eigen::internal::svd_precondition_2x2_block_to_be_real<Eigen::Matrix<std::complex<double>, -1, -1, 0, -1, -1>, 0, true>::run(Eigen::Matrix<std
+ 11,429,778 ( 0.36%)  /usr/lib/gcc/x86_64-linux-gnu/13/include/emmintrin.h:Eigen::internal::partial_lu_impl<std::complex<double>, 0, int, -1>::unblocked_lu(Eigen::Ref<Eigen::Matrix<std::complex<double
+ 10,929,465 ( 0.35%)  src/math_util.h:nec_context::efld_compute(double, double, double, double, double, bool, std::complex<double>*)
+ 10,535,961 ( 0.34%)  /usr/include/c++/13/complex:Eigen::internal::triangular_solve_matrix<std::complex<double>, long, 1, 5, false, 0, 0, 1>::run(long, long, std::complex<double> const*, long, std::co
