@@ -387,9 +387,17 @@ void nec_stateful_model::validate_load_target(
       fail("ADD LOAD", "ABSOLUTE SEGMENT TARGET IS OUT OF RANGE");
   } else {
     const int first = load.first_segment == 0 ? 1 : load.first_segment;
-    geometry->get_segment_number(load.tag, first);
-    if (load.last_segment != 0)
-      geometry->get_segment_number(load.tag, load.last_segment);
+    const int last = load.last_segment == 0 ? first : load.last_segment;
+    int64_t tag_segment_count = 0;
+    for (int64_t i = 0; i < geometry->n_segments; ++i)
+      if (geometry->segment_tags[i] == load.tag)
+        ++tag_segment_count;
+    // An absent tag keeps the legacy LD-card diagnostic. A present tag with a
+    // segment position past its end is reported as a range error instead.
+    if (tag_segment_count == 0)
+      geometry->get_segment_number(load.tag, first);
+    if (last > tag_segment_count)
+      fail("ADD LOAD", "SEGMENT TARGET IS OUT OF RANGE FOR THE TAG");
   }
 }
 

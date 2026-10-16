@@ -1,7 +1,28 @@
 ## Unreleased
 
+### Added
+
+* Conductivity-load (LD 5) regression coverage. Native and package tests pin
+  the following:
+  * `structureLossW` equals the segment-centre sum of NEC's `ZINT` resistance
+    in all three branches.
+  * Every selected segment is loaded with its own radius, feed segments
+    included.
+  * `prepare()` at a new frequency recomputes the load, on the stateful model
+    and on `NecArraySolver`.
+  * Perfect-ground loss counts physical segments only.
+  * The ring evaluator accepts loaded wires.
+  * Results agree with the original FORTRAN NEC-2 on copper, stainless, and
+    low-σ decks.
+  `docs/wasm-api.md` documents the formula and the accounting rule.
+
 ### Bug Fixes
 
+* **Out-of-range load segments get an accurate error:** a tag-relative load
+  range that runs past the tag's last segment now fails at `addLoad` with
+  "SEGMENT TARGET IS OUT OF RANGE FOR THE TAG". The old message, "NO SEGMENT
+  HAS AN ITAG OF n", named a tag that does exist. The error class
+  (`NecGeometryError`) and the absent-tag message are unchanged.
 * **`zero-current` now maps to signed NEC `GE -1`:** the stable public ABI value remains `2` (`NEC_GROUND_CONNECTION_ZERO_CURRENT`), while the native geometry receives `-1`. Previously `GE -1` was documented but effectively treated as no ground: `build_connections()` guarded every ground check with `ignd > 0`, so zero-current geometries skipped the plane checks the manual mandates. Both signed ground modes now reject segments that extend below the ground plane or lie in it (a segment may still end on the plane), and a non-none connection without a ground model (`GN` card) fails at `simulate()` instead of silently running free space — NEC-2 Part 3: "A positive or negative value of I1 does not cause a ground to be included in the calculation... The ground parameters must be specified on a program control card following the geometry cards." The `GE -1` connection semantics are unchanged from the Fortran: a ground-touching end stays a free end, so the current goes to zero there, and the low-horizontal-wire escape hatch (height < 1e-3 × segment length) still applies. `testharness/data/discone.nec` gained the missing `GN 1`; `test_example1` now completes the geometry with 0, matching its free-space deck.
 
 ### Compatibility

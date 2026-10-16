@@ -120,6 +120,60 @@ tag-relative segment addressing follow the
 [EX card](https://www.nec2.org/part_3/cards/ex.html). Load units and targeting
 follow the [LD card](https://www.nec2.org/part_3/cards/ld.html).
 
+### Conductivity loads (LD 5)
+
+A `{ kind: "conductivity", conductivitySPerM: σ }` load is NEC-2 LD type 5.
+Perfect conductor is expressed by having no load. This section is normative
+for consumers that compute conductor loss from exported currents.
+
+- **Scope.** Every segment the target selects is loaded, including source
+  (port) segments. A tag-only target selects every segment of the tag.
+- **Radius.** Each segment uses its own radius, `radiiM` in current
+  distributions and `radiusM` in NECQ.
+- **Impedance per metre.** NEC's `ZINT` is used, with \(\lambda\) the NEC
+  free-space wavelength and \(a\) the segment radius. Internally NEC uses
+  \(\omega\mu_0=2\pi\cdot120\pi/\lambda\), not \(\mu_0c_0\). Define
+  \(x=a\sqrt{2\pi\cdot120\pi\,\sigma/\lambda}=\sqrt2\,a/\delta\). Then
+  \[Z'=\frac{j}{a}\sqrt{\frac{60}{\sigma\lambda}}\;
+  \frac{\mathrm{ber}\,x+j\,\mathrm{bei}\,x}{\mathrm{ber}'x+j\,\mathrm{bei}'x}
+  \quad[\Omega/\mathrm{m}],\]
+  evaluated in three branches:
+  - \(x\le8\): NEC's Kelvin-function polynomials;
+  - \(8<x\le110\): NEC's asymptotic series;
+  - \(x>110\): the constant ratio \(0.70710678-0.70710678j\), which gives
+    \(R'=\sqrt{60/(\sigma\lambda)}\cdot0.70710678/a\).
+
+  The first two branches match the exact \(J_0/J_1\) form to about
+  \(2\times10^{-7}\). The last branch drops the \(1/(\sqrt2\,x)\) correction,
+  so it reads \(0.35\%\) below the exact Bessel value at \(x\approx200\), and
+  \(R'\) jumps by about \(-0.64\%\) across \(x=110\). Consumers that must
+  reproduce `structureLossW` copy the three branches literally. The reference
+  implementation is `ld5ResistancePerMetre` in
+  `packages/necpp-wasm/test/conductivity-load.test.mjs`.
+- **Frequency.** Each `prepare()` at a new frequency recomputes \(Z'\), on
+  both the stateful model and `NecArraySolver`. A model swept
+  \(f_1\to f_2\) is bitwise identical to a fresh model prepared at \(f_2\).
+- **Loss accounting.** `structureLossW` is the segment-centre rule
+  \(\sum_i\tfrac12\,\mathrm{Re}(Z'_i)\,L_i\,|I_i(0)|^2\), where
+  \(I_i(0)=A_i+C_i\). It is not a quadrature of \(|I(s)|^2\) along the
+  segment. The sum runs over physical segments only, so perfect-ground images
+  are excluded. With four Gauss–Legendre NECQ nodes, \(I(0)\) is recovered
+  exactly from the even part \(A+C\cos ks\) at the two node pairs. The
+  Gauss–Legendre integral of \(|I|^2\) differs from `structureLossW` by about
+  \(10^{-5}\) to \(4\times10^{-4}\) on dipoles and helices.
+- **Impedance shift.** \(\mathrm{Re}\,Z(\sigma)-\mathrm{Re}\,Z(\mathrm{PEC})\)
+  is not the conductor loss. The internal reactance \(\mathrm{Im}\,Z'\)
+  redistributes the current, which changes the radiated power by a comparable
+  amount: +9 % of the loss on a 0.47 λ copper dipole, −80 % on a helix. Use
+  `structureLossW` or the centre rule above.
+- **Validation.** `addLoad` rejects \(\sigma\le0\) and non-finite values with
+  `NecInputError`. A tag-relative range that runs past the tag's last segment
+  fails with `NecGeometryError` "SEGMENT TARGET IS OUT OF RANGE FOR THE TAG";
+  it is never silently clipped. Out-of-range absolute targets and absent tags
+  also fail at `addLoad`, not at `prepare`.
+- **Field evaluators.** Loads do not change the field kernels. The ring
+  evaluator accepts loaded wires as ordinary wires.
+
 ## Array layout and ownership
 
 `ComplexVector.real` and `.imag` have the same length. A vector supplied to a
@@ -245,7 +299,7 @@ enumerates every operation/state pair plus both `prepare()` branches.
 | `addWire(wire)` | Positive integer tag/count; distinct finite endpoints and positive finite radius, all in m | `void`; copies the definition | `NecInputError` for shape/range errors; `NecGeometryError` for engine geometry limits |
 | `completeGeometry(options?)` | Ground connection plus optional finalized reflection/rotation descriptor | `GeometryCompletionResult`; `symmetry` is absent for ordinary completion | `NecInputError` for an invalid descriptor; `NecGeometryError` for intersections, invalid junctions, symmetry/ground conflicts, or a ground-incompatible structure |
 | `definePorts(ports)` | Nonempty ordered tag and one-based segment pairs | `void`; copies and freezes order | `NecPortError` for missing/duplicate ports or non-source-capable segments; `NecInputError` for malformed integers |
-| `addLoad(load)` | Segment target and impedance, RLC, or conductivity values in the units above | `void`; invalidates prepared data | `NecInputError` for invalid values/ranges; `NecGeometryError` when no segment matches |
+| `addLoad(load)` | Segment target and impedance, RLC, or conductivity values in the units above | `void`; invalidates prepared data | `NecInputError` for invalid values/ranges; `NecGeometryError` when no segment matches or a tag-relative range runs past the tag's last segment |
 | `clearLoads()` | None | `void`; removes every load and invalidates prepared data | No non-state failure |
 | `setGround(ground)` | Free space, perfect ground, or finite ground with method, relative permittivity, and S/m conductivity | `void`; invalidates prepared data | `NecInputError` for nonphysical values; `NecGeometryError` if inconsistent with geometry completion |
 | `prepare({ frequencyMHz })` | One positive finite MHz value | `void`; retains/factors the interaction matrix | `NecInputError` for frequency; `NecPortError` if ports are absent; `NecSolverError` for fill/factorization failure |
