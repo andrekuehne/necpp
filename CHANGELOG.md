@@ -1,4 +1,30 @@
-## Unreleased
+## 0.9.0 - 2026-10-16
+
+### Added
+
+* Conductivity-load (LD 5) regression coverage. Native and package tests pin
+  the following:
+  * `structureLossW` equals the segment-centre sum of NEC's `ZINT` resistance
+    in all three branches.
+  * Every selected segment is loaded with its own radius, feed segments
+    included.
+  * `prepare()` at a new frequency recomputes the load, on the stateful model
+    and on `NecArraySolver`.
+  * Perfect-ground loss counts physical segments only.
+  * The ring evaluator accepts loaded wires.
+  * Results agree with the original FORTRAN NEC-2 on copper, stainless, and
+    low-σ decks.
+  `docs/wasm-api.md` documents the formula and the accounting rule.
+
+### Bug Fixes
+
+* **Out-of-range load segments get an accurate error:** a tag-relative load
+  range that runs past the tag's last segment now fails at `addLoad` with
+  "SEGMENT TARGET IS OUT OF RANGE FOR THE TAG". The old message, "NO SEGMENT
+  HAS AN ITAG OF n", named a tag that does exist. The error class
+  (`NecGeometryError`) and the absent-tag message are unchanged.
+
+## 0.8.0 - 2026-09-27
 
 ### Bug Fixes
 
@@ -9,8 +35,6 @@
 * The stateful C++ enum is now `nec_model_ground_connection`, avoiding a name
   collision with upstream's C `nec_ground_connection`. Native C++ callers must
   update the type name and rebuild. C/WASM entry points and values are unchanged.
-
-## 0.8.0 - 2026-09-27
 
 ### Added
 
