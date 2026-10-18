@@ -5,6 +5,9 @@ import {
   createNecArraySolver,
   createNecModel,
   engineVersion,
+  necfSchemaVersion,
+  necqFlags,
+  necqSchemaVersion,
   packageVersion,
   rotationalOrder,
   runDeck,
@@ -222,6 +225,12 @@ async function validConsumer(): Promise<void> {
   packageVersion satisfies string;
   engineVersion satisfies string;
   abiVersion satisfies 1;
+  necqSchemaVersion satisfies 1;
+  necfSchemaVersion satisfies 1;
+  necqFlags.images satisfies 1;
+  necqFlags.weights satisfies 2;
+  // @ts-expect-error necqFlags is readonly
+  necqFlags.images = 1;
 
   const deck = await runDeck("CE\nEN\n");
   deck.report.toUpperCase();

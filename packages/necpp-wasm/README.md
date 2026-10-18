@@ -864,7 +864,7 @@ appropriate CORS header.
 import { createNecModel } from "@necpp-engine/wasm";
 
 const model = await createNecModel({
-  wasmUrl: new URL("https://cdn.example.test/necpp/0.9.0/nec2pp.wasm"),
+  wasmUrl: new URL("https://cdn.example.test/necpp/0.10.0/nec2pp.wasm"),
 });
 model.dispose();
 ```
@@ -954,10 +954,17 @@ tarball used by every release gate.
 | `packageVersion` | Semantic version of the public TypeScript API |
 | `engineVersion` | NEC2++ version compiled into the shipped WebAssembly |
 | `abiVersion` | Stable internal C ABI; currently `1` |
+| `necqSchemaVersion` | Schema of the packed `NECQ` quadrature buffer (byte offset 4); currently `1` |
+| `necfSchemaVersion` | Schema of the packed `NECF` embedded-field envelope (byte offset 4); currently `1` |
+| `necqFlags` | Defined `NECQ` flag bits (byte offset 8): `{ images: 1, weights: 2 }` |
 
 Instantiation rejects a binary whose ABI or engine version does not match the
 facade. Package and engine versions intentionally have independent version
 lines; the release records both.
+
+External readers of `NECQ`/`NECF` buffers can compare their own expected
+schema against `necqSchemaVersion` and `necfSchemaVersion` of the installed
+package. A schema bump then fails that check instead of passing silently.
 
 ## License
 

@@ -10,7 +10,14 @@ export {
   NecStateError,
 } from "./errors.js";
 
-export { abiVersion, engineVersion, packageVersion } from "./versions.js";
+export {
+  abiVersion,
+  engineVersion,
+  necfSchemaVersion,
+  necqFlags,
+  necqSchemaVersion,
+  packageVersion,
+} from "./versions.js";
 export { rotationalOrder } from "./symmetry.js";
 export { analyzeArraySymmetry, createExplicitArrayBuildPlan } from "./array-symmetry.js";
 export {

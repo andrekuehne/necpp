@@ -516,6 +516,7 @@ void sync_embedded(
 
 constexpr size_t kNecfHeaderBytes = 64;
 constexpr uint8_t kNecfMagic[4] = { 'N', 'E', 'C', 'F' };
+constexpr uint32_t kNecfSchemaVersion = 1;
 
 void store_u32_le(uint8_t* dest, uint32_t value)
 {
@@ -666,7 +667,7 @@ std::vector<uint8_t> pack_embedded_field_envelope(
   bytes[1] = kNecfMagic[1];
   bytes[2] = kNecfMagic[2];
   bytes[3] = kNecfMagic[3];
-  store_u32_le(bytes + 4, 1);
+  store_u32_le(bytes + 4, kNecfSchemaVersion);
   store_u32_le(bytes + 8, static_cast<uint32_t>(field.ports.size()));
   store_u32_le(bytes + 12, static_cast<uint32_t>(field.theta_deg.size()));
   store_u32_le(bytes + 16, static_cast<uint32_t>(field.phi_deg.size()));
