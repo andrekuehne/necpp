@@ -1,3 +1,14 @@
+## 0.10.0 - 2026-10-18
+
+### Added
+
+* `@necpp-engine/wasm` and `@necpp-engine/wasm/worker` export
+  `necqSchemaVersion`, `necfSchemaVersion`, and `necqFlags`
+  (`{ images: 1, weights: 2 }`) next to `abiVersion`. External `NECQ`/`NECF`
+  readers can compare their expected schema against the installed package
+  instead of recording it by hand (#14). Tests tie the constants to the C++
+  writer, the Rust reference views, and the published fixtures.
+
 ## 0.9.0 - 2026-10-16
 
 ### Added

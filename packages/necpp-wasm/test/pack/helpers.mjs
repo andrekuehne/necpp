@@ -176,6 +176,9 @@ export const dipoleScript = `import {
   createNecArraySolver,
   createNecModel,
   engineVersion,
+  necfSchemaVersion,
+  necqFlags,
+  necqSchemaVersion,
   packageVersion,
 } from "@necpp-engine/wasm";
 
@@ -254,6 +257,9 @@ try {
   process.stdout.write(JSON.stringify({
     abiVersion,
     engineVersion,
+    necfSchemaVersion,
+    necqFlags,
+    necqSchemaVersion,
     packageVersion,
     sectionCount: completion.symmetry?.sectionCount,
     resistanceOhm: matrices.impedance.real[0],

@@ -42,6 +42,16 @@ without constructing a model:
 The facade refuses to instantiate a binary whose ABI or engine version does
 not match those constants.
 
+It also exports the layout versions of the packed buffers it writes, so an
+external reader can pin against the installed package:
+
+- `necqSchemaVersion` — `u32` at byte offset 4 of every `NECQ` buffer,
+  currently `1`
+- `necfSchemaVersion` — `u32` at byte offset 4 of every `NECF` envelope,
+  currently `1`
+- `necqFlags` — defined bits of the `NECQ` flags word at byte offset 8:
+  `{ images: 1, weights: 2 }`
+
 `createNecModel()` asynchronously initializes the Emscripten module and
 returns a stateful `NecModel`. After creation, those model methods are
 synchronous. Large browser calculations should use `createNecWorkerModel()`

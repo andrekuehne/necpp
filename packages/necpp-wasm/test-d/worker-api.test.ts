@@ -3,6 +3,9 @@ import {
   abiVersion,
   createNecWorkerModel,
   engineVersion,
+  necfSchemaVersion,
+  necqFlags,
+  necqSchemaVersion,
   packageVersion,
   rotationalOrder,
   type GeometryCompletionResult,
@@ -133,6 +136,10 @@ async function validWorkerConsumer(): Promise<void> {
   packageVersion satisfies string;
   engineVersion satisfies string;
   abiVersion satisfies 1;
+  necqSchemaVersion satisfies 1;
+  necfSchemaVersion satisfies 1;
+  necqFlags.images satisfies 1;
+  necqFlags.weights satisfies 2;
 }
 
 void validWorkerConsumer;
