@@ -15,9 +15,9 @@
     "portCount": 1,
     "packedNceqBytes": 4072,
     "expectedNecfBytes": 23008,
-    "characterizeMs": 0.380668,
-    "splitCurrentAndFieldMs": 0.421792,
-    "retrieveMs": 5.739e-06,
+    "characterizeMs": 0.2736,
+    "splitCurrentAndFieldMs": 1558.96,
+    "retrieveMs": 2.59e-05,
     "geometryWalks": 1,
     "growingAllocations": 1
   },
@@ -26,8 +26,8 @@
     "portCount": 2,
     "packedNceqBytes": 9480,
     "expectedNecfBytes": 45504,
-    "characterizeMs": 1.68004,
-    "retrieveMs": 5.641e-06,
+    "characterizeMs": 1556.74,
+    "retrieveMs": 1.59e-05,
     "geometryWalks": 1,
     "growingAllocations": 1
   }
