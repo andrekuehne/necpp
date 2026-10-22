@@ -37,6 +37,7 @@ import {
   isWorkerResponse,
   reviveEmbeddedFarFieldResult,
   reviveError,
+  reviveErrorOptions,
   reviveFarFieldResult,
   reviveGeometryCompletionResult,
   reviveImpedanceResult,
@@ -471,7 +472,7 @@ class WorkerNecModel implements NecWorkerModel {
     if (data.kind === "crash") {
       this.#failAll(new NecRuntimeError(
         data.error.message,
-        data.error.details === undefined ? {} : { details: data.error.details },
+        reviveErrorOptions(data.error),
       ));
       return;
     }

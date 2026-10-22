@@ -9,7 +9,7 @@
  * `NECQ` and `NECF` buffers this package writes. They must match
  * `src/nec_prepared_current_quadrature.h` and `src/necpp_wasm_v1.cpp`.
  */
-export const packageVersion = "0.10.0";
+export const packageVersion = "0.10.1";
 export const abiVersion = 1;
 export const engineVersion = "2.5.0";
 

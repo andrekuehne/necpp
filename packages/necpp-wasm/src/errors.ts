@@ -31,11 +31,18 @@ export class NecStateError extends NecError<"NEC_STATE"> {
   readonly operation: string;
   readonly state: NecModelState;
 
-  constructor(operation: string, state: NecModelState, message?: string) {
+  constructor(
+    operation: string,
+    state: NecModelState,
+    message?: string,
+    cause?: unknown,
+  ) {
     super(
       "NEC_STATE",
       message ?? `Operation ${operation} is not valid while the model is ${state}`,
-      { details: { operation, state } },
+      cause === undefined
+        ? { details: { operation, state } }
+        : { details: { operation, state }, cause },
     );
     this.name = "NecStateError";
     this.operation = operation;

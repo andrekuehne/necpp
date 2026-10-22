@@ -128,6 +128,91 @@ test("typed errors round-trip through the worker protocol", () => {
   assert.equal(runtime.message, "boom");
 });
 
+// (module (func (export "run") unreachable))
+const trappingModuleBytes = Uint8Array.of(
+  0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+  0x01, 0x04, 0x01, 0x60, 0x00, 0x00,
+  0x03, 0x02, 0x01, 0x00,
+  0x07, 0x07, 0x01, 0x03, 0x72, 0x75, 0x6e, 0x00, 0x00,
+  0x0a, 0x05, 0x01, 0x03, 0x00, 0x00, 0x0b,
+);
+
+function realWasmTrap() {
+  const instance = new WebAssembly.Instance(
+    new WebAssembly.Module(trappingModuleBytes),
+  );
+  try {
+    instance.exports.run();
+  } catch (error) {
+    return error;
+  }
+  throw new Error("the trapping module did not trap");
+}
+
+test("a WASM trap cause survives the worker protocol and structured clone", () => {
+  const trap = realWasmTrap();
+  assert.ok(trap instanceof WebAssembly.RuntimeError);
+  const original = new NecRuntimeError("solve failed at the WASM boundary", {
+    cause: trap,
+    details: { operation: "solve" },
+  });
+
+  const wire = structuredClone(serializeError(original));
+  assert.deepEqual(wire.cause, { name: "RuntimeError", message: trap.message });
+
+  const revived = reviveError(wire);
+  assert.ok(revived instanceof NecRuntimeError);
+  assert.equal(revived.message, "solve failed at the WASM boundary");
+  assert.deepEqual(revived.details, { operation: "solve" });
+  assert.ok(revived.cause instanceof Error);
+  assert.equal(revived.cause.name, "RuntimeError");
+  assert.equal(revived.cause.message, trap.message);
+});
+
+test("errors without a cause revive without one", () => {
+  const typed = reviveError(structuredClone(serializeError(
+    new NecInputError("bad input", { details: { field: "x" } }),
+  )));
+  assert.ok(typed instanceof NecInputError);
+  assert.equal(typed.cause, undefined);
+  assert.deepEqual(typed.details, { field: "x" });
+
+  const wire = serializeError(new NecRuntimeError("no cause"));
+  assert.equal("cause" in wire, false);
+  assert.equal(reviveError(structuredClone(wire)).cause, undefined);
+
+  // Wire errors from workers older than 0.10.1 carry no cause field.
+  const legacy = reviveError({
+    name: "NecRuntimeError",
+    code: "NEC_RUNTIME",
+    message: "legacy",
+  });
+  assert.equal(legacy.cause, undefined);
+});
+
+test("non-Error causes and NecStateError causes are preserved", () => {
+  const stringCause = reviveError(structuredClone(serializeError(
+    new NecRuntimeError("wrapped", { cause: "Aborted(). Build with -sASSERTIONS" }),
+  )));
+  assert.equal(stringCause.cause.name, "Error");
+  assert.equal(stringCause.cause.message, "Aborted(). Build with -sASSERTIONS");
+
+  const state = reviveError(structuredClone(serializeError(
+    new NecStateError("prepare", "empty", undefined, realWasmTrap()),
+  )));
+  assert.ok(state instanceof NecStateError);
+  assert.equal(state.operation, "prepare");
+  assert.equal(state.state, "empty");
+  assert.equal(state.cause.name, "RuntimeError");
+
+  const plain = reviveError(serializeError(
+    new Error("outer", { cause: new TypeError("inner") }),
+  ));
+  assert.ok(plain instanceof NecRuntimeError);
+  assert.equal(plain.cause.name, "TypeError");
+  assert.equal(plain.cause.message, "inner");
+});
+
 test("create options copy wasm bytes and reject invalid overrides", () => {
   const bytes = new Uint8Array([1, 2, 3]);
   const serialized = serializeCreateOptions({ wasmBinary: bytes });

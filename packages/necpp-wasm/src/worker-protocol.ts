@@ -74,6 +74,12 @@ export type WorkerRequest =
     readonly kind: "cancel-field";
   };
 
+/** Structured-clone-safe summary of an error's `cause` (one level deep). */
+export interface SerializedErrorCause {
+  readonly name: string;
+  readonly message: string;
+}
+
 export interface SerializedNecError {
   readonly name: string;
   readonly code: NecErrorCode;
@@ -81,6 +87,8 @@ export interface SerializedNecError {
   readonly details?: Readonly<Record<string, unknown>>;
   readonly operation?: string;
   readonly state?: NecModelState;
+  /** Optional since 0.10.1; older workers omit it. */
+  readonly cause?: SerializedErrorCause;
 }
 
 export type WorkerProgressMessage = {
@@ -161,40 +169,78 @@ export function collectTransferables(value: unknown): ArrayBuffer[] {
   return [...buffers];
 }
 
-function errorOptions(
-  details: Readonly<Record<string, unknown>> | undefined,
-): NecErrorOptions {
-  return details === undefined ? {} : { details };
+function serializeCause(cause: unknown): SerializedErrorCause | undefined {
+  if (cause === undefined) {
+    return undefined;
+  }
+  if (cause instanceof Error) {
+    return { name: String(cause.name), message: String(cause.message) };
+  }
+  return { name: "Error", message: String(cause) };
+}
+
+function reviveCause(
+  cause: SerializedErrorCause | undefined,
+): Error | undefined {
+  if (
+    typeof cause !== "object"
+    || cause === null
+    || typeof cause.message !== "string"
+  ) {
+    return undefined;
+  }
+  const revived = new Error(cause.message);
+  if (typeof cause.name === "string") {
+    revived.name = cause.name;
+  }
+  return revived;
+}
+
+/** Rebuild constructor options, including the cause, from a wire error. */
+export function reviveErrorOptions(serialized: SerializedNecError): NecErrorOptions {
+  const cause = reviveCause(serialized.cause);
+  return {
+    ...(serialized.details === undefined ? {} : { details: serialized.details }),
+    ...(cause === undefined ? {} : { cause }),
+  };
+}
+
+function withOptionalFields(
+  serialized: SerializedNecError,
+  error: NecError,
+): SerializedNecError {
+  const cause = serializeCause(error.cause);
+  return {
+    ...serialized,
+    ...(error.details === undefined ? {} : { details: error.details }),
+    ...(cause === undefined ? {} : { cause }),
+  };
 }
 
 export function serializeError(error: unknown): SerializedNecError {
   if (error instanceof NecStateError) {
-    const serialized: SerializedNecError = {
+    return withOptionalFields({
       name: error.name,
       code: error.code,
       message: error.message,
       operation: error.operation,
       state: error.state,
-    };
-    return error.details === undefined
-      ? serialized
-      : { ...serialized, details: error.details };
+    }, error);
   }
   if (error instanceof NecError) {
-    const serialized: SerializedNecError = {
+    return withOptionalFields({
       name: error.name,
       code: error.code,
       message: error.message,
-    };
-    return error.details === undefined
-      ? serialized
-      : { ...serialized, details: error.details };
+    }, error);
   }
   if (error instanceof Error) {
+    const cause = serializeCause(error.cause);
     return {
       name: "NecRuntimeError",
       code: "NEC_RUNTIME",
       message: error.message,
+      ...(cause === undefined ? {} : { cause }),
     };
   }
   return {
@@ -211,27 +257,28 @@ export function reviveError(serialized: SerializedNecError): NecError {
       serialized.operation ?? "unknown",
       serialized.state ?? "disposed",
       serialized.message,
+      reviveErrorOptions(serialized).cause,
     );
   case "NEC_INPUT":
-    return new NecInputError(serialized.message, errorOptions(serialized.details));
+    return new NecInputError(serialized.message, reviveErrorOptions(serialized));
   case "NEC_GEOMETRY":
     return new NecGeometryError(
       serialized.message,
-      errorOptions(serialized.details),
+      reviveErrorOptions(serialized),
     );
   case "NEC_PORT":
-    return new NecPortError(serialized.message, errorOptions(serialized.details));
+    return new NecPortError(serialized.message, reviveErrorOptions(serialized));
   case "NEC_CONDITIONING":
     return new NecConditioningError(
       serialized.message,
-      errorOptions(serialized.details),
+      reviveErrorOptions(serialized),
     );
   case "NEC_SOLVER":
-    return new NecSolverError(serialized.message, errorOptions(serialized.details));
+    return new NecSolverError(serialized.message, reviveErrorOptions(serialized));
   default:
     return new NecRuntimeError(
       serialized.message,
-      errorOptions(serialized.details),
+      reviveErrorOptions(serialized),
     );
   }
 }
