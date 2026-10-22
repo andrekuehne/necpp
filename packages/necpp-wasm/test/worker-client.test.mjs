@@ -172,6 +172,9 @@ function createLoopbackHost(createModel, options = {}) {
     simulateExit(code) {
       exitListener?.(code);
     },
+    postFromWorker(data) {
+      port2.postMessage(data);
+    },
     postMessage(data, transfer = []) {
       port1.postMessage(data, transfer);
     },
@@ -421,6 +424,56 @@ test("the client thread keeps a heartbeat while a worker request is outstanding"
   await pending;
   clearInterval(timer);
   await model.dispose();
+});
+
+test("worker operation failures keep the WASM trap cause", async () => {
+  const trap = new WebAssembly.RuntimeError("memory access out of bounds");
+  const { model } = await preparedModel(async () => createFakeModel({
+    computeImpedanceMatrix() {
+      throw new NecRuntimeError("computeImpedanceMatrix failed at the WASM boundary", {
+        cause: trap,
+        details: { operation: "computeImpedanceMatrix" },
+      });
+    },
+  }));
+  await assert.rejects(model.computeImpedanceMatrix(), (error) => (
+    error instanceof NecRuntimeError
+    && error.details?.operation === "computeImpedanceMatrix"
+    && error.cause instanceof Error
+    && error.cause.name === "RuntimeError"
+    && error.cause.message === "memory access out of bounds"
+  ));
+  await model.dispose();
+});
+
+test("worker crash messages keep their serialized cause", async () => {
+  let release;
+  const hang = {
+    filter: (request) => request.method === "computeImpedanceMatrix",
+    gate: new Promise((resolve) => {
+      release = resolve;
+    }),
+  };
+  const host = createLoopbackHost(async () => createFakeModel(), { hang });
+  const model = await createNecWorkerModelFromHost(host);
+  const pending = model.computeImpedanceMatrix();
+  host.postFromWorker({
+    kind: "crash",
+    error: {
+      name: "NecRuntimeError",
+      code: "NEC_RUNTIME",
+      message: "The NEC worker failed",
+      cause: { name: "RuntimeError", message: "unreachable" },
+    },
+  });
+  await assert.rejects(pending, (error) => (
+    error instanceof NecRuntimeError
+    && error.message === "The NEC worker failed"
+    && error.cause?.name === "RuntimeError"
+    && error.cause.message === "unreachable"
+  ));
+  release();
+  model.terminate();
 });
 
 test("termination releases the worker and rejects outstanding operations", async () => {

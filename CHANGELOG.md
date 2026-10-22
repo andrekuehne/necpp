@@ -1,3 +1,16 @@
+## 0.10.1 - 2026-10-22
+
+### Bug Fixes
+
+* **Worker errors keep their cause:** errors from worker-backed models
+  (`createNecWorkerModel`, `createNecArraySolver`) now carry a `cause` with
+  the original `name` and `message`. Before this fix, a WASM trap reached the
+  caller only as "<op> failed at the WASM boundary", and the reason, such as
+  "memory access out of bounds" or "Aborted()", was lost. The worker protocol
+  sends the cause as an optional `{ name, message }` field. Workers that omit
+  it still work, and their errors arrive with `cause === undefined`.
+  `NecStateError` takes an optional fourth `cause` constructor argument.
+
 ## 0.10.0 - 2026-10-18
 
 ### Added

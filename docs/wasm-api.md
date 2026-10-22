@@ -326,6 +326,10 @@ enumerates every operation/state pair plus both `prepare()` branches.
 All native exceptions are contained at the C ABI. The TypeScript layer maps a
 nonzero native status to one of the errors below and retains the native
 message as `message` or `cause`; a raw number or string is never thrown.
+Worker-backed models (`createNecWorkerModel`, `createNecArraySolver`) forward
+the `cause` across the worker boundary as a plain `Error` that keeps the
+original `name` and `message`, for example `RuntimeError: memory access out
+of bounds` from a WASM trap. Only that one level crosses the boundary.
 
 ## Error taxonomy
 
