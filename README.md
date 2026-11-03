@@ -36,7 +36,8 @@ and a transparent full-array solver that conservatively selects symmetry or
 falls back to the unchanged explicit model. Ordinary Z/Y, solve, and field
 results stay in caller port order. See the
 [package guide](packages/necpp-wasm/README.md) and the
-[detailed WASM API and symmetry contract](docs/wasm-api.md), plus the
+[detailed WASM API and symmetry contract](docs/wasm-api.md), the
+[macro-basis reduced interaction contract](docs/macro-basis-api.md), plus the
 [four-element Vite example](examples/wasm-array-vite/README.md).
 
 ## Installation
