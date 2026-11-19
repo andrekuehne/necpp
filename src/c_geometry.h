@@ -170,6 +170,16 @@ public:
   	 */
   	const std::vector<nec_overlap_finding>& overlap_findings() const { return m_overlap_findings; }
 
+  	/*! \brief One completed segment in metres, as entered and independent of
+  	 *  the frequency scaling of the solve.
+  	 *  \param index The segment index, 0 to n_segments - 1.
+  	 *  \param start The first end of the segment.
+  	 *  \param end The second end of the segment.
+  	 *  \param radius The wire radius.
+  	 */
+  	void segment_in_metres(int64_t index, nec_3vector& start, nec_3vector& end,
+  	  nec_float& radius) const;
+
   	/*! \brief Geometry is complete
   	 *  \exception nec_exception* If there is an error with the geometry.
   	 */

@@ -108,6 +108,20 @@ TEST_CASE("The lattice changes the port impedance until it is cleared", "[period
   REQUIRE(port_impedance(model) == isolated);
 }
 
+TEST_CASE("A lattice under which a conductor touches its image is refused without effect", "[periodic_model]")
+{
+  nec_stateful_model model;
+  build_dipole_cell(model);
+  model.set_lattice(square_lattice(0.7));
+  const nec_complex before = port_impedance(model);
+
+  // The vertical dipoles of 1 mm radius would stand 1.5 mm apart along y.
+  REQUIRE_THROWS_AS(model.set_lattice({0.7, 0.0, 0.0, 0.0015}), nec_geometry_exception);
+  REQUIRE(model.periodic());
+  REQUIRE(model.state() == nec_model_state::prepared);
+  REQUIRE(port_impedance(model) == before);
+}
+
 TEST_CASE("Periodic mode refuses symmetry, ground and single-cell fields", "[periodic_model]")
 {
   SECTION("symmetric geometry")

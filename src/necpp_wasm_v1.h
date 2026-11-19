@@ -245,6 +245,8 @@ int32_t necpp_wasm_v1_set_ground(
  * the next along a1 and a2; setting a lattice resets them to zero. Both calls
  * invalidate the factorization. Symmetric geometry and any ground other than
  * free space are refused, as are far-field and embedded-field calls.
+ * set_lattice returns NECPP_WASM_V1_GEOMETRY_ERROR when a conductor touches
+ * or nearly touches a periodic image (connected arrays are not supported).
  */
 int32_t necpp_wasm_v1_set_lattice(
   necpp_wasm_v1_model* model,

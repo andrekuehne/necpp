@@ -576,7 +576,10 @@ void nec_stateful_model::set_lattice(const nec_lattice_definition& lattice)
   if (m_ground.kind != nec_ground_kind::free_space)
     fail_geometry("SET LATTICE", "ONLY FREE SPACE IS SUPPORTED IN PERIODIC MODE");
 
-  // The context validates the vectors before anything changes.
+  // The context validates the vectors and the clearance of every conductor
+  // from its periodic images before anything changes.
+  m_context->stateful_check_periodic_clearance(
+    lattice.a1x_m, lattice.a1y_m, lattice.a2x_m, lattice.a2y_m);
   m_context->stateful_set_periodic(
     lattice.a1x_m, lattice.a1y_m, lattice.a2x_m, lattice.a2y_m, 0.0, 0.0);
   m_periodic = true;

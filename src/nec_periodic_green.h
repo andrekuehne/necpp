@@ -40,6 +40,9 @@ public:
   // Transverse wavevector kt0 of the scan state with scan phases
   // psi_i = -kt0 . a_i along the given lattice vectors.
   vec2 scan_wavevector(double psi1, double psi2) const;
+  // Reciprocal vectors of the given lattice vectors: a_i . b_j = 2 pi delta_ij.
+  vec2 b1() const { return b1_; }
+  vec2 b2() const { return b2_; }
   // Reduced lattice vectors (shortest first) and their reciprocal vectors.
   vec2 reduced_a1() const { return reduced_a1_; }
   vec2 reduced_a2() const { return reduced_a2_; }

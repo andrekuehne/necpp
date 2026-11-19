@@ -569,10 +569,33 @@ export interface PeriodicLattice {
  */
 export type ScanPhasesRad = readonly [psi1Rad: number, psi2Rad: number];
 
-export interface ScanImpedanceRequest {
-  readonly frequencyMHz: number;
-  readonly scanPhasesRad: ScanPhasesRad;
+/**
+ * Scan direction: the beam direction of a scan state in visible space, in
+ * degrees. `thetaDeg` from +z, 0 to 90; `phiDeg` from +x towards +y. It maps
+ * to the transverse wavevector `kt0 = k sin(theta) [cos(phi), sin(phi)]` and
+ * so to the scan phases `psi_i = -kt0 . a_i` along the lattice vectors.
+ */
+export interface ScanDirection {
+  readonly thetaDeg: number;
+  readonly phiDeg: number;
 }
+
+/**
+ * One scan state at one frequency: either scan phases along the lattice
+ * vectors (any scan state, including invisible space) or a scan direction
+ * (visible space only). Exactly one of the two.
+ */
+export type ScanImpedanceRequest =
+  | {
+    readonly frequencyMHz: number;
+    readonly scanPhasesRad: ScanPhasesRad;
+    readonly scanDirection?: never;
+  }
+  | {
+    readonly frequencyMHz: number;
+    readonly scanDirection: ScanDirection;
+    readonly scanPhasesRad?: never;
+  };
 
 /**
  * P x P scan impedance and scan admittance of the unit-cell ports at one
@@ -583,6 +606,7 @@ export interface ScanImpedanceResult {
   readonly impedance: ComplexMatrix;
   readonly admittance: ComplexMatrix;
   readonly frequencyMHz: number;
+  /** The scan phases solved for, also when the request gave a scan direction. */
   readonly scanPhasesRad: ScanPhasesRad;
 }
 

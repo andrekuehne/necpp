@@ -32,6 +32,13 @@ export {
 } from "./array-solver.js";
 export type { AppliedArrayBuildPlan } from "./array-solver.js";
 export { createNecPeriodicModel } from "./periodic-model.js";
+export {
+  centeredRectangularLattice,
+  hexagonalLattice,
+  rectangularLattice,
+  scanPhasesForDirection,
+  squareLattice,
+} from "./periodic-lattice.js";
 
 export type {
   NecCancellationReason,
@@ -116,6 +123,7 @@ export type {
   RotationalSymmetry,
   RotateZTransform,
   RunDeckOptions,
+  ScanDirection,
   ScanImpedanceRequest,
   ScanImpedanceResult,
   ScanPhasesRad,

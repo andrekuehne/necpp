@@ -40,6 +40,21 @@ Stage 2 so far:
   the (0,0) Floquet-mode power to 1e-3 at 21 segments, checked natively). A
   uniformly driven finite array is no usable reference: its centre converges
   only like `N^(-1/2)` and is off by tens of percent at 11 x 11.
+- issue #23: any lattice and multi-element unit cells. Lattice presets
+  (square, rectangular, centered rectangular, hexagonal with rows along x or
+  y) and the scan direction `(theta, phi)` live in TypeScript only; the
+  engine keeps taking two vectors. `setLattice` refuses a lattice under which
+  a conductor touches or nearly touches a periodic image: the axis distance
+  of a segment to any image segment (its own or another conductor's) is at
+  most the two radii plus NEC's joining tolerance `SMIN` times the longer
+  segment. Verified at the package seam against tapered finite arrays at
+  oblique scan: rectangular 4.1 % (9 cells, sin theta = 0.61), centered
+  rectangular 2.8 % (sin theta = 0.41), hexagonal 2.3 % (sin theta = 0.58),
+  and a honeycomb cell (hexagonal lattice, two dipoles) 3.7 % on all four
+  entries of its non-reciprocal 2 x 2 scan impedance; broadside differs from
+  the same finite results by 19 to 29 %. Oblique lattice vectors and their reduced
+  equivalent agree to 8e-15 for the same physical scan state, and a scan
+  direction gives the same result as its scan phases.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -145,9 +160,9 @@ Three implementation details depend on the lattice:
   `|m|,|n| <= M`, which converges poorly for skewed lattices.
 - A strongly skewed input basis is reduced internally (Lagrange/Gauss
   reduction) to keep the term count low.
-- Clearance is checked as the distance from each conductor to its own
-  periodic images, not to a cell wall, which has no unique shape for a
-  non-rectangular lattice.
+- Clearance is checked as the distance from each conductor to the periodic
+  images of the unit cell's conductors (its own and the others'), not to a
+  cell wall, which has no unique shape for a non-rectangular lattice.
 
 Honeycomb, kagome and dual-polarized arrays with offset sub-lattices are not
 lattices; they are a lattice with several elements per unit cell. The

@@ -1,8 +1,14 @@
 import {
+  centeredRectangularLattice,
   createNecPeriodicModel,
+  hexagonalLattice,
+  rectangularLattice,
+  scanPhasesForDirection,
+  squareLattice,
   type ComplexMatrix,
   type NecPeriodicModel,
   type PeriodicLattice,
+  type ScanDirection,
   type ScanImpedanceResult,
   type ScanPhasesRad,
 } from "../src/index.js";
@@ -29,6 +35,38 @@ export async function periodicModelTypes(): Promise<void> {
   void impedance;
   void admittance;
   void echoed;
+
+  // Presets return plain lattice vectors; there is no lattice-type field.
+  const presets: readonly PeriodicLattice[] = [
+    squareLattice({ spacingM: 0.5 }),
+    rectangularLattice({ spacingXM: 0.6, spacingYM: 0.5 }),
+    centeredRectangularLattice({ spacingXM: 0.7, spacingYM: 0.45 }),
+    hexagonalLattice({ spacingM: 0.6 }),
+    hexagonalLattice({ spacingM: 0.6, rowsAlong: "y" }),
+  ];
+  for (const preset of presets) {
+    cell.setLattice(preset);
+  }
+  // @ts-expect-error hexagonal rows run along x or y only.
+  hexagonalLattice({ spacingM: 0.6, rowsAlong: "z" });
+
+  const direction: ScanDirection = { thetaDeg: 30, phiDeg: 45 };
+  const steered: ScanImpedanceResult = cell.computeScanImpedance({
+    frequencyMHz: 300,
+    scanDirection: direction,
+  });
+  const solvedPhases: ScanPhasesRad = steered.scanPhasesRad;
+  const mapped: ScanPhasesRad = scanPhasesForDirection({
+    lattice,
+    frequencyMHz: 300,
+    ...direction,
+  });
+  void solvedPhases;
+  void mapped;
+  // @ts-expect-error a scan state is either scan phases or a scan direction, not both.
+  cell.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: phases, scanDirection: direction });
+  // @ts-expect-error a scan state is required.
+  cell.computeScanImpedance({ frequencyMHz: 300 });
 
   // A single cell of an infinite array has no far field of its own.
   // @ts-expect-error no far fields on the periodic model.

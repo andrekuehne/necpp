@@ -127,6 +127,12 @@ public:
     nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m,
     nec_float psi1_rad, nec_float psi2_rad);
   void stateful_clear_periodic();
+  /*! Refuse a lattice under which a conductor touches or nearly touches a
+   * periodic image (nec_geometry_exception), or whose vectors are invalid
+   * (nec_exception). Changes nothing.
+   */
+  void stateful_check_periodic_clearance(
+    nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m) const;
 
   /*! Result ownership helpers for the stateful layer. */
   void stateful_clear_results()  { m_results.clear(); }

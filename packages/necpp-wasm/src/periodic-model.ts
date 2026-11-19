@@ -1,6 +1,12 @@
 import { NecStateError } from "./errors.js";
 import { instantiateNecModule } from "./loader.js";
 import {
+  finitePair,
+  scanPhasesForDirection,
+  validLattice,
+  validScanDirection,
+} from "./periodic-lattice.js";
+import {
   WasmNecModel,
   createModelFromModule,
   inputError,
@@ -17,21 +23,11 @@ import type {
   PortDefinition,
   ScanImpedanceRequest,
   ScanImpedanceResult,
+  ScanPhasesRad,
   WasmAssetOptions,
   WireDefinition,
 } from "./types.js";
 import type { NecWasmModule } from "./wasm-internal.js";
-
-function finitePair(value: unknown, name: string): readonly [number, number] {
-  if (
-    !Array.isArray(value)
-    || value.length !== 2
-    || !value.every((entry) => typeof entry === "number" && Number.isFinite(entry))
-  ) {
-    inputError(`${name} must be a pair of finite numbers`, { name, value });
-  }
-  return Object.freeze([value[0] as number, value[1] as number]);
-}
 
 /**
  * The unit cell of an infinite array. It owns a finite model whose interaction
@@ -40,7 +36,7 @@ function finitePair(value: unknown, name: string): readonly [number, number] {
  */
 export class WasmNecPeriodicModel implements NecPeriodicModel {
   readonly #cell: WasmNecModel;
-  #hasLattice = false;
+  #lattice: PeriodicLattice | undefined;
 
   constructor(cell: WasmNecModel) {
     this.#cell = cell;
@@ -71,15 +67,14 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
   }
 
   setLattice(lattice: PeriodicLattice): void {
-    const record = requireRecord(lattice, "lattice");
-    const a1M = finitePair(record.a1M, "lattice.a1M");
-    const a2M = finitePair(record.a2M, "lattice.a2M");
-    this.#cell[setLatticeEntry](a1M, a2M);
-    this.#hasLattice = true;
+    const valid = validLattice(lattice, "lattice");
+    this.#cell[setLatticeEntry](valid.a1M, valid.a2M);
+    this.#lattice = valid;
   }
 
   computeScanImpedance(request: ScanImpedanceRequest): ScanImpedanceResult {
-    if (this.state === "disposed" || !this.#hasLattice) {
+    const lattice = this.#lattice;
+    if (this.state === "disposed" || lattice === undefined) {
       throw new NecStateError(
         "computeScanImpedance",
         this.state,
@@ -90,7 +85,7 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
     }
     const record = requireRecord(request, "request");
     const frequencyMHz = positiveNumber(record.frequencyMHz, "request.frequencyMHz");
-    const scanPhasesRad = finitePair(record.scanPhasesRad, "request.scanPhasesRad");
+    const scanPhasesRad = requestedScanPhases(record, lattice, frequencyMHz);
 
     this.#cell[setScanPhasesEntry](scanPhasesRad);
     this.#cell.prepare({ frequencyMHz });
@@ -106,6 +101,26 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
   dispose(): void {
     this.#cell.dispose();
   }
+}
+
+/** Scan phases from exactly one of `scanPhasesRad` and `scanDirection`. */
+function requestedScanPhases(
+  request: Readonly<Record<string, unknown>>,
+  lattice: PeriodicLattice,
+  frequencyMHz: number,
+): ScanPhasesRad {
+  const hasPhases = request.scanPhasesRad !== undefined;
+  const hasDirection = request.scanDirection !== undefined;
+  if (hasPhases === hasDirection) {
+    inputError("request needs exactly one of scanPhasesRad and scanDirection", {
+      name: "request",
+    });
+  }
+  if (hasPhases) {
+    return finitePair(request.scanPhasesRad, "request.scanPhasesRad");
+  }
+  const direction = validScanDirection(request.scanDirection, "request.scanDirection");
+  return scanPhasesForDirection({ lattice, frequencyMHz, ...direction });
 }
 
 export function createPeriodicModelFromModule(module: NecWasmModule): NecPeriodicModel {

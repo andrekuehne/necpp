@@ -39,9 +39,12 @@
 #include "c_geometry.h"
 #include "nec_exception.h"
 #include "nec_periodic_green.h"
+#include "nec_periodic_clearance.h"
  
+#include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <optional>
 
 nec_context::nec_context() : fnorm(0,0), current_vector(0) {
   m_output_fp=NULL;
@@ -403,22 +406,64 @@ void nec_context::stateful_solve_voltage_sources(
   processing_state = PROCESSING_NEAR_FIELD;
 }
 
+/*! The lattice of two vectors in the xy-plane; a nec_exception if they are
+ * not finite or are parallel.
+ */
+static nec_periodic::lattice_2d checked_lattice(
+  nec_float a1x, nec_float a1y, nec_float a2x, nec_float a2y)
+{
+  try {
+    return nec_periodic::lattice_2d({a1x, a1y}, {a2x, a2y});
+  } catch (const std::invalid_argument& error) {
+    nec_exception failure("INVALID LATTICE: ");
+    failure.append(error.what());
+    throw failure;
+  }
+}
+
 void nec_context::stateful_set_periodic(
   nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m,
   nec_float psi1_rad, nec_float psi2_rad)
 {
   if (!std::isfinite(psi1_rad) || !std::isfinite(psi2_rad))
     throw nec_exception("SCAN PHASES MUST BE FINITE");
-  try {
-    // Validates the vectors: finite, in the plane and not parallel.
-    static_cast<void>(nec_periodic::lattice_2d({a1x_m, a1y_m}, {a2x_m, a2y_m}));
-  } catch (const std::invalid_argument& error) {
-    nec_exception failure("INVALID LATTICE: ");
-    failure.append(error.what());
-    throw failure;
-  }
+  static_cast<void>(checked_lattice(a1x_m, a1y_m, a2x_m, a2y_m));
   m_periodic = {true, a1x_m, a1y_m, a2x_m, a2y_m, psi1_rad, psi2_rad};
   m_periodic_green.reset();
+}
+
+void nec_context::stateful_check_periodic_clearance(
+  nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m) const
+{
+  const nec_periodic::lattice_2d lattice =
+    checked_lattice(a1x_m, a1y_m, a2x_m, a2y_m);
+
+  std::vector<nec_periodic::wire_segment> segments(
+    static_cast<size_t>(m_geometry->n_segments));
+  for (int64_t index = 0; index < m_geometry->n_segments; ++index) {
+    nec_3vector start, end;
+    nec_float radius = 0;
+    m_geometry->segment_in_metres(index, start, end, radius);
+    segments[static_cast<size_t>(index)] = {
+      {start(0), start(1), start(2)}, {end(0), end(1), end(2)}, radius};
+  }
+
+  const std::optional<nec_periodic::image_contact> contact =
+    nec_periodic::find_image_contact(segments, lattice, SMIN);
+  if (!contact)
+    return;
+  const int64_t own = static_cast<int64_t>(contact->segment);
+  const int64_t image = static_cast<int64_t>(contact->image_segment);
+  char reason[320];
+  std::snprintf(reason, sizeof(reason),
+    "CONDUCTOR TOO CLOSE TO A PERIODIC IMAGE: SEGMENT %lld (TAG %d) AND THE"
+    " IMAGE OF SEGMENT %lld (TAG %d) IN CELL (%lld, %lld) ARE %.4g M APART"
+    " (AXIS TO AXIS), AT MOST %.4g M (TOUCHING OR NEARLY TOUCHING);"
+    " CONNECTED ARRAYS ARE NOT SUPPORTED",
+    static_cast<long long>(own + 1), m_geometry->segment_tags[own],
+    static_cast<long long>(image + 1), m_geometry->segment_tags[image],
+    contact->m, contact->n, contact->distance, contact->minimum_distance);
+  throw nec_geometry_exception(reason);
 }
 
 void nec_context::stateful_clear_periodic()

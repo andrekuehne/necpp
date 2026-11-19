@@ -178,7 +178,7 @@ export function inputError(message: string, details?: Readonly<Record<string, un
   throw new NecInputError(message, details === undefined ? {} : { details });
 }
 
-function finiteNumber(value: unknown, name: string): number {
+export function finiteNumber(value: unknown, name: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     inputError(`${name} must be a finite number`, { name, value });
   }
