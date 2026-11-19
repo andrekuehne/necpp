@@ -7,12 +7,17 @@ reading the engine and the WASM layer. Formulas are written from the standard
 literature; items that need verification before implementation are marked
 **[verify]**. Cost figures are estimates.
 
-**Implemented so far:** the periodic kernel unit (stage 1, issue #20):
-lattice setup with Gauss reduction, the complex error function and the Ewald
-evaluation of `G_p` and `G_smooth` with gradients, tested in the native
-`[periodic_green]` suite. The spatial, spectral and Ewald formulas below are
-verified numerically there against direct lattice sums with loss, the
-spectral series and independence of the splitting parameter.
+**Implemented so far:** stage 1, the periodic kernel unit, tested in the
+native `[periodic_green]` suite:
+
+- issue #20: lattice setup with Gauss reduction, the complex error function
+  and the Ewald evaluation of `G_p` and `G_smooth` with gradients. The
+  spatial, spectral and Ewald formulas below are verified against direct
+  lattice sums with loss, the spectral series and independence of the
+  splitting parameter.
+- issue #21: the field of a segment under a smooth kernel. Its sign and
+  normalization are verified against `efld_compute` (see
+  [Field of a segment under the smooth kernel](#field-of-a-segment-under-the-smooth-kernel)).
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -190,7 +195,8 @@ of the difference.
   self term, the extended thin-wire kernel and the far-segment lumped
   approximation.
 - `G_smooth` is the only new physics. Because it is smooth, the field it
-  produces can be computed with a 2 or 3 point Gauss rule per source segment.
+  produces can be computed with a low-order Gauss rule per source segment
+  (as implemented: 6 points, see below).
 
 If conductors come close to a cell wall, the nearest images make `G_smooth`
 nearly singular. The remedy is to move the nearest ring (3x3 minus centre)
@@ -219,9 +225,23 @@ segment. Unlike the free-space term, the result is a full 3-vector; the local
 (rho, z) decomposition used in `efld_compute` does not apply because the
 lattice sum is not axially symmetric about the source segment.
 
-**[verify]** The normalization and sign must match `efld_compute`. A direct
-test: feed the new routine with the plain free-space kernel for a source
-displaced by several segment lengths and compare with `efld_compute` output.
+Verified (issue #21): fed with the plain free-space kernel, the routine
+matches `efld_compute` (exact thin-wire branch) to 5.5e-11 for the sine and
+cosine terms and the transverse part of the constant term in parallel,
+collinear, skewed, near and far geometries. The axial part of the constant
+term agrees to about 1e-5, the accuracy of NEC's own Romberg integral
+(`intx`, tolerance 1e-4). Two details came out of that comparison:
+
+- `eta` must be 376.73 ohm, the value fixed in `eksc`/`ekscx`
+  (`j 4.771341189 = j eta / (8 pi^2)`), not `em::impedance()` (about
+  376.7343). The two differ by 1.1e-5, and the smooth correction is added
+  to the `eksc` fill.
+- Under the smooth kernel the Gauss rule converges spectrally. Six points
+  keep the error near 2e-11 for segments up to a tenth of a wavelength. On
+  short segments the charge and end-charge terms cancel to about `(kL)^2`,
+  which amplifies kernel rounding. To keep that rounding near 1e-11, the
+  origin term of `G_smooth` uses its Taylor series through `R^14` up to
+  `R (E + |k|) = 0.3`.
 
 ### Ground
 

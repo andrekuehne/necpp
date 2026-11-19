@@ -3,7 +3,9 @@
 #include <array>
 #include <cmath>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace nec_periodic {
 namespace {
@@ -95,10 +97,10 @@ constexpr double gaussian_cutoff = 36;
 // about a wavelength).
 constexpr double max_kappa = 2;
 // Below this R (E + |k|), the origin term uses its Taylor series (through
-// R^6, truncation error about (0.05 * 2)^8 / 9! < 1e-13) instead of a
-// difference of nearly equal values, whose error grows like 1/R^2 in the
-// gradient.
-constexpr double origin_series_limit = 0.05;
+// R^14, truncation error about (2 * 0.3)^16 / 17! ~ 1e-18) instead of the
+// difference (f(R) - f(-R)) / (8 pi R). That difference loses accuracy like
+// 1/R^2 in the gradient, about 1e-10 relative at 0.05 but 1e-12 at 0.3.
+constexpr double origin_series_limit = 0.3;
 }
 
 lattice_2d::lattice_2d(vec2 a1, vec2 a2) {
@@ -140,7 +142,7 @@ periodic_green::periodic_green(const lattice_2d& lattice, complex_d k, vec2 scan
   // Origin term T(R) = (f(R) - f(-R)) / (8 pi R), f(R) = exp(jkR) erfc(RE + j kappa),
   // so T = (1/4pi) sum over odd n of f^(n)(0) R^(n-1) / n!. With w = RE + j kappa,
   // h(R) = erfc(w): h^(i)(0) = -(2/sqrt pi) E^i (-1)^(i-1) H_(i-1)(j kappa) exp(kappa^2).
-  // Stored as f^(n)(0) / n! for n = 1, 3, 5, 7.
+  // Stored as f^(n)(0) / n! for n = 1, 3, ..., 2 origin_series_terms - 1.
   constexpr int highest = 2 * origin_series_terms - 1;
   const complex_d w0 = j * kappa_;
   complex_d hermite[highest] = {1.0, 2.0 * w0};
@@ -189,7 +191,7 @@ void periodic_green::add_spatial(const point& r, bool subtract_origin_free_term,
       if(origin && subtract_origin_free_term) {
         if(distance * (e + std::abs(k_)) < origin_series_limit) {
           // T = (1/4pi) sum_n c_n R^(n-1), T'/R = (1/4pi) sum_n c_n (n-1) R^(n-3),
-          // n = 1, 3, 5, 7, c_n = f^(n)(0) / n!.
+          // n odd, c_n = f^(n)(0) / n!.
           const double distance2 = distance * distance;
           complex_d value = 0, derivative = 0;
           for(int slot = origin_series_terms - 1; slot >= 0; --slot) {
@@ -254,6 +256,97 @@ green_value periodic_green::full(const point& r) const {
   add_spatial(r, false, sum);
   add_spectral(r, sum);
   return sum;
+}
+
+namespace {
+// Impedance in NEC's thin-wire segment field (eksc, ekscx): their fixed
+// prefactor j 4.771341189 = j eta / (8 pi^2) gives eta = 376.73 ohm,
+// independent of em::impedance() (about 376.7343). The periodic correction is
+// added to that free-space fill, so it uses the same value.
+constexpr double nec_segment_field_impedance = 4.771341189 * 8 * pi * pi;
+
+struct gauss_rule {
+  std::vector<double> node, weight;  // on [-1, 1]
+};
+
+// Gauss-Legendre rules of every order up to max_segment_gauss_order, by Newton
+// iteration on the Legendre polynomial.
+const gauss_rule& gauss_legendre(int order) {
+  static const std::vector<gauss_rule> rules = [] {
+    std::vector<gauss_rule> all(max_segment_gauss_order + 1);
+    for(int n = 1; n <= max_segment_gauss_order; ++n) {
+      gauss_rule& rule = all[n];
+      for(int i = 0; i < n; ++i) {
+        double x = std::cos(pi * (i + 0.75) / (n + 0.5)), derivative = 1;
+        for(int iteration = 0; iteration < 100; ++iteration) {
+          double p0 = 1, p1 = x;
+          for(int m = 2; m <= n; ++m) {
+            const double p2 = ((2 * m - 1) * x * p1 - (m - 1) * p0) / m;
+            p0 = p1;
+            p1 = p2;
+          }
+          derivative = n * (x * p1 - p0) / (x * x - 1);
+          const double step = p1 / derivative;
+          x -= step;
+          if(std::abs(step) < 1e-15) break;
+        }
+        rule.node.push_back(x);
+        rule.weight.push_back(2 / ((1 - x * x) * derivative * derivative));
+      }
+    }
+    return all;
+  }();
+  return rules[order];
+}
+
+std::array<complex_d, 3> axial(const point& direction, complex_d scale) {
+  return {scale * direction[0], scale * direction[1], scale * direction[2]};
+}
+}
+
+segment_field segment_field_of_kernel(const kernel_function& kernel, const source_segment& segment,
+                                      const point& observation, double k, int gauss_order) {
+  if(gauss_order < 1 || gauss_order > max_segment_gauss_order)
+    throw std::invalid_argument("Gauss order must be between 1 and " + std::to_string(max_segment_gauss_order));
+  const gauss_rule& rule = gauss_legendre(gauss_order);
+  const point& u = segment.direction;
+  const double half = segment.length / 2;
+  const auto kernel_at = [&](double s) {
+    return kernel({observation[0] - (segment.centre[0] + s * u[0]), observation[1] - (segment.centre[1] + s * u[1]),
+                   observation[2] - (segment.centre[2] + s * u[2])});
+  };
+  // int I G ds' for I = 1, sin, cos, and int I' grad G ds' for sin (I' = k cos)
+  // and cos (I' = -k sin).
+  complex_d potential_constant = 0, potential_sine = 0, potential_cosine = 0;
+  std::array<complex_d, 3> charge_sine{}, charge_cosine{};
+  for(size_t i = 0; i < rule.node.size(); ++i) {
+    const double s = half * rule.node[i], w = half * rule.weight[i];
+    const green_value g = kernel_at(s);
+    const double sin_ks = std::sin(k * s), cos_ks = std::cos(k * s);
+    potential_constant += w * g.value;
+    potential_sine += w * sin_ks * g.value;
+    potential_cosine += w * cos_ks * g.value;
+    for(int c = 0; c < 3; ++c) {
+      charge_sine[c] += w * k * cos_ks * g.gradient[c];
+      charge_cosine[c] -= w * k * sin_ks * g.gradient[c];
+    }
+  }
+  const green_value plus_end = kernel_at(half), minus_end = kernel_at(-half);
+  const double sin_end = std::sin(k * half), cos_end = std::cos(k * half);
+  const complex_d prefactor = -j * nec_segment_field_impedance / k;
+  // (-j eta / k) [ k^2 s_hat potential + charge - (I(+h) grad G(+h) - I(-h) grad G(-h)) ]
+  const auto field = [&](complex_d potential, const std::array<complex_d, 3>& charge, double i_plus, double i_minus) {
+    const std::array<complex_d, 3> vector_part = axial(u, k * k * potential);
+    std::array<complex_d, 3> e;
+    for(int c = 0; c < 3; ++c)
+      e[c] = prefactor * (vector_part[c] + charge[c] - (i_plus * plus_end.gradient[c] - i_minus * minus_end.gradient[c]));
+    return e;
+  };
+  segment_field result;
+  result.constant = field(potential_constant, {}, 1.0, 1.0);
+  result.sine = field(potential_sine, charge_sine, sin_end, -sin_end);
+  result.cosine = field(potential_cosine, charge_cosine, cos_end, cos_end);
+  return result;
 }
 }
 

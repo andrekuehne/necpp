@@ -14,6 +14,7 @@
 // to xy. Lengths and wavenumbers may use any consistent unit.
 #include <array>
 #include <complex>
+#include <functional>
 
 namespace nec_periodic {
 using complex_d = std::complex<double>;
@@ -81,7 +82,42 @@ private:
   complex_d kappa_;  // k / (2 E), E the splitting parameter
   vec2 kt0_;
   double splitting_ = 0, spatial_radius_ = 0, spectral_radius_ = 0;
-  static constexpr int origin_series_terms = 4;
-  complex_d origin_series_[origin_series_terms];  // f^(n)(0) / n!, n = 1, 3, 5, 7, of the origin term
+  static constexpr int origin_series_terms = 8;
+  complex_d origin_series_[origin_series_terms];  // f^(n)(0) / n!, n = 1, 3, ..., 15, of the origin term
 };
+
+// One straight source segment: centre, unit direction and length.
+struct source_segment {
+  point centre;
+  point direction;
+  double length = 0;
+};
+
+// Electric field at one observation point of a source segment carrying each
+// of NEC's three current terms I(s) = 1, sin(ks), cos(ks), with s measured
+// from the segment centre along its direction. With lengths in wavelengths
+// and k = 2 pi this is NEC's segment-field normalization (exk..ezc).
+struct segment_field {
+  std::array<complex_d, 3> constant, sine, cosine;
+};
+
+// A Green's function kernel G(r), r = observation minus source point, with
+// G including the 1/(4 pi) of exp(-jkR)/(4 pi R).
+using kernel_function = std::function<green_value(const point&)>;
+
+// Six points keep the quadrature error near 2e-11 for segments up to a
+// tenth of a wavelength, below the Ewald kernel's own accuracy (1e-10).
+constexpr int default_segment_gauss_order = 6;
+constexpr int max_segment_gauss_order = 64;
+
+// Field of a segment under a smooth kernel:
+//   E = (-j eta / k) [ k^2 s_hat int I G ds' + int I' grad G ds' - (I grad G) at the ends ],
+// grad with respect to the observation point, eta as in NEC's segment field
+// (376.73 ohm). The end terms carry the charge at the segment ends (NEC's
+// current terms are nonzero there). The integrals use a Gauss-Legendre rule of
+// the given order (1 to max_segment_gauss_order), so the kernel must be
+// smooth along the segment.
+segment_field segment_field_of_kernel(const kernel_function& kernel, const source_segment& segment,
+                                      const point& observation, double k,
+                                      int gauss_order = default_segment_gauss_order);
 }

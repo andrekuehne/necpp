@@ -43,6 +43,7 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/wasm_api_contract_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_ring_field_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_green_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_periodic_segment_field_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp2_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp3_tb.cpp

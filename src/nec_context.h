@@ -962,6 +962,9 @@ public:
 
 private:
   friend class nec_stateful_model;
+  // Defined only in the periodic segment-field test, which checks the
+  // periodic kernel's segment field against efld_compute.
+  friend struct nec_context_segment_field_access;
 
   /*! Return a read-only view for raw ordinary far-field evaluation. */
   nec_far_field_evaluation_input far_field_evaluation_input(

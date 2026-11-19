@@ -168,11 +168,13 @@ TEST_CASE("Ewald kernel matches the spectral series for nonzero vertical offset"
 TEST_CASE("Ewald smooth kernel matches a direct lattice sum with loss", "[periodic_green]") {
   const complex_d k = 2 * pi * complex_d(1.0, -0.08);  // wavelength 1, slight loss
   // Includes points inside and on both sides of the switch from the origin
-  // term's Taylor series to its closed form (R (E + |k|) = 0.05: about
-  // R = 5e-3 for the half-wavelength cells, 6.4e-3 for the large cells).
+  // term's Taylor series to its closed form (R (E + |k|) = 0.3: R from about
+  // 0.03 for the half-wavelength cells to 0.038 for the large cells).
+  // Also keeps the points around the earlier switch point (0.05) from #20.
   const point points[] = {
     {0.0, 0.0, 0.0}, {1e-4, 0.0, 5e-5}, {2e-4, -3e-4, 0.0}, {0.003, 0.0, 0.001}, {4.6e-3, 0.0, 1e-3},
-    {0.0, 5.3e-3, 0.0}, {4.4e-3, 4.4e-3, 0.0}, {0.008, -0.002, 0.0}, {0.1, 0.05, 0.0}, {0.21, -0.13, 0.07},
+    {0.0, 5.3e-3, 0.0}, {4.4e-3, 4.4e-3, 0.0}, {0.008, -0.002, 0.0}, {0.026, 0.0, 0.005}, {0.0, 0.031, 0.0},
+    {0.024, 0.024, 0.0}, {0.036, -0.01, 0.0}, {0.04, 0.0, 0.005}, {0.1, 0.05, 0.0}, {0.21, -0.13, 0.07},
     {0.4, 0.3, -0.2},
   };
   for(const auto& c : all_lattices_and_scans()) {
