@@ -10,6 +10,7 @@ import {
   WasmNecModel,
   createModelFromModule,
   inputError,
+  periodicDiagnosticsEntry,
   positiveNumber,
   requireRecord,
   setLatticeEntry,
@@ -95,6 +96,7 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
       admittance: result.admittance,
       frequencyMHz: result.frequencyMHz,
       scanPhasesRad,
+      diagnostics: this.#cell[periodicDiagnosticsEntry](),
     };
   }
 

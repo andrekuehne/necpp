@@ -40,6 +40,8 @@ public:
   // Transverse wavevector kt0 of the scan state with scan phases
   // psi_i = -kt0 . a_i along the given lattice vectors.
   vec2 scan_wavevector(double psi1, double psi2) const;
+  vec2 a1() const { return a1_; }
+  vec2 a2() const { return a2_; }
   // Reciprocal vectors of the given lattice vectors: a_i . b_j = 2 pi delta_ij.
   vec2 b1() const { return b1_; }
   vec2 b2() const { return b2_; }
@@ -50,6 +52,7 @@ public:
   vec2 reduced_b2() const { return reduced_b2_; }
 
 private:
+  vec2 a1_, a2_;
   vec2 b1_, b2_;  // reciprocal to the given lattice vectors: a_i . b_j = 2 pi delta_ij
   vec2 reduced_a1_, reduced_a2_, reduced_b1_, reduced_b2_;
   double area_ = 0;
@@ -58,6 +61,13 @@ private:
 struct green_value {
   complex_d value;
   std::array<complex_d, 3> gradient;  // with respect to the observation point
+};
+
+// A Floquet mode kt = kt0 + p b1 + q b2, indexed along the reciprocal vectors
+// of the given lattice vectors, with |kz| / |k| (zero at cut-off).
+struct floquet_cutoff {
+  long p = 0, q = 0;
+  double kz_over_k = 0;
 };
 
 // Periodic Green's function of one lattice, wavenumber and scan state,
@@ -76,8 +86,16 @@ public:
   green_value smooth(const point& r) const;
   // The full G_p; singular at every lattice point including the origin.
   green_value full(const point& r) const;
+  // Number of Floquet modes in the spectral sum, the work of one evaluation
+  // (estimated from the spectral radius and the cell area).
+  double spectral_mode_count() const;
+  // The Floquet mode nearest to cut-off. Near it the spectral sum carries a
+  // term of size 1 / kz, which the matrix solution cancels; rounding then
+  // grows like |k| / |kz|.
+  floquet_cutoff nearest_cutoff() const;
 
 private:
+  template <typename Visit> void for_each_mode(double radius, Visit visit) const;
   void add_spatial(const point& r, bool subtract_origin_free_term, green_value& sum) const;
   void add_spectral(const point& r, green_value& sum) const;
   lattice_2d lattice_;

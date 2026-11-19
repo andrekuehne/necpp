@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -108,6 +109,8 @@ lattice_2d::lattice_2d(vec2 a1, vec2 a2) {
   if(!std::isfinite(det) || std::abs(det) <= 1e-12 * norm(a1) * norm(a2))
     throw std::invalid_argument("Lattice vectors must be finite and not parallel");
   area_ = std::abs(det);
+  a1_ = a1;
+  a2_ = a2;
   const reciprocal_pair given = reciprocal(a1, a2);
   b1_ = given.b1;
   b2_ = given.b2;
@@ -217,31 +220,59 @@ void periodic_green::add_spatial(const point& r, bool subtract_origin_free_term,
     }
 }
 
-void periodic_green::add_spectral(const point& r, green_value& sum) const {
+// Calls visit(kt, kz) for every Floquet mode kt = kt0 + p b1 + q b2 (reduced
+// reciprocal vectors) with |kt| <= radius, kz = sqrt(k^2 - kt^2), Im kz <= 0.
+template <typename Visit>
+void periodic_green::for_each_mode(double radius, Visit visit) const {
   const vec2 a1 = lattice_.reduced_a1(), a2 = lattice_.reduced_a2();
   const vec2 b1 = lattice_.reduced_b1(), b2 = lattice_.reduced_b2();
-  // Floquet modes kt = kt0 + p b1 + q b2 with |kt| <= spectral_radius_.
-  const index_range p_range = indices_within(-dot(kt0_, a1) / (2 * pi), spectral_radius_ * norm(a1) / (2 * pi));
-  const index_range q_range = indices_within(-dot(kt0_, a2) / (2 * pi), spectral_radius_ * norm(a2) / (2 * pi));
-  const double e = splitting_, dz = r[2];
-  const complex_d scale = 1.0 / (4.0 * j * lattice_.cell_area());
+  const index_range p_range = indices_within(-dot(kt0_, a1) / (2 * pi), radius * norm(a1) / (2 * pi));
+  const index_range q_range = indices_within(-dot(kt0_, a2) / (2 * pi), radius * norm(a2) / (2 * pi));
   for(long p = p_range.first; p <= p_range.last; ++p)
     for(long q = q_range.first; q <= q_range.last; ++q) {
       const vec2 kt{kt0_.x + p * b1.x + q * b2.x, kt0_.y + p * b1.y + q * b2.y};
-      if(norm(kt) > spectral_radius_) continue;
+      if(norm(kt) > radius) continue;
       complex_d kz = std::sqrt(k_ * k_ - dot(kt, kt));
       if(kz.imag() > 0) kz = -kz;
-      const complex_d alpha = j * kz / (2 * e);
-      const complex_d below = exp_erfc(-j * kz * dz, alpha - dz * e);
-      const complex_d above = exp_erfc(j * kz * dz, alpha + dz * e);
-      const complex_d mode = scale * std::exp(-j * (kt.x * r[0] + kt.y * r[1]));
-      const complex_d value = mode * (below + above) / kz;
-      sum.value += value;
-      sum.gradient[0] += -j * kt.x * value;
-      sum.gradient[1] += -j * kt.y * value;
-      // The Gaussian parts of d/dz cancel between the two terms.
-      sum.gradient[2] += mode * j * (above - below);
+      visit(kt, kz);
     }
+}
+
+double periodic_green::spectral_mode_count() const {
+  return spectral_radius_ * spectral_radius_ * lattice_.cell_area() / (4 * pi);
+}
+
+floquet_cutoff periodic_green::nearest_cutoff() const {
+  // Modes at cut-off have |kt| = |Re k|; twice that covers every candidate.
+  const double magnitude = std::abs(k_);
+  floquet_cutoff nearest;
+  nearest.kz_over_k = std::numeric_limits<double>::infinity();
+  for_each_mode(2 * magnitude, [&](vec2 kt, complex_d kz) {
+    const double ratio = std::abs(kz) / magnitude;
+    if(ratio >= nearest.kz_over_k) return;
+    // Indices along the given lattice vectors' reciprocal vectors.
+    const vec2 step = kt - kt0_;
+    nearest = {std::lround(dot(step, lattice_.a1()) / (2 * pi)), std::lround(dot(step, lattice_.a2()) / (2 * pi)),
+               ratio};
+  });
+  return nearest;
+}
+
+void periodic_green::add_spectral(const point& r, green_value& sum) const {
+  const double e = splitting_, dz = r[2];
+  const complex_d scale = 1.0 / (4.0 * j * lattice_.cell_area());
+  for_each_mode(spectral_radius_, [&](vec2 kt, complex_d kz) {
+    const complex_d alpha = j * kz / (2 * e);
+    const complex_d below = exp_erfc(-j * kz * dz, alpha - dz * e);
+    const complex_d above = exp_erfc(j * kz * dz, alpha + dz * e);
+    const complex_d mode = scale * std::exp(-j * (kt.x * r[0] + kt.y * r[1]));
+    const complex_d value = mode * (below + above) / kz;
+    sum.value += value;
+    sum.gradient[0] += -j * kt.x * value;
+    sum.gradient[1] += -j * kt.y * value;
+    // The Gaussian parts of d/dz cancel between the two terms.
+    sum.gradient[2] += mode * j * (above - below);
+  });
 }
 
 green_value periodic_green::smooth(const point& r) const {

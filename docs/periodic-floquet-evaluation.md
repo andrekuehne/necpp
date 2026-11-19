@@ -80,6 +80,38 @@ Stage 2 so far:
   Collinear dipoles with 5 mm gaps match a tapered finite array to 1.2 %,
   which is the finite array's edge error and larger than the close-image
   effect, so that case guards only against gross errors.
+- issue #25: accuracy reporting and refusals. One fixed tolerance, `1e-5`
+  relative to the largest scan-impedance entry (`nec_periodic_accuracy.h`),
+  and no numerical parameters in the API. Every result carries an estimated
+  error and a point status. The estimate covers the solver's numerics: the
+  Ewald kernel (`1e-10`), the 6-point Gauss rule over the longest segment
+  (`1e-10 max(1, (L / 0.1)^10)`, L in wavelengths, at least four times the
+  error measured on lattices of 0.5, 1 and 3 wavelengths) and the rounding
+  near the Floquet mode nearest to cut-off (`eps / (|kz| / k)`). Refused
+  instead of loosened: cells whose spectral sum would need more than 10000
+  modes per evaluation (about 320 square wavelengths; the cost grows with the
+  cell area, 22 s for one 11-segment dipole in a 40 wavelength cell), segments
+  above about 0.3 wavelengths, and scan states exactly on a Wood anomaly.
+  Next to one the solution is benign: the scan impedance follows the
+  expected square-root kink down to 1e-12 of cut-off, finite throughout, and
+  even at the closest floating-point states (`|kz| / k` about 1e-8) the noise
+  is about 1e-9, consistent with `eps / (|kz| / k)`. NEC's `pi()` is truncated
+  (3.1415926536), so k and the reciprocal vectors differ by 1.6e-11 and an
+  exact cut-off is reached only by searching for it.
+  Thin-wire modelling error is not part of the estimate. The difference
+  between the thin-wire route of close images and the filament of the smooth
+  kernel is not mainly `(a/d)^2`, as assumed for issue #24: NEC's reduced
+  kernel evaluates the free-space kernel at `sqrt(d^2 + a^2)` at every
+  distance, a phase of about `k a^2 / (2 d)` far from the wire, whereas the
+  field of a tube current differs from a filament only by order `(ka)^2` and
+  `(a/d)^2`. Sending more images through the thin-wire kernel does not
+  converge (the lattice sum of that phase converges only conditionally): from
+  the issue #24 reach to 16 times it, with the thin-wire kernel evaluated by
+  the Gauss rule so that `efld_compute`'s Romberg tolerance plays no part, the
+  scan impedance moves by 7e-6 (1 mm wires, 0.7 x 0.5 wavelength cell, 22 cm
+  end gaps), 1e-5 (10 cm gaps), 3e-5 (5 mm gaps), 6e-5 (stack with 10 mm
+  pitch) and 3e-4 (5 mm wires, 2 cm gaps). That is the order by which a
+  finite NEC array differs from the periodic result for this reason alone.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -234,7 +266,8 @@ sums keep every term whose Gaussian factor exceeds `exp(-36)`: lattice points
 within a radius of the observation point (spatial), and Floquet modes with
 `|k_tpq| <= sqrt(|k|^2 + 144 E^2)` (spectral), enumerated over Gauss-reduced
 lattice vectors. A half-wavelength cell then needs about 40 terms per sum
-rather than 9 to 25; the fixed tolerance (stage 2) may loosen this. The
+rather than 9 to 25; the fixed tolerance (issue #25) keeps the kernel at
+`1e-10`, well inside it. The
 complex error function uses Weideman's rational approximation of the
 Faddeeva function (40 terms, about 1e-13 relative), with `exp(a) erfc(z)`
 combined so neither factor overflows.

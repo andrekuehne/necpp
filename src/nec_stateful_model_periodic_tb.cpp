@@ -5,11 +5,18 @@
 */
 #include <catch2/catch_test_macros.hpp>
 
+#include "c_geometry.h"
+#include "electromag.h"
+#include "math_util.h"
+#include "nec_context.h"
 #include "nec_exception.h"
+#include "nec_periodic_accuracy.h"
+#include "nec_periodic_green.h"
 #include "nec_stateful_model.h"
 
 #include <cmath>
 #include <limits>
+#include <string>
 #include <vector>
 
 namespace {
@@ -44,6 +51,24 @@ nec_far_field_grid one_direction()
   nec_far_field_grid grid;
   grid.theta_start_deg = 90.0;
   return grid;
+}
+
+// The reason of the refusal the operation must raise as an Exception.
+template <typename Exception, typename Operation>
+std::string refusal(Operation operation)
+{
+  try {
+    operation();
+  } catch (const Exception& error) {
+    return error.get_message();
+  }
+  FAIL("the operation was not refused");
+  return {};
+}
+
+bool mentions(const std::string& reason, const char* text)
+{
+  return reason.find(text) != std::string::npos;
 }
 
 } // namespace
@@ -143,12 +168,23 @@ TEST_CASE("Periodic mode refuses symmetry, ground and single-cell fields", "[per
     build_dipole_cell(model);
     nec_ground_definition perfect;
     perfect.kind = nec_ground_kind::perfect;
+    nec_ground_definition finite;
+    finite.kind = nec_ground_kind::finite_reflection_coefficient;
+    finite.relative_permittivity = 13.0;
+    finite.conductivity_s_per_m = 0.005;
     model.set_ground(perfect);
-    REQUIRE_THROWS_AS(model.set_lattice(square_lattice(0.7)), nec_exception);
+    REQUIRE(mentions(refusal<nec_geometry_exception>(
+      [&] { model.set_lattice(square_lattice(0.7)); }), "PERFECT GROUND"));
+    model.set_ground(finite);
+    REQUIRE(mentions(refusal<nec_geometry_exception>(
+      [&] { model.set_lattice(square_lattice(0.7)); }), "FINITE GROUND"));
 
     model.set_ground(nec_ground_definition{});
     model.set_lattice(square_lattice(0.7));
-    REQUIRE_THROWS_AS(model.set_ground(perfect), nec_exception);
+    REQUIRE(mentions(refusal<nec_geometry_exception>(
+      [&] { model.set_ground(perfect); }), "PERFECT GROUND"));
+    REQUIRE(mentions(refusal<nec_geometry_exception>(
+      [&] { model.set_ground(finite); }), "FINITE GROUND"));
   }
 
   SECTION("far fields")
@@ -167,3 +203,114 @@ TEST_CASE("Periodic mode refuses symmetry, ground and single-cell fields", "[per
     REQUIRE_THROWS_AS(model.characterize_isolated_element(request), nec_exception);
   }
 }
+
+TEST_CASE("Periodic scan impedances carry an estimated error and a point status", "[periodic_model]")
+{
+  nec_stateful_model model;
+  build_dipole_cell(model);
+  model.prepare(frequency_mhz);
+  REQUIRE_FALSE(model.compute_impedance_matrix().periodic.has_value());
+
+  model.set_lattice(square_lattice(0.7));
+  model.set_scan_phases(0.8, 0.3);
+  model.prepare(frequency_mhz);
+  const nec_impedance_result& result = model.compute_impedance_matrix();
+  REQUIRE(result.periodic.has_value());
+  REQUIRE(result.periodic->estimated_error > 0.0);
+  REQUIRE(result.periodic->estimated_error <= nec_periodic::tolerance);
+  REQUIRE(result.periodic->status == nec_periodic_point_status::ok);
+}
+
+TEST_CASE("A scan state exactly on a Wood anomaly is refused instead of returning NaN", "[periodic_model]")
+{
+  // At this frequency one metre is exactly one wavelength in the engine's
+  // arithmetic, where k = two_pi(). Broadside, the Floquet mode along the
+  // reciprocal vector 2 pi / d of a1 = (d, 0) is exactly at cut-off when
+  // 2 pi / d rounds to k; search the spacings next to 2 pi / k for it.
+  const nec_float frequency = em::speed_of_light() / 1.0e6;
+  REQUIRE(1.0e6 * frequency / em::speed_of_light() == 1.0);
+  const nec_float exact_two_pi = 2.0 * std::acos(-1.0);
+  nec_float spacing = exact_two_pi / two_pi();
+  bool on_cutoff = false;
+  for (int step = 0; step < 64 && !on_cutoff; ++step) {
+    for (const nec_float candidate : {
+           spacing + step * std::numeric_limits<nec_float>::epsilon(),
+           spacing - step * std::numeric_limits<nec_float>::epsilon()}) {
+      const nec_periodic::lattice_2d lattice({candidate, 0.0}, {0.0, 1.0});
+      if (nec_periodic::periodic_green(lattice, two_pi(), {0.0, 0.0})
+            .nearest_cutoff().kz_over_k == 0.0) {
+        spacing = candidate;
+        on_cutoff = true;
+        break;
+      }
+    }
+  }
+  REQUIRE(on_cutoff);
+
+  nec_stateful_model model;
+  build_dipole_cell(model);
+  model.set_lattice({spacing, 0.0, 0.0, 1.0});
+  REQUIRE(mentions(refusal<nec_exception>([&] { model.prepare(frequency); }),
+    "WOOD ANOMALY"));
+}
+
+TEST_CASE("A unit cell too large for the tolerance is refused with the reason", "[periodic_model]")
+{
+  // 400 square wavelengths: the spectral sum would need about 12600 modes.
+  nec_stateful_model model;
+  build_dipole_cell(model);
+  model.set_lattice(square_lattice(20.0));
+  REQUIRE(mentions(refusal<nec_geometry_exception>(
+    [&] { model.prepare(frequency_mhz); }), "UNIT CELL TOO LARGE"));
+}
+
+TEST_CASE("Segments too long for the tolerance are refused with the reason", "[periodic_model]")
+{
+  // A vertical dipole of three 0.35 wavelength segments.
+  nec_stateful_model model;
+  model.add_wire({1, 3, 0.0, 0.0, -0.525, 0.0, 0.0, 0.525, 0.001});
+  model.complete_geometry();
+  model.define_ports({{1, 2}});
+  model.set_lattice(square_lattice(0.7));
+  REQUIRE(mentions(refusal<nec_geometry_exception>(
+    [&] { model.prepare(frequency_mhz); }), "TOO LONG"));
+}
+
+TEST_CASE("The engine refuses patches, networks and transmission lines in periodic mode", "[periodic_model]")
+{
+  // The stateful model cannot express these; the engine refuses them should
+  // a later entry point combine them with a lattice.
+  nec_context nec;
+  nec.initialize();
+  c_geometry* geometry = nec.get_geometry();
+  geometry->wire(1, 11, 0.0, 0.0, -0.24, 0.0, 0.0, 0.24, 0.001, 1.0, 1.0);
+  geometry->wire(2, 11, 0.2, 0.0, -0.24, 0.2, 0.0, 0.24, 0.001, 1.0, 1.0);
+
+  SECTION("surface patches")
+  {
+    nec.sp_card(0, 0.1, 0.3, 0.0, 90.0, 0.0, 0.01);
+    nec.geometry_complete(0);
+    nec.stateful_set_periodic(0.7, 0.0, 0.0, 0.7, 0.0, 0.0);
+    REQUIRE(mentions(refusal<nec_geometry_exception>(
+      [&] { nec.stateful_prepare_frequency(frequency_mhz); }), "SURFACE PATCHES"));
+  }
+
+  SECTION("networks")
+  {
+    nec.geometry_complete(0);
+    nec.nt_card(1, 6, 2, 6, 0.0, -0.01, 0.0, 0.01, 0.0, -0.01);
+    nec.stateful_set_periodic(0.7, 0.0, 0.0, 0.7, 0.0, 0.0);
+    REQUIRE(mentions(refusal<nec_geometry_exception>(
+      [&] { nec.stateful_prepare_frequency(frequency_mhz); }), "NETWORKS"));
+  }
+
+  SECTION("transmission lines")
+  {
+    nec.geometry_complete(0);
+    nec.tl_card(1, 6, 2, 6, 50.0, 0.2, 0.0, 0.0, 0.0, 0.0);
+    nec.stateful_set_periodic(0.7, 0.0, 0.0, 0.7, 0.0, 0.0);
+    REQUIRE(mentions(refusal<nec_geometry_exception>(
+      [&] { nec.stateful_prepare_frequency(frequency_mhz); }), "TRANSMISSION LINES"));
+  }
+}
+

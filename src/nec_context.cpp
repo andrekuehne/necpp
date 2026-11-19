@@ -38,11 +38,13 @@
 #include "nec_far_field.h"
 #include "c_geometry.h"
 #include "nec_exception.h"
+#include "nec_periodic_accuracy.h"
 #include "nec_periodic_green.h"
 #include "nec_periodic_clearance.h"
  
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <optional>
 
@@ -326,6 +328,28 @@ static nec_float periodic_close_image_reach(nec_float length, nec_float radius)
     periodic_close_image_radii * radius);
 }
 
+/*! Refuse what periodic mode does not support, with the reason. The
+ * periodic correction assumes one full, unreduced fill of wires in free
+ * space.
+ */
+void nec_context::refuse_unsupported_periodic_configuration() const
+{
+  if (m_geometry->m > 0)
+    throw nec_geometry_exception(
+      "SURFACE PATCHES ARE NOT SUPPORTED IN PERIODIC MODE");
+  if (network_count > 0)
+    throw nec_geometry_exception(ntyp[0] == 1
+      ? "NETWORKS ARE NOT SUPPORTED IN PERIODIC MODE (UNTESTED)"
+      : "TRANSMISSION LINES ARE NOT SUPPORTED IN PERIODIC MODE (UNTESTED)");
+  if (ground.present())
+    throw nec_geometry_exception(ground.type_perfect()
+      ? "PERFECT GROUND IS NOT YET SUPPORTED IN PERIODIC MODE"
+      : "FINITE GROUND IS NOT SUPPORTED IN PERIODIC MODE UNTIL LAYERED STACKS ARRIVE");
+  if (nop != 1)
+    throw nec_geometry_exception(
+      "GEOMETRY SYMMETRY IS NOT SUPPORTED IN PERIODIC MODE");
+}
+
 void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
 {
   if (!(frequency_mhz > 0.0) || !std::isfinite(frequency_mhz))
@@ -339,10 +363,8 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
   cm.resize(matrix_size);
 
   nop = int32_t(neq / npeq);
-  // The periodic correction assumes one full, unreduced fill in free space.
-  if (m_periodic.active && (nop != 1 || ground.present()))
-    throw nec_exception(
-      "PERIODIC MODE REQUIRES FREE SPACE AND GEOMETRY WITHOUT SYMMETRY");
+  if (m_periodic.active)
+    refuse_unsupported_periodic_configuration();
   symmetry_array.resize(nop * nop);
   fblock(npeq, neq, matrix_size, m_geometry->m_ipsym);
 
@@ -353,6 +375,7 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
   // as c_geometry::frequency_scale scales the wires.
   m_periodic_green.reset();
   m_periodic_close_images.clear();
+  m_periodic_estimated_error = 0;
   if (m_periodic.active) {
     const nec_float per_metre = (1.0e6 * freq_mhz) / em::speed_of_light();
     const nec_periodic::lattice_2d lattice(
@@ -360,8 +383,47 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
       {m_periodic.a2x_m * per_metre, m_periodic.a2y_m * per_metre});
     const nec_periodic::vec2 scan_wavevector =
       lattice.scan_wavevector(m_periodic.psi1_rad, m_periodic.psi2_rad);
-    m_periodic_green = std::make_shared<const nec_periodic::periodic_green>(
+    auto green = std::make_shared<const nec_periodic::periodic_green>(
       lattice, two_pi(), scan_wavevector);
+
+    char reason[320];
+    const nec_float modes = green->spectral_mode_count();
+    if (modes > nec_periodic::max_spectral_modes) {
+      std::snprintf(reason, sizeof(reason),
+        "UNIT CELL TOO LARGE FOR THE PERIODIC KERNEL: AT THE PERIODIC TOLERANCE,"
+        " %.4g SQUARE WAVELENGTHS WOULD NEED ABOUT %.0f FLOQUET MODES PER KERNEL"
+        " EVALUATION, AT MOST %.0f; MODEL THE ARRAY AS A FINITE ARRAY",
+        lattice.cell_area(), modes, nec_periodic::max_spectral_modes);
+      throw nec_geometry_exception(reason);
+    }
+
+    // The estimated error: the kernel, the Gauss rule over the longest
+    // segment (in wavelengths here) and, near cut-off, where the spectral sum
+    // carries a term of size 1 / kz that the solution cancels, the rounding
+    // left behind, growing like k / kz.
+    nec_float longest = 0;
+    for (int64_t index = 0; index < m_geometry->n_segments; ++index)
+      longest = std::max(longest, m_geometry->segment_length[index]);
+    const nec_float quadrature = nec_periodic::gauss_error(longest);
+    const nec_periodic::floquet_cutoff cutoff = green->nearest_cutoff();
+    const nec_float rounding =
+      std::numeric_limits<nec_float>::epsilon() / cutoff.kz_over_k;
+    m_periodic_estimated_error = nec_periodic::kernel_error + quadrature + rounding;
+    if (!(m_periodic_estimated_error <= nec_periodic::tolerance)) {
+      if (rounding < quadrature) {
+        std::snprintf(reason, sizeof(reason),
+          "SEGMENTS OF %.3g WAVELENGTHS ARE TOO LONG FOR THE PERIODIC TOLERANCE:"
+          " THE PERIODIC CORRECTION NEEDS SEGMENTS OF AT MOST ABOUT 0.3 WAVELENGTHS",
+          longest);
+        throw nec_geometry_exception(reason);
+      }
+      std::snprintf(reason, sizeof(reason),
+        "SCAN STATE ON A WOOD ANOMALY: FLOQUET MODE (%ld, %ld) IS AT CUT-OFF"
+        " (KZ = 0), WHERE THE PERIODIC TOLERANCE CANNOT BE REACHED",
+        cutoff.p, cutoff.q);
+      throw nec_exception(reason);
+    }
+    m_periodic_green = green;
 
     // Every translation under which an image comes within the largest reach
     // of any segment; add_periodic_correction picks per segment pair.
