@@ -2,11 +2,17 @@
 
 ## Status
 
-**Evaluation with design decisions, 2026-11-18.** Nothing described here is
-implemented or prototyped. The findings come from reading the engine and the
-WASM layer. Formulas are written from the standard literature and have not
-been checked numerically against this code base; items that need verification
-before implementation are marked **[verify]**. Cost figures are estimates.
+**Evaluation with design decisions, 2026-11-18.** The findings come from
+reading the engine and the WASM layer. Formulas are written from the standard
+literature; items that need verification before implementation are marked
+**[verify]**. Cost figures are estimates.
+
+**Implemented so far:** the periodic kernel unit (stage 1, issue #20):
+lattice setup with Gauss reduction, the complex error function and the Ewald
+evaluation of `G_p` and `G_smooth` with gradients, tested in the native
+`[periodic_green]` suite. The spatial, spectral and Ewald formulas below are
+verified numerically there against direct lattice sums with loss, the
+spectral series and independence of the splitting parameter.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -67,7 +73,8 @@ Observations that matter for the design:
 - The stateful model and the WASM ABI expose voltage and current drives only.
   Plane-wave excitation exists in the legacy card path but is not reachable
   from the stateful model.
-- The repository has no complex error function (`erfc` of complex argument).
+- The repository had no complex error function (`erfc` of complex argument);
+  the periodic kernel unit now provides one.
 - The LU solver is general (not symmetric-only), so a non-symmetric
   interaction matrix is acceptable to the solver itself.
 
@@ -137,8 +144,8 @@ Spectral (Floquet) form, with `k_tpq = k_t0 + p b1 + q b2` and
 The spectral form converges exponentially only when `|z - z'| > 0`, so it is
 useless for a planar or thin cell but is exactly what the Floquet port needs.
 
-Ewald form, usable everywhere, with splitting parameter `E` **[verify signs
-and prefactors against the references before coding]**:
+Ewald form, usable everywhere, with splitting parameter `E` (signs and
+prefactors verified in the `[periodic_green]` suite):
 
     G_p = G_spat + G_spec
 
@@ -150,11 +157,20 @@ and prefactors against the references before coding]**:
              [ exp(-j kz_pq dz) erfc(j kz_pq/(2E) - dz E)
              + exp(+j kz_pq dz) erfc(j kz_pq/(2E) + dz E) ],   dz = z - z'
 
-Both sums converge like a Gaussian; with `E = sqrt(pi / A)` roughly 9 to 25
-terms each are enough. For cells larger than about one wavelength the optimal
-`E` causes loss of significance (large terms cancelling); `E` must then be
-raised so that `k/(2E)` stays bounded (around 3), at the cost of more spectral
-terms.
+Both sums converge like a Gaussian. For cells larger than about one
+wavelength the optimal `E = sqrt(pi / A)` causes loss of significance (terms
+of size `exp((k/2E)^2)` cancelling); `E` must then be raised so that `k/(2E)`
+stays bounded, at the cost of more spectral terms.
+
+As implemented: `E = max(sqrt(pi / A), |Re(k)| / 4)`, so `k/(2E) <= 2`. Both
+sums keep every term whose Gaussian factor exceeds `exp(-36)`: lattice points
+within a radius of the observation point (spatial), and Floquet modes with
+`|k_tpq| <= sqrt(|k|^2 + 144 E^2)` (spectral), enumerated over Gauss-reduced
+lattice vectors. A half-wavelength cell then needs about 40 terms per sum
+rather than 9 to 25; the fixed tolerance (stage 2) may loosen this. The
+complex error function uses Weideman's rational approximation of the
+Faddeeva function (40 terms, about 1e-13 relative), with `exp(a) erfc(z)`
+combined so neither factor overflows.
 
 ### Splitting off what NEC already does
 
@@ -163,9 +179,12 @@ Write
     G_p = G_free(0,0) + G_smooth
     G_smooth = G_spec + G_spat(without its (0,0) term) + [ G_spat(0,0) - G_free ]
 
-The bracket is finite at `R -> 0` (the 1/R singularities cancel; the limit
-has a closed form involving `erfc` and its derivative), so `G_smooth` is
-smooth everywhere inside the cell.
+The bracket is finite at `R -> 0` (the 1/R singularities cancel), so
+`G_smooth` is smooth everywhere inside the cell. With
+`f(R) = exp(jkR) erfc(RE + jk/(2E))` the bracket equals
+`(f(R) - f(-R)) / (8 pi R)`; near `R = 0` the implementation uses its Taylor
+series in `R^2` (odd derivatives of `f` through Hermite polynomials) instead
+of the difference.
 
 - `G_free(0,0)` is the existing NEC interaction, unchanged, including the
   self term, the extended thin-wire kernel and the far-segment lumped

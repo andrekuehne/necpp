@@ -79,7 +79,9 @@ Run one Catch2 work-package partition directly:
 ```
 
 Registered CTest entries are `necpp_unit`, `necpp_wp1`, `necpp_wp2`,
-`necpp_wp3`, `necpp_wp4`, and `necpp_smoke_hertzian_dipole`. The test binary is compiled
+`necpp_wp3`, `necpp_wp4`, `necpp_wp_s2`, `necpp_wp_s3`,
+`necpp_periodic_green` (periodic Green's function kernel), and
+`necpp_smoke_hertzian_dipole`. The test binary is compiled
 with `NEC_ERROR_CHECK=1`, so direct runs can emit substantial solver tracing.
 
 ## Docker native build
