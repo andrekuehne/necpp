@@ -1,5 +1,41 @@
-// Finite-array references for the periodic-model tests.
-import { createNecArraySolver } from "../.test-build/src/index.js";
+// Shared unit cells and finite-array references for the periodic-model tests.
+import { createNecArraySolver, createNecPeriodicModel } from "../.test-build/src/index.js";
+
+// About one-metre wavelength; half-wave dipoles along x.
+export const FREQUENCY_MHZ = 299.792458;
+export const HALF_LENGTH_M = 0.24;
+export const RADIUS_M = 0.001;
+export const SEGMENTS = 11;
+export const FEED_SEGMENT = 6;
+
+/** A half-wave dipole along x, centred at `centre`, as a finite-array pattern wire. */
+export const dipoleWire = (id, [x, y], radiusM = RADIUS_M) => ({
+  id,
+  segments: SEGMENTS,
+  startM: [x - HALF_LENGTH_M, y, 0],
+  endM: [x + HALF_LENGTH_M, y, 0],
+  radiusM,
+});
+
+/**
+ * A periodic model of x-directed half-wave dipoles centred at `centres`, one
+ * port per dipole, without a lattice.
+ */
+export async function dipoleCell(centres, radiusM = RADIUS_M) {
+  const cell = await createNecPeriodicModel();
+  centres.forEach(([x, y], index) => {
+    cell.addWire({
+      tag: index + 1,
+      segments: SEGMENTS,
+      start: [x - HALF_LENGTH_M, y, 0],
+      end: [x + HALF_LENGTH_M, y, 0],
+      radiusM,
+    });
+  });
+  cell.completeGeometry();
+  cell.definePorts(centres.map((_, index) => ({ tag: index + 1, segment: FEED_SEGMENT })));
+  return cell;
+}
 
 export function entry(matrix, row, column) {
   const index = row * matrix.columns + column;

@@ -37,7 +37,7 @@
 class c_geometry;
 class nec_stateful_model;
 struct nec_far_field_evaluation_input;
-namespace nec_periodic { class periodic_green; }
+namespace nec_periodic { class periodic_green; struct wire_segment; }
 
 enum excitation_return {
     FREQ_PRINT_NORMALIZATION = 0,
@@ -988,7 +988,17 @@ private:
   periodic_state m_periodic;
   // Built for the prepared frequency; null outside periodic mode.
   std::shared_ptr<const nec_periodic::periodic_green> m_periodic_green;
-  void add_periodic_correction(nec_float xi, nec_float yi, nec_float zi);
+  // Lattice translations, in wavelengths, under which some periodic image
+  // comes close to the unit cell, with their scan phase factors. For each
+  // observation point and source segment, the images within reach go
+  // through efld_compute instead of the smooth kernel, like the ground image.
+  struct periodic_close_image {
+    nec_float x = 0, y = 0;
+    nec_complex phase;
+  };
+  std::vector<periodic_close_image> m_periodic_close_images;
+  std::vector<nec_periodic::wire_segment> periodic_wire_segments_m() const;
+  void add_periodic_correction(nec_float xi, nec_float yi, nec_float zi, nec_float ai);
 
   friend class nec_stateful_model;
   // Defined only in the periodic segment-field test, which checks the

@@ -35,6 +35,10 @@ _Avoid_: element (one radiator; a unit cell can hold several), reference element
 **Periodic image**:
 The copy of a unit-cell conductor in another cell of the infinite array, displaced by a lattice translation. Not the ground image of a conductor over perfect ground.
 
+**Close image**:
+A periodic image of a source segment near enough to an observation point that it is evaluated with the finite model's thin-wire kernel rather than the smooth part of the periodic Green's function. Chosen per observation point and source segment.
+_Avoid_: near image, image ring
+
 **Clearance**:
 The separation between the unit cell's conductors and the periodic images of all of them. A lattice under which a conductor touches or nearly touches a periodic image is refused: that would be a connected array.
 _Avoid_: distance to the cell wall (no unique shape for a non-rectangular lattice)

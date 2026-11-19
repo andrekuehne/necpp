@@ -49,18 +49,26 @@ double segment_distance(const point& p1, const point& q1, const point& p2, const
   return length(minus(plus_scaled(p1, d1, s), plus_scaled(p2, d2, t)));
 }
 
-std::optional<image_contact> find_image_contact(const std::vector<wire_segment>& segments,
-                                                const lattice_2d& lattice, double contact_fraction) {
-  if(segments.empty()) return std::nullopt;
+namespace {
+double segment_length(const wire_segment& segment) { return length(minus(segment.end, segment.start)); }
 
-  // A contact needs the image within reach of a segment: the in-plane extent
-  // of the cell plus twice the largest reach (half length, radius and
-  // tolerance) bounds the translations worth checking.
-  double reach = 0;
+double segment_distance(const wire_segment& own, const wire_segment& other, const vec2& translation) {
+  return nec_periodic::segment_distance(own.start, own.end, translated(other.start, translation.x, translation.y),
+                                        translated(other.end, translation.x, translation.y));
+}
+
+// Lattice translations, other than zero and one of each pair T, -T, under
+// which an image of some segment may come within `reach` of a segment, axis
+// to axis. A pair (i, j) at T is the pair (j, i) at -T, so half the
+// translations cover every pair.
+std::vector<vec2> candidate_translations(const std::vector<wire_segment>& segments, const lattice_2d& lattice,
+                                         double reach) {
+  // The in-plane extent of the cell plus the longest segment and the reach
+  // bounds the translations worth checking.
+  double longest = 0;
   double low_x = segments[0].start[0], high_x = low_x, low_y = segments[0].start[1], high_y = low_y;
   for(const wire_segment& segment : segments) {
-    const double segment_length = length(minus(segment.end, segment.start));
-    reach = std::max(reach, segment_length * (0.5 + contact_fraction) + segment.radius);
+    longest = std::max(longest, segment_length(segment));
     for(const point& end : {segment.start, segment.end}) {
       low_x = std::min(low_x, end[0]);
       high_x = std::max(high_x, end[0]);
@@ -68,7 +76,7 @@ std::optional<image_contact> find_image_contact(const std::vector<wire_segment>&
       high_y = std::max(high_y, end[1]);
     }
   }
-  const double search_radius = std::hypot(high_x - low_x, high_y - low_y) + 2 * reach;
+  const double search_radius = std::hypot(high_x - low_x, high_y - low_y) + longest + reach;
 
   // Enumerate over the reduced vectors, which keeps the index range tight
   // for skewed lattice vectors: |m| <= R |b1| / (2 pi) for every point within R.
@@ -76,37 +84,65 @@ std::optional<image_contact> find_image_contact(const std::vector<wire_segment>&
   const vec2 b1 = lattice.reduced_b1(), b2 = lattice.reduced_b2();
   const long long m_max = static_cast<long long>(std::ceil(search_radius * std::hypot(b1.x, b1.y) / (2 * pi)));
   const long long n_max = static_cast<long long>(std::ceil(search_radius * std::hypot(b2.x, b2.y) / (2 * pi)));
-
-  for(long long m = 0; m <= m_max; ++m) {
+  std::vector<vec2> translations;
+  for(long long m = 0; m <= m_max; ++m)
     for(long long n = -n_max; n <= n_max; ++n) {
-      // A pair (i, j) at translation T is the pair (j, i) at -T, so half the
-      // translations suffice.
       if(m == 0 && n <= 0) continue;
-      const double tx = m * a1.x + n * a2.x, ty = m * a1.y + n * a2.y;
-      if(std::hypot(tx, ty) > search_radius) continue;
-      for(std::size_t i = 0; i < segments.size(); ++i) {
-        const wire_segment& own = segments[i];
-        const double own_length = length(minus(own.end, own.start));
-        for(std::size_t k = 0; k < segments.size(); ++k) {
-          const wire_segment& other = segments[k];
-          const double minimum_distance =
-            own.radius + other.radius +
-            contact_fraction * std::max(own_length, length(minus(other.end, other.start)));
-          const double distance = segment_distance(own.start, own.end, translated(other.start, tx, ty),
-                                                   translated(other.end, tx, ty));
-          if(distance > minimum_distance) continue;
-          // Report the image cell along the lattice vectors as given.
-          const vec2 given_b1 = lattice.b1(), given_b2 = lattice.b2();
-          return image_contact{i,
-                               k,
-                               std::llround((tx * given_b1.x + ty * given_b1.y) / (2 * pi)),
-                               std::llround((tx * given_b2.x + ty * given_b2.y) / (2 * pi)),
-                               distance,
-                               minimum_distance};
-        }
+      const vec2 translation{m * a1.x + n * a2.x, m * a1.y + n * a2.y};
+      if(std::hypot(translation.x, translation.y) <= search_radius) translations.push_back(translation);
+    }
+  return translations;
+}
+}
+
+std::optional<image_contact> find_image_contact(const std::vector<wire_segment>& segments,
+                                                const lattice_2d& lattice, double contact_fraction) {
+  if(segments.empty()) return std::nullopt;
+  // The largest threshold of any pair bounds the search.
+  double largest_radius = 0, longest = 0;
+  for(const wire_segment& segment : segments) {
+    largest_radius = std::max(largest_radius, segment.radius);
+    longest = std::max(longest, segment_length(segment));
+  }
+  const double reach = 2 * largest_radius + contact_fraction * longest;
+
+  for(const vec2& translation : candidate_translations(segments, lattice, reach)) {
+    for(std::size_t i = 0; i < segments.size(); ++i) {
+      const wire_segment& own = segments[i];
+      for(std::size_t k = 0; k < segments.size(); ++k) {
+        const wire_segment& other = segments[k];
+        const double minimum_distance = own.radius + other.radius +
+                                        contact_fraction * std::max(segment_length(own), segment_length(other));
+        const double distance = segment_distance(own, other, translation);
+        if(distance > minimum_distance) continue;
+        // Report the image cell along the lattice vectors as given.
+        const vec2 given_b1 = lattice.b1(), given_b2 = lattice.b2();
+        return image_contact{i,
+                             k,
+                             std::llround((translation.x * given_b1.x + translation.y * given_b1.y) / (2 * pi)),
+                             std::llround((translation.x * given_b2.x + translation.y * given_b2.y) / (2 * pi)),
+                             distance,
+                             minimum_distance};
       }
     }
   }
   return std::nullopt;
+}
+
+std::vector<vec2> close_image_translations(const std::vector<wire_segment>& segments, const lattice_2d& lattice,
+                                           double reach) {
+  std::vector<vec2> close;
+  if(segments.empty()) return close;
+  for(const vec2& translation : candidate_translations(segments, lattice, reach)) {
+    bool is_close = false;
+    for(std::size_t i = 0; i < segments.size() && !is_close; ++i)
+      for(std::size_t k = 0; k < segments.size() && !is_close; ++k)
+        is_close = segment_distance(segments[i], segments[k], translation) <= reach;
+    if(is_close) {
+      close.push_back(translation);
+      close.push_back({-translation.x, -translation.y});
+    }
+  }
+  return close;
 }
 }

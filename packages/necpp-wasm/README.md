@@ -862,7 +862,10 @@ all ports of the cell.
   segment axes is at most the sum of the two wire radii plus NEC's segment
   joining tolerance (0.001 times the longer segment's length). Connected
   arrays are not supported. Conductors that keep clear but come close to a
-  neighbouring cell's conductors are accepted; results lose accuracy there.
+  neighbouring cell's conductors (tightly packed cells, small end gaps) need
+  no special input: close periodic images are evaluated with the same
+  thin-wire kernel as a finite array. Dividing the same array into larger
+  cells changes the scan impedance by a few 1e-6 relative.
 
 ## Direct mode and worker mode
 
