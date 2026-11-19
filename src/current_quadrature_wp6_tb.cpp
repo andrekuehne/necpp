@@ -325,9 +325,7 @@ TEST_CASE("WP6 native baseline JSON is recorded",
   (void)turnstile_bytes;
 
   const std::filesystem::path destination =
-    std::filesystem::path(__FILE__).parent_path().parent_path()
-    / "packages" / "necpp-wasm" / "bench" / "evidence"
-    / "current-quadrature-wp6" / "native-baseline.json";
+    current_quadrature_fixtures::native_baseline_destination("current-quadrature-wp6");
   std::filesystem::create_directories(destination.parent_path());
   std::ofstream output(destination, std::ios::trunc);
   REQUIRE(output.good());

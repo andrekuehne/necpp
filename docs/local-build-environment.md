@@ -84,6 +84,17 @@ Registered CTest entries are `necpp_unit`, `necpp_wp1`, `necpp_wp2`,
 `necpp_smoke_hertzian_dipole`. The test binary is compiled
 with `NEC_ERROR_CHECK=1`, so direct runs can emit substantial solver tracing.
 
+The current-quadrature baseline tests (`[baseline]`) record timing JSON. By
+default they write it to `<temp>/necpp-bench-evidence/`, so a test run leaves
+the tree clean. To refresh the committed evidence under
+`packages/necpp-wasm/bench/evidence/`, run them with the variable set:
+
+```powershell
+$env:NECPP_WRITE_BENCH_EVIDENCE = "1"
+& "build-wp0\tests\Release\nec2++_tests.exe" "[baseline]"
+Remove-Item Env:NECPP_WRITE_BENCH_EVIDENCE
+```
+
 ## Docker native build
 
 The locally available `emscripten/emsdk:4.0.7` image also contains:
