@@ -13,6 +13,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <string>
 
@@ -34,8 +35,10 @@ const char* kPatternWithBlankSense =
     "   89.00      0.00     -9.34   -34.22    -9.33      0.0510     -1.46 LEFT    1.5271E-01     77.57  8.7103E-03   -166.00\n"
     "\n";
 
+// In the temp directory, so a test run never touches the working directory
+// (running the binary from the repository root used to delete a tracked copy).
 std::string write_temp_file(const char* contents) {
-    std::string path = "radiation_input_tb.tmp";
+    std::string path = (std::filesystem::temp_directory_path() / "radiation_input_tb.tmp").string();
     std::ofstream os(path.c_str());
     os << contents;
     os.close();
