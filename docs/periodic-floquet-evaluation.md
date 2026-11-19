@@ -2,17 +2,22 @@
 
 ## Status
 
-**Evaluation only, 2026-11-18.** Nothing described here is implemented or
-prototyped. The findings come from reading the engine and the WASM layer.
-Formulas are written from the standard literature and have not been checked
-numerically against this code base; items that need verification before
-implementation are marked **[verify]**. Cost figures are estimates.
+**Evaluation with design decisions, 2026-11-18.** Nothing described here is
+implemented or prototyped. The findings come from reading the engine and the
+WASM layer. Formulas are written from the standard literature and have not
+been checked numerically against this code base; items that need verification
+before implementation are marked **[verify]**. Cost figures are estimates.
+
+The design decisions taken after the evaluation are collected in
+[Decisions](#decisions). Where they change an earlier section, that section
+says so. Terms follow [`GLOSSARY.md`](../GLOSSARY.md); the layered-stack route
+is recorded in [ADR 0001](adr/0001-layered-stacks-in-matrix-fill.md).
 
 ## Goal
 
 1. Define an antenna configuration (the unit cell) and a 2D lattice, and get
-   back the periodic (active / scan) Z and Y of the unit-cell ports for given
-   scan directions.
+   back the scan impedance and scan admittance (Z and Y) of the unit-cell
+   ports for given scan states.
 2. As an additional feature, a Floquet port at a defined height above the
    cell: Floquet-mode amplitudes radiated by the cell, and eventually a
    generalized scattering matrix between circuit ports and Floquet modes.
@@ -81,8 +86,41 @@ The scan state is the transverse wavevector `k_t0`. Two equivalent inputs:
 - inter-element phases: `psi_i = -k_t0 . a_i`.
 
 Phases are the better primary input: they also cover invisible space
-(`|k_t0| > k`), which is needed if the active Y is later integrated over the
-Brillouin zone. (theta, phi) is a convenience on top.
+(`|k_t0| > k`), which is needed if the scan admittance is later integrated
+over the Brillouin zone. (theta, phi) is a convenience on top. The phases are
+always relative to the user's `a1`, `a2`; any internal basis reduction is
+mapped back before results are returned.
+
+### Lattice types
+
+All five planar lattice types are special cases of the general `a1`, `a2`
+above, so the kernel, the Floquet-mode indexing and the Bloch phase need no
+per-type code. Named presets exist only in TypeScript.
+
+| Lattice | `a1`, `a2` | Array-literature name |
+|---|---|---|
+| Square | `(d,0)`, `(0,d)` | square grid |
+| Rectangular | `(dx,0)`, `(0,dy)` | rectangular grid |
+| Centered rectangular | `(dx,0)`, `(dx/2,dy)` | staggered / offset-row grid |
+| Hexagonal | `(d,0)`, `(d/2, d*sqrt(3)/2)` | equilateral triangular grid |
+| Oblique | anything else | skewed grid |
+
+Three implementation details depend on the lattice:
+
+- Spatial and spectral sums are truncated by radius, not by an index box
+  `|m|,|n| <= M`, which converges poorly for skewed lattices.
+- A strongly skewed input basis is reduced internally (Lagrange/Gauss
+  reduction) to keep the term count low.
+- Clearance is checked as the distance from each conductor to its own
+  periodic images, not to a cell wall, which has no unique shape for a
+  non-rectangular lattice.
+
+Honeycomb, kagome and dual-polarized arrays with offset sub-lattices are not
+lattices; they are a lattice with several elements per unit cell. The
+hexagonal lattice's six nearest Wood-anomaly circles sit further from the
+visible region than the square lattice's four for the same element density,
+which is the classic reason it allows about 13 % fewer elements for the same
+grating-lobe-free scan range.
 
 ### Periodic Green's function
 
@@ -171,9 +209,37 @@ displaced by several segment lengths and compare with `efld_compute` output.
 - **Perfect ground:** the image source gets the same treatment as the direct
   source (free-space image term from existing code, plus a smooth correction
   for the image lattice).
-- **Finite ground:** out of scope initially. It is attractive later because in
+- **Finite ground** (soil of infinite extent, `GroundModel` `kind: "finite"`):
+  not in stage 2. It arrives in stage 3b as one case of a layered stack: in
   the spectral domain each Floquet mode sees an exact Fresnel coefficient, so
   no Sommerfeld integrals are needed.
+
+### Layered stacks (stage 3b)
+
+Decided in [ADR 0001](adr/0001-layered-stacks-in-matrix-fill.md). The wires
+live in an air region. Above and below it, layered stacks that are uniform in
+the lattice plane (radome, substrate below the wires, finite ground) act on
+each Floquet mode `(p, q)` only through a TE and a TM reflection coefficient
+from a transmission-line model of the stack. Such stacks do not couple
+Floquet modes.
+
+Each mode leaves a source segment, reflects off the stack and returns to an
+observation segment, which adds
+
+    Z_refl = sum_pq U_pq Gamma_pq V_pq^T
+
+a sum of rank-2 (TE + TM) terms. `V_pq` is the modal segment integral the
+Floquet port already computes in stage 3, so the code is shared. The terms
+decay like `exp(-|kz_pq| * 2 g)` over the air gap `g`, so they need no Ewald
+treatment. Perfect ground stays on the image route, because reflection terms
+converge badly for wires close to the ground.
+
+- A conductor that enters a stack is rejected.
+- The mode count is chosen from the decay against the fixed tolerance; above a
+  mode cap the configuration is refused, never silently truncated. The gap and
+  mode count are reported in the diagnostics.
+- With a stack above the array, the embedded (0,0) amplitude is the wave
+  transmitted through the stack.
 
 ## Engine changes for periodic Z/Y
 
@@ -193,20 +259,35 @@ displaced by several segment lengths and compare with `efld_compute` output.
 6. **C ABI (additive):** e.g. `necpp_wasm_v1_set_lattice`,
    `necpp_wasm_v1_set_scan_phases`, `necpp_wasm_v1_clear_lattice`; add to the
    exported-function list in `src/CMakeLists.txt`.
-7. **TypeScript:** a periodic variant of `NecModel` (or options on it), worker
-   protocol entries, and a sweep helper that loops scan points.
+7. **TypeScript:** a separate `PeriodicModel` type (decided), worker protocol
+   entries, lattice presets, and a scan sweep over caller-given scan states
+   that runs on the worker pool, can be cancelled and delivers results in
+   chunks.
+8. **Wood anomalies:** Floquet modes near cut-off are split out of the
+   spectral sum. Their singular part tends to `(2/gamma)` times a separable
+   rank-2 (TE + TM) term, independent of `dz`; solving with a low-rank
+   (Woodbury) update on the LU keeps port quantities finite and smooth in
+   `gamma`, including `gamma = 0` exactly. The per-point status marks "on or
+   near cut-off"; NaN is reserved for genuine failure.
+9. **Tolerance:** one fixed internal tolerance for Ewald sums, mode truncation
+   and stack modes. No truncation parameters in the API; each result carries
+   an estimated error. A configuration that cannot reach the tolerance is
+   refused.
 
 Everything downstream of the matrix (loads, port definition, Y by unit-voltage
 solves, Z by inversion, power budget) works unchanged. The result at each scan
-point is the P x P active admittance of the P unit-cell ports.
+point is the P x P scan admittance of the P unit-cell ports.
 
 ### Restrictions for a first version
 
-- 2D lattice in the xy-plane only. A 1D (linear) periodic array needs a
-  different Green's function.
+- 2D lattice in the xy-plane only, parallel to any ground. A 1D (linear)
+  periodic array needs a different Green's function and would get its own
+  entry points; 3D stacking is out of scope.
 - Wires only; no surface patches.
-- No conductor may touch or cross the cell boundary (see connected arrays).
-- Free space or perfect ground only.
+- No conductor may touch its own periodic image, checked by image distance
+  (see connected arrays).
+- Free space or perfect ground only; layered stacks and finite ground follow
+  in stage 3b.
 - Geometry symmetry reduction disabled.
 - Networks and transmission lines: untested in this mode; exclude until
   checked.
@@ -252,8 +333,13 @@ ground, add the image current to `N`.
   integral of `(A + B sin ks + C cos ks) exp(j k . r')` is the same expression
   with a complex direction cosine; this needs a small generalization.
 - The inputs (segment centres, tangents, lengths, A/B/C coefficients) are
-  already exported by `getCurrentDistribution`, so this stage can be done in
-  TypeScript first and moved into C++ only if performance requires.
+  already exported by `getCurrentDistribution`. **Decided:** the amplitudes are
+  nevertheless computed in C++, because the stage 3b matrix fill needs the
+  same modal segment integrals and sweeps run to thousands of scan points.
+- Amplitudes per port are normalized as `EmbeddedFieldNormalization`: unit
+  voltage with the other ports shorted, or unit current with them open.
+  Generator-referred, terminated versions are derived in TypeScript from the
+  scan impedance.
 
 Modes are split into TE and TM with respect to z and power-normalized. The
 power carried per cell by a propagating mode is
@@ -288,30 +374,85 @@ Without a ground plane a second port below the cell is required for the
 transmitted wave. Only propagating modes need to be supported as incident
 modes; evanescent modes are useful as outputs when `h` is small.
 
+### Finite-array pattern from the periodic result
+
+A windowed array (a finite block of driven elements inside the infinite array,
+all other elements present and terminated) has the pattern
+
+    E(theta, phi) = g_inf(theta, phi) * sum_mn a_mn exp(+j k r_hat . rho_mn)
+    a_mn = w_mn exp(-j k_t0 . rho_mn)
+
+exactly, where `g_inf(theta, phi)` is the scan element pattern: the (0,0)
+Floquet amplitude at the scan state `k_t = k sin(theta) (cos(phi), sin(phi))`.
+It therefore needs a scan sweep over the visible region, not only the steering
+state. Only truncation (edge effects) is left out; a direct finite solve with
+`array-solver.ts` is the exact reference.
+
+- **Approximation, flagged:** every driven element is taken to see the scan
+  impedance of the steering direction. Per-element active impedances of the
+  windowed array need the Brillouin-zone mutual coupling below and come later.
+  Until then, the finite-array solve gives exact per-element active impedances
+  for arrays of moderate size without a radome.
+- **Sampling:** `g_inf` comes from a sweep on an `auto` u-v grid inside the
+  unit circle (spacing from the unit-cell size, with a `manual` override),
+  refined along both sides of the Wood-anomaly circles. These are known in
+  advance: unit circles centred on the reciprocal-lattice points scaled by
+  `1/k`. Interpolation never crosses a circle.
+- **API:** the package exposes the result as a scan element pattern object
+  that can be evaluated at any `(u, v)`, so any consumer field grid and
+  display frame works. The array factor stays with the consumer.
+- **Termination consistency:** the windowed model is exactly periodic only if
+  the passive elements' termination equals the generators' internal impedance
+  (short with ideal voltage drive, open with ideal current drive, or a common
+  generator impedance).
+- **What stays honest:** the infinite model overstates scan blindness. A
+  radome guided wave needs many cells to build up, so a small real array
+  shows a shallower, wider and shifted dip. The notch also appears in every
+  steered pattern, because `g_inf` multiplies them all.
+
 ### Mutual coupling from the periodic result
 
 The coupling between the reference element and element (m, n) in the infinite
-array is the Fourier coefficient of the active admittance over the Brillouin
+array is the Fourier coefficient of the scan admittance over the Brillouin
 zone:
 
     Y_mn = 1/(4 pi^2) * double integral over psi1, psi2 of
            Y(psi1, psi2) exp(-j (m psi1 + n psi2))      [verify sign convention]
 
-The integrand is singular on the Wood-anomaly curves, so the quadrature needs
-care. This is optional and purely a TS-side feature.
+The integrand stays finite on the Wood-anomaly curves but has square-root
+kinks there, so a uniform grid converges slowly in the far couplings and the
+quadrature needs care. A uniform N x N grid followed by a 2D FFT gives the
+couplings of an array that repeats every N cells (aliased), which is a usable
+first approximation. This is optional and purely a TS-side feature.
+
+**Why deferred (stage 5):** the existing finite-array solve already answers
+"what does each element of my array see?" for arrays of moderate size, and it
+does better: real edges, no aliasing, scan blindness damped correctly. The
+Brillouin route gives a windowed array (elements outside the window present
+and shorted), not a finite one, and costs a full scan-phase sweep including
+invisible space. It only becomes worthwhile where the finite solve cannot go:
+
+- **Layered stacks** (after stage 3b): NEC-2 has no dielectric layers, so
+  this is the only way to get element-to-element coupling and per-element
+  active impedance with a radome or substrate included.
+- **Very large arrays**, where the finite MoM becomes too slow. One sweep then
+  serves every window size, shape and taper.
+- **Isolating edge effects**, by comparing the finite array against the
+  windowed array of the same size.
 
 ## Risks and open questions
 
 | Risk | Consequence | Mitigation |
 |---|---|---|
 | Sign / normalization mismatch with NEC's field routines | Wrong Z that looks plausible | Free-space-kernel comparison test against `efld_compute` |
-| Wood anomalies (`kz_pq = 0`) | Kernel diverges; ill-conditioned matrix | Detect and report through the existing conditioning status; never return silently |
+| Wood anomalies (`kz_pq = 0`) | Kernel diverges; ill-conditioned matrix | Split near-cut-off modes out as rank-2 terms and solve with a low-rank update, so results stay finite; flag the point's status |
 | Ewald breakdown for large cells or high frequency | Loss of accuracy | Bound `k/(2E)`; test with cells of several wavelengths |
 | Conductors near the cell wall | Low-order quadrature of `G_smooth` inaccurate | Nearest-image ring through `efld_compute`; clearance check |
 | Code assuming symmetric Z | Wrong results outside the engine core | Audit stateful model, ABI and TS for symmetry assumptions |
 | Complex `erfc` implementation | Accuracy and licence | Use a known algorithm; unit-test against reference values |
 | Scan-sweep run time | Slow visualizer interaction | Free-space matrix cache, worker pool, later kernel interpolation |
-| Connected arrays requested early | Changes basis-function handling in stage 2 | Decide before stage 2 (see below) |
+| Connected arrays requested early | Changes basis-function handling in stage 2 | Decided: not in stage 2 (see below) |
+| Stack too close to the wires | Too many Floquet modes for the tolerance | Mode cap; refuse rather than truncate; report gap and mode count |
 
 ### Connected arrays
 
@@ -329,9 +470,10 @@ for validation once it exists.
 |---|---|---|---|
 | 1 | Periodic kernel unit: Ewald `G_smooth` and gradient, complex `erfc`, tests against a brute-force lattice sum with small loss and against the spectral form at `dz > 0` | none | small |
 | 2 | Lattice and scan state, matrix-fill correction, free-space cache, stateful model, ABI, TS periodic model returning Y/Z | 1 | largest |
-| 3 | Floquet transmit amplitudes, TE/TM normalization, scan element pattern, power check | 2 | small to medium |
+| 3 | Floquet transmit amplitudes (C++), TE/TM normalization, scan element pattern object, finite-array pattern support, power check | 2 | small to medium |
+| 3b | Layered stacks above and below the wires (radome, substrate, finite ground) through per-mode reflection terms in the matrix fill | 3 | medium |
 | 4 | Floquet-mode excitation, full generalized S-matrix, lower port | 3 | medium |
-| 5 | Connected arrays; finite ground through spectral Fresnel coefficients; sweep acceleration; Brillouin-zone mutual coupling | 2 to 4 | open-ended |
+| 5 | Connected arrays; sweep acceleration (scan-space symmetry, adaptive refinement); Brillouin-zone mutual coupling and per-element windowed active impedance | 2 to 4 | open-ended |
 
 Stage 1 has no effect on existing behaviour and can be merged on its own.
 
@@ -351,18 +493,75 @@ Stage 1 has no effect on existing behaviour and can be merged on its own.
   arrays with and without a ground plane.
 - **Power:** port power against Floquet power plus loss for every test case.
 - **Reciprocity:** `Z(psi) = Z(-psi)^T`; transmit and receive Floquet entries.
+- **Lattice types:** centre-element active impedance of large finite
+  hexagonal and centered-rectangular arrays from `array-solver.ts` against the
+  periodic scan impedance.
+- **Windowed pattern:** against direct finite solves at 8x8, 16x16 and 32x32,
+  showing the edge error shrinking.
+- **Wood anomalies:** circle positions predicted from the reciprocal lattice
+  against the observed kinks in the scan impedance; finite values exactly on
+  a circle.
+- **Layered stacks:** an `eps_r = 1` layer changes nothing; thin-layer limit;
+  power closure including dielectric loss; a published wide-angle impedance
+  matching (WAIM) sheet case (Magill and Wheeler, from memory **[verify]**).
+- **Finite ground:** against NEC's existing reflection-coefficient ground in
+  the large-spacing limit.
 
-## Decisions needed before stage 2
+## Decisions
 
-1. **Scan input:** phases (psi1, psi2) as primary input with (theta, phi) as a
-   convenience (recommended), or angles only.
-2. **Connected arrays:** needed early or not. If yes, the basis-function work
-   should be designed together with stage 2.
-3. **API shape:** a separate periodic model type in TS, or lattice options on
-   the existing `NecModel`. A separate type makes it easier to reject
-   far-field calls and to return scan-indexed results.
-4. **Where Floquet amplitudes are computed:** TypeScript from the exported
-   current distribution (faster to build) or C++ (faster to run in sweeps).
+Taken 2026-11-18. Terms as in [`GLOSSARY.md`](../GLOSSARY.md).
+
+**Scope**
+
+1. The first target is phased-array scan impedance. Frequency-selective
+   surfaces follow with the Floquet excitation in stage 4. Work is in the
+   necpp backend only (engine, ABI, `necpp-wasm`).
+
+**Lattice**
+
+2. One general lattice given by `a1`, `a2` in the engine and ABI; named
+   presets only in TypeScript. No `latticeType` enum.
+3. Honeycomb and sub-lattice arrangements are a lattice with several elements
+   per unit cell, not a lattice type.
+4. 2D periodicity in the xy-plane only, parallel to any ground. No 1D or 3D
+   periodicity, and no ABI placeholders for them.
+
+**Scan and API**
+
+5. Scan phases `(psi1, psi2)` along the user's `a1`, `a2` are the primary
+   input; `(theta, phi)` is a convenience. Internal basis reduction is mapped
+   back.
+6. A separate `PeriodicModel` type in TypeScript, without far-field calls.
+7. The P x P result is the scan impedance / scan admittance; active impedance
+   keeps its per-drive meaning.
+8. Floquet amplitudes are computed in C++, normalized as
+   `EmbeddedFieldNormalization`; terminated versions are derived in
+   TypeScript.
+9. Wood anomalies return finite values through a low-rank split of
+   near-cut-off modes; the status flags them and NaN means genuine failure.
+10. One fixed internal tolerance, no truncation parameters, an estimated error
+    in the diagnostics, and refusal when the tolerance cannot be met.
+
+**Physics scope**
+
+11. No connected arrays in stage 2; clearance is checked by image distance.
+12. Stage 2 supports free space and perfect ground (image route) only.
+13. Layered stacks (radome, substrate, finite ground) enter through per-mode
+    TE/TM reflection terms in the matrix fill, in a new stage 3b
+    ([ADR 0001](adr/0001-layered-stacks-in-matrix-fill.md)). Conductors may
+    not enter a stack; too small a gap is refused.
+
+**Finite-array pattern**
+
+14. Version 1 is the windowed array: array factor times scan element pattern,
+    with the steering-direction scan impedance for every element flagged as an
+    approximation. Per-element windowed active impedance follows the
+    Brillouin-zone work.
+15. The scan element pattern comes from an `auto` u-v sweep (with `manual`
+    override) refined along the Wood circles, exposed as an object
+    evaluable at any `(u, v)`.
+16. Sweeps run on the worker pool, can be cancelled and deliver results in
+    chunks.
 
 ## References to consult
 
