@@ -27,7 +27,9 @@ configure=(
 
 if [[ "${NECPP_SANITIZE:-}" == "address" ]]; then
   build_dir="${build_dir}-asan"
-  sanitize="-fsanitize=address,undefined -fno-omit-frame-pointer -g"
+  # -fno-sanitize-recover makes undefined behaviour fail the test; otherwise
+  # UBSan only prints, and ctest hides the output of passing tests.
+  sanitize="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -g"
   configure+=(
     "-DCMAKE_C_FLAGS=${sanitize}"
     "-DCMAKE_CXX_FLAGS=${sanitize}"
