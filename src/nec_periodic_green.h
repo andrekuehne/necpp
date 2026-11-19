@@ -89,6 +89,9 @@ private:
   complex_d origin_series_[origin_series_terms];  // f^(n)(0) / n!, n = 1, 3, ..., 15, of the origin term
 };
 
+// The free-space kernel exp(-jkR)/(4 pi R), R = |r| > 0, and its gradient.
+green_value free_space_green(const point& r, complex_d k);
+
 // One straight source segment: centre, unit direction and length.
 struct source_segment {
   point centre;

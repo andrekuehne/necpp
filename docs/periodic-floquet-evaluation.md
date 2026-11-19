@@ -55,6 +55,31 @@ Stage 2 so far:
   the same finite results by 19 to 29 %. Oblique lattice vectors and their reduced
   equivalent agree to 8e-15 for the same physical scan state, and a scan
   direction gives the same result as its scan phases.
+- issue #24: close images. For each observation point (segment centre) and
+  source segment, the images of the source within `max(2 L, 40 a)` of the
+  observation point (L, a the source segment's length and radius; capped at
+  `rkh / 2`, below `efld_compute`'s lumped approximation) are taken out of
+  `G_smooth` and evaluated through `efld_compute` with a displaced source and
+  the scan phase factor. Images are chosen by distance per pair, not as a
+  fixed 3x3 ring, so skewed lattices and cells larger than one lattice step
+  need nothing special, and distant pairs keep the exact Gauss-integrated
+  route. Measured with collinear half-wave dipoles (11 segments, radius 0.001
+  wavelengths) against a reference that sends every image within 40 segment
+  lengths through `efld_compute` (lumped approximation off): the filament
+  route was off by 7.6e-5 at a 0.02 wavelength end gap and 3.6e-4 at 0.003;
+  the thin-wire route stays at 5.7e-6 for any reach of one segment length or
+  more. The error was never the Gauss rule (6 and 64 points agree to 3e-7 at
+  a 0.003 gap) but the filament model of a close image, whose difference
+  from the thin-wire kernel grows like `(a/d)^2`; hence the reach in radii
+  (at 5 mm radius the jump where an image switches route is 9e-5 with two
+  segment lengths, 3.3e-6 with 40 radii). Verified at the package seam: a
+  stack of parallel dipoles 10 wire radii apart gives the same scan
+  impedance as a one-dipole cell and as a two-dipole supercell to 3.0e-6
+  (9.5e-4 before); the jump where an image switches route is 2.1e-6 (1 mm
+  wires) and 3.3e-6 (5 mm); cells without close images are unchanged.
+  Collinear dipoles with 5 mm gaps match a tapered finite array to 1.2 %,
+  which is the finite array's edge error and larger than the close-image
+  effect, so that case guards only against gross errors.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -236,11 +261,14 @@ of the difference.
   (as implemented: 6 points, see below).
 
 If conductors come close to a cell wall, the nearest images make `G_smooth`
-nearly singular. The remedy is to move the nearest ring (3x3 minus centre)
-out of `G_smooth` and evaluate those eight images through the existing
-`efld_compute` with a displaced source and a phase factor, the same way the
-ground image is handled today. Those image fields are scan-independent apart
-from the phase factor.
+nearly singular. The remedy is to move the nearest images out of `G_smooth`
+and evaluate them through the existing `efld_compute` with a displaced source
+and a phase factor, the same way the ground image is handled today. Those
+image fields are scan-independent apart from the phase factor. As
+implemented (issue #24), the images moved out are chosen by distance per
+observation point and source segment rather than as a fixed 3x3 ring; in
+practice the thin-wire kernel, not the Gauss rule, is what the close images
+need.
 
 ### Field of a segment under the smooth kernel
 

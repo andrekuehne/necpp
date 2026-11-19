@@ -733,6 +733,15 @@ joins segment ends. The `NecGeometryError` names the two segments, their
 tags, the image cell along the given lattice vectors and both distances. A
 refused lattice leaves the model unchanged.
 
+Close images: for each observation point (segment centre) and source
+segment, the periodic images of the source within `max(2 L, 40 a)` of the
+observation point (L the source segment's length, a its radius, at most half
+a wavelength) are taken out of the smooth part of the periodic Green's
+function and evaluated through NEC's thin-wire segment field, displaced and
+multiplied by their scan phase factor, as the ground image is. Close
+conductors in neighbouring cells then interact as in a finite array. Where an
+image changes route, the scan impedance steps by a few 1e-6 relative.
+
 The native C ABI adds `necpp_wasm_v1_set_lattice`,
 `necpp_wasm_v1_clear_lattice` and `necpp_wasm_v1_set_scan_phases`. They are
 additive v1 symbols; `necpp_wasm_v1_set_lattice` returns the geometry status

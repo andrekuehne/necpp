@@ -7,49 +7,22 @@ import {
   NecInputError,
   NecStateError,
   centeredRectangularLattice,
-  createNecPeriodicModel,
   hexagonalLattice,
   rectangularLattice,
   scanPhasesForDirection,
   squareLattice,
 } from "../.test-build/src/index.js";
-import { finiteArrayCentreImpedance, relativeMatrixError } from "./periodic-reference.mjs";
+import {
+  FEED_SEGMENT,
+  FREQUENCY_MHZ,
+  dipoleCell,
+  dipoleWire,
+  finiteArrayCentreImpedance,
+  relativeMatrixError,
+} from "./periodic-reference.mjs";
 
 const hasWasm = existsSync(new URL("../.test-build/src/nec2pp.wasm", import.meta.url));
 const skip = !hasWasm && "WASM artifacts have not been built";
-
-// About one-metre wavelength.
-const FREQUENCY_MHZ = 299.792458;
-const HALF_LENGTH_M = 0.24;
-const RADIUS_M = 0.001;
-const SEGMENTS = 11;
-const FEED_SEGMENT = 6;
-
-/** A half-wave dipole along x, centred at `centre`, as a finite-array pattern wire. */
-const dipoleWire = (id, [x, y]) => ({
-  id,
-  segments: SEGMENTS,
-  startM: [x - HALF_LENGTH_M, y, 0],
-  endM: [x + HALF_LENGTH_M, y, 0],
-  radiusM: RADIUS_M,
-});
-
-/** A periodic model of x-directed dipoles centred at `centres`, without a lattice. */
-async function dipoleCell(centres) {
-  const cell = await createNecPeriodicModel();
-  centres.forEach(([x, y], index) => {
-    cell.addWire({
-      tag: index + 1,
-      segments: SEGMENTS,
-      start: [x - HALF_LENGTH_M, y, 0],
-      end: [x + HALF_LENGTH_M, y, 0],
-      radiusM: RADIUS_M,
-    });
-  });
-  cell.completeGeometry();
-  cell.definePorts(centres.map((_, index) => ({ tag: index + 1, segment: FEED_SEGMENT })));
-  return cell;
-}
 
 /**
  * Scan impedance of a unit cell of x-directed dipoles at the given centres,

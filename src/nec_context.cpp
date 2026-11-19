@@ -312,6 +312,20 @@ void nec_context::geometry_complete(int gpflag) {
   calc_prepare();
 }
 
+/*! The distance, in the unit of its arguments, within which a periodic image
+ * of a source segment is evaluated through NEC's thin-wire segment field
+ * rather than the smooth kernel: two segment lengths, or for thick wires
+ * periodic_close_image_radii radii, beyond which the filament of the smooth
+ * kernel and the thin-wire kernel agree closely.
+ */
+static constexpr nec_float periodic_close_image_lengths = 2.0;
+static constexpr nec_float periodic_close_image_radii = 40.0;
+static nec_float periodic_close_image_reach(nec_float length, nec_float radius)
+{
+  return std::max(periodic_close_image_lengths * length,
+    periodic_close_image_radii * radius);
+}
+
 void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
 {
   if (!(frequency_mhz > 0.0) || !std::isfinite(frequency_mhz))
@@ -338,14 +352,32 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
   // The fill works in wavelengths (k = 2 pi); scale the lattice the same way
   // as c_geometry::frequency_scale scales the wires.
   m_periodic_green.reset();
+  m_periodic_close_images.clear();
   if (m_periodic.active) {
     const nec_float per_metre = (1.0e6 * freq_mhz) / em::speed_of_light();
     const nec_periodic::lattice_2d lattice(
       {m_periodic.a1x_m * per_metre, m_periodic.a1y_m * per_metre},
       {m_periodic.a2x_m * per_metre, m_periodic.a2y_m * per_metre});
+    const nec_periodic::vec2 scan_wavevector =
+      lattice.scan_wavevector(m_periodic.psi1_rad, m_periodic.psi2_rad);
     m_periodic_green = std::make_shared<const nec_periodic::periodic_green>(
-      lattice, two_pi(),
-      lattice.scan_wavevector(m_periodic.psi1_rad, m_periodic.psi2_rad));
+      lattice, two_pi(), scan_wavevector);
+
+    // Every translation under which an image comes within the largest reach
+    // of any segment; add_periodic_correction picks per segment pair.
+    nec_float reach = 0;
+    for (int64_t index = 0; index < m_geometry->n_segments; ++index)
+      reach = std::max(reach, periodic_close_image_reach(
+        m_geometry->segment_length[index], m_geometry->segment_radius[index]));
+    const nec_float metres_per_wavelength = 1.0 / per_metre;
+    const nec_periodic::lattice_2d lattice_m(
+      {m_periodic.a1x_m, m_periodic.a1y_m}, {m_periodic.a2x_m, m_periodic.a2y_m});
+    for (const nec_periodic::vec2& translation : nec_periodic::close_image_translations(
+           periodic_wire_segments_m(), lattice_m, reach * metres_per_wavelength)) {
+      const nec_float x = translation.x * per_metre, y = translation.y * per_metre;
+      m_periodic_close_images.push_back({x, y,
+        std::exp(nec_complex(0.0, -(scan_wavevector.x * x + scan_wavevector.y * y)))});
+    }
   }
 
   processing_state = PROCESSING_STRUCTURE_LOADING;
@@ -432,12 +464,8 @@ void nec_context::stateful_set_periodic(
   m_periodic_green.reset();
 }
 
-void nec_context::stateful_check_periodic_clearance(
-  nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m) const
+std::vector<nec_periodic::wire_segment> nec_context::periodic_wire_segments_m() const
 {
-  const nec_periodic::lattice_2d lattice =
-    checked_lattice(a1x_m, a1y_m, a2x_m, a2y_m);
-
   std::vector<nec_periodic::wire_segment> segments(
     static_cast<size_t>(m_geometry->n_segments));
   for (int64_t index = 0; index < m_geometry->n_segments; ++index) {
@@ -447,9 +475,17 @@ void nec_context::stateful_check_periodic_clearance(
     segments[static_cast<size_t>(index)] = {
       {start(0), start(1), start(2)}, {end(0), end(1), end(2)}, radius};
   }
+  return segments;
+}
+
+void nec_context::stateful_check_periodic_clearance(
+  nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m) const
+{
+  const nec_periodic::lattice_2d lattice =
+    checked_lattice(a1x_m, a1y_m, a2x_m, a2y_m);
 
   const std::optional<nec_periodic::image_contact> contact =
-    nec_periodic::find_image_contact(segments, lattice, SMIN);
+    nec_periodic::find_image_contact(periodic_wire_segments_m(), lattice, SMIN);
   if (!contact)
     return;
   const int64_t own = static_cast<int64_t>(contact->segment);
@@ -472,17 +508,62 @@ void nec_context::stateful_clear_periodic()
   m_periodic_green.reset();
 }
 
-/*! Add the field of the smooth periodic remainder G_smooth = G_p - G_free,
- * radiated by the current source segment (xj, yj, zj, ...), to the nine
- * free-space field components just computed by efld().
+/*! Add the field of the other cells, radiated by the current source segment
+ * (xj, yj, zj, m_s, m_b, ...), to the nine free-space field components just
+ * computed by efld(). Images of the source within periodic_close_image_reach
+ * of the observation point go through efld_compute, the thin-wire segment
+ * field of the finite model, displaced and phase-shifted as the ground image
+ * is. The rest of G_p - G_free is smooth along the segment and goes through
+ * a Gauss rule.
  */
-void nec_context::add_periodic_correction(nec_float xi, nec_float yi, nec_float zi)
+void nec_context::add_periodic_correction(
+  nec_float xi, nec_float yi, nec_float zi, nec_float ai)
 {
+  // Kept below rkh, where efld_compute would switch to its lumped
+  // approximation and be less accurate than the Gauss rule.
+  const nec_float reach = std::min(periodic_close_image_reach(m_s, m_b), 0.5 * rkh);
+  const nec_float half_x = 0.5 * m_s * cabj, half_y = 0.5 * m_s * sabj, half_z = 0.5 * m_s * salpj;
+  std::vector<const periodic_close_image*> close;
+  for (const periodic_close_image& image : m_periodic_close_images) {
+    const nec_float cx = xj + image.x, cy = yj + image.y;
+    const nec_float distance = nec_periodic::segment_distance(
+      {xi, yi, zi}, {xi, yi, zi},
+      {cx - half_x, cy - half_y, zj - half_z}, {cx + half_x, cy + half_y, zj + half_z});
+    if (distance < reach)
+      close.push_back(&image);
+  }
+
   const nec_periodic::periodic_green& green = *m_periodic_green;
   const nec_periodic::source_segment segment{{xj, yj, zj}, {cabj, sabj, salpj}, m_s};
   const nec_periodic::segment_field field = nec_periodic::segment_field_of_kernel(
-    [&green](const nec_periodic::point& r) { return green.smooth(r); },
+    [&green, &close](const nec_periodic::point& r) {
+      nec_periodic::green_value value = green.smooth(r);
+      for (const periodic_close_image* image : close) {
+        const nec_periodic::green_value free = nec_periodic::free_space_green(
+          {r[0] - image->x, r[1] - image->y, r[2]}, two_pi());
+        value.value -= image->phase * free.value;
+        for (int axis = 0; axis < 3; ++axis)
+          value.gradient[axis] -= image->phase * free.gradient[axis];
+      }
+      return value;
+    },
     segment, {xi, yi, zi}, two_pi());
+  nec_complex image_field[9];
+  for (const periodic_close_image* close_image : close) {
+    const periodic_close_image& image = *close_image;
+    // The image source sits at (xj + x, yj + y, zj).
+    efld_compute(xi - xj - image.x, yi - yj - image.y, ai, salpj, zi - zj,
+      true, image_field);
+    exk += image.phase * image_field[0];
+    eyk += image.phase * image_field[1];
+    ezk += image.phase * image_field[2];
+    exs += image.phase * image_field[3];
+    eys += image.phase * image_field[4];
+    ezs += image.phase * image_field[5];
+    exc += image.phase * image_field[6];
+    eyc += image.phase * image_field[7];
+    ezc += image.phase * image_field[8];
+  }
   exk += field.constant[0];
   eyk += field.constant[1];
   ezk += field.constant[2];
@@ -2861,7 +2942,7 @@ void nec_context::cmww( int j, int i1, int i2, complex_array& in_cm,
 
     efld( xi, yi, zi, ai, i != j);
     if (m_periodic_green)
-      add_periodic_correction(xi, yi, zi);
+      add_periodic_correction(xi, yi, zi, ai);
 
     etk= exk* cabi+ eyk* sabi+ ezk* salpi;
     ets= exs* cabi+ eys* sabi+ ezs* salpi;

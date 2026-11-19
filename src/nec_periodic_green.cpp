@@ -251,6 +251,14 @@ green_value periodic_green::smooth(const point& r) const {
   return sum;
 }
 
+green_value free_space_green(const point& r, complex_d k) {
+  const double distance = std::sqrt(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]);
+  const complex_d value = std::exp(-j * k * distance) / (4 * pi * distance);
+  // d/dR (exp(-jkR) / R) / R = -(1 + jkR) exp(-jkR) / R^3.
+  const complex_d derivative_over_distance = -(1.0 + j * k * distance) * value / (distance * distance);
+  return {value, {derivative_over_distance * r[0], derivative_over_distance * r[1], derivative_over_distance * r[2]}};
+}
+
 green_value periodic_green::full(const point& r) const {
   green_value sum{};
   add_spatial(r, false, sum);
