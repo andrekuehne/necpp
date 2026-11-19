@@ -32,6 +32,16 @@ _Avoid_: triangular lattice, honeycomb lattice
 The conductors, ports and loads that repeat at every lattice point. May contain any number of elements and ports.
 _Avoid_: element (one radiator; a unit cell can hold several), reference element
 
+**Periodic image**:
+The copy of a unit-cell conductor in another cell of the infinite array, displaced by a lattice translation. Not the ground image of a conductor over perfect ground.
+
+**Clearance**:
+The separation between the unit cell's conductors and the periodic images of all of them. A lattice under which a conductor touches or nearly touches a periodic image is refused: that would be a connected array.
+_Avoid_: distance to the cell wall (no unique shape for a non-rectangular lattice)
+
+**Connected array**:
+An infinite array whose conductors join their periodic images, so current crosses from cell to cell (tightly coupled dipoles, wire grids). Not supported.
+
 **Scan state**:
 The common transverse wavevector of an infinite array's excitation, which fixes the phase relation between all cells. Expressed either as scan phases or, within visible space, as a scan direction.
 

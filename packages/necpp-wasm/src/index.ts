@@ -31,6 +31,14 @@ export {
   scatterComplexVector,
 } from "./array-solver.js";
 export type { AppliedArrayBuildPlan } from "./array-solver.js";
+export { createNecPeriodicModel } from "./periodic-model.js";
+export {
+  centeredRectangularLattice,
+  hexagonalLattice,
+  rectangularLattice,
+  scanPhasesForDirection,
+  squareLattice,
+} from "./periodic-lattice.js";
 
 export type {
   NecCancellationReason,
@@ -80,11 +88,13 @@ export type {
   IsolatedElementHandoff,
   IsolatedElementHandoffOptions,
   IsolatedElementRequest,
+  LatticeVectorM,
   LoadDefinition,
   NecArraySolver,
   NecCurrentDistribution,
   NecModel,
   NecModelState,
+  NecPeriodicModel,
   NecSegmentEnd,
   NecSegmentIdentity,
   NecWorkerModel,
@@ -93,6 +103,7 @@ export type {
   NecWorkerProgressListener,
   ParallelRlcLoad,
   PerfectGround,
+  PeriodicLattice,
   PortDefinition,
   PortSolution,
   PowerBudget,
@@ -112,6 +123,10 @@ export type {
   RotationalSymmetry,
   RotateZTransform,
   RunDeckOptions,
+  ScanDirection,
+  ScanImpedanceRequest,
+  ScanImpedanceResult,
+  ScanPhasesRad,
   SegmentSelection,
   SeriesRlcLoad,
   SymmetryCopy,

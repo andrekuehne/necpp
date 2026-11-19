@@ -2,11 +2,59 @@
 
 ## Status
 
-**Evaluation with design decisions, 2026-11-18.** Nothing described here is
-implemented or prototyped. The findings come from reading the engine and the
-WASM layer. Formulas are written from the standard literature and have not
-been checked numerically against this code base; items that need verification
-before implementation are marked **[verify]**. Cost figures are estimates.
+**Evaluation with design decisions, 2026-11-18.** The findings come from
+reading the engine and the WASM layer. Formulas are written from the standard
+literature; items that need verification before implementation are marked
+**[verify]**. Cost figures are estimates.
+
+**Implemented so far:** stage 1, the periodic kernel unit, tested in the
+native `[periodic_green]` suite:
+
+- issue #20: lattice setup with Gauss reduction, the complex error function
+  and the Ewald evaluation of `G_p` and `G_smooth` with gradients. The
+  spatial, spectral and Ewald formulas below are verified against direct
+  lattice sums with loss, the spectral series and independence of the
+  splitting parameter.
+- issue #21: the field of a segment under a smooth kernel. Its sign and
+  normalization are verified against `efld_compute` (see
+  [Field of a segment under the smooth kernel](#field-of-a-segment-under-the-smooth-kernel)).
+
+Stage 2 so far:
+
+- issue #22: lattice and scan phases on `nec_context` and the stateful model,
+  the smooth correction in `cmww`, the C ABI entry points and
+  `createNecPeriodicModel()` in the WASM package. Free space only; symmetric
+  geometry is refused rather than unfolded. Verified at the package seam
+  against finite arrays driven with uniform phase progression and a
+  Gaussian amplitude taper:
+  - broadside scan impedance of a half-wave dipole cell against the centre
+    of a 15 x 15 array, 3.7 % (1.6 % at 21 x 21, so the difference is the
+    finite array's edge error);
+  - the sign of the scan phases, with an asymmetric two-dipole cell at
+    `psi = (1.2, 0.5)`: the finite mutual impedance matches `Z01(psi)` to
+    5.7 % and misses `Z01(-psi)` by 100 %. A one-port cell cannot show the
+    sign, because reciprocity makes its `Z(psi) = Z(-psi)`.
+
+  Also verified: the approach to the isolated element at large spacing,
+  reciprocity `Z(psi) = Z(-psi)^T` to 2.5e-4, and power closure (Re Z equals
+  the (0,0) Floquet-mode power to 1e-3 at 21 segments, checked natively). A
+  uniformly driven finite array is no usable reference: its centre converges
+  only like `N^(-1/2)` and is off by tens of percent at 11 x 11.
+- issue #23: any lattice and multi-element unit cells. Lattice presets
+  (square, rectangular, centered rectangular, hexagonal with rows along x or
+  y) and the scan direction `(theta, phi)` live in TypeScript only; the
+  engine keeps taking two vectors. `setLattice` refuses a lattice under which
+  a conductor touches or nearly touches a periodic image: the axis distance
+  of a segment to any image segment (its own or another conductor's) is at
+  most the two radii plus NEC's joining tolerance `SMIN` times the longer
+  segment. Verified at the package seam against tapered finite arrays at
+  oblique scan: rectangular 4.1 % (9 cells, sin theta = 0.61), centered
+  rectangular 2.8 % (sin theta = 0.41), hexagonal 2.3 % (sin theta = 0.58),
+  and a honeycomb cell (hexagonal lattice, two dipoles) 3.7 % on all four
+  entries of its non-reciprocal 2 x 2 scan impedance; broadside differs from
+  the same finite results by 19 to 29 %. Oblique lattice vectors and their reduced
+  equivalent agree to 8e-15 for the same physical scan state, and a scan
+  direction gives the same result as its scan phases.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -67,7 +115,8 @@ Observations that matter for the design:
 - The stateful model and the WASM ABI expose voltage and current drives only.
   Plane-wave excitation exists in the legacy card path but is not reachable
   from the stateful model.
-- The repository has no complex error function (`erfc` of complex argument).
+- The repository had no complex error function (`erfc` of complex argument);
+  the periodic kernel unit now provides one.
 - The LU solver is general (not symmetric-only), so a non-symmetric
   interaction matrix is acceptable to the solver itself.
 
@@ -111,9 +160,9 @@ Three implementation details depend on the lattice:
   `|m|,|n| <= M`, which converges poorly for skewed lattices.
 - A strongly skewed input basis is reduced internally (Lagrange/Gauss
   reduction) to keep the term count low.
-- Clearance is checked as the distance from each conductor to its own
-  periodic images, not to a cell wall, which has no unique shape for a
-  non-rectangular lattice.
+- Clearance is checked as the distance from each conductor to the periodic
+  images of the unit cell's conductors (its own and the others'), not to a
+  cell wall, which has no unique shape for a non-rectangular lattice.
 
 Honeycomb, kagome and dual-polarized arrays with offset sub-lattices are not
 lattices; they are a lattice with several elements per unit cell. The
@@ -137,8 +186,8 @@ Spectral (Floquet) form, with `k_tpq = k_t0 + p b1 + q b2` and
 The spectral form converges exponentially only when `|z - z'| > 0`, so it is
 useless for a planar or thin cell but is exactly what the Floquet port needs.
 
-Ewald form, usable everywhere, with splitting parameter `E` **[verify signs
-and prefactors against the references before coding]**:
+Ewald form, usable everywhere, with splitting parameter `E` (signs and
+prefactors verified in the `[periodic_green]` suite):
 
     G_p = G_spat + G_spec
 
@@ -150,11 +199,20 @@ and prefactors against the references before coding]**:
              [ exp(-j kz_pq dz) erfc(j kz_pq/(2E) - dz E)
              + exp(+j kz_pq dz) erfc(j kz_pq/(2E) + dz E) ],   dz = z - z'
 
-Both sums converge like a Gaussian; with `E = sqrt(pi / A)` roughly 9 to 25
-terms each are enough. For cells larger than about one wavelength the optimal
-`E` causes loss of significance (large terms cancelling); `E` must then be
-raised so that `k/(2E)` stays bounded (around 3), at the cost of more spectral
-terms.
+Both sums converge like a Gaussian. For cells larger than about one
+wavelength the optimal `E = sqrt(pi / A)` causes loss of significance (terms
+of size `exp((k/2E)^2)` cancelling); `E` must then be raised so that `k/(2E)`
+stays bounded, at the cost of more spectral terms.
+
+As implemented: `E = max(sqrt(pi / A), |Re(k)| / 4)`, so `k/(2E) <= 2`. Both
+sums keep every term whose Gaussian factor exceeds `exp(-36)`: lattice points
+within a radius of the observation point (spatial), and Floquet modes with
+`|k_tpq| <= sqrt(|k|^2 + 144 E^2)` (spectral), enumerated over Gauss-reduced
+lattice vectors. A half-wavelength cell then needs about 40 terms per sum
+rather than 9 to 25; the fixed tolerance (stage 2) may loosen this. The
+complex error function uses Weideman's rational approximation of the
+Faddeeva function (40 terms, about 1e-13 relative), with `exp(a) erfc(z)`
+combined so neither factor overflows.
 
 ### Splitting off what NEC already does
 
@@ -163,15 +221,19 @@ Write
     G_p = G_free(0,0) + G_smooth
     G_smooth = G_spec + G_spat(without its (0,0) term) + [ G_spat(0,0) - G_free ]
 
-The bracket is finite at `R -> 0` (the 1/R singularities cancel; the limit
-has a closed form involving `erfc` and its derivative), so `G_smooth` is
-smooth everywhere inside the cell.
+The bracket is finite at `R -> 0` (the 1/R singularities cancel), so
+`G_smooth` is smooth everywhere inside the cell. With
+`f(R) = exp(jkR) erfc(RE + jk/(2E))` the bracket equals
+`(f(R) - f(-R)) / (8 pi R)`; near `R = 0` the implementation uses its Taylor
+series in `R^2` (odd derivatives of `f` through Hermite polynomials) instead
+of the difference.
 
 - `G_free(0,0)` is the existing NEC interaction, unchanged, including the
   self term, the extended thin-wire kernel and the far-segment lumped
   approximation.
 - `G_smooth` is the only new physics. Because it is smooth, the field it
-  produces can be computed with a 2 or 3 point Gauss rule per source segment.
+  produces can be computed with a low-order Gauss rule per source segment
+  (as implemented: 6 points, see below).
 
 If conductors come close to a cell wall, the nearest images make `G_smooth`
 nearly singular. The remedy is to move the nearest ring (3x3 minus centre)
@@ -200,9 +262,23 @@ segment. Unlike the free-space term, the result is a full 3-vector; the local
 (rho, z) decomposition used in `efld_compute` does not apply because the
 lattice sum is not axially symmetric about the source segment.
 
-**[verify]** The normalization and sign must match `efld_compute`. A direct
-test: feed the new routine with the plain free-space kernel for a source
-displaced by several segment lengths and compare with `efld_compute` output.
+Verified (issue #21): fed with the plain free-space kernel, the routine
+matches `efld_compute` (exact thin-wire branch) to 5.5e-11 for the sine and
+cosine terms and the transverse part of the constant term in parallel,
+collinear, skewed, near and far geometries. The axial part of the constant
+term agrees to about 1e-5, the accuracy of NEC's own Romberg integral
+(`intx`, tolerance 1e-4). Two details came out of that comparison:
+
+- `eta` must be 376.73 ohm, the value fixed in `eksc`/`ekscx`
+  (`j 4.771341189 = j eta / (8 pi^2)`), not `em::impedance()` (about
+  376.7343). The two differ by 1.1e-5, and the smooth correction is added
+  to the `eksc` fill.
+- Under the smooth kernel the Gauss rule converges spectrally. Six points
+  keep the error near 2e-11 for segments up to a tenth of a wavelength. On
+  short segments the charge and end-charge terms cancel to about `(kL)^2`,
+  which amplifies kernel rounding. To keep that rounding near 1e-11, the
+  origin term of `G_smooth` uses its Taylor series through `R^14` up to
+  `R (E + |k|) = 0.3`.
 
 ### Ground
 

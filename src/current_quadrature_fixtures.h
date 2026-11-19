@@ -12,9 +12,44 @@
 #include "nec_context.h"
 #include "nec_stateful_model.h"
 
+#include <cstdlib>
+#include <filesystem>
+#include <string>
 #include <vector>
 
 namespace current_quadrature_fixtures {
+
+// True when NECPP_WRITE_BENCH_EVIDENCE=1 asks the baseline tests to rewrite
+// the committed benchmark evidence.
+inline bool write_committed_bench_evidence()
+{
+#if defined(_MSC_VER)
+  char* value = nullptr;
+  size_t length = 0;
+  const bool requested =
+    _dupenv_s(&value, &length, "NECPP_WRITE_BENCH_EVIDENCE") == 0 &&
+    value != nullptr && std::string(value) == "1";
+  std::free(value);
+  return requested;
+#else
+  const char* value = std::getenv("NECPP_WRITE_BENCH_EVIDENCE");
+  return value != nullptr && std::string(value) == "1";
+#endif
+}
+
+// Where a native baseline JSON is recorded. The committed evidence under
+// packages/necpp-wasm/bench/evidence/<work_package>/ is rewritten only when
+// NECPP_WRITE_BENCH_EVIDENCE=1; otherwise the file goes to the temp
+// directory, so ordinary test runs leave the source tree unchanged while
+// still exercising the recording.
+inline std::filesystem::path native_baseline_destination(const char* work_package)
+{
+  const std::filesystem::path directory = write_committed_bench_evidence()
+    ? std::filesystem::path(__FILE__).parent_path().parent_path()
+        / "packages" / "necpp-wasm" / "bench" / "evidence"
+    : std::filesystem::temp_directory_path() / "necpp-bench-evidence";
+  return directory / work_package / "native-baseline.json";
+}
 
 constexpr nec_float kFrequencyMHz = 300.0;
 constexpr nec_float kRadiusM = 0.001;

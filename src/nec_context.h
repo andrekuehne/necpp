@@ -37,6 +37,7 @@
 class c_geometry;
 class nec_stateful_model;
 struct nec_far_field_evaluation_input;
+namespace nec_periodic { class periodic_green; }
 
 enum excitation_return {
     FREQ_PRINT_NORMALIZATION = 0,
@@ -114,6 +115,24 @@ public:
 
   /*! Clear load cards without relying on LD card sequencing state. */
   void stateful_clear_loads();
+
+  /*! Periodic (infinite-array) mode for stateful solves.
+   *
+   * Lattice vectors are in metres in the xy-plane; scan phases are the
+   * radians by which the current advances from one cell to the next along
+   * a1 and a2.  The next stateful_prepare_frequency() adds the smooth
+   * periodic correction to the free-space interaction matrix.
+   */
+  void stateful_set_periodic(
+    nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m,
+    nec_float psi1_rad, nec_float psi2_rad);
+  void stateful_clear_periodic();
+  /*! Refuse a lattice under which a conductor touches or nearly touches a
+   * periodic image (nec_geometry_exception), or whose vectors are invalid
+   * (nec_exception). Changes nothing.
+   */
+  void stateful_check_periodic_clearance(
+    nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m) const;
 
   /*! Result ownership helpers for the stateful layer. */
   void stateful_clear_results()  { m_results.clear(); }
@@ -961,7 +980,20 @@ public:
   
 
 private:
+  struct periodic_state {
+    bool active = false;
+    nec_float a1x_m = 0, a1y_m = 0, a2x_m = 0, a2y_m = 0;
+    nec_float psi1_rad = 0, psi2_rad = 0;
+  };
+  periodic_state m_periodic;
+  // Built for the prepared frequency; null outside periodic mode.
+  std::shared_ptr<const nec_periodic::periodic_green> m_periodic_green;
+  void add_periodic_correction(nec_float xi, nec_float yi, nec_float zi);
+
   friend class nec_stateful_model;
+  // Defined only in the periodic segment-field test, which checks the
+  // periodic kernel's segment field against efld_compute.
+  friend struct nec_context_segment_field_access;
 
   /*! Return a read-only view for raw ordinary far-field evaluation. */
   nec_far_field_evaluation_input far_field_evaluation_input(

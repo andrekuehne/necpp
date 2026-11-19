@@ -28,6 +28,7 @@ import type {
   ImpedanceResult,
   IsolatedElementCharacterization,
   IsolatedElementRequest,
+  LatticeVectorM,
   LoadDefinition,
   NecCurrentDistribution,
   NecModel,
@@ -38,10 +39,22 @@ import type {
   PrepareOptions,
   PreparedQuadratureRequest,
   PreparedTransferHandle,
+  ScanPhasesRad,
   SegmentSelection,
   WireDefinition,
 } from "./types.js";
 import type { NecWasmModule } from "./wasm-internal.js";
+
+/** Operations of the periodic model that reach the native model directly. */
+type PeriodicOperation = "setLattice" | "setScanPhases";
+
+/**
+ * @internal Keys of the periodic entry points on `WasmNecModel`. They are not
+ * exported from the package, so only `WasmNecPeriodicModel` can put a model
+ * into periodic mode.
+ */
+export const setLatticeEntry: unique symbol = Symbol("necpp.setLattice");
+export const setScanPhasesEntry: unique symbol = Symbol("necpp.setScanPhases");
 
 const STATUS_OK = 0;
 const STATUS_STATE = 1;
@@ -161,18 +174,18 @@ export interface FarFieldEvaluationSnapshot {
 
 const textDecoder = new TextDecoder();
 
-function inputError(message: string, details?: Readonly<Record<string, unknown>>): never {
+export function inputError(message: string, details?: Readonly<Record<string, unknown>>): never {
   throw new NecInputError(message, details === undefined ? {} : { details });
 }
 
-function finiteNumber(value: unknown, name: string): number {
+export function finiteNumber(value: unknown, name: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     inputError(`${name} must be a finite number`, { name, value });
   }
   return value;
 }
 
-function positiveNumber(value: unknown, name: string): number {
+export function positiveNumber(value: unknown, name: string): number {
   const number = finiteNumber(value, name);
   if (!(number > 0)) {
     inputError(`${name} must be greater than zero`, { name, value });
@@ -199,7 +212,7 @@ function integerInRange(
   return value;
 }
 
-function requireRecord(
+export function requireRecord(
   value: unknown,
   name: string,
 ): Readonly<Record<string, unknown>> {
@@ -541,7 +554,7 @@ export class WasmNecModel implements NecModel {
 
   #statusError(
     status: number,
-    operation: ModelOperation,
+    operation: ModelOperation | PeriodicOperation,
     symmetryFailure?: "INCOMPATIBLE_GROUND" | "INCOMPLETE_LOAD_ORBIT",
   ): never {
     const message = this.#lastError() || `${operation} failed with native status ${status}`;
@@ -572,7 +585,7 @@ export class WasmNecModel implements NecModel {
   }
 
   #invokeStatus(
-    operation: ModelOperation,
+    operation: ModelOperation | PeriodicOperation,
     call: () => number,
     symmetryFailure?: "INCOMPATIBLE_GROUND" | "INCOMPLETE_LOAD_ORBIT",
   ): void {
@@ -1751,6 +1764,34 @@ export class WasmNecModel implements NecModel {
         },
       };
     });
+  }
+
+  /** @internal Periodic entry point; see `setLatticeEntry`. Arguments arrive validated. */
+  [setLatticeEntry](a1M: LatticeVectorM, a2M: LatticeVectorM): void {
+    this.#assertNotDisposed("setLattice");
+    this.#invokeStatus("setLattice", () => this.#module._necpp_wasm_v1_set_lattice(
+      this.#handle,
+      a1M[0],
+      a1M[1],
+      a2M[0],
+      a2M[1],
+    ));
+  }
+
+  /** @internal Periodic entry point; see `setLatticeEntry`. Arguments arrive validated. */
+  [setScanPhasesEntry](phases: ScanPhasesRad): void {
+    this.#assertNotDisposed("setScanPhases");
+    this.#invokeStatus("setScanPhases", () => this.#module._necpp_wasm_v1_set_scan_phases(
+      this.#handle,
+      phases[0],
+      phases[1],
+    ));
+  }
+
+  #assertNotDisposed(operation: PeriodicOperation): void {
+    if (this.#state === "disposed") {
+      throw new NecStateError(operation, this.#state);
+    }
   }
 
   dispose(): void {

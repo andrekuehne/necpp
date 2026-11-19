@@ -257,5 +257,8 @@ npm --prefix packages/necpp-wasm run bench:current-quadrature-wp6 -- `
 ```
 
 Native size/solve evidence is written by `[wp6_current]` to
-`bench/evidence/current-quadrature-wp6/native-baseline.json`. The browser
-handoff/steer summary is `browser-trace-summary.json`.
+`bench/evidence/current-quadrature-wp6/native-baseline.json` when the native
+tests run with `NECPP_WRITE_BENCH_EVIDENCE=1`; ordinary runs record it in the
+temp directory instead and leave the committed file alone. The same applies to
+the WP0 and WP2 native baselines. The browser handoff/steer summary is
+`browser-trace-summary.json`.

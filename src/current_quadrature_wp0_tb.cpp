@@ -342,9 +342,7 @@ TEST_CASE("WP0 current-quadrature native baseline JSON is recorded",
     turnstile.capture_far_field_snapshot();
 
   const std::filesystem::path destination =
-    std::filesystem::path(__FILE__).parent_path().parent_path()
-    / "packages" / "necpp-wasm" / "bench" / "evidence"
-    / "current-quadrature-wp0" / "native-baseline.json";
+    current_quadrature_fixtures::native_baseline_destination("current-quadrature-wp0");
   std::filesystem::create_directories(destination.parent_path());
   std::ofstream output(destination, std::ios::trunc);
   REQUIRE(output.good());

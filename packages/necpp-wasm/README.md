@@ -776,6 +776,94 @@ Embedded fields are useful when many weight sets share one geometry and
 frequency: compute the bases once, then combine them in JavaScript without
 additional native solves.
 
+## Infinite periodic arrays
+
+`createNecPeriodicModel()` models one **unit cell** of an infinite planar
+array in free space. Wires, ports and loads use the same definitions as
+`NecModel`; the lattice is two vectors in the xy-plane, in metres. For each
+**scan state** it returns the P x P **scan impedance** and **scan admittance**
+of the unit-cell ports: the port matrices of the cell inside the infinite
+array.
+
+```ts
+import { createNecPeriodicModel, squareLattice } from "@necpp-engine/wasm";
+
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 11, start: [-0.24, 0, 0], end: [0.24, 0, 0], radiusM: 0.001 });
+cell.completeGeometry();
+cell.definePorts([{ tag: 1, segment: 6 }]);
+cell.setLattice(squareLattice({ spacingM: 0.7 })); // a1M = [0.7, 0], a2M = [0, 0.7]
+
+// Scan phases: radians per cell along a1 and a2.
+const scan = cell.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: [1.2, 0] });
+console.log(scan.impedance.real[0], scan.impedance.imag[0]);
+
+// Or a beam direction in visible space; the result reports the scan phases.
+const steered = cell.computeScanImpedance({
+  frequencyMHz: 300,
+  scanDirection: { thetaDeg: 30, phiDeg: 45 },
+});
+console.log(steered.scanPhasesRad);
+cell.dispose();
+```
+
+### Lattices
+
+Any planar lattice works: pass two non-parallel vectors, or use a preset.
+Presets return plain `{ a1M, a2M }` vectors, and those vectors fix the
+meaning of the scan phases:
+
+| Preset | `a1M` | `a2M` |
+|---|---|---|
+| `squareLattice({ spacingM: d })` | `[d, 0]` | `[0, d]` |
+| `rectangularLattice({ spacingXM: dx, spacingYM: dy })` | `[dx, 0]` | `[0, dy]` |
+| `centeredRectangularLattice({ spacingXM: dx, spacingYM: dy })`, rows along x, `dy` apart, every other row shifted by `dx / 2` | `[dx, 0]` | `[dx / 2, dy]` |
+| `hexagonalLattice({ spacingM: d })` or `rowsAlong: "x"` | `[d, 0]` | `[d / 2, d sqrt(3) / 2]` |
+| `hexagonalLattice({ spacingM: d, rowsAlong: "y" })` | `[0, d]` | `[d sqrt(3) / 2, d / 2]` |
+
+An oblique lattice is just two other vectors. The engine reduces a skewed
+pair internally to short vectors spanning the same lattice, but the scan
+phases always refer to the vectors you gave: `{ a1M, a2M }` and
+`{ 2 a1M + a2M, 3 a1M + 2 a2M }` describe the same array, and give the same
+scan impedance for the same physical scan state (`psi1' = 2 psi1 + psi2`,
+`psi2' = 3 psi1 + 2 psi2`).
+
+A unit cell may hold any number of elements and ports. A honeycomb array is a
+hexagonal lattice with two elements per cell; dual-polarized and
+sub-lattice arrangements work the same way. The scan impedance then couples
+all ports of the cell.
+
+### Scan phases and scan direction
+
+- Cell (m, n) sits at `m * a1M + n * a2M`. Its currents are the unit-cell
+  currents times `exp(j (m * psi1 + n * psi2))`, with `scanPhasesRad = [psi1,
+  psi2]` always relative to the lattice vectors as given. Scan phases reach
+  every scan state, including invisible space.
+- `scanDirection: { thetaDeg, phiDeg }` is the main-beam direction, with
+  `thetaDeg` from +z (0 to 90, visible space only) and `phiDeg` from +x
+  towards +y. It maps to `psi_i = -kt0 . a_i` with
+  `kt0 = k sin(theta) [cos(phi), sin(phi)]`. `scanPhasesForDirection({
+  lattice, frequencyMHz, thetaDeg, phiDeg })` gives the same mapping without
+  a solve. A request takes exactly one of `scanPhasesRad` and `scanDirection`.
+
+### Conventions and limits
+
+- Scan impedance is not the active impedance of any finite array: it belongs
+  to the infinite array. It is not symmetric in general; reciprocity holds as
+  `Z(psi) = Z(-psi)^T`.
+- A single cell of an infinite array has no far field of its own, so the
+  periodic model has no far-field, embedded-field or isolated-element methods.
+- Free space only, and no geometry symmetry. Each call fills and factors the
+  interaction matrix again.
+- Clearance: the cells must be electrically separate. `setLattice` refuses,
+  with a `NecGeometryError` naming the segments and the image cell, a lattice
+  under which any conductor touches or nearly touches a periodic image of a
+  conductor in the cell (its own or another's): the distance between the
+  segment axes is at most the sum of the two wire radii plus NEC's segment
+  joining tolerance (0.001 times the longer segment's length). Connected
+  arrays are not supported. Conductors that keep clear but come close to a
+  neighbouring cell's conductors are accepted; results lose accuracy there.
+
 ## Direct mode and worker mode
 
 | Mode | Import | Calls | Best for |

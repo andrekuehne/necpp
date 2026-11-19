@@ -1,5 +1,6 @@
 import { selectEvaluator } from "./field-selection.js";
 import type { FarFieldEvaluator } from "./types.js";
+import { necWavenumberPerM } from "./nec-constants.js";
 import {
   analyzeArraySymmetry,
   createExplicitArrayBuildPlan,
@@ -42,12 +43,6 @@ import type {
   SymmetrizationReasonCode,
   SymmetryFailureReason,
 } from "./types.js";
-
-const NEC_VACUUM_PERMITTIVITY_F_PER_M = 8.854e-12;
-const NEC_VACUUM_PERMEABILITY_H_PER_M = 4 * Math.PI * 1e-7;
-const NEC_SPEED_OF_LIGHT_M_PER_S = 1 / Math.sqrt(
-  NEC_VACUUM_PERMITTIVITY_F_PER_M * NEC_VACUUM_PERMEABILITY_H_PER_M,
-);
 
 type ArrayModel = NecModel | NecWorkerModel;
 type ArrayWorkerFactory = (
@@ -499,7 +494,7 @@ function rephaseArrays(
   if (centerM[0] === 0 && centerM[1] === 0) {
     return { eThetaReal: thetaReal, eThetaImag: thetaImag, ePhiReal: phiReal, ePhiImag: phiImag };
   }
-  const waveNumber = 2 * Math.PI * result.frequencyMHz * 1e6 / NEC_SPEED_OF_LIGHT_M_PER_S;
+  const waveNumber = necWavenumberPerM(result.frequencyMHz);
   for (let basis = 0; basis < basisCount; basis += 1) {
     for (let phiIndex = 0; phiIndex < result.phiDeg.length; phiIndex += 1) {
       const phi = result.phiDeg[phiIndex]! * Math.PI / 180;

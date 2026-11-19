@@ -674,6 +674,75 @@ local orientation under rotation, and the gather mapping for every exposed
 quantity. Until all of those agree, such patterns stay explicit or fail under
 the caller's requested policy.
 
+## Periodic unit cell
+
+`createNecPeriodicModel(options?)` returns a `NecPeriodicModel`: the unit cell
+of an infinite planar array in free space. It shares the loading options,
+error taxonomy and lifecycle states of `NecModel`, with these methods:
+
+| Method | Inputs and units | Output | Failures beyond illegal state |
+|---|---|---|---|
+| `addWire`, `definePorts`, `addLoad`, `clearLoads`, `dispose` | As for `NecModel` | As for `NecModel` | As for `NecModel` |
+| `completeGeometry()` | None; no symmetry and no ground connection | `void` | As for `NecModel` |
+| `setLattice({ a1M, a2M })` | Two finite, non-parallel `[x, y]` vectors in m, in the xy-plane | `void`; resets the scan phases, invalidates prepared data | `NecInputError` for malformed or parallel vectors; `NecGeometryError` when a conductor touches or nearly touches a periodic image (see clearance below) |
+| `computeScanImpedance({ frequencyMHz, scanPhasesRad })` | Positive MHz; finite `[psi1, psi2]` in radians per cell along `a1M`, `a2M` | P x P scan impedance and admittance, frequency and the scan phases; the model is `prepared` afterwards | `NecStateError` before `setLattice`; otherwise as `prepare` and `computeImpedanceMatrix` |
+| `computeScanImpedance({ frequencyMHz, scanDirection })` | Positive MHz; `{ thetaDeg, phiDeg }`, finite, `thetaDeg` 0 to 90 | As above; `scanPhasesRad` reports the phases the direction maps to | As above; `NecInputError` for a direction outside visible space or with both or neither of `scanPhasesRad` and `scanDirection` |
+
+Pure helpers, without a model:
+
+| Function | Output | Failures |
+|---|---|---|
+| `squareLattice({ spacingM })` | `{ a1M: [d, 0], a2M: [0, d] }` | `NecInputError` unless every spacing is finite and positive |
+| `rectangularLattice({ spacingXM, spacingYM })` | `{ a1M: [dx, 0], a2M: [0, dy] }` | As above |
+| `centeredRectangularLattice({ spacingXM, spacingYM })` | Rows along x: `{ a1M: [dx, 0], a2M: [dx / 2, dy] }` | As above |
+| `hexagonalLattice({ spacingM, rowsAlong? })` | `rowsAlong: "x"` (default): `{ a1M: [d, 0], a2M: [d / 2, d sqrt(3) / 2] }`; `"y"`: `{ a1M: [0, d], a2M: [d sqrt(3) / 2, d / 2] }` | As above; `rowsAlong` must be `"x"` or `"y"` |
+| `scanPhasesForDirection({ lattice, frequencyMHz, thetaDeg, phiDeg })` | `[psi1, psi2]` with `psi_i = -kt0 . a_i`, `kt0 = k sin(theta) [cos(phi), sin(phi)]`, k from NEC's speed of light | `NecInputError` for malformed input or `thetaDeg` outside 0 to 90 |
+
+Presets exist only in TypeScript; the engine and the ABI take any two
+lattice vectors. An oblique lattice needs no preset: the engine reduces a
+skewed pair internally (Lagrange/Gauss reduction) and maps the scan state
+back, so the scan phases always refer to the vectors as given.
+
+Lifecycle, in the notation of the [Lifecycle](#lifecycle) table (operations
+shared with `NecModel` follow that table):
+
+| Operation | empty | geometry-building | geometry-complete | prepared | solved | disposed |
+|---|---|---|---|---|---|---|
+| `setLattice` | — | — | same | geometry-complete | geometry-complete | — |
+| `computeScanImpedance`, lattice set | — | — | prepared | same | prepared | — |
+| `computeScanImpedance`, no lattice | — | — | — | — | — | — |
+
+A periodic model never reaches `solved`: it has no excitation calls.
+`computeScanImpedance` sets the scan phases, which always invalidates the
+factorization, then fills, factors and extracts Z and Y.
+
+Scan-phase convention: cell (m, n) sits at `m * a1M + n * a2M` and carries
+the unit-cell currents times `exp(j (m psi1 + n psi2))`. The scan impedance is
+not symmetric in general; reciprocity holds as `Z(psi) = Z(-psi)^T`, and no
+code path assumes `Z = Z^T`. A unit cell may hold several elements and ports
+(honeycomb, dual-polarized, sub-lattices); P is the number of ports.
+
+Clearance rule: the cells must be electrically separate, because connected
+arrays are not supported. `setLattice` checks every segment of the cell
+against the periodic images, in every other cell, of every segment of the
+cell, its own included. It refuses the lattice when the shortest distance
+between the two segment axes is at most the sum of the two wire radii plus
+NEC's segment-joining tolerance (`SMIN`, 0.001 times the longer segment's
+length): the conductors touch, or come within the distance at which NEC
+joins segment ends. The `NecGeometryError` names the two segments, their
+tags, the image cell along the given lattice vectors and both distances. A
+refused lattice leaves the model unchanged.
+
+The native C ABI adds `necpp_wasm_v1_set_lattice`,
+`necpp_wasm_v1_clear_lattice` and `necpp_wasm_v1_set_scan_phases`. They are
+additive v1 symbols; `necpp_wasm_v1_set_lattice` returns the geometry status
+for a clearance refusal. While a lattice is set, the native model refuses
+symmetric geometry, any ground other than free space, far fields, embedded
+far fields and isolated-element characterization. The interaction matrix is
+NEC's free-space matrix plus the field of the smooth part of the periodic
+Green's function; see
+[`periodic-floquet-evaluation.md`](periodic-floquet-evaluation.md).
+
 ## Worker facade
 
 `createNecWorkerModel()` is imported from `@necpp-engine/wasm/worker`. The package

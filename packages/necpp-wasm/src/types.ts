@@ -549,6 +549,89 @@ export interface NecModel {
   dispose(): void;
 }
 
+/** A vector in the lattice (xy) plane, in metres. */
+export type LatticeVectorM = readonly [xM: number, yM: number];
+
+/**
+ * Two lattice vectors of an infinite planar array, in the xy-plane, in
+ * metres. Cell (m, n) of the array sits at `m * a1M + n * a2M` relative to the
+ * unit cell. The vectors must not be parallel.
+ */
+export interface PeriodicLattice {
+  readonly a1M: LatticeVectorM;
+  readonly a2M: LatticeVectorM;
+}
+
+/**
+ * Scan phases: the phase in radians by which the excitation advances from one
+ * cell to the next along `a1M` and along `a2M`. The current in cell (m, n) is
+ * the unit-cell current times `exp(j (m * psi1 + n * psi2))`.
+ */
+export type ScanPhasesRad = readonly [psi1Rad: number, psi2Rad: number];
+
+/**
+ * Scan direction: the beam direction of a scan state in visible space, in
+ * degrees. `thetaDeg` from +z, 0 to 90; `phiDeg` from +x towards +y. It maps
+ * to the transverse wavevector `kt0 = k sin(theta) [cos(phi), sin(phi)]` and
+ * so to the scan phases `psi_i = -kt0 . a_i` along the lattice vectors.
+ */
+export interface ScanDirection {
+  readonly thetaDeg: number;
+  readonly phiDeg: number;
+}
+
+/**
+ * One scan state at one frequency: either scan phases along the lattice
+ * vectors (any scan state, including invisible space) or a scan direction
+ * (visible space only). Exactly one of the two.
+ */
+export type ScanImpedanceRequest =
+  | {
+    readonly frequencyMHz: number;
+    readonly scanPhasesRad: ScanPhasesRad;
+    readonly scanDirection?: never;
+  }
+  | {
+    readonly frequencyMHz: number;
+    readonly scanDirection: ScanDirection;
+    readonly scanPhasesRad?: never;
+  };
+
+/**
+ * P x P scan impedance and scan admittance of the unit-cell ports at one
+ * scan state. They are not symmetric in general; reciprocity holds as
+ * `Z(psi) = Z(-psi)^T`.
+ */
+export interface ScanImpedanceResult {
+  readonly impedance: ComplexMatrix;
+  readonly admittance: ComplexMatrix;
+  readonly frequencyMHz: number;
+  /** The scan phases solved for, also when the request gave a scan direction. */
+  readonly scanPhasesRad: ScanPhasesRad;
+}
+
+/**
+ * The unit cell of an infinite periodic array in free space. Wires, ports and
+ * loads use the same definitions as `NecModel`. A single cell of an infinite
+ * array has no far field of its own, so there are no far-field,
+ * embedded-field or isolated-element methods.
+ */
+export interface NecPeriodicModel {
+  readonly state: NecModelState;
+
+  addWire(wire: WireDefinition): void;
+  /** Completes the unit-cell geometry. Symmetry and ground connections are not supported. */
+  completeGeometry(): void;
+  definePorts(ports: readonly PortDefinition[]): void;
+  addLoad(load: LoadDefinition): void;
+  clearLoads(): void;
+  setLattice(lattice: PeriodicLattice): void;
+  /** Fill, factor and return the scan impedance for one scan state. */
+  computeScanImpedance(request: ScanImpedanceRequest): ScanImpedanceResult;
+  /** Idempotent. After disposal, every operation except `state` and `dispose` fails. */
+  dispose(): void;
+}
+
 /** Coarse worker-boundary operation names, including worker-only `create`. */
 export type NecWorkerOperation =
   | "create"

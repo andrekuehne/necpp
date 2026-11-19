@@ -137,6 +137,70 @@ int necpp_wasm_v1_run_c_symmetry_contract_test(void)
   return 0;
 }
 
+int necpp_wasm_v1_run_c_periodic_contract_test(void)
+{
+  static const int32_t tags[1] = {1};
+  static const int32_t segments[1] = {6};
+  static const double voltage_real[1] = {1.0};
+  static const double voltage_imag[1] = {0.0};
+  necpp_wasm_v1_model* model;
+
+  CHECK(necpp_wasm_v1_set_lattice(NULL, 0.7, 0, 0, 0.7) ==
+    NECPP_WASM_V1_RUNTIME_ERROR);
+  CHECK(necpp_wasm_v1_clear_lattice(NULL) == NECPP_WASM_V1_RUNTIME_ERROR);
+  CHECK(necpp_wasm_v1_set_scan_phases(NULL, 0, 0) ==
+    NECPP_WASM_V1_RUNTIME_ERROR);
+
+  model = necpp_wasm_v1_model_create();
+  CHECK(model != NULL);
+  CHECK(necpp_wasm_v1_set_lattice(model, 0.7, 0, 0, 0.7) ==
+    NECPP_WASM_V1_STATE_ERROR);
+  CHECK(necpp_wasm_v1_add_wire(
+    model, 1, 11, -0.24, 0, 0, 0.24, 0, 0, 0.001) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_complete_geometry(
+    model, NECPP_WASM_V1_GROUND_CONNECTION_NONE) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_define_ports(model, tags, segments, 1) ==
+    NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_set_scan_phases(model, 0.5, 0) ==
+    NECPP_WASM_V1_STATE_ERROR);
+  CHECK(necpp_wasm_v1_set_lattice(model, NAN, 0, 0, 0.7) ==
+    NECPP_WASM_V1_INPUT_ERROR);
+  CHECK(necpp_wasm_v1_set_lattice(model, 0.7, 0, 1.4, 0) ==
+    NECPP_WASM_V1_INPUT_ERROR);
+  CHECK(strlen(necpp_wasm_v1_last_error(model)) != 0);
+  CHECK(necpp_wasm_v1_set_lattice(model, 0.7, 0, 0, 0.7) ==
+    NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_set_scan_phases(model, INFINITY, 0) ==
+    NECPP_WASM_V1_INPUT_ERROR);
+  CHECK(necpp_wasm_v1_set_scan_phases(model, 0.5, -0.25) ==
+    NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_set_ground(
+    model, NECPP_WASM_V1_GROUND_PERFECT, 0, 0) ==
+    NECPP_WASM_V1_GEOMETRY_ERROR);
+
+  CHECK(necpp_wasm_v1_prepare(model, 299.792458) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_compute_impedance(model) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_impedance_order(model) == 1);
+  CHECK(necpp_wasm_v1_solve_voltages(
+    model, voltage_real, voltage_imag, 1) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_compute_far_field(
+    model, 1.0, 0.0, 1, 0.0, 0.0, 1, 0.0) != NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_compute_embedded_far_fields(
+    model, 1.0, 0.0, 1, 0.0, 0.0, 1, 0.0,
+    NECPP_WASM_V1_UNIT_VOLTAGE) != NECPP_WASM_V1_OK);
+
+  /* A scan change invalidates the factorization and its results. */
+  CHECK(necpp_wasm_v1_set_scan_phases(model, 1.0, 0) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_model_state(model) ==
+    NECPP_WASM_V1_STATE_GEOMETRY_COMPLETE);
+  CHECK(necpp_wasm_v1_impedance_order(model) == 0);
+  CHECK(necpp_wasm_v1_clear_lattice(model) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_set_scan_phases(model, 0.5, 0) ==
+    NECPP_WASM_V1_STATE_ERROR);
+  necpp_wasm_v1_model_delete(model);
+  return 0;
+}
+
 int necpp_wasm_v1_run_c_contract_test(void)
 {
   static const int32_t tags[2] = {1, 2};

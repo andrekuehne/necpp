@@ -87,6 +87,14 @@ struct nec_ground_definition {
   nec_float conductivity_s_per_m = 0.0;
 };
 
+/*! Two lattice vectors in the xy-plane, in metres, for periodic mode. */
+struct nec_lattice_definition {
+  nec_float a1x_m = 0.0;
+  nec_float a1y_m = 0.0;
+  nec_float a2x_m = 0.0;
+  nec_float a2y_m = 0.0;
+};
+
 struct nec_far_field_grid {
   nec_float radius_m = 1.0;
   nec_float theta_start_deg = 0.0;
@@ -286,6 +294,19 @@ public:
   void clear_loads();
   void set_ground(const nec_ground_definition& ground);
 
+  /*! Make the geometry the unit cell of an infinite periodic array.
+   *
+   * Port impedances then become scan impedances. Scan phases reset to zero
+   * (broadside). Requires completed geometry without symmetry, in free
+   * space. Far-field, embedded-field and isolated-element calls are refused
+   * while a lattice is set.
+   */
+  void set_lattice(const nec_lattice_definition& lattice);
+  void clear_lattice();
+  /*! Phase advance in radians from one cell to the next along a1 and a2. */
+  void set_scan_phases(nec_float psi1_rad, nec_float psi2_rad);
+  bool periodic() const { return m_periodic; }
+
   void prepare(nec_float frequency_mhz);
 
   /*! Backward-compatible WP1 current-only voltage solve. */
@@ -375,6 +396,8 @@ private:
   void invalidate_factorization();
   void validate_load_target(const nec_load_definition& load) const;
   void validate_symmetric_load_orbits() const;
+  void refuse_periodic(const char* operation) const;
+  void apply_periodic_state();
   void validate_symmetry_ground(
     const nec_ground_definition& ground, const char* operation) const;
   void clear_matrix_cache();
@@ -429,6 +452,10 @@ private:
   std::vector<nec_float> m_far_field_segment_half_lengths;
   nec_ground_definition m_ground;
   nec_model_ground_connection m_ground_connection = nec_model_ground_connection::none;
+  bool m_periodic = false;
+  nec_lattice_definition m_lattice;
+  nec_float m_scan_psi1_rad = 0.0;
+  nec_float m_scan_psi2_rad = 0.0;
   nec_float m_frequency_mhz = 0.0;
   uint64_t m_factorization_generation = 0;
   uint64_t m_solve_generation = 0;

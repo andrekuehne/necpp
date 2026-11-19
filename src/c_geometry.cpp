@@ -3719,6 +3719,19 @@ void c_geometry::get_current_coefficients(nec_float wavelength, complex_array& c
 }
 
 
+void c_geometry::segment_in_metres(int64_t index, nec_3vector& start,
+  nec_3vector& end, nec_float& radius) const
+{
+  // The unscaled arrays hold segment centres; the direction cosines do not
+  // depend on the scaling.
+  const nec_3vector centre(x_unscaled[index], y_unscaled[index], z_unscaled[index]);
+  const nec_3vector half(0.5 * si_unscaled[index] * cab[index],
+    0.5 * si_unscaled[index] * sab[index], 0.5 * si_unscaled[index] * salp[index]);
+  start = centre - half;
+  end = centre + half;
+  radius = bi_unscaled[index];
+}
+
 void c_geometry::frequency_scale(nec_float freq_mhz)  {
   DEBUG_TRACE("frequency_scale(" << freq_mhz << ")");
   nec_float fr = (1.0e6 * freq_mhz) / em::speed_of_light();

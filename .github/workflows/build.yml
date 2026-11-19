@@ -63,7 +63,7 @@ jobs:
         run: >-
           ctest --test-dir build-ci-api --build-config Release
           --output-on-failure
-          --tests-regex "^necpp_wp[1-4]$"
+          --tests-regex "^(necpp_wp[1-4]|necpp_periodic_green)$"
 
   wasm-build:
     name: Reproducible Emscripten build

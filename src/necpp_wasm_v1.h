@@ -237,6 +237,23 @@ int32_t necpp_wasm_v1_clear_loads(necpp_wasm_v1_model* model);
 int32_t necpp_wasm_v1_set_ground(
   necpp_wasm_v1_model* model,
   int32_t kind, double relative_permittivity, double conductivity_s_per_m);
+/*
+ * Periodic (infinite-array) mode, additive ABI v1 symbols. The completed
+ * geometry becomes the unit cell of an infinite array with lattice vectors
+ * a1, a2 in metres in the xy-plane; port impedances become scan impedances.
+ * Scan phases are the radians by which the current advances from one cell to
+ * the next along a1 and a2; setting a lattice resets them to zero. Both calls
+ * invalidate the factorization. Symmetric geometry and any ground other than
+ * free space are refused, as are far-field and embedded-field calls.
+ * set_lattice returns NECPP_WASM_V1_GEOMETRY_ERROR when a conductor touches
+ * or nearly touches a periodic image (connected arrays are not supported).
+ */
+int32_t necpp_wasm_v1_set_lattice(
+  necpp_wasm_v1_model* model,
+  double a1x_m, double a1y_m, double a2x_m, double a2y_m);
+int32_t necpp_wasm_v1_clear_lattice(necpp_wasm_v1_model* model);
+int32_t necpp_wasm_v1_set_scan_phases(
+  necpp_wasm_v1_model* model, double psi1_rad, double psi2_rad);
 int32_t necpp_wasm_v1_prepare(
   necpp_wasm_v1_model* model, double frequency_mhz);
 int32_t necpp_wasm_v1_compute_impedance(necpp_wasm_v1_model* model);

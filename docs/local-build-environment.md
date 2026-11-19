@@ -79,8 +79,57 @@ Run one Catch2 work-package partition directly:
 ```
 
 Registered CTest entries are `necpp_unit`, `necpp_wp1`, `necpp_wp2`,
-`necpp_wp3`, `necpp_wp4`, and `necpp_smoke_hertzian_dipole`. The test binary is compiled
+`necpp_wp3`, `necpp_wp4`, `necpp_wp_s2`, `necpp_wp_s3`,
+`necpp_periodic_green` (periodic Green's function kernel), and
+`necpp_smoke_hertzian_dipole`. The test binary is compiled
 with `NEC_ERROR_CHECK=1`, so direct runs can emit substantial solver tracing.
+
+The current-quadrature baseline tests (`[baseline]`) record timing JSON. By
+default they write it to `<temp>/necpp-bench-evidence/`, so a test run leaves
+the tree clean. To refresh the committed evidence under
+`packages/necpp-wasm/bench/evidence/`, run them with the variable set:
+
+```powershell
+$env:NECPP_WRITE_BENCH_EVIDENCE = "1"
+& "build-wp0\tests\Release\nec2++_tests.exe" "[baseline]"
+Remove-Item Env:NECPP_WRITE_BENCH_EVIDENCE
+```
+
+## WSL native build (matches CI)
+
+The CI native jobs run on `ubuntu-latest` with GCC. An Ubuntu 24.04 WSL
+distribution reproduces them closely and avoids the intermittent MSVC
+exception-path crashes and hangs seen in some Windows `ctest` runs.
+
+One-time setup, from PowerShell and then inside Ubuntu:
+
+```powershell
+wsl --install -d Ubuntu-24.04
+```
+
+```bash
+sudo apt update && sudo apt install -y build-essential cmake git ninja-build gdb
+```
+
+Build and run every registered CTest entry, configured as in CI (Release,
+static, WASM off). The build tree goes to `~/necpp-build` on the Linux file
+system; the sources stay on the Windows drive:
+
+```powershell
+wsl -d Ubuntu-24.04 -- bash scripts/test-native-wsl.sh
+wsl -d Ubuntu-24.04 -- bash scripts/test-native-wsl.sh -R necpp_periodic_green
+```
+
+Arguments after the script name go to `ctest`. `NECPP_SANITIZE=address`
+selects an AddressSanitizer and UndefinedBehaviorSanitizer build in
+`~/necpp-build-asan`:
+
+```powershell
+wsl -d Ubuntu-24.04 -- env NECPP_SANITIZE=address bash scripts/test-native-wsl.sh -R necpp_wp2
+```
+
+Use git from Windows, not inside WSL: the two see line endings and file modes
+differently on the same checkout.
 
 ## Docker native build
 
