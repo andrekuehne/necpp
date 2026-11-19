@@ -38,6 +38,7 @@
 #include "nec_far_field.h"
 #include "c_geometry.h"
 #include "nec_exception.h"
+#include "nec_periodic_green.h"
  
 #include <cstdlib>
 #include <memory>
@@ -321,11 +322,29 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
   cm.resize(matrix_size);
 
   nop = int32_t(neq / npeq);
+  // The periodic correction assumes one full, unreduced fill in free space.
+  if (m_periodic.active && (nop != 1 || ground.present()))
+    throw nec_exception(
+      "PERIODIC MODE REQUIRES FREE SPACE AND GEOMETRY WITHOUT SYMMETRY");
   symmetry_array.resize(nop * nop);
   fblock(npeq, neq, matrix_size, m_geometry->m_ipsym);
 
   _wavelength = em::get_wavelength(1.0e6 * freq_mhz);
   m_geometry->frequency_scale(freq_mhz);
+
+  // The fill works in wavelengths (k = 2 pi); scale the lattice the same way
+  // as c_geometry::frequency_scale scales the wires.
+  m_periodic_green.reset();
+  if (m_periodic.active) {
+    const nec_float per_metre = (1.0e6 * freq_mhz) / em::speed_of_light();
+    const nec_periodic::lattice_2d lattice(
+      {m_periodic.a1x_m * per_metre, m_periodic.a1y_m * per_metre},
+      {m_periodic.a2x_m * per_metre, m_periodic.a2y_m * per_metre});
+    m_periodic_green = std::make_shared<const nec_periodic::periodic_green>(
+      lattice, two_pi(),
+      lattice.scan_wavevector(m_periodic.psi1_rad, m_periodic.psi2_rad));
+  }
+
   processing_state = PROCESSING_STRUCTURE_LOADING;
   structure_segment_loading();
 
@@ -382,6 +401,52 @@ void nec_context::stateful_solve_voltage_sources(
   // The latest currents are now available for a subsequent far-field-only
   // pass without repeating excitation or factorization.
   processing_state = PROCESSING_NEAR_FIELD;
+}
+
+void nec_context::stateful_set_periodic(
+  nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m,
+  nec_float psi1_rad, nec_float psi2_rad)
+{
+  if (!std::isfinite(psi1_rad) || !std::isfinite(psi2_rad))
+    throw nec_exception("SCAN PHASES MUST BE FINITE");
+  try {
+    // Validates the vectors: finite, in the plane and not parallel.
+    static_cast<void>(nec_periodic::lattice_2d({a1x_m, a1y_m}, {a2x_m, a2y_m}));
+  } catch (const std::invalid_argument& error) {
+    nec_exception failure("INVALID LATTICE: ");
+    failure.append(error.what());
+    throw failure;
+  }
+  m_periodic = {true, a1x_m, a1y_m, a2x_m, a2y_m, psi1_rad, psi2_rad};
+  m_periodic_green.reset();
+}
+
+void nec_context::stateful_clear_periodic()
+{
+  m_periodic = {};
+  m_periodic_green.reset();
+}
+
+/*! Add the field of the smooth periodic remainder G_smooth = G_p - G_free,
+ * radiated by the current source segment (xj, yj, zj, ...), to the nine
+ * free-space field components just computed by efld().
+ */
+void nec_context::add_periodic_correction(nec_float xi, nec_float yi, nec_float zi)
+{
+  const nec_periodic::periodic_green& green = *m_periodic_green;
+  const nec_periodic::source_segment segment{{xj, yj, zj}, {cabj, sabj, salpj}, m_s};
+  const nec_periodic::segment_field field = nec_periodic::segment_field_of_kernel(
+    [&green](const nec_periodic::point& r) { return green.smooth(r); },
+    segment, {xi, yi, zi}, two_pi());
+  exk += field.constant[0];
+  eyk += field.constant[1];
+  ezk += field.constant[2];
+  exs += field.sine[0];
+  eys += field.sine[1];
+  ezs += field.sine[2];
+  exc += field.cosine[0];
+  eyc += field.cosine[1];
+  ezc += field.cosine[2];
 }
 
 nec_power_budget nec_context::stateful_power_budget() const
@@ -2750,6 +2815,8 @@ void nec_context::cmww( int j, int i1, int i2, complex_array& in_cm,
     salpi= m_geometry->salp[i];
 
     efld( xi, yi, zi, ai, i != j);
+    if (m_periodic_green)
+      add_periodic_correction(xi, yi, zi);
 
     etk= exk* cabi+ eyk* sabi+ ezk* salpi;
     ets= exs* cabi+ eys* sabi+ ezs* salpi;

@@ -549,6 +549,65 @@ export interface NecModel {
   dispose(): void;
 }
 
+/** A vector in the lattice (xy) plane, in metres. */
+export type LatticeVectorM = readonly [xM: number, yM: number];
+
+/**
+ * Two lattice vectors of an infinite planar array, in the xy-plane, in
+ * metres. Cell (m, n) of the array sits at `m * a1M + n * a2M` relative to the
+ * unit cell. The vectors must not be parallel.
+ */
+export interface PeriodicLattice {
+  readonly a1M: LatticeVectorM;
+  readonly a2M: LatticeVectorM;
+}
+
+/**
+ * Scan phases: the phase in radians by which the excitation advances from one
+ * cell to the next along `a1M` and along `a2M`. The current in cell (m, n) is
+ * the unit-cell current times `exp(j (m * psi1 + n * psi2))`.
+ */
+export type ScanPhasesRad = readonly [psi1Rad: number, psi2Rad: number];
+
+export interface ScanImpedanceRequest {
+  readonly frequencyMHz: number;
+  readonly scanPhasesRad: ScanPhasesRad;
+}
+
+/**
+ * P x P scan impedance and scan admittance of the unit-cell ports at one
+ * scan state. They are not symmetric in general; reciprocity holds as
+ * `Z(psi) = Z(-psi)^T`.
+ */
+export interface ScanImpedanceResult {
+  readonly impedance: ComplexMatrix;
+  readonly admittance: ComplexMatrix;
+  readonly frequencyMHz: number;
+  readonly scanPhasesRad: ScanPhasesRad;
+}
+
+/**
+ * The unit cell of an infinite periodic array in free space. Wires, ports and
+ * loads use the same definitions as `NecModel`. A single cell of an infinite
+ * array has no far field of its own, so there are no far-field,
+ * embedded-field or isolated-element methods.
+ */
+export interface NecPeriodicModel {
+  readonly state: NecModelState;
+
+  addWire(wire: WireDefinition): void;
+  /** Completes the unit-cell geometry. Symmetry and ground connections are not supported. */
+  completeGeometry(): void;
+  definePorts(ports: readonly PortDefinition[]): void;
+  addLoad(load: LoadDefinition): void;
+  clearLoads(): void;
+  setLattice(lattice: PeriodicLattice): void;
+  /** Fill, factor and return the scan impedance for one scan state. */
+  computeScanImpedance(request: ScanImpedanceRequest): ScanImpedanceResult;
+  /** Idempotent. After disposal, every operation except `state` and `dispose` fails. */
+  dispose(): void;
+}
+
 /** Coarse worker-boundary operation names, including worker-only `create`. */
 export type NecWorkerOperation =
   | "create"

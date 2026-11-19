@@ -19,6 +19,28 @@ native `[periodic_green]` suite:
   normalization are verified against `efld_compute` (see
   [Field of a segment under the smooth kernel](#field-of-a-segment-under-the-smooth-kernel)).
 
+Stage 2 so far:
+
+- issue #22: lattice and scan phases on `nec_context` and the stateful model,
+  the smooth correction in `cmww`, the C ABI entry points and
+  `createNecPeriodicModel()` in the WASM package. Free space only; symmetric
+  geometry is refused rather than unfolded. Verified at the package seam
+  against finite arrays driven with uniform phase progression and a
+  Gaussian amplitude taper:
+  - broadside scan impedance of a half-wave dipole cell against the centre
+    of a 15 x 15 array, 3.7 % (1.6 % at 21 x 21, so the difference is the
+    finite array's edge error);
+  - the sign of the scan phases, with an asymmetric two-dipole cell at
+    `psi = (1.2, 0.5)`: the finite mutual impedance matches `Z01(psi)` to
+    5.7 % and misses `Z01(-psi)` by 100 %. A one-port cell cannot show the
+    sign, because reciprocity makes its `Z(psi) = Z(-psi)`.
+
+  Also verified: the approach to the isolated element at large spacing,
+  reciprocity `Z(psi) = Z(-psi)^T` to 2.5e-4, and power closure (Re Z equals
+  the (0,0) Floquet-mode power to 1e-3 at 21 segments, checked natively). A
+  uniformly driven finite array is no usable reference: its centre converges
+  only like `N^(-1/2)` and is off by tens of percent at 11 x 11.
+
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
 says so. Terms follow [`GLOSSARY.md`](../GLOSSARY.md); the layered-stack route

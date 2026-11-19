@@ -674,6 +674,46 @@ local orientation under rotation, and the gather mapping for every exposed
 quantity. Until all of those agree, such patterns stay explicit or fail under
 the caller's requested policy.
 
+## Periodic unit cell
+
+`createNecPeriodicModel(options?)` returns a `NecPeriodicModel`: the unit cell
+of an infinite planar array in free space. It shares the loading options,
+error taxonomy and lifecycle states of `NecModel`, with these methods:
+
+| Method | Inputs and units | Output | Failures beyond illegal state |
+|---|---|---|---|
+| `addWire`, `definePorts`, `addLoad`, `clearLoads`, `dispose` | As for `NecModel` | As for `NecModel` | As for `NecModel` |
+| `completeGeometry()` | None; no symmetry and no ground connection | `void` | As for `NecModel` |
+| `setLattice({ a1M, a2M })` | Two finite, non-parallel `[x, y]` vectors in m, in the xy-plane | `void`; resets the scan phases, invalidates prepared data | `NecInputError` for malformed or parallel vectors |
+| `computeScanImpedance({ frequencyMHz, scanPhasesRad })` | Positive MHz; finite `[psi1, psi2]` in radians per cell along `a1M`, `a2M` | P x P scan impedance and admittance, frequency and the scan phases; the model is `prepared` afterwards | `NecStateError` before `setLattice`; otherwise as `prepare` and `computeImpedanceMatrix` |
+
+Lifecycle, in the notation of the [Lifecycle](#lifecycle) table (operations
+shared with `NecModel` follow that table):
+
+| Operation | empty | geometry-building | geometry-complete | prepared | solved | disposed |
+|---|---|---|---|---|---|---|
+| `setLattice` | — | — | same | geometry-complete | geometry-complete | — |
+| `computeScanImpedance`, lattice set | — | — | prepared | same | prepared | — |
+| `computeScanImpedance`, no lattice | — | — | — | — | — | — |
+
+A periodic model never reaches `solved`: it has no excitation calls.
+`computeScanImpedance` sets the scan phases, which always invalidates the
+factorization, then fills, factors and extracts Z and Y.
+
+Scan-phase convention: cell (m, n) sits at `m * a1M + n * a2M` and carries
+the unit-cell currents times `exp(j (m psi1 + n psi2))`. The scan impedance is
+not symmetric in general; reciprocity holds as `Z(psi) = Z(-psi)^T`, and no
+code path assumes `Z = Z^T`.
+
+The native C ABI adds `necpp_wasm_v1_set_lattice`,
+`necpp_wasm_v1_clear_lattice` and `necpp_wasm_v1_set_scan_phases`. They are
+additive v1 symbols. While a lattice is set, the native model refuses
+symmetric geometry, any ground other than free space, far fields, embedded
+far fields and isolated-element characterization. The interaction matrix is
+NEC's free-space matrix plus the field of the smooth part of the periodic
+Green's function; see
+[`periodic-floquet-evaluation.md`](periodic-floquet-evaluation.md).
+
 ## Worker facade
 
 `createNecWorkerModel()` is imported from `@necpp-engine/wasm/worker`. The package

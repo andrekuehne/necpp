@@ -9,6 +9,7 @@
 
 extern "C" int necpp_wasm_v1_run_c_contract_test(void);
 extern "C" int necpp_wasm_v1_run_c_symmetry_contract_test(void);
+extern "C" int necpp_wasm_v1_run_c_periodic_contract_test(void);
 
 TEST_CASE("WP4 versioned ABI is consumable from C", "[wp4][wasm_abi]")
 {
@@ -23,6 +24,15 @@ TEST_CASE("WP-S3 additive symmetry ABI is consumable from pure C",
 {
   const int failed_line = necpp_wasm_v1_run_c_symmetry_contract_test();
   INFO("C symmetry ABI contract check failed at necpp_wasm_v1_c_tb.c line "
+       << failed_line);
+  REQUIRE(failed_line == 0);
+}
+
+TEST_CASE("Additive periodic ABI is consumable from pure C",
+          "[periodic_model][wasm_abi]")
+{
+  const int failed_line = necpp_wasm_v1_run_c_periodic_contract_test();
+  INFO("C periodic ABI contract check failed at necpp_wasm_v1_c_tb.c line "
        << failed_line);
   REQUIRE(failed_line == 0);
 }

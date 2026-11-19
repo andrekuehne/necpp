@@ -63,6 +63,19 @@ export interface NecWasmModule {
     relativePermittivity: number,
     conductivitySPerM: number,
   ): number;
+  _necpp_wasm_v1_set_lattice(
+    model: number,
+    a1xM: number,
+    a1yM: number,
+    a2xM: number,
+    a2yM: number,
+  ): number;
+  _necpp_wasm_v1_clear_lattice(model: number): number;
+  _necpp_wasm_v1_set_scan_phases(
+    model: number,
+    psi1Rad: number,
+    psi2Rad: number,
+  ): number;
   _necpp_wasm_v1_prepare(model: number, frequencyMHz: number): number;
   _necpp_wasm_v1_compute_impedance(model: number): number;
   _necpp_wasm_v1_solve_voltages(

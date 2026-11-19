@@ -49,6 +49,7 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp3_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_symmetry_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_conductivity_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_periodic_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp0_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp1_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp2_tb.cpp

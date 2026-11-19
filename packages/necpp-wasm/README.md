@@ -776,6 +776,45 @@ Embedded fields are useful when many weight sets share one geometry and
 frequency: compute the bases once, then combine them in JavaScript without
 additional native solves.
 
+## Infinite periodic arrays
+
+`createNecPeriodicModel()` models one **unit cell** of an infinite planar
+array in free space. Wires, ports and loads use the same definitions as
+`NecModel`; the lattice is two vectors in the xy-plane, in metres. For each
+**scan state** it returns the P x P **scan impedance** and **scan admittance**
+of the unit-cell ports: the port matrices of the cell inside the infinite
+array.
+
+```ts
+import { createNecPeriodicModel } from "@necpp-engine/wasm";
+
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 11, start: [-0.24, 0, 0], end: [0.24, 0, 0], radiusM: 0.001 });
+cell.completeGeometry();
+cell.definePorts([{ tag: 1, segment: 6 }]);
+cell.setLattice({ a1M: [0.7, 0], a2M: [0, 0.7] });
+
+// Scan phases: radians per cell along a1 and a2.
+const scan = cell.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: [1.2, 0] });
+console.log(scan.impedance.real[0], scan.impedance.imag[0]);
+cell.dispose();
+```
+
+Conventions:
+
+- Cell (m, n) sits at `m * a1M + n * a2M`. Its currents are the unit-cell
+  currents times `exp(j (m * psi1 + n * psi2))`, with `scanPhasesRad = [psi1,
+  psi2]` always relative to the lattice vectors as given.
+- Scan impedance is not the active impedance of any finite array: it belongs
+  to the infinite array. It is not symmetric in general; reciprocity holds as
+  `Z(psi) = Z(-psi)^T`.
+- A single cell of an infinite array has no far field of its own, so the
+  periodic model has no far-field, embedded-field or isolated-element methods.
+- Free space only, and no geometry symmetry. Each call fills and factors the
+  interaction matrix again. Keep conductors away from their periodic images:
+  results lose accuracy when a conductor comes close to a neighbouring cell's
+  copy of itself.
+
 ## Direct mode and worker mode
 
 | Mode | Import | Calls | Best for |

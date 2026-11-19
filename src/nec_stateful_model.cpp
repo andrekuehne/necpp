@@ -519,6 +519,8 @@ void nec_stateful_model::set_ground(const nec_ground_definition& ground)
 {
   require_configurable("SET GROUND");
   validate_symmetry_ground(ground, "SET GROUND");
+  if (m_periodic && ground.kind != nec_ground_kind::free_space)
+    fail_geometry("SET GROUND", "ONLY FREE SPACE IS SUPPORTED IN PERIODIC MODE");
 
   int ground_type = -1;
   switch (ground.kind) {
@@ -550,6 +552,61 @@ void nec_stateful_model::set_ground(const nec_ground_definition& ground)
     ground.relative_permittivity, ground.conductivity_s_per_m,
     0.0, 0.0, 0.0, 0.0);
   m_ground = ground;
+  invalidate_factorization();
+}
+
+void nec_stateful_model::refuse_periodic(const char* operation) const
+{
+  if (m_periodic)
+    fail(operation, "NOT AVAILABLE FOR A PERIODIC UNIT CELL");
+}
+
+void nec_stateful_model::apply_periodic_state()
+{
+  m_context->stateful_set_periodic(
+    m_lattice.a1x_m, m_lattice.a1y_m, m_lattice.a2x_m, m_lattice.a2y_m,
+    m_scan_psi1_rad, m_scan_psi2_rad);
+}
+
+void nec_stateful_model::set_lattice(const nec_lattice_definition& lattice)
+{
+  require_configurable("SET LATTICE");
+  if (m_geometry_completion.symmetry.kind != nec_geometry_symmetry_kind::none)
+    fail_geometry("SET LATTICE", "GEOMETRY SYMMETRY IS NOT SUPPORTED IN PERIODIC MODE");
+  if (m_ground.kind != nec_ground_kind::free_space)
+    fail_geometry("SET LATTICE", "ONLY FREE SPACE IS SUPPORTED IN PERIODIC MODE");
+
+  // The context validates the vectors before anything changes.
+  m_context->stateful_set_periodic(
+    lattice.a1x_m, lattice.a1y_m, lattice.a2x_m, lattice.a2y_m, 0.0, 0.0);
+  m_periodic = true;
+  m_lattice = lattice;
+  m_scan_psi1_rad = 0.0;
+  m_scan_psi2_rad = 0.0;
+  invalidate_factorization();
+}
+
+void nec_stateful_model::clear_lattice()
+{
+  require_configurable("CLEAR LATTICE");
+  m_context->stateful_clear_periodic();
+  m_periodic = false;
+  m_lattice = {};
+  m_scan_psi1_rad = 0.0;
+  m_scan_psi2_rad = 0.0;
+  invalidate_factorization();
+}
+
+void nec_stateful_model::set_scan_phases(nec_float psi1_rad, nec_float psi2_rad)
+{
+  require_configurable("SET SCAN PHASES");
+  if (!m_periodic)
+    fail("SET SCAN PHASES", "NO LATTICE IS SET");
+  if (!finite_value(psi1_rad) || !finite_value(psi2_rad))
+    fail("SET SCAN PHASES", "SCAN PHASES MUST BE FINITE");
+  m_scan_psi1_rad = psi1_rad;
+  m_scan_psi2_rad = psi2_rad;
+  apply_periodic_state();
   invalidate_factorization();
 }
 
@@ -1128,6 +1185,7 @@ const nec_far_field_result& nec_stateful_model::compute_far_field(
   const nec_far_field_grid& grid)
 {
   require_state(nec_model_state::solved, "COMPUTE FAR FIELD");
+  refuse_periodic("COMPUTE FAR FIELD");
 #ifdef NECPP_FAR_FIELD_REUSE_OUTPUTS
   std::swap(m_far_field_result, m_far_field_scratch_result);
   try {
@@ -1154,6 +1212,12 @@ nec_far_field_snapshot nec_stateful_model::capture_far_field_snapshot() const
   snapshot.solution_generation = m_solve_generation;
   if (m_state != nec_model_state::solved || !m_has_port_solution)
     return snapshot;
+  if (m_periodic) {
+    // A single cell of an infinite array has no far field of its own.
+    snapshot.capability =
+      nec_far_field_snapshot_capability::unsupported_far_field_mode;
+    return snapshot;
+  }
 
   const c_geometry* geometry = m_context->get_geometry();
   if (geometry == nullptr)
@@ -1207,6 +1271,7 @@ nec_stateful_model::compute_embedded_far_fields(
 {
   if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
     fail("COMPUTE EMBEDDED FAR FIELDS", "MODEL IS NOT PREPARED");
+  refuse_periodic("COMPUTE EMBEDDED FAR FIELDS");
 
   const size_t samples_per_port =
     checked_field_sample_count(grid, "COMPUTE EMBEDDED FAR FIELDS");
@@ -1500,6 +1565,7 @@ nec_stateful_model::characterize_isolated_element(
 {
   if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
     fail("CHARACTERIZE ISOLATED ELEMENT", "MODEL IS NOT PREPARED");
+  refuse_periodic("CHARACTERIZE ISOLATED ELEMENT");
   switch (request.quadrature.modes) {
   case nec_current_mode_kind::unit_current:
     break;

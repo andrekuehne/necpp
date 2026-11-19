@@ -108,6 +108,14 @@ for (const getter of [
 ]) {
   check(typeof module[getter] === "function", `${getter} was not exported`);
 }
+// Periodic (infinite-array) mode: additive v1 symbols.
+for (const entry of [
+  "_necpp_wasm_v1_set_lattice",
+  "_necpp_wasm_v1_clear_lattice",
+  "_necpp_wasm_v1_set_scan_phases",
+]) {
+  check(typeof module[entry] === "function", `${entry} was not exported`);
+}
 check(module._nec_create_context === undefined, "legacy ABI leaked into module");
 
 const model = module._necpp_wasm_v1_model_create();

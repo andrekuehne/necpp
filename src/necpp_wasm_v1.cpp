@@ -1297,6 +1297,58 @@ int32_t necpp_wasm_v1_set_ground(
   });
 }
 
+int32_t necpp_wasm_v1_set_lattice(
+  necpp_wasm_v1_model* model,
+  double a1x_m, double a1y_m, double a2x_m, double a2y_m)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_configurable(model))
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "setLattice requires completed geometry");
+  if (!finite_value(a1x_m) || !finite_value(a1y_m) ||
+      !finite_value(a2x_m) || !finite_value(a2y_m))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Lattice vectors must be finite");
+
+  // Parallel vectors arrive as an input error; symmetry and ground
+  // refusals as geometry errors.
+  return invoke(model, NECPP_WASM_V1_INPUT_ERROR, [&] {
+    model->native.set_lattice({a1x_m, a1y_m, a2x_m, a2y_m});
+    clear_calculated_results(*model);
+  });
+}
+
+int32_t necpp_wasm_v1_clear_lattice(necpp_wasm_v1_model* model)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_configurable(model))
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "clearLattice requires completed geometry");
+  return invoke(model, NECPP_WASM_V1_RUNTIME_ERROR, [&] {
+    model->native.clear_lattice();
+    clear_calculated_results(*model);
+  });
+}
+
+int32_t necpp_wasm_v1_set_scan_phases(
+  necpp_wasm_v1_model* model, double psi1_rad, double psi2_rad)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_configurable(model) || !model->native.periodic())
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "setScanPhases requires a lattice");
+  if (!finite_value(psi1_rad) || !finite_value(psi2_rad))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Scan phases must be finite");
+  return invoke(model, NECPP_WASM_V1_INPUT_ERROR, [&] {
+    model->native.set_scan_phases(psi1_rad, psi2_rad);
+    clear_calculated_results(*model);
+  });
+}
+
 int32_t necpp_wasm_v1_prepare(
   necpp_wasm_v1_model* model, double frequency_mhz)
 {

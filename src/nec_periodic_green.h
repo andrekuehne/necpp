@@ -1,6 +1,6 @@
 #pragma once
-// Periodic Green's function kernel for infinite 2D arrays (periodic solver,
-// stage 1). Nothing in the solver uses this unit yet.
+// Periodic Green's function kernel for infinite 2D arrays. The matrix fill
+// (nec_context::cmww) adds the field of G_smooth in periodic mode.
 //
 // Conventions (see docs/periodic-floquet-evaluation.md): time dependence
 // exp(+jwt), free-space kernel exp(-jkR)/(4 pi R). The current in cell
