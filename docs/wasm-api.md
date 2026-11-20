@@ -677,14 +677,16 @@ the caller's requested policy.
 ## Periodic unit cell
 
 `createNecPeriodicModel(options?)` returns a `NecPeriodicModel`: the unit cell
-of an infinite planar array in free space. It shares the loading options,
-error taxonomy and lifecycle states of `NecModel`, with these methods:
+of an infinite planar array in free space or above a perfect ground plane at
+z=0. It shares the loading options, error taxonomy and lifecycle states of
+`NecModel`, with these methods:
 
 | Method | Inputs and units | Output | Failures beyond illegal state |
 |---|---|---|---|
 | `addWire`, `definePorts`, `addLoad`, `clearLoads`, `dispose` | As for `NecModel` | As for `NecModel` | As for `NecModel` |
 | `completeGeometry()` | None; no symmetry and no ground connection | `void` | As for `NecModel` |
-| `setLattice({ a1M, a2M })` | Two finite, non-parallel `[x, y]` vectors in m, in the xy-plane | `void`; resets the scan phases, invalidates prepared data | `NecInputError` for malformed or parallel vectors; `NecGeometryError` when a conductor touches or nearly touches a periodic image (see clearance below) |
+| `setGround(ground)` | `{ kind: "free-space" }` (the default) or `{ kind: "perfect" }` | `void`; invalidates prepared data | `NecGeometryError` for finite ground (until layered stacks arrive) and, over perfect ground, when a conductor touches, nearly touches or crosses the ground plane (see clearance below); refused here while a lattice is set, otherwise by `setLattice` |
+| `setLattice({ a1M, a2M })` | Two finite, non-parallel `[x, y]` vectors in m, in the xy-plane | `void`; resets the scan phases, invalidates prepared data | `NecInputError` for malformed or parallel vectors; `NecGeometryError` when a conductor touches or nearly touches a periodic image, or over perfect ground the ground plane (see clearance below) |
 | `computeScanImpedance({ frequencyMHz, scanPhasesRad })` | Positive MHz; finite `[psi1, psi2]` in radians per cell along `a1M`, `a2M` | P x P scan impedance and admittance, frequency, the scan phases and `diagnostics: { estimatedError, status }`; the model is `prepared` afterwards | `NecStateError` before `setLattice`; refusals of the accuracy policy below; otherwise as `prepare` and `computeImpedanceMatrix` |
 | `computeScanImpedance({ frequencyMHz, scanDirection })` | Positive MHz; `{ thetaDeg, phiDeg }`, finite, `thetaDeg` 0 to 90 | As above; `scanPhasesRad` reports the phases the direction maps to | As above; `NecInputError` for a direction outside visible space or with both or neither of `scanPhasesRad` and `scanDirection` |
 
@@ -732,6 +734,24 @@ length): the conductors touch, or come within the distance at which NEC
 joins segment ends. The `NecGeometryError` names the two segments, their
 tags, the image cell along the given lattice vectors and both distances. A
 refused lattice leaves the model unchanged.
+
+Over perfect ground the same rule applies to each segment and its own ground
+image: the lowest point of the segment axis must lie higher than the wire
+radius plus half of `SMIN` times the segment length, so a conductor that
+touches, nearly touches or crosses the plane is refused, by `setGround` or
+`setLattice`, whichever comes second; the `NecGeometryError` names the
+segment, its tag, its lowest z and the least height. Ground connections
+(monopoles on the plane) are not supported. Above the plane, no ground image
+comes closer to a segment than the corresponding direct image.
+
+Perfect ground: the ground images of all cells form a second lattice of
+sources, mirrored in z=0 with the opposite current along the mirrored
+segment. The ground image in the cell itself is NEC's own; those of the
+other cells get the same treatment as the direct images, close images
+through NEC's thin-wire segment field and the rest through the smooth part
+of the periodic Green's function. By image theory the result equals a
+free-space cell that holds the conductors and their mirror images driven
+oppositely, which the tests check to below 1e-13.
 
 Close images: for each observation point (segment centre) and source
 segment, the periodic images of the source within `max(2 L, 40 a)` of the
@@ -782,12 +802,13 @@ reason, never solved with a looser one:
 | Scan state exactly on a Wood anomaly (`kz = 0` in floating point) | `NecSolverError` | The spectral sum is singular; states next to it are solved (measured finite to within 1e-12 of cut-off) |
 
 Unsupported configurations are refused with a reason through the same error
-types as the finite model. The periodic model has no ground, patch, network
-or transmission-line methods; the native model refuses, as
-`NECPP_WASM_V1_GEOMETRY_ERROR`, perfect ground (until it arrives), finite
-ground (until layered stacks arrive), surface patches, networks and
-transmission lines (untested in periodic mode) and symmetric geometry. NaN
-appears only for a genuine failure.
+types as the finite model. The periodic model has no patch, network or
+transmission-line methods, and its `setGround` takes free space or perfect
+ground; the native model refuses, as `NECPP_WASM_V1_GEOMETRY_ERROR`, finite
+ground (until layered stacks arrive), conductors on or through a perfect
+ground plane, surface patches, networks and transmission lines (untested in
+periodic mode) and symmetric geometry. NaN appears only for a genuine
+failure.
 
 The native C ABI adds `necpp_wasm_v1_set_lattice`,
 `necpp_wasm_v1_clear_lattice`, `necpp_wasm_v1_set_scan_phases`,
@@ -797,8 +818,8 @@ They are additive v1 symbols; `necpp_wasm_v1_set_lattice` returns the
 geometry status for a clearance refusal. While a lattice is set, the native
 model also refuses far fields, embedded far fields and isolated-element
 characterization. The interaction matrix is
-NEC's free-space matrix plus the field of the smooth part of the periodic
-Green's function; see
+NEC's free-space (or perfect-ground) matrix plus the field of the images in
+the other cells; see
 [`periodic-floquet-evaluation.md`](periodic-floquet-evaluation.md).
 
 ## Worker facade

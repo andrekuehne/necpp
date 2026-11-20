@@ -147,7 +147,7 @@ TEST_CASE("A lattice under which a conductor touches its image is refused withou
   REQUIRE(port_impedance(model) == before);
 }
 
-TEST_CASE("Periodic mode refuses symmetry, ground and single-cell fields", "[periodic_model]")
+TEST_CASE("Periodic mode refuses symmetry and finite ground", "[periodic_model]")
 {
   SECTION("symmetric geometry")
   {
@@ -162,19 +162,14 @@ TEST_CASE("Periodic mode refuses symmetry, ground and single-cell fields", "[per
     REQUIRE_FALSE(model.periodic());
   }
 
-  SECTION("ground")
+  SECTION("finite ground")
   {
     nec_stateful_model model;
     build_dipole_cell(model);
-    nec_ground_definition perfect;
-    perfect.kind = nec_ground_kind::perfect;
     nec_ground_definition finite;
     finite.kind = nec_ground_kind::finite_reflection_coefficient;
     finite.relative_permittivity = 13.0;
     finite.conductivity_s_per_m = 0.005;
-    model.set_ground(perfect);
-    REQUIRE(mentions(refusal<nec_geometry_exception>(
-      [&] { model.set_lattice(square_lattice(0.7)); }), "PERFECT GROUND"));
     model.set_ground(finite);
     REQUIRE(mentions(refusal<nec_geometry_exception>(
       [&] { model.set_lattice(square_lattice(0.7)); }), "FINITE GROUND"));
@@ -182,10 +177,52 @@ TEST_CASE("Periodic mode refuses symmetry, ground and single-cell fields", "[per
     model.set_ground(nec_ground_definition{});
     model.set_lattice(square_lattice(0.7));
     REQUIRE(mentions(refusal<nec_geometry_exception>(
-      [&] { model.set_ground(perfect); }), "PERFECT GROUND"));
-    REQUIRE(mentions(refusal<nec_geometry_exception>(
       [&] { model.set_ground(finite); }), "FINITE GROUND"));
   }
+}
+
+TEST_CASE("Over perfect ground, a conductor on or through the ground plane is refused", "[periodic_model]")
+{
+  nec_ground_definition perfect;
+  perfect.kind = nec_ground_kind::perfect;
+
+  // A vertical dipole from z = z1 to z1 + 0.48 m, 11 segments of 1 mm radius.
+  const auto refused = [&](nec_float z1) {
+    nec_stateful_model model;
+    model.add_wire({1, 11, 0.0, 0.0, z1, 0.0, 0.0, z1 + 0.48, 0.001});
+    model.complete_geometry();
+    model.define_ports({{1, 6}});
+    model.set_lattice(square_lattice(0.7));
+    const nec_complex before = port_impedance(model);
+    const std::string reason = refusal<nec_geometry_exception>(
+      [&] { model.set_ground(perfect); });
+    // Refused without effect, also in the other order.
+    REQUIRE(model.state() == nec_model_state::prepared);
+    REQUIRE(port_impedance(model) == before);
+    model.clear_lattice();
+    model.set_ground(perfect);
+    REQUIRE(refusal<nec_geometry_exception>(
+      [&] { model.set_lattice(square_lattice(0.7)); }) == reason);
+    REQUIRE_FALSE(model.periodic());
+    return reason;
+  };
+  REQUIRE(mentions(refused(-0.24), "GROUND PLANE"));
+  REQUIRE(mentions(refused(0.0), "GROUND PLANE"));
+  REQUIRE(mentions(refused(0.001), "GROUND PLANE"));
+
+  nec_stateful_model clear;
+  clear.add_wire({1, 11, 0.0, 0.0, 0.0011, 0.0, 0.0, 0.4811, 0.001});
+  clear.complete_geometry();
+  clear.define_ports({{1, 6}});
+  clear.set_lattice(square_lattice(0.7));
+  clear.set_ground(perfect);
+  const nec_complex impedance = port_impedance(clear);
+  REQUIRE(std::isfinite(impedance.real()));
+  REQUIRE(std::isfinite(impedance.imag()));
+}
+
+TEST_CASE("Periodic mode refuses single-cell fields", "[periodic_model]")
+{
 
   SECTION("far fields")
   {

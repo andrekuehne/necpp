@@ -225,6 +225,9 @@ export interface FiniteGround {
 
 export type GroundModel = FreeSpaceGround | PerfectGround | FiniteGround;
 
+/** Ground models of a periodic unit cell: free space or a perfect ground plane at z=0. */
+export type PeriodicGround = FreeSpaceGround | PerfectGround;
+
 export interface PrepareOptions {
   /** Frequency in megahertz; must be finite and greater than zero. */
   readonly frequencyMHz: number;
@@ -631,10 +634,10 @@ export interface ScanImpedanceResult {
 }
 
 /**
- * The unit cell of an infinite periodic array in free space. Wires, ports and
- * loads use the same definitions as `NecModel`. A single cell of an infinite
- * array has no far field of its own, so there are no far-field,
- * embedded-field or isolated-element methods.
+ * The unit cell of an infinite periodic array in free space or above a perfect
+ * ground plane. Wires, ports and loads use the same definitions as
+ * `NecModel`. A single cell of an infinite array has no far field of its own,
+ * so there are no far-field, embedded-field or isolated-element methods.
  */
 export interface NecPeriodicModel {
   readonly state: NecModelState;
@@ -645,6 +648,12 @@ export interface NecPeriodicModel {
   definePorts(ports: readonly PortDefinition[]): void;
   addLoad(load: LoadDefinition): void;
   clearLoads(): void;
+  /**
+   * Defaults to free space. Over perfect ground every conductor must stay
+   * clear of the plane at z=0: one that touches, nearly touches or crosses
+   * it is refused, since ground connections are not supported.
+   */
+  setGround(ground: PeriodicGround): void;
   setLattice(lattice: PeriodicLattice): void;
   /** Fill, factor and return the scan impedance for one scan state. */
   computeScanImpedance(request: ScanImpedanceRequest): ScanImpedanceResult;

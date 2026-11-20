@@ -133,6 +133,11 @@ public:
    */
   void stateful_check_periodic_clearance(
     nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m) const;
+  /*! Periodic mode over perfect ground: refuse a conductor that touches,
+   * nearly touches or crosses the ground plane (nec_geometry_exception).
+   * Changes nothing.
+   */
+  void stateful_check_periodic_ground_clearance() const;
   /*! Periodic mode: the estimated numerical error of the prepared periodic
    * correction relative to the largest scan-impedance entry (kernel and
    * Gauss rule, and the rounding near the Floquet mode nearest to cut-off).
@@ -1006,6 +1011,8 @@ private:
   nec_float m_periodic_estimated_error = 0;
   std::vector<nec_periodic::wire_segment> periodic_wire_segments_m() const;
   void add_periodic_correction(nec_float xi, nec_float yi, nec_float zi, nec_float ai);
+  void add_periodic_images(nec_float xi, nec_float yi, nec_float zi, nec_float ai,
+    bool ground_image);
   void refuse_unsupported_periodic_configuration() const;
 
   friend class nec_stateful_model;

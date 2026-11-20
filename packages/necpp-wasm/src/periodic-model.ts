@@ -20,6 +20,7 @@ import type {
   LoadDefinition,
   NecModelState,
   NecPeriodicModel,
+  PeriodicGround,
   PeriodicLattice,
   PortDefinition,
   ScanImpedanceRequest,
@@ -65,6 +66,10 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
 
   clearLoads(): void {
     this.#cell.clearLoads();
+  }
+
+  setGround(ground: PeriodicGround): void {
+    this.#cell.setGround(ground);
   }
 
   setLattice(lattice: PeriodicLattice): void {

@@ -112,6 +112,40 @@ Stage 2 so far:
   end gaps), 1e-5 (10 cm gaps), 3e-5 (5 mm gaps), 6e-5 (stack with 10 mm
   pitch) and 3e-4 (5 mm wires, 2 cm gaps). That is the order by which a
   finite NEC array differs from the periodic result for this reason alone.
+- issue #26: perfect ground. The ground images of the other cells, mirrored
+  in z=0 with the opposite current along the mirrored segment (NEC's
+  `frati = 1`), go through the same correction as the direct images:
+  `add_periodic_images` runs once for the source and once for its mirror,
+  with close images through `efld_compute` at `zi + zj` and `-salpj`. The
+  close-image list of the direct images serves both, since for conductors
+  above the plane `|p - q'| >= |p - q|` for every pair of points; conductors
+  that touch, nearly touch or cross the plane are refused by the image-contact
+  rule against their own ground image. Ground connections stay unsupported.
+  Image theory: a dipole over ground equals a free-space cell with the dipole
+  and its mirror driven oppositely, `Z = Z00 - Z01`, to 8e-14 (horizontal)
+  and 5e-14 (tilted). A tapered 15 x 15 finite array over the same ground
+  (horizontal dipoles at a quarter wavelength, off broadside) matches the
+  centre element to 1.9 %, 0.9 % at 21 x 21; without the ground images of the
+  other cells the periodic result is 86 % off. Reciprocity
+  `Z(psi) = Z(-psi)^T` holds to 7.8e-5.
+  Literature: Stark (1966) gives the scan resistance of half-wave dipoles a
+  quarter wavelength over ground in closed form, `R = R_bs SF` (his eq. 20,
+  Wheeler's broadside value times a scanning factor), from a sinusoidal
+  current by induced EMF; without the image term the same expansion gives
+  the free-space array. His figure 8 (a = b = 0.5 wavelengths) puts the
+  dipoles end to end, a connected array, so the test uses 0.6 along and 0.5
+  across the dipoles (radius 1e-5 wavelengths, 21 segments). Broadside is 3.1 %
+  above Stark over ground and 3.3 % in free space, the moment-method current
+  against the sinusoid (the isolated half-wave dipole is 6 % above its EMF
+  value at this radius, 16 % at 1e-3). The scanning factor agrees to 0.4 % in
+  free space (E, H and D planes to 40 degrees, H 40: 1.9 %) and to 1 to 6 %
+  over ground (6.4 % at H 40). Beyond a grating-lobe onset Stark's curves
+  part from the moment method: at 0.6 wavelengths over ground, H-plane 56
+  degrees, the periodic solver gives `272.9 + j145.1` ohm against about 223
+  ohm read from his figure 9, while the centre of a tapered finite array
+  over the same ground goes from `249.7 + j156.6` (17 x 17) to `264.0 + j152.0`
+  (25 x 25), towards the periodic value. Stark's crosses come from Carter's
+  mutual impedances, which assume the same sinusoidal current.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -714,5 +748,11 @@ Listed from memory; check the bibliographic details before citing.
   using the Ewald transformation," IEEE Trans. MTT, 2006.
 - R. C. Hansen, "Phased Array Antennas" (scan impedance of infinite dipole
   arrays; scan element pattern).
+- L. Stark, "Radiation impedance of a dipole in an infinite planar phased
+  array," Radio Science, vol. 1 (new series), no. 3, pp. 361-377, March 1966
+  (checked; used by the issue #26 literature test).
+- H. A. Wheeler, "The radiation resistance of an antenna in an infinite
+  array or waveguide," Proc. IRE, vol. 36, pp. 478-487, April 1948 (as cited
+  by Stark).
 - NEC-2 manual Part I (theory) and Part III (cards):
   https://www.nec2.org/other/nec2prt3.pdf

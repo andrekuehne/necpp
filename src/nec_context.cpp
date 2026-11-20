@@ -330,7 +330,7 @@ static nec_float periodic_close_image_reach(nec_float length, nec_float radius)
 
 /*! Refuse what periodic mode does not support, with the reason. The
  * periodic correction assumes one full, unreduced fill of wires in free
- * space.
+ * space or above perfect ground.
  */
 void nec_context::refuse_unsupported_periodic_configuration() const
 {
@@ -341,13 +341,42 @@ void nec_context::refuse_unsupported_periodic_configuration() const
     throw nec_geometry_exception(ntyp[0] == 1
       ? "NETWORKS ARE NOT SUPPORTED IN PERIODIC MODE (UNTESTED)"
       : "TRANSMISSION LINES ARE NOT SUPPORTED IN PERIODIC MODE (UNTESTED)");
-  if (ground.present())
-    throw nec_geometry_exception(ground.type_perfect()
-      ? "PERFECT GROUND IS NOT YET SUPPORTED IN PERIODIC MODE"
-      : "FINITE GROUND IS NOT SUPPORTED IN PERIODIC MODE UNTIL LAYERED STACKS ARRIVE");
+  if (ground.present() && !ground.type_perfect())
+    throw nec_geometry_exception(
+      "FINITE GROUND IS NOT SUPPORTED IN PERIODIC MODE UNTIL LAYERED STACKS ARRIVE");
+  if (ground.type_perfect())
+    stateful_check_periodic_ground_clearance();
   if (nop != 1)
     throw nec_geometry_exception(
       "GEOMETRY SYMMETRY IS NOT SUPPORTED IN PERIODIC MODE");
+}
+
+void nec_context::stateful_check_periodic_ground_clearance() const
+{
+  // A conductor near the plane nearly touches its own ground image; the
+  // limit follows the image-contact rule of nec_periodic_clearance.h for a
+  // segment and its own image (radii plus SMIN times the length). Above it,
+  // no ground image of a cell comes closer to a segment than the
+  // corresponding direct image, so the close images of the direct source
+  // also cover the ground images.
+  const std::vector<nec_periodic::wire_segment> segments = periodic_wire_segments_m();
+  for (size_t index = 0; index < segments.size(); ++index) {
+    const nec_periodic::wire_segment& segment = segments[index];
+    const nec_float lowest = std::min(segment.start[2], segment.end[2]);
+    const nec_float length = std::hypot(segment.end[0] - segment.start[0],
+      segment.end[1] - segment.start[1], segment.end[2] - segment.start[2]);
+    const nec_float minimum = segment.radius + 0.5 * SMIN * length;
+    if (lowest > minimum)
+      continue;
+    char reason[320];
+    std::snprintf(reason, sizeof(reason),
+      "CONDUCTOR TOO CLOSE TO THE GROUND PLANE: SEGMENT %lld (TAG %d) REACHES"
+      " Z = %.4g M, AT LEAST %.4g M IS NEEDED (TOUCHING OR NEARLY TOUCHING ITS"
+      " GROUND IMAGE); GROUND CONNECTIONS ARE NOT SUPPORTED IN PERIODIC MODE",
+      static_cast<long long>(index + 1),
+      m_geometry->segment_tags[static_cast<int64_t>(index)], lowest, minimum);
+    throw nec_geometry_exception(reason);
+  }
 }
 
 void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
@@ -571,32 +600,52 @@ void nec_context::stateful_clear_periodic()
 }
 
 /*! Add the field of the other cells, radiated by the current source segment
- * (xj, yj, zj, m_s, m_b, ...), to the nine free-space field components just
- * computed by efld(). Images of the source within periodic_close_image_reach
- * of the observation point go through efld_compute, the thin-wire segment
- * field of the finite model, displaced and phase-shifted as the ground image
- * is. The rest of G_p - G_free is smooth along the segment and goes through
- * a Gauss rule.
+ * (xj, yj, zj, m_s, m_b, ...), to the nine field components just computed by
+ * efld(). Over perfect ground the ground images of the other cells are added
+ * the same way, as efld() adds the ground image of the source itself.
  */
 void nec_context::add_periodic_correction(
   nec_float xi, nec_float yi, nec_float zi, nec_float ai)
 {
+  add_periodic_images(xi, yi, zi, ai, false);
+  if (ground.type_perfect())
+    add_periodic_images(xi, yi, zi, ai, true);
+}
+
+/*! Add the field of the images in the other cells of the current source
+ * segment (xj, yj, zj, m_s, m_b, ...), or with ground_image of its ground
+ * image: the segment reflected in z = 0, with the opposite current along the
+ * reflected segment (efld's frati = 1 for perfect ground). Images within
+ * periodic_close_image_reach of the observation point go through
+ * efld_compute, the thin-wire segment field of the finite model, displaced
+ * and phase-shifted. The rest of G_p - G_free is smooth along the segment
+ * and goes through a Gauss rule.
+ */
+void nec_context::add_periodic_images(
+  nec_float xi, nec_float yi, nec_float zi, nec_float ai, bool ground_image)
+{
+  const nec_float source_z = ground_image ? -zj : zj;
+  const nec_float source_salp = ground_image ? -salpj : salpj;
+  const nec_float sign = ground_image ? -1.0 : 1.0;
   // Kept below rkh, where efld_compute would switch to its lumped
   // approximation and be less accurate than the Gauss rule.
   const nec_float reach = std::min(periodic_close_image_reach(m_s, m_b), 0.5 * rkh);
-  const nec_float half_x = 0.5 * m_s * cabj, half_y = 0.5 * m_s * sabj, half_z = 0.5 * m_s * salpj;
+  const nec_float half_x = 0.5 * m_s * cabj, half_y = 0.5 * m_s * sabj;
+  const nec_float half_z = 0.5 * m_s * source_salp;
   std::vector<const periodic_close_image*> close;
   for (const periodic_close_image& image : m_periodic_close_images) {
     const nec_float cx = xj + image.x, cy = yj + image.y;
     const nec_float distance = nec_periodic::segment_distance(
       {xi, yi, zi}, {xi, yi, zi},
-      {cx - half_x, cy - half_y, zj - half_z}, {cx + half_x, cy + half_y, zj + half_z});
+      {cx - half_x, cy - half_y, source_z - half_z},
+      {cx + half_x, cy + half_y, source_z + half_z});
     if (distance < reach)
       close.push_back(&image);
   }
 
   const nec_periodic::periodic_green& green = *m_periodic_green;
-  const nec_periodic::source_segment segment{{xj, yj, zj}, {cabj, sabj, salpj}, m_s};
+  const nec_periodic::source_segment segment{
+    {xj, yj, source_z}, {cabj, sabj, source_salp}, m_s};
   const nec_periodic::segment_field field = nec_periodic::segment_field_of_kernel(
     [&green, &close](const nec_periodic::point& r) {
       nec_periodic::green_value value = green.smooth(r);
@@ -613,28 +662,29 @@ void nec_context::add_periodic_correction(
   nec_complex image_field[9];
   for (const periodic_close_image* close_image : close) {
     const periodic_close_image& image = *close_image;
-    // The image source sits at (xj + x, yj + y, zj).
-    efld_compute(xi - xj - image.x, yi - yj - image.y, ai, salpj, zi - zj,
-      true, image_field);
-    exk += image.phase * image_field[0];
-    eyk += image.phase * image_field[1];
-    ezk += image.phase * image_field[2];
-    exs += image.phase * image_field[3];
-    eys += image.phase * image_field[4];
-    ezs += image.phase * image_field[5];
-    exc += image.phase * image_field[6];
-    eyc += image.phase * image_field[7];
-    ezc += image.phase * image_field[8];
+    // The image source sits at (xj + x, yj + y, source_z).
+    efld_compute(xi - xj - image.x, yi - yj - image.y, ai, source_salp,
+      zi - source_z, true, image_field);
+    const nec_complex weight = sign * image.phase;
+    exk += weight * image_field[0];
+    eyk += weight * image_field[1];
+    ezk += weight * image_field[2];
+    exs += weight * image_field[3];
+    eys += weight * image_field[4];
+    ezs += weight * image_field[5];
+    exc += weight * image_field[6];
+    eyc += weight * image_field[7];
+    ezc += weight * image_field[8];
   }
-  exk += field.constant[0];
-  eyk += field.constant[1];
-  ezk += field.constant[2];
-  exs += field.sine[0];
-  eys += field.sine[1];
-  ezs += field.sine[2];
-  exc += field.cosine[0];
-  eyc += field.cosine[1];
-  ezc += field.cosine[2];
+  exk += sign * field.constant[0];
+  eyk += sign * field.constant[1];
+  ezk += sign * field.constant[2];
+  exs += sign * field.sine[0];
+  eys += sign * field.sine[1];
+  ezs += sign * field.sine[2];
+  exc += sign * field.cosine[0];
+  eyc += sign * field.cosine[1];
+  ezc += sign * field.cosine[2];
 }
 
 nec_power_budget nec_context::stateful_power_budget() const
