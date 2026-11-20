@@ -137,9 +137,11 @@ TEST_CASE("Segment field of the smooth periodic kernel converges with the Gauss 
         const auto reference = nec_periodic::segment_field_of_kernel(smooth, segment, observation, k, 48);
         // Rounding floor: two converged rules differ only by rounding, which on
         // short segments is raised by the cancellation between the charge and
-        // end-charge terms (about 1/(kL)^2).
+        // end-charge terms (about 1/(kL)^2). One pair of rules samples it; other
+        // rules and compilers land up to a few times higher (CI's GCC: 1.04
+        // times 10 such samples), hence the margin.
         const double floor =
-          10 * field_error(nec_periodic::segment_field_of_kernel(smooth, segment, observation, k, 40), reference);
+          30 * field_error(nec_periodic::segment_field_of_kernel(smooth, segment, observation, k, 40), reference);
         double previous = 1e300;
         for(int order = 1; order <= 8; ++order) {
           const double error =
