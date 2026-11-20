@@ -4,6 +4,7 @@
 // periodic kernel.
 #include <catch2/catch_test_macros.hpp>
 #include "nec_context.h"
+#include "nec_periodic_accuracy.h"
 #include "nec_periodic_green.h"
 #include <algorithm>
 #include <array>
@@ -163,4 +164,33 @@ TEST_CASE("Segment field refuses Gauss orders outside the supported range", "[pe
   CHECK_THROWS_AS(nec_periodic::segment_field_of_kernel(zero, segment, {0.1, 0, 0}, 2 * pi(),
                                                         nec_periodic::max_segment_gauss_order + 1),
                   std::invalid_argument);
+}
+
+TEST_CASE("The default Gauss rule stays within its share of the estimated error", "[periodic_green]") {
+  // nec_periodic::gauss_error bounds the default rule over a source segment
+  // in the estimated error of every periodic result; small cells, where the
+  // smooth kernel varies fastest, set it.
+  const double k = 2 * pi();
+  const point centre{0.02, -0.03, 0.01}, direction = unit(0.3, 1, 0.2);
+  for(const double cell : {3.0, 1.0, 0.5}) {
+    const nec_periodic::periodic_green green({{cell, 0.0}, {0.13 * cell, 0.97 * cell}}, k, {1.7, -0.9});
+    const auto smooth = [&](const point& r) { return green.smooth(r); };
+    for(const double length : {0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5}) {
+      // Images nearer than two segment lengths are close images, which do not
+      // go through the smooth kernel.
+      if(2 * length > 0.9 * cell) continue;
+      const source_segment segment{centre, direction, length};
+      const point offsets[] = {{0.0, 0.0, 0.0}, scaled(length / 2, direction), {0.12, 0.05, 0.0}, {0.2, -0.1, 0.05}};
+      for(const point& offset : offsets) {
+        const point observation = point_sum(centre, offset);
+        const double error = field_error(
+          nec_periodic::segment_field_of_kernel(smooth, segment, observation, k),
+          nec_periodic::segment_field_of_kernel(smooth, segment, observation, k, 48));
+        INFO("cell " << cell << ", segment length " << length << ", error " << error);
+        CHECK(error < nec_periodic::gauss_error(length) / 4);
+      }
+    }
+  }
+  // Segments up to 0.3 wavelengths fit the tolerance.
+  CHECK(nec_periodic::gauss_error(0.3) < nec_periodic::tolerance);
 }

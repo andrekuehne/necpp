@@ -855,6 +855,15 @@ all ports of the cell.
   periodic model has no far-field, embedded-field or isolated-element methods.
 - Free space only, and no geometry symmetry. Each call fills and factors the
   interaction matrix again.
+- Accuracy: one fixed internal tolerance, `1e-5` relative to the largest
+  scan-impedance entry, and no numerical parameters. Each result carries
+  `diagnostics.estimatedError` (the solver's numerical error: periodic
+  Green's function, quadrature, rounding near a Wood anomaly; about `2e-10`
+  for typical cells) and `diagnostics.status` (`"ok"`). Thin-wire modelling
+  error is not included. Configurations that cannot reach the tolerance are
+  refused with a reason: unit cells above about 320 square wavelengths,
+  segments longer than about 0.3 wavelengths, and a scan state exactly on a
+  Wood anomaly. Results next to a Wood anomaly are finite.
 - Clearance: the cells must be electrically separate. `setLattice` refuses,
   with a `NecGeometryError` naming the segments and the image cell, a lattice
   under which any conductor touches or nearly touches a periodic image of a

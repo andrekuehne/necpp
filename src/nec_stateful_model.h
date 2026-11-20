@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -228,12 +229,32 @@ struct nec_complex_matrix {
   }
 };
 
+/*! How a periodic result relates to the tolerance. Every result returned is
+ * within it; Wood-anomaly handling is to add a status for results near
+ * cut-off.
+ */
+enum class nec_periodic_point_status {
+  ok = 0,
+};
+
+/*! Estimated error and point status of one periodic scan-impedance result
+ * (nec_periodic_accuracy.h). */
+struct nec_periodic_diagnostics {
+  /*! The solver's numerical error (Ewald kernel, Gauss rule, rounding near
+   * cut-off) relative to the largest scan-impedance entry. Thin-wire
+   * modelling error is not included. */
+  nec_float estimated_error = 0.0;
+  nec_periodic_point_status status = nec_periodic_point_status::ok;
+};
+
 struct nec_impedance_result {
   nec_complex_matrix impedance;
   nec_complex_matrix admittance;
   nec_float condition_estimate = 0.0;
   nec_float frequency_mhz = 0.0;
   uint64_t factorization_generation = 0;
+  /*! Present in periodic mode only. */
+  std::optional<nec_periodic_diagnostics> periodic;
 };
 
 #include "nec_isolated_element_characterization.h"

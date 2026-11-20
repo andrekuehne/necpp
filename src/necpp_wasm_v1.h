@@ -53,6 +53,11 @@ enum necpp_wasm_v1_symmetry_kind {
   NECPP_WASM_V1_SYMMETRY_ROTATIONAL = 2
 };
 
+/* Periodic point status, an additive ABI v1 symbol. */
+enum necpp_wasm_v1_point_status {
+  NECPP_WASM_V1_POINT_STATUS_OK = 0
+};
+
 enum necpp_wasm_v1_reflection_plane {
   NECPP_WASM_V1_REFLECTION_PLANE_X = 1,
   NECPP_WASM_V1_REFLECTION_PLANE_Y = 2,
@@ -247,6 +252,9 @@ int32_t necpp_wasm_v1_set_ground(
  * free space are refused, as are far-field and embedded-field calls.
  * set_lattice returns NECPP_WASM_V1_GEOMETRY_ERROR when a conductor touches
  * or nearly touches a periodic image (connected arrays are not supported).
+ * prepare returns NECPP_WASM_V1_GEOMETRY_ERROR for a unit cell too large or
+ * segments too long for the periodic tolerance, and NECPP_WASM_V1_SOLVER_ERROR
+ * for a scan state exactly on a Wood anomaly.
  */
 int32_t necpp_wasm_v1_set_lattice(
   necpp_wasm_v1_model* model,
@@ -366,6 +374,14 @@ size_t necpp_wasm_v1_impedance_order(const necpp_wasm_v1_model* model);
 double necpp_wasm_v1_impedance_frequency_mhz(
   const necpp_wasm_v1_model* model);
 double necpp_wasm_v1_impedance_condition_estimate(
+  const necpp_wasm_v1_model* model);
+/* Periodic mode only (0 and NECPP_WASM_V1_POINT_STATUS_OK otherwise): the
+ * estimated numerical error of the scan impedance relative to its largest
+ * entry, and the point status. prepare refuses a configuration whose
+ * estimate exceeds the fixed tolerance (1e-5). */
+double necpp_wasm_v1_impedance_estimated_error(
+  const necpp_wasm_v1_model* model);
+int32_t necpp_wasm_v1_impedance_point_status(
   const necpp_wasm_v1_model* model);
 double necpp_wasm_v1_impedance_factorization_generation(
   const necpp_wasm_v1_model* model);

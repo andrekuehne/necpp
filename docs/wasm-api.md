@@ -685,7 +685,7 @@ error taxonomy and lifecycle states of `NecModel`, with these methods:
 | `addWire`, `definePorts`, `addLoad`, `clearLoads`, `dispose` | As for `NecModel` | As for `NecModel` | As for `NecModel` |
 | `completeGeometry()` | None; no symmetry and no ground connection | `void` | As for `NecModel` |
 | `setLattice({ a1M, a2M })` | Two finite, non-parallel `[x, y]` vectors in m, in the xy-plane | `void`; resets the scan phases, invalidates prepared data | `NecInputError` for malformed or parallel vectors; `NecGeometryError` when a conductor touches or nearly touches a periodic image (see clearance below) |
-| `computeScanImpedance({ frequencyMHz, scanPhasesRad })` | Positive MHz; finite `[psi1, psi2]` in radians per cell along `a1M`, `a2M` | P x P scan impedance and admittance, frequency and the scan phases; the model is `prepared` afterwards | `NecStateError` before `setLattice`; otherwise as `prepare` and `computeImpedanceMatrix` |
+| `computeScanImpedance({ frequencyMHz, scanPhasesRad })` | Positive MHz; finite `[psi1, psi2]` in radians per cell along `a1M`, `a2M` | P x P scan impedance and admittance, frequency, the scan phases and `diagnostics: { estimatedError, status }`; the model is `prepared` afterwards | `NecStateError` before `setLattice`; refusals of the accuracy policy below; otherwise as `prepare` and `computeImpedanceMatrix` |
 | `computeScanImpedance({ frequencyMHz, scanDirection })` | Positive MHz; `{ thetaDeg, phiDeg }`, finite, `thetaDeg` 0 to 90 | As above; `scanPhasesRad` reports the phases the direction maps to | As above; `NecInputError` for a direction outside visible space or with both or neither of `scanPhasesRad` and `scanDirection` |
 
 Pure helpers, without a model:
@@ -742,12 +742,61 @@ multiplied by their scan phase factor, as the ground image is. Close
 conductors in neighbouring cells then interact as in a finite array. Where an
 image changes route, the scan impedance steps by a few 1e-6 relative.
 
+Accuracy policy: one fixed internal tolerance, `1e-5` relative to the
+largest scan-impedance entry, governs the periodic solver. There are no
+truncation, Ewald or quadrature parameters. Every result carries
+`diagnostics.estimatedError`, the solver's numerical error on that scale,
+and `diagnostics.status` (`"ok"`; Wood-anomaly handling is to add a status
+for results near cut-off). The estimate is the sum of
+
+- the Ewald kernel's error, `1e-10` (kernel tests against direct lattice
+  sums and the spectral series);
+- the Gauss rule over the longest segment, `1e-10` up to a tenth of a
+  wavelength and growing like the tenth power of the length beyond, at least
+  four times the error measured on lattices of 0.5, 1 and 3 wavelengths;
+- the rounding near the Floquet mode nearest to cut-off, `eps / (|kz| / k)`:
+  the spectral sum carries a term of size `1 / kz` there, which the solution
+  cancels.
+
+Typical cells report about `2e-10`; 0.16 wavelength segments about `1e-8`.
+These are errors of the interaction-matrix entries, taken over to the scan
+impedance as they are: port quantities of the moment method are stationary
+in the current, so ill-conditioning of the matrix is not counted.
+Thin-wire modelling error is not included. In particular, NEC's thin-wire
+kernel, used for close images, evaluates the free-space kernel at
+`sqrt(d^2 + a^2)` at every distance, which far from a wire is a phase error
+of about `k a^2 / (2 d)`; the smooth kernel treats the other images as
+filaments, which is closer to the field of a tube current there. The two
+differ for tightly packed or thick wires by up to `1e-5` to `3e-4` of the
+scan impedance (1 mm wires at 1 m wavelength: 7e-6 for a 0.7 x 0.5 m cell,
+3e-5 with 5 mm end gaps; 5 mm wires with 2 cm gaps: 3e-4). A finite NEC
+array differs from the periodic result by that much for this reason alone.
+
+A configuration whose estimate would exceed the tolerance is refused with a
+reason, never solved with a looser one:
+
+| Refusal | Error | Reason |
+|---|---|---|
+| Unit cell above about 320 square wavelengths | `NecGeometryError` | A work bound: the kernel stays accurate by widening its spectral sum, which would need more than 10000 Floquet modes per evaluation; model the array as a finite array |
+| Segments longer than about 0.3 wavelengths | `NecGeometryError` | The Gauss rule of the periodic correction |
+| Scan state exactly on a Wood anomaly (`kz = 0` in floating point) | `NecSolverError` | The spectral sum is singular; states next to it are solved (measured finite to within 1e-12 of cut-off) |
+
+Unsupported configurations are refused with a reason through the same error
+types as the finite model. The periodic model has no ground, patch, network
+or transmission-line methods; the native model refuses, as
+`NECPP_WASM_V1_GEOMETRY_ERROR`, perfect ground (until it arrives), finite
+ground (until layered stacks arrive), surface patches, networks and
+transmission lines (untested in periodic mode) and symmetric geometry. NaN
+appears only for a genuine failure.
+
 The native C ABI adds `necpp_wasm_v1_set_lattice`,
-`necpp_wasm_v1_clear_lattice` and `necpp_wasm_v1_set_scan_phases`. They are
-additive v1 symbols; `necpp_wasm_v1_set_lattice` returns the geometry status
-for a clearance refusal. While a lattice is set, the native model refuses
-symmetric geometry, any ground other than free space, far fields, embedded
-far fields and isolated-element characterization. The interaction matrix is
+`necpp_wasm_v1_clear_lattice`, `necpp_wasm_v1_set_scan_phases`,
+`necpp_wasm_v1_impedance_estimated_error` and
+`necpp_wasm_v1_impedance_point_status` (`NECPP_WASM_V1_POINT_STATUS_OK`).
+They are additive v1 symbols; `necpp_wasm_v1_set_lattice` returns the
+geometry status for a clearance refusal. While a lattice is set, the native
+model also refuses far fields, embedded far fields and isolated-element
+characterization. The interaction matrix is
 NEC's free-space matrix plus the field of the smooth part of the periodic
 Green's function; see
 [`periodic-floquet-evaluation.md`](periodic-floquet-evaluation.md).

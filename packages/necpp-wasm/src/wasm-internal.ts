@@ -159,6 +159,8 @@ export interface NecWasmModule {
   _necpp_wasm_v1_impedance_order(model: number): number;
   _necpp_wasm_v1_impedance_frequency_mhz(model: number): number;
   _necpp_wasm_v1_impedance_condition_estimate(model: number): number;
+  _necpp_wasm_v1_impedance_estimated_error(model: number): number;
+  _necpp_wasm_v1_impedance_point_status(model: number): number;
   _necpp_wasm_v1_impedance_factorization_generation(model: number): number;
 
   _necpp_wasm_v1_solution_count(model: number): number;

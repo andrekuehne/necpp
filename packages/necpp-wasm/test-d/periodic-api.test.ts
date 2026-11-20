@@ -8,6 +8,8 @@ import {
   type ComplexMatrix,
   type NecPeriodicModel,
   type PeriodicLattice,
+  type PeriodicPointDiagnostics,
+  type PeriodicPointStatus,
   type ScanDirection,
   type ScanImpedanceResult,
   type ScanPhasesRad,
@@ -68,6 +70,34 @@ export async function periodicModelTypes(): Promise<void> {
   // @ts-expect-error a scan state is required.
   cell.computeScanImpedance({ frequencyMHz: 300 });
 
+  // One fixed internal tolerance: every result carries its estimated error and
+  // point status, and nothing numerical can be tuned.
+  const diagnostics: PeriodicPointDiagnostics = result.diagnostics;
+  const estimatedError: number = diagnostics.estimatedError;
+  const status: PeriodicPointStatus = diagnostics.status;
+  void estimatedError;
+  void status;
+  // @ts-expect-error diagnostics are read-only.
+  result.diagnostics.estimatedError = 0;
+  // @ts-expect-error no tolerance in a scan request.
+  cell.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: phases, tolerance: 1e-3 });
+  // @ts-expect-error no Ewald splitting in a scan request.
+  cell.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: phases, ewaldSplitting: 2 });
+  // @ts-expect-error no Floquet-mode truncation in a scan request.
+  cell.computeScanImpedance({ frequencyMHz: 300, scanDirection: direction, floquetModes: 50 });
+  // @ts-expect-error no numerical options with the lattice.
+  cell.setLattice({ ...lattice, imageReachM: 0.1 });
+  // @ts-expect-error no accuracy setting on the periodic model.
+  void cell.setTolerance;
+
+  // Wires only: there are no surface patches, networks or transmission lines.
+  // @ts-expect-error no surface patches on the periodic model.
+  void cell.addPatch;
+  // @ts-expect-error no networks on the periodic model.
+  void cell.addNetwork;
+  // @ts-expect-error no transmission lines on the periodic model.
+  void cell.addTransmissionLine;
+
   // A single cell of an infinite array has no far field of its own.
   // @ts-expect-error no far fields on the periodic model.
   void cell.computeFarField;
@@ -75,7 +105,7 @@ export async function periodicModelTypes(): Promise<void> {
   void cell.computeEmbeddedFarFields;
   // @ts-expect-error no isolated-element (ring-field) characterization on the periodic model.
   void cell.characterizeIsolatedElement;
-  // @ts-expect-error no ground: the first periodic release is free space only.
+  // @ts-expect-error no ground: free space only until perfect ground arrives; finite ground needs layered stacks.
   void cell.setGround;
   // @ts-expect-error unit cells take no symmetry options.
   cell.completeGeometry({ symmetry: { kind: "reflection", planes: ["x=0"], tagIncrement: 10 } });

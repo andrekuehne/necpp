@@ -39,6 +39,8 @@ import type {
   PrepareOptions,
   PreparedQuadratureRequest,
   PreparedTransferHandle,
+  PeriodicPointDiagnostics,
+  PeriodicPointStatus,
   ScanPhasesRad,
   SegmentSelection,
   WireDefinition,
@@ -55,6 +57,9 @@ type PeriodicOperation = "setLattice" | "setScanPhases";
  */
 export const setLatticeEntry: unique symbol = Symbol("necpp.setLattice");
 export const setScanPhasesEntry: unique symbol = Symbol("necpp.setScanPhases");
+export const periodicDiagnosticsEntry: unique symbol = Symbol("necpp.periodicDiagnostics");
+
+const POINT_STATUS: Readonly<Record<number, PeriodicPointStatus>> = { 0: "ok" };
 
 const STATUS_OK = 0;
 const STATUS_STATE = 1;
@@ -1786,6 +1791,20 @@ export class WasmNecModel implements NecModel {
       phases[0],
       phases[1],
     ));
+  }
+
+  /** @internal Periodic entry point: the diagnostics of the latest impedance result. */
+  [periodicDiagnosticsEntry](): PeriodicPointDiagnostics {
+    const estimatedError =
+      this.#module._necpp_wasm_v1_impedance_estimated_error(this.#handle);
+    if (!Number.isFinite(estimatedError) || estimatedError <= 0) {
+      throw new NecRuntimeError("The native estimated error is invalid");
+    }
+    const status = POINT_STATUS[this.#module._necpp_wasm_v1_impedance_point_status(this.#handle)];
+    if (status === undefined) {
+      throw new NecRuntimeError("The native point status is invalid");
+    }
+    return { estimatedError, status };
   }
 
   #assertNotDisposed(operation: PeriodicOperation): void {

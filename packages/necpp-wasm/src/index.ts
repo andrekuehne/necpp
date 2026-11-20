@@ -104,6 +104,8 @@ export type {
   ParallelRlcLoad,
   PerfectGround,
   PeriodicLattice,
+  PeriodicPointDiagnostics,
+  PeriodicPointStatus,
   PortDefinition,
   PortSolution,
   PowerBudget,

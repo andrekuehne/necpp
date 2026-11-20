@@ -302,3 +302,21 @@ TEST_CASE("exp(a) erfc(z) stays finite where either factor alone overflows", "[p
     CHECK(relative_error(nec_periodic::exp_erfc({c[0], c[1]}, {c[2], c[3]}), reference) < 1e-12);
   }
 }
+
+TEST_CASE("The Floquet mode nearest to cut-off is found, indexed along the given lattice vectors", "[periodic_green]") {
+  const complex_d k = 2 * pi;
+  // Unit square lattice at broadside: the modes (+-1, 0) and (0, +-1) graze
+  // the lattice plane, kz = 0 exactly.
+  const nec_periodic::lattice_2d square({1, 0}, {0, 1});
+  REQUIRE(nec_periodic::periodic_green(square, k, {0, 0}).nearest_cutoff().kz_over_k == 0);
+
+  // Scanning along y by 0.3 k, the modes kt0 +- (2 pi, 0) have
+  // |kt|^2 = (1 + 0.09) k^2: evanescent with |kz| = 0.3 |k|. Given as the
+  // skewed vectors (1, 0), (1, 1) of the same lattice, (2 pi, 0) is b1 + b2.
+  const nec_periodic::lattice_2d skewed({1, 0}, {1, 1});
+  const nec_periodic::floquet_cutoff nearest =
+    nec_periodic::periodic_green(skewed, k, {0, 0.3 * 2 * pi}).nearest_cutoff();
+  REQUIRE(std::abs(nearest.kz_over_k - 0.3) < 1e-12);
+  REQUIRE(std::abs(nearest.p) == 1);
+  REQUIRE(nearest.q == nearest.p);
+}

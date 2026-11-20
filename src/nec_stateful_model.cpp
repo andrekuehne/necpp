@@ -515,12 +515,25 @@ void nec_stateful_model::validate_symmetric_load_orbits() const
   }
 }
 
+/*! The reason periodic mode refuses a ground model, or null for free space. */
+static const char* periodic_ground_refusal(const nec_ground_definition& ground)
+{
+  switch (ground.kind) {
+  case nec_ground_kind::free_space:
+    return nullptr;
+  case nec_ground_kind::perfect:
+    return "PERFECT GROUND IS NOT YET SUPPORTED IN PERIODIC MODE";
+  default:
+    return "FINITE GROUND IS NOT SUPPORTED IN PERIODIC MODE UNTIL LAYERED STACKS ARRIVE";
+  }
+}
+
 void nec_stateful_model::set_ground(const nec_ground_definition& ground)
 {
   require_configurable("SET GROUND");
   validate_symmetry_ground(ground, "SET GROUND");
-  if (m_periodic && ground.kind != nec_ground_kind::free_space)
-    fail_geometry("SET GROUND", "ONLY FREE SPACE IS SUPPORTED IN PERIODIC MODE");
+  if (const char* refusal = m_periodic ? periodic_ground_refusal(ground) : nullptr)
+    fail_geometry("SET GROUND", refusal);
 
   int ground_type = -1;
   switch (ground.kind) {
@@ -573,8 +586,8 @@ void nec_stateful_model::set_lattice(const nec_lattice_definition& lattice)
   require_configurable("SET LATTICE");
   if (m_geometry_completion.symmetry.kind != nec_geometry_symmetry_kind::none)
     fail_geometry("SET LATTICE", "GEOMETRY SYMMETRY IS NOT SUPPORTED IN PERIODIC MODE");
-  if (m_ground.kind != nec_ground_kind::free_space)
-    fail_geometry("SET LATTICE", "ONLY FREE SPACE IS SUPPORTED IN PERIODIC MODE");
+  if (const char* refusal = periodic_ground_refusal(m_ground))
+    fail_geometry("SET LATTICE", refusal);
 
   // The context validates the vectors and the clearance of every conductor
   // from its periodic images before anything changes.
@@ -885,6 +898,11 @@ const nec_impedance_result& nec_stateful_model::compute_impedance_matrix()
   result.condition_estimate = inverse.condition_estimate;
   result.frequency_mhz = m_frequency_mhz;
   result.factorization_generation = m_factorization_generation;
+  if (m_periodic) {
+    nec_periodic_diagnostics diagnostics;
+    diagnostics.estimated_error = m_context->stateful_periodic_estimated_error();
+    result.periodic = diagnostics;
+  }
   m_impedance_result = std::move(result);
   m_has_impedance_result = true;
   return m_impedance_result;

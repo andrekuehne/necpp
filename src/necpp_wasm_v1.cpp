@@ -71,6 +71,8 @@ struct impedance_buffers {
   double frequency_mhz = 0.0;
   double condition_estimate = 0.0;
   uint64_t factorization_generation = 0;
+  double estimated_error = 0.0;
+  int32_t point_status = NECPP_WASM_V1_POINT_STATUS_OK;
   bool available = false;
 
   void clear()
@@ -81,6 +83,8 @@ struct impedance_buffers {
     frequency_mhz = 0.0;
     condition_estimate = 0.0;
     factorization_generation = 0;
+    estimated_error = 0.0;
+    point_status = NECPP_WASM_V1_POINT_STATUS_OK;
     available = false;
   }
 };
@@ -439,6 +443,10 @@ void sync_impedance(
   next.frequency_mhz = result.frequency_mhz;
   next.condition_estimate = result.condition_estimate;
   next.factorization_generation = result.factorization_generation;
+  if (result.periodic) {
+    next.estimated_error = result.periodic->estimated_error;
+    next.point_status = static_cast<int32_t>(result.periodic->status);
+  }
   next.available = true;
   model.impedance = std::move(next);
 }
@@ -1984,6 +1992,20 @@ double necpp_wasm_v1_impedance_condition_estimate(
 {
   return model != nullptr && model->impedance.available
     ? model->impedance.condition_estimate : 0.0;
+}
+
+double necpp_wasm_v1_impedance_estimated_error(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->impedance.available
+    ? model->impedance.estimated_error : 0.0;
+}
+
+int32_t necpp_wasm_v1_impedance_point_status(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->impedance.available
+    ? model->impedance.point_status : NECPP_WASM_V1_POINT_STATUS_OK;
 }
 
 double necpp_wasm_v1_impedance_factorization_generation(

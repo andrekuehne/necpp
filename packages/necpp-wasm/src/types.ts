@@ -597,6 +597,25 @@ export type ScanImpedanceRequest =
     readonly scanPhasesRad?: never;
   };
 
+/** How a periodic result relates to the tolerance: `"ok"`, within it. */
+export type PeriodicPointStatus = "ok";
+
+/**
+ * Estimated error and point status of one periodic result. The periodic solver has one fixed
+ * internal tolerance (1e-5) and no numerical parameters; a configuration
+ * whose estimate would exceed it is refused instead of returned.
+ */
+export interface PeriodicPointDiagnostics {
+  /**
+   * The solver's numerical error relative to the largest scan-impedance
+   * entry: the periodic Green's function, the quadrature over each segment
+   * and the rounding near a Wood anomaly. Thin-wire modelling error is not
+   * included.
+   */
+  readonly estimatedError: number;
+  readonly status: PeriodicPointStatus;
+}
+
 /**
  * P x P scan impedance and scan admittance of the unit-cell ports at one
  * scan state. They are not symmetric in general; reciprocity holds as
@@ -608,6 +627,7 @@ export interface ScanImpedanceResult {
   readonly frequencyMHz: number;
   /** The scan phases solved for, also when the request gave a scan direction. */
   readonly scanPhasesRad: ScanPhasesRad;
+  readonly diagnostics: PeriodicPointDiagnostics;
 }
 
 /**

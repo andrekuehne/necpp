@@ -19,21 +19,21 @@ export const dipoleWire = (id, [x, y], radiusM = RADIUS_M) => ({
 
 /**
  * A periodic model of x-directed half-wave dipoles centred at `centres`, one
- * port per dipole, without a lattice.
+ * port per dipole at its centre segment (`segments` odd), without a lattice.
  */
-export async function dipoleCell(centres, radiusM = RADIUS_M) {
+export async function dipoleCell(centres, radiusM = RADIUS_M, segments = SEGMENTS) {
   const cell = await createNecPeriodicModel();
   centres.forEach(([x, y], index) => {
     cell.addWire({
       tag: index + 1,
-      segments: SEGMENTS,
+      segments,
       start: [x - HALF_LENGTH_M, y, 0],
       end: [x + HALF_LENGTH_M, y, 0],
       radiusM,
     });
   });
   cell.completeGeometry();
-  cell.definePorts(centres.map((_, index) => ({ tag: index + 1, segment: FEED_SEGMENT })));
+  cell.definePorts(centres.map((_, index) => ({ tag: index + 1, segment: (segments + 1) / 2 })));
   return cell;
 }
 

@@ -39,6 +39,17 @@ The copy of a unit-cell conductor in another cell of the infinite array, displac
 A periodic image of a source segment near enough to an observation point that it is evaluated with the finite model's thin-wire kernel rather than the smooth part of the periodic Green's function. Chosen per observation point and source segment.
 _Avoid_: near image, image ring
 
+**Estimated error**:
+The numerical error a periodic result carries in its diagnostics, relative to the largest scan-impedance entry: periodic Green's function, quadrature and rounding near a Wood anomaly. Thin-wire modelling error is not included.
+_Avoid_: accuracy, error bound
+
+**Periodic tolerance**:
+The one fixed internal tolerance (1e-5) that governs the periodic solver. A configuration whose estimated error would exceed it is refused with a reason, never solved with a looser one; there are no numerical parameters in the API.
+_Avoid_: precision setting, truncation parameter
+
+**Point status**:
+How one periodic result relates to the periodic tolerance, reported with its estimated error. Every returned result is `ok`; results on or near a Wood anomaly get their own status.
+
 **Clearance**:
 The separation between the unit cell's conductors and the periodic images of all of them. A lattice under which a conductor touches or nearly touches a periodic image is refused: that would be a connected array.
 _Avoid_: distance to the cell wall (no unique shape for a non-rectangular lattice)
