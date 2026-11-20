@@ -19,6 +19,20 @@
 #include <string>
 #include <vector>
 
+// Declared a friend of nec_stateful_model and nec_context: the internal test
+// seam of the low-rank update, which widens the split of Floquet modes near
+// cut-off.
+struct nec_periodic_split_access {
+  static void set_near_cutoff(nec_stateful_model& model, nec_float ratio)
+  {
+    model.m_context->m_periodic_near_cutoff = ratio;
+  }
+  static size_t split_mode_count(const nec_stateful_model& model)
+  {
+    return model.m_context->m_periodic_green->split_modes().size();
+  }
+};
+
 namespace {
 
 constexpr nec_float frequency_mhz = 299.792458;  // one metre wavelength
@@ -258,7 +272,7 @@ TEST_CASE("Periodic scan impedances carry an estimated error and a point status"
   REQUIRE(result.periodic->status == nec_periodic_point_status::ok);
 }
 
-TEST_CASE("A scan state exactly on a Wood anomaly is refused instead of returning NaN", "[periodic_model]")
+TEST_CASE("A scan state exactly on a Wood anomaly is solved, flagged and continuous with its neighbours", "[periodic_model]")
 {
   // At this frequency one metre is exactly one wavelength in the engine's
   // arithmetic, where k = two_pi(). Broadside, the Floquet mode along the
@@ -269,11 +283,10 @@ TEST_CASE("A scan state exactly on a Wood anomaly is refused instead of returnin
   const nec_float exact_two_pi = 2.0 * std::acos(-1.0);
   nec_float spacing = exact_two_pi / two_pi();
   bool on_cutoff = false;
-  for (int step = 0; step < 64 && !on_cutoff; ++step) {
-    for (const nec_float candidate : {
-           spacing + step * std::numeric_limits<nec_float>::epsilon(),
-           spacing - step * std::numeric_limits<nec_float>::epsilon()}) {
-      const nec_periodic::lattice_2d lattice({candidate, 0.0}, {0.0, 1.0});
+  nec_float above = spacing, below = spacing;
+  for (int step = 0; step < 256 && !on_cutoff; ++step) {
+    for (const nec_float candidate : {above, below}) {
+      const nec_periodic::lattice_2d lattice({candidate, 0.0}, {0.0, 0.5});
       if (nec_periodic::periodic_green(lattice, two_pi(), {0.0, 0.0})
             .nearest_cutoff().kz_over_k == 0.0) {
         spacing = candidate;
@@ -281,14 +294,88 @@ TEST_CASE("A scan state exactly on a Wood anomaly is refused instead of returnin
         break;
       }
     }
+    above = std::nextafter(above, 2.0);
+    below = std::nextafter(below, 0.0);
   }
   REQUIRE(on_cutoff);
 
-  nec_stateful_model model;
-  build_dipole_cell(model);
-  model.set_lattice({spacing, 0.0, 0.0, 1.0});
-  REQUIRE(mentions(refusal<nec_exception>([&] { model.prepare(frequency); }),
-    "WOOD ANOMALY"));
+  const auto solve = [&](nec_float a1x) {
+    nec_stateful_model model;
+    build_dipole_cell(model);
+    model.set_lattice({a1x, 0.0, 0.0, 0.5});
+    model.prepare(frequency);
+    return model.compute_impedance_matrix();
+  };
+  const nec_impedance_result on = solve(spacing);
+  const nec_complex z_on = on.impedance.at(0, 0);
+  REQUIRE(std::isfinite(z_on.real()));
+  REQUIRE(std::isfinite(z_on.imag()));
+  REQUIRE(on.periodic->status == nec_periodic_point_status::near_cutoff);
+  REQUIRE(on.periodic->estimated_error <= nec_periodic::tolerance);
+
+  // Stretching a1 by 1 + delta makes the modes (+-1, 0) propagating with
+  // |kz| about sqrt(2 delta) k, shrinking it evanescent. The scan impedance
+  // has a square-root kink: it approaches the value on cut-off like
+  // sqrt(delta) from both sides (measured 24.7 sqrt(delta) on each side below
+  // delta = 1e-6, 34 at 1e-4 on the evanescent side), through
+  // the split boundary |kz| = 1e-3 k (delta = 5e-7). a2 = 0.5 keeps the modes
+  // (0, +-1) far from cut-off, and its reciprocal vector exact.
+  for (const nec_float side : {1.0, -1.0}) {
+    INFO((side > 0 ? "propagating side" : "evanescent side"));
+    nec_float previous = 0;
+    for (const nec_float delta : {1e-4, 1e-6, 1e-8, 1e-10}) {
+      INFO("delta = " << delta);
+      const nec_impedance_result next = solve(spacing * (1 + side * delta));
+      const nec_float change = std::abs(next.impedance.at(0, 0) - z_on) / std::abs(z_on);
+      CHECK(change < 40 * std::sqrt(delta));
+      if (previous > 0)
+        CHECK(change < previous / 3);
+      previous = change;
+      CHECK(next.periodic->status == (delta < 5e-7 ? nec_periodic_point_status::near_cutoff
+                                                  : nec_periodic_point_status::ok));
+    }
+  }
+}
+
+TEST_CASE("Splitting more Floquet modes into the low-rank update leaves the scan impedance unchanged", "[periodic_model]")
+{
+  // Two tilted wires, so that the TE, TM and longitudinal parts all couple,
+  // each with a port. At this scan state four modes, the propagating (0, 0)
+  // and (-1, 0) and the evanescent (0, 1) and (-1, 1), have |kz| < 1.3 k.
+  // With the split widened to them, the low-rank update carries their
+  // singular parts instead of the kernel, which must give the same scan
+  // impedance.
+  for (const bool perfect : {false, true}) {
+    INFO((perfect ? "over perfect ground" : "in free space"));
+    const auto solve = [&](nec_float near_cutoff, size_t& split) {
+      nec_stateful_model model;
+      model.add_wire({1, 11, -0.2, -0.05, 0.12, 0.2, 0.05, 0.36, 0.001});
+      model.add_wire({2, 9, 0.1, 0.15, 0.3, 0.3, 0.35, 0.15, 0.001});
+      model.complete_geometry();
+      model.define_ports({{1, 6}, {2, 5}});
+      if (perfect)
+        model.set_ground({nec_ground_kind::perfect});
+      model.set_lattice({0.8, 0.0, 0.0, 0.7});
+      model.set_scan_phases(-3.2, 0.9);
+      nec_periodic_split_access::set_near_cutoff(model, near_cutoff);
+      model.prepare(frequency_mhz);
+      split = nec_periodic_split_access::split_mode_count(model);
+      return model.compute_impedance_matrix().impedance;
+    };
+    size_t unsplit_count = 0, split_count = 0;
+    const nec_complex_matrix whole = solve(0.0, unsplit_count);
+    const nec_complex_matrix split = solve(1.3, split_count);
+    REQUIRE(unsplit_count == 0);
+    REQUIRE(split_count == 4);
+    nec_float difference = 0, size = 0;
+    for (size_t row = 0; row < 2; ++row)
+      for (size_t column = 0; column < 2; ++column) {
+        difference = std::max(difference, std::abs(split.at(row, column) - whole.at(row, column)));
+        size = std::max(size, std::abs(whole.at(row, column)));
+      }
+    // Measured 5e-14 (2e-14 over ground).
+    CHECK(difference / size < 1e-11);
+  }
 }
 
 TEST_CASE("A unit cell too large for the tolerance is refused with the reason", "[periodic_model]")

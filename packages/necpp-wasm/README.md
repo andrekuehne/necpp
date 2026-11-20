@@ -863,11 +863,14 @@ all ports of the cell.
   scan-impedance entry, and no numerical parameters. Each result carries
   `diagnostics.estimatedError` (the solver's numerical error: periodic
   Green's function, quadrature, rounding near a Wood anomaly; about `2e-10`
-  for typical cells) and `diagnostics.status` (`"ok"`). Thin-wire modelling
-  error is not included. Configurations that cannot reach the tolerance are
-  refused with a reason: unit cells above about 320 square wavelengths,
-  segments longer than about 0.3 wavelengths, and a scan state exactly on a
-  Wood anomaly. Results next to a Wood anomaly are finite.
+  for typical cells) and `diagnostics.status`. Thin-wire modelling error is
+  not included. Configurations that cannot reach the tolerance are refused
+  with a reason: unit cells above about 320 square wavelengths and segments
+  longer than about 0.3 wavelengths.
+- Wood anomalies: results are finite and continuous on and next to them
+  (with a square-root kink), never refused or NaN. Within `|kz| < 1e-3 k` of
+  a Floquet mode's cut-off the status is `"near-cutoff"`, otherwise `"ok"`;
+  do not interpolate across a Wood circle.
 - Clearance: the cells must be electrically separate. `setLattice` refuses,
   with a `NecGeometryError` naming the segments and the image cell, a lattice
   under which any conductor touches or nearly touches a periodic image of a

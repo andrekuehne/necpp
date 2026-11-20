@@ -230,11 +230,15 @@ struct nec_complex_matrix {
 };
 
 /*! How a periodic result relates to the tolerance. Every result returned is
- * within it; Wood-anomaly handling is to add a status for results near
- * cut-off.
+ * within it.
  */
 enum class nec_periodic_point_status {
   ok = 0,
+  /*! On or near a Wood anomaly: a Floquet mode within 1e-3 k of cut-off
+   * (|kz| < 1e-3 k) was split out of the kernel and solved by the low-rank
+   * update. The result is finite and continuous, but the scan impedance has
+   * a square-root kink there. */
+  near_cutoff = 1,
 };
 
 /*! Estimated error and point status of one periodic scan-impedance result
@@ -457,6 +461,8 @@ private:
     std::vector<nec_complex> achieved_currents);
 
   std::unique_ptr<nec_context> m_context;
+  // Defined only in the periodic model test (see nec_context).
+  friend struct nec_periodic_split_access;
   nec_model_state m_state = nec_model_state::empty;
   nec_geometry_completion_result m_geometry_completion;
   std::vector<nec_port_definition> m_ports;

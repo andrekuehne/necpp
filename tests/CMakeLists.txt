@@ -85,6 +85,7 @@ add_executable(nec2++_tests
     ${CMAKE_SOURCE_DIR}/src/nec_field_evaluator_wasm.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_ring_field.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_green.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_periodic_low_rank.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_clearance.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_ground.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_output.cpp

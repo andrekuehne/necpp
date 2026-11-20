@@ -600,8 +600,14 @@ export type ScanImpedanceRequest =
     readonly scanPhasesRad?: never;
   };
 
-/** How a periodic result relates to the tolerance: `"ok"`, within it. */
-export type PeriodicPointStatus = "ok";
+/**
+ * How a periodic result relates to the tolerance; every returned result is
+ * within it. `"near-cutoff"`: on or near a Wood anomaly, where a Floquet mode
+ * is within `|kz| < 1e-3 k` of cut-off. The result is finite and continuous,
+ * but the scan impedance has a square-root kink there, so do not interpolate
+ * across it. Otherwise `"ok"`.
+ */
+export type PeriodicPointStatus = "ok" | "near-cutoff";
 
 /**
  * Estimated error and point status of one periodic result. The periodic solver has one fixed

@@ -3,6 +3,9 @@ import { createNecArraySolver, createNecPeriodicModel } from "../.test-build/src
 
 // About one-metre wavelength; half-wave dipoles along x.
 export const FREQUENCY_MHZ = 299.792458;
+// The engine's wavenumber at FREQUENCY_MHZ: its speed of light follows from
+// NEC's permittivity 8.854e-12, so one metre is not exactly one wavelength.
+export const WAVENUMBER_PER_M = 2 * Math.PI * FREQUENCY_MHZ * 1e6 * Math.sqrt(8.854e-12 * 4e-7 * Math.PI);
 export const HALF_LENGTH_M = 0.24;
 export const RADIUS_M = 0.001;
 export const SEGMENTS = 11;

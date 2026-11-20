@@ -15,6 +15,7 @@
 #include <array>
 #include <complex>
 #include <functional>
+#include <vector>
 
 namespace nec_periodic {
 using complex_d = std::complex<double>;
@@ -70,39 +71,69 @@ struct floquet_cutoff {
   double kz_over_k = 0;
 };
 
+// A Floquet mode kt = kt0 + p b1 + q b2, indexed along the reciprocal vectors
+// of the given lattice vectors, with kz = sqrt(k^2 - kt^2), Im kz <= 0.
+struct floquet_mode {
+  long p = 0, q = 0;
+  vec2 kt;
+  complex_d kz;
+};
+
+// Floquet modes with |kz| below this fraction of |k| are split out of the
+// spectral sum (periodic_green::split_modes): the results that need them are
+// on or near a Wood anomaly.
+constexpr double near_cutoff = 1e-3;
+
 // Periodic Green's function of one lattice, wavenumber and scan state,
 // evaluated by Ewald splitting. Both sums are truncated by radius: the
 // spatial sum over lattice points near the observation point, the spectral
 // sum over Floquet modes with transverse wavevector |kt| below a bound.
-// At a Wood anomaly (kz = 0 for some mode) the spectral sum is singular.
+//
+// At a Wood anomaly (kz = 0 for some mode) the spectral sum is singular: the
+// term of a mode tends to its singular part exp(-j kt . r) / (2 j A kz), A
+// the cell area. The modes within near_cutoff_ratio |k| of cut-off are split
+// out: smooth() and full() leave out their singular parts, which stay finite
+// through and exactly on cut-off, and the caller adds the singular parts in a
+// form that cancels 1 / kz (the matrix solve's low-rank update).
 class periodic_green {
 public:
   // k may be complex (Im k <= 0 for loss). splitting = 0 selects the Ewald
   // splitting parameter automatically; a positive value overrides it.
-  periodic_green(const lattice_2d& lattice, complex_d k, vec2 scan_wavevector, double splitting = 0);
+  periodic_green(const lattice_2d& lattice, complex_d k, vec2 scan_wavevector, double splitting = 0,
+                 double near_cutoff_ratio = near_cutoff);
   double splitting() const { return splitting_; }
+  const lattice_2d& lattice() const { return lattice_; }
   // G_p minus the free-space term of the origin cell, exp(-jkR)/(4 pi R) with
-  // R = |r|. Finite everywhere except at other lattice points.
+  // R = |r|, and minus the singular parts of the split modes. Finite
+  // everywhere except at other lattice points.
   green_value smooth(const point& r) const;
-  // The full G_p; singular at every lattice point including the origin.
+  // G_p minus the singular parts of the split modes; singular at every
+  // lattice point including the origin.
   green_value full(const point& r) const;
+  // The modes with |kz| < near_cutoff_ratio |k|, whose singular parts smooth()
+  // and full() leave out.
+  const std::vector<floquet_mode>& split_modes() const { return split_modes_; }
+  // The singular part exp(-j kt . r) / (2 j A kz) of a mode and its gradient;
+  // needs kz != 0.
+  green_value singular_part(const floquet_mode& mode, const point& r) const;
   // Number of Floquet modes in the spectral sum, the work of one evaluation
   // (estimated from the spectral radius and the cell area).
   double spectral_mode_count() const;
-  // The Floquet mode nearest to cut-off. Near it the spectral sum carries a
-  // term of size 1 / kz, which the matrix solution cancels; rounding then
-  // grows like |k| / |kz|.
+  // The Floquet mode nearest to cut-off, split or not.
   floquet_cutoff nearest_cutoff() const;
 
 private:
   template <typename Visit> void for_each_mode(double radius, Visit visit) const;
   void add_spatial(const point& r, bool subtract_origin_free_term, green_value& sum) const;
   void add_spectral(const point& r, green_value& sum) const;
+  bool is_split(complex_d kz) const { return std::abs(kz) < near_cutoff_ratio_ * std::abs(k_); }
   lattice_2d lattice_;
   complex_d k_;
   complex_d kappa_;  // k / (2 E), E the splitting parameter
   vec2 kt0_;
   double splitting_ = 0, spatial_radius_ = 0, spectral_radius_ = 0;
+  double near_cutoff_ratio_ = 0;
+  std::vector<floquet_mode> split_modes_;
   static constexpr int origin_series_terms = 8;
   complex_d origin_series_[origin_series_terms];  // f^(n)(0) / n!, n = 1, 3, ..., 15, of the origin term
 };
@@ -124,6 +155,23 @@ struct source_segment {
 struct segment_field {
   std::array<complex_d, 3> constant, sine, cosine;
 };
+
+// Impedance in NEC's thin-wire segment field (eksc, ekscx): their fixed
+// prefactor j 4.771341189 = j eta / (8 pi^2) gives eta = 376.73 ohm,
+// independent of em::impedance() (about 376.7343). The periodic correction is
+// added to that free-space fill, so it uses the same value.
+constexpr double nec_segment_field_impedance =
+  4.771341189 * 8 * 3.141592653589793238462643383279502884 * 3.141592653589793238462643383279502884;
+
+// Integrals of NEC's current terms against the transverse phase of a Floquet
+// mode over a straight segment:
+//   int {1, sin(ks), cos(ks)} exp(j kt . (centre + s u)) ds,  -length/2 <= s <= length/2,
+// with kt in the lattice plane (z does not enter). They couple a segment's
+// current to the singular part of the mode.
+struct floquet_moments {
+  complex_d constant, sine, cosine;
+};
+floquet_moments segment_floquet_moments(const source_segment& segment, vec2 kt, double k);
 
 // A Green's function kernel G(r), r = observation minus source point, with
 // G including the 1/(4 pi) of exp(-jkR)/(4 pi R).

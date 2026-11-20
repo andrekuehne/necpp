@@ -55,7 +55,9 @@ enum necpp_wasm_v1_symmetry_kind {
 
 /* Periodic point status, an additive ABI v1 symbol. */
 enum necpp_wasm_v1_point_status {
-  NECPP_WASM_V1_POINT_STATUS_OK = 0
+  NECPP_WASM_V1_POINT_STATUS_OK = 0,
+  /* On or near a Wood anomaly (|kz| < 1e-3 k for some Floquet mode). */
+  NECPP_WASM_V1_POINT_STATUS_NEAR_CUTOFF = 1
 };
 
 enum necpp_wasm_v1_reflection_plane {
@@ -248,13 +250,14 @@ int32_t necpp_wasm_v1_set_ground(
  * a1, a2 in metres in the xy-plane; port impedances become scan impedances.
  * Scan phases are the radians by which the current advances from one cell to
  * the next along a1 and a2; setting a lattice resets them to zero. Both calls
- * invalidate the factorization. Symmetric geometry and any ground other than
- * free space are refused, as are far-field and embedded-field calls.
- * set_lattice returns NECPP_WASM_V1_GEOMETRY_ERROR when a conductor touches
- * or nearly touches a periodic image (connected arrays are not supported).
- * prepare returns NECPP_WASM_V1_GEOMETRY_ERROR for a unit cell too large or
- * segments too long for the periodic tolerance, and NECPP_WASM_V1_SOLVER_ERROR
- * for a scan state exactly on a Wood anomaly.
+ * invalidate the factorization. Symmetric geometry and finite ground are
+ * refused, as are far-field and embedded-field calls. set_lattice returns
+ * NECPP_WASM_V1_GEOMETRY_ERROR when a conductor touches or nearly touches a
+ * periodic image (connected arrays are not supported) or, over perfect
+ * ground, the ground plane. prepare returns NECPP_WASM_V1_GEOMETRY_ERROR for
+ * a unit cell too large or segments too long for the periodic tolerance.
+ * Scan states on a Wood anomaly are solved and flagged
+ * (NECPP_WASM_V1_POINT_STATUS_NEAR_CUTOFF).
  */
 int32_t necpp_wasm_v1_set_lattice(
   necpp_wasm_v1_model* model,

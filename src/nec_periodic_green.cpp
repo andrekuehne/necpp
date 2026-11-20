@@ -134,8 +134,9 @@ vec2 lattice_2d::scan_wavevector(double psi1, double psi2) const {
   return {-(psi1 * b1_.x + psi2 * b2_.x) / (2 * pi), -(psi1 * b1_.y + psi2 * b2_.y) / (2 * pi)};
 }
 
-periodic_green::periodic_green(const lattice_2d& lattice, complex_d k, vec2 scan_wavevector, double splitting)
-  : lattice_(lattice), k_(k), kt0_(scan_wavevector) {
+periodic_green::periodic_green(const lattice_2d& lattice, complex_d k, vec2 scan_wavevector, double splitting,
+                               double near_cutoff_ratio)
+  : lattice_(lattice), k_(k), kt0_(scan_wavevector), near_cutoff_ratio_(near_cutoff_ratio) {
   splitting_ = splitting > 0 ? splitting
                              : std::max(std::sqrt(pi / lattice.cell_area()), std::abs(k.real()) / (2 * max_kappa));
   const double e = splitting_;
@@ -166,6 +167,13 @@ periodic_green::periodic_green(const lattice_2d& lattice, complex_d k, vec2 scan
     for(int i = 2; i <= n; ++i) factorial *= i;
     origin_series_[slot] = f / factorial;
   }
+  // Modes at cut-off have |kt| = |Re k|; twice that covers every candidate.
+  for_each_mode(2 * std::abs(k_), [&](vec2 kt, complex_d kz) {
+    if(!is_split(kz)) return;
+    const vec2 step = kt - kt0_;
+    split_modes_.push_back(
+      {std::lround(dot(step, lattice_.a1()) / (2 * pi)), std::lround(dot(step, lattice_.a2()) / (2 * pi)), kt, kz});
+  });
 }
 
 void periodic_green::add_spatial(const point& r, bool subtract_origin_free_term, green_value& sum) const {
@@ -258,6 +266,64 @@ floquet_cutoff periodic_green::nearest_cutoff() const {
   return nearest;
 }
 
+namespace {
+// Below this |kz| (|dz| + 1/E), the remainder (f(kz) - 2) / kz of a split mode
+// uses its Taylor series through kz^3 (truncation about 1e-3^4 / 5!) instead
+// of the difference, which loses eps / (|kz| (|dz| + 1/E)).
+constexpr double remainder_series_limit = 1e-3;
+
+// (f(kz) - 2) / kz for the spectral factor
+//   f(kz) = exp(-j kz dz) erfc(j kz / 2E - dz E) + exp(j kz dz) erfc(j kz / 2E + dz E),
+// which tends to 2 at cut-off.
+complex_d spectral_remainder(complex_d kz, double dz, double e, complex_d below, complex_d above) {
+  if(std::abs(kz) * (std::abs(dz) + 1 / e) >= remainder_series_limit) return (below + above - 2.0) / kz;
+  // f^(n)(0) = sum over both terms g(kz) = exp(s j kz dz) erfc(x0 + j kz / 2E),
+  // x0 = s dz E: sum_i C(n, i) (s j dz)^(n-i) (j / 2E)^i erfc^(i)(x0), with
+  // erfc^(i)(x) = -(2 / sqrt pi) (-1)^(i-1) H_(i-1)(x) exp(-x^2) for i >= 1.
+  constexpr int orders = 4;
+  complex_d derivative[orders + 1] = {};
+  for(const double s : {-1.0, 1.0}) {
+    const double x0 = s * dz * e;
+    double hermite[orders] = {1, 2 * x0};
+    for(int m = 1; m + 1 < orders; ++m) hermite[m + 1] = 2 * x0 * hermite[m] - 2 * m * hermite[m - 1];
+    double erfc_derivative[orders + 1];
+    erfc_derivative[0] = std::erfc(x0);
+    for(int i = 1; i <= orders; ++i)
+      erfc_derivative[i] = -(2 / std::sqrt(pi)) * (i % 2 ? 1.0 : -1.0) * hermite[i - 1] * std::exp(-x0 * x0);
+    // Powers (s j dz)^m and (j / 2E)^m by products: std::pow(0, 0) is NaN in
+    // some standard libraries, and dz = 0 is common.
+    complex_d phase_power[orders + 1], shift_power[orders + 1];
+    phase_power[0] = shift_power[0] = 1.0;
+    for(int m = 1; m <= orders; ++m) {
+      phase_power[m] = phase_power[m - 1] * (s * j * dz);
+      shift_power[m] = shift_power[m - 1] * (j / (2 * e));
+    }
+    for(int n = 1; n <= orders; ++n) {
+      double binomial = 1;  // n choose i
+      for(int i = 0; i <= n; ++i) {
+        derivative[n] += binomial * phase_power[n - i] * shift_power[i] * erfc_derivative[i];
+        binomial = binomial * (n - i) / (i + 1);
+      }
+    }
+  }
+  // (f - 2) / kz = sum_n f^(n)(0) kz^(n-1) / n!.
+  complex_d remainder = 0;
+  double factorial = 1;
+  for(int n = 1; n <= orders; ++n) factorial *= n;
+  for(int n = orders; n >= 1; --n) {
+    remainder = remainder * kz + derivative[n] / factorial;
+    factorial /= n;
+  }
+  return remainder;
+}
+}
+
+green_value periodic_green::singular_part(const floquet_mode& mode, const point& r) const {
+  const complex_d value =
+    std::exp(-j * (mode.kt.x * r[0] + mode.kt.y * r[1])) / (2.0 * j * lattice_.cell_area() * mode.kz);
+  return {value, {-j * mode.kt.x * value, -j * mode.kt.y * value, 0.0}};
+}
+
 void periodic_green::add_spectral(const point& r, green_value& sum) const {
   const double e = splitting_, dz = r[2];
   const complex_d scale = 1.0 / (4.0 * j * lattice_.cell_area());
@@ -266,7 +332,9 @@ void periodic_green::add_spectral(const point& r, green_value& sum) const {
     const complex_d below = exp_erfc(-j * kz * dz, alpha - dz * e);
     const complex_d above = exp_erfc(j * kz * dz, alpha + dz * e);
     const complex_d mode = scale * std::exp(-j * (kt.x * r[0] + kt.y * r[1]));
-    const complex_d value = mode * (below + above) / kz;
+    // A split mode leaves out its singular part 2 mode / kz.
+    const complex_d value =
+      is_split(kz) ? mode * spectral_remainder(kz, dz, e, below, above) : mode * (below + above) / kz;
     sum.value += value;
     sum.gradient[0] += -j * kt.x * value;
     sum.gradient[1] += -j * kt.y * value;
@@ -298,12 +366,6 @@ green_value periodic_green::full(const point& r) const {
 }
 
 namespace {
-// Impedance in NEC's thin-wire segment field (eksc, ekscx): their fixed
-// prefactor j 4.771341189 = j eta / (8 pi^2) gives eta = 376.73 ohm,
-// independent of em::impedance() (about 376.7343). The periodic correction is
-// added to that free-space fill, so it uses the same value.
-constexpr double nec_segment_field_impedance = 4.771341189 * 8 * pi * pi;
-
 struct gauss_rule {
   std::vector<double> node, weight;  // on [-1, 1]
 };
@@ -341,6 +403,26 @@ const gauss_rule& gauss_legendre(int order) {
 std::array<complex_d, 3> axial(const point& direction, complex_d scale) {
   return {scale * direction[0], scale * direction[1], scale * direction[2]};
 }
+}
+
+floquet_moments segment_floquet_moments(const source_segment& segment, vec2 kt, double k) {
+  // The integrand is entire with phase rates up to |kt| + k (about 2k near
+  // cut-off); 16 points integrate it to rounding over segments up to the
+  // 0.3 wavelengths the periodic tolerance allows.
+  const gauss_rule& rule = gauss_legendre(16);
+  const point& u = segment.direction;
+  const double half = segment.length / 2;
+  const double centre_phase = kt.x * segment.centre[0] + kt.y * segment.centre[1];
+  const double phase_rate = kt.x * u[0] + kt.y * u[1];
+  floquet_moments moments{};
+  for(size_t i = 0; i < rule.node.size(); ++i) {
+    const double s = half * rule.node[i], w = half * rule.weight[i];
+    const complex_d phase = w * std::exp(j * (centre_phase + phase_rate * s));
+    moments.constant += phase;
+    moments.sine += std::sin(k * s) * phase;
+    moments.cosine += std::cos(k * s) * phase;
+  }
+  return moments;
 }
 
 segment_field segment_field_of_kernel(const kernel_function& kernel, const source_segment& segment,

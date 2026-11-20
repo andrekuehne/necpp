@@ -907,6 +907,8 @@ const nec_impedance_result& nec_stateful_model::compute_impedance_matrix()
   if (m_periodic) {
     nec_periodic_diagnostics diagnostics;
     diagnostics.estimated_error = m_context->stateful_periodic_estimated_error();
+    if (m_context->stateful_periodic_near_cutoff())
+      diagnostics.status = nec_periodic_point_status::near_cutoff;
     result.periodic = diagnostics;
   }
   m_impedance_result = std::move(result);

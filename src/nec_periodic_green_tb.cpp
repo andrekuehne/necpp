@@ -320,3 +320,81 @@ TEST_CASE("The Floquet mode nearest to cut-off is found, indexed along the given
   REQUIRE(std::abs(nearest.p) == 1);
   REQUIRE(nearest.q == nearest.p);
 }
+
+namespace {
+// A scan state on the 1 x 0.8 wavelength rectangular lattice at which the
+// Floquet mode (1, 0) is at |kz| = ratio |k|, propagating or evanescent.
+vec2 next_to_cutoff(double ratio, bool propagating) {
+  const double k = 2 * pi, ky = 0.5;
+  const double kt2 = k * k * (propagating ? 1 - ratio * ratio : 1 + ratio * ratio);
+  return {std::sqrt(kt2 - ky * ky) - 2 * pi, ky};
+}
+
+const point near_cutoff_points[] = {
+  {0.1, 0.05, 0.0}, {0.3, -0.2, 0.15}, {-0.4, 0.1, 0.7}, {0.02, 0.01, -0.01}};
+}
+
+TEST_CASE("A Floquet mode next to cut-off is split out of the kernel as its singular term", "[periodic_green]") {
+  const complex_d k = 2 * pi;
+  const nec_periodic::lattice_2d lattice({1, 0}, {0, 0.8});
+  for(const bool propagating : {true, false}) {
+    INFO((propagating ? "propagating" : "evanescent"));
+    const vec2 kt0 = next_to_cutoff(4e-4, propagating);
+    const nec_periodic::periodic_green split(lattice, k, kt0);
+    // No mode split: the plain Ewald sum, accurate here to rounding of its
+    // 1 / kz term.
+    const nec_periodic::periodic_green whole(lattice, k, kt0, 0, 0.0);
+    REQUIRE(whole.split_modes().empty());
+    REQUIRE(split.split_modes().size() == 1);
+    const nec_periodic::floquet_mode& mode = split.split_modes()[0];
+    REQUIRE(mode.p == 1);
+    REQUIRE(mode.q == 0);
+    REQUIRE(std::abs(std::abs(mode.kz) / std::abs(k) - 4e-4) < 1e-12);
+
+    for(const point& r : near_cutoff_points) {
+      INFO("r = " << r[0] << ", " << r[1] << ", " << r[2]);
+      const green_value reference = whole.smooth(r);
+      // Spectral term of the mode as kz -> 0: exp(-j kt . r) / (2 j A kz).
+      const complex_d singular =
+        std::exp(-j * (mode.kt.x * r[0] + mode.kt.y * r[1])) / (2.0 * j * lattice.cell_area() * mode.kz);
+      green_value sum = split.smooth(r);
+      // Without the singular term the kernel is of order one, not 1 / kz.
+      CHECK(std::abs(sum.value) < 0.01 * std::abs(singular));
+      const green_value part = split.singular_part(mode, r);
+      CHECK(relative_error(part.value, singular) < 1e-14);
+      sum.value += part.value;
+      for(int i = 0; i < 3; ++i) sum.gradient[i] += part.gradient[i];
+      CHECK(relative_error(sum.value, reference.value) < 1e-12);
+      CHECK(gradient_error(sum, reference, k) < 1e-12);
+      const green_value full = split.full(r);
+      const green_value full_reference = whole.full(r);
+      CHECK(relative_error(full.value + part.value, full_reference.value) < 1e-12);
+    }
+  }
+}
+
+TEST_CASE("The split kernel is finite exactly on cut-off and continuous through it", "[periodic_green]") {
+  const complex_d k = 2 * pi;
+  // Unit square lattice at broadside: the modes (+-1, 0) and (0, +-1) are at
+  // cut-off with kz = 0 exactly.
+  const nec_periodic::lattice_2d square({1, 0}, {0, 1});
+  const nec_periodic::periodic_green on(square, k, {0, 0});
+  REQUIRE(on.split_modes().size() == 4);
+  for(const nec_periodic::floquet_mode& mode : on.split_modes()) REQUIRE(mode.kz == 0.0);
+  // Next to it along kx, the modes (+-1, 0) are propagating on one side and
+  // evanescent on the other, |kz| about sqrt(2 * 1e-9) k.
+  const nec_periodic::periodic_green before(square, k, {-1e-9 * 2 * pi, 0});
+  const nec_periodic::periodic_green after(square, k, {1e-9 * 2 * pi, 0});
+  for(const point& r : near_cutoff_points) {
+    INFO("r = " << r[0] << ", " << r[1] << ", " << r[2]);
+    const green_value value = on.smooth(r);
+    REQUIRE(std::isfinite(value.value.real()));
+    REQUIRE(std::isfinite(value.value.imag()));
+    for(int i = 0; i < 3; ++i) REQUIRE(std::isfinite(std::abs(value.gradient[i])));
+    // The remainder changes like kz, about 5e-5 relative here.
+    CHECK(relative_error(before.smooth(r).value, value.value) < 1e-3);
+    CHECK(relative_error(after.smooth(r).value, value.value) < 1e-3);
+    CHECK(gradient_error(before.smooth(r), value, k) < 1e-3);
+    CHECK(gradient_error(after.smooth(r), value, k) < 1e-3);
+  }
+}

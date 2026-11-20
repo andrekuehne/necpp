@@ -40,6 +40,7 @@
 #include "nec_exception.h"
 #include "nec_periodic_accuracy.h"
 #include "nec_periodic_green.h"
+#include "nec_periodic_low_rank.h"
 #include "nec_periodic_clearance.h"
  
 #include <cstdio>
@@ -403,6 +404,7 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
   // The fill works in wavelengths (k = 2 pi); scale the lattice the same way
   // as c_geometry::frequency_scale scales the wires.
   m_periodic_green.reset();
+  m_periodic_low_rank.reset();
   m_periodic_close_images.clear();
   m_periodic_estimated_error = 0;
   if (m_periodic.active) {
@@ -412,8 +414,10 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
       {m_periodic.a2x_m * per_metre, m_periodic.a2y_m * per_metre});
     const nec_periodic::vec2 scan_wavevector =
       lattice.scan_wavevector(m_periodic.psi1_rad, m_periodic.psi2_rad);
+    const nec_float near_cutoff_ratio =
+      m_periodic_near_cutoff.value_or(nec_periodic::near_cutoff);
     auto green = std::make_shared<const nec_periodic::periodic_green>(
-      lattice, two_pi(), scan_wavevector);
+      lattice, two_pi(), scan_wavevector, 0.0, near_cutoff_ratio);
 
     char reason[320];
     const nec_float modes = green->spectral_mode_count();
@@ -427,30 +431,23 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
     }
 
     // The estimated error: the kernel, the Gauss rule over the longest
-    // segment (in wavelengths here) and, near cut-off, where the spectral sum
-    // carries a term of size 1 / kz that the solution cancels, the rounding
-    // left behind, growing like k / kz.
+    // segment (in wavelengths here) and the rounding near cut-off. A mode
+    // left in the kernel carries a term of size 1 / kz that the solution
+    // cancels, leaving rounding that grows like k / kz; the modes nearer to
+    // cut-off are split out and solved by the low-rank update instead.
     nec_float longest = 0;
     for (int64_t index = 0; index < m_geometry->n_segments; ++index)
       longest = std::max(longest, m_geometry->segment_length[index]);
     const nec_float quadrature = nec_periodic::gauss_error(longest);
-    const nec_periodic::floquet_cutoff cutoff = green->nearest_cutoff();
-    const nec_float rounding =
-      std::numeric_limits<nec_float>::epsilon() / cutoff.kz_over_k;
+    const nec_float rounding = std::numeric_limits<nec_float>::epsilon() /
+      std::max(green->nearest_cutoff().kz_over_k, near_cutoff_ratio);
     m_periodic_estimated_error = nec_periodic::kernel_error + quadrature + rounding;
     if (!(m_periodic_estimated_error <= nec_periodic::tolerance)) {
-      if (rounding < quadrature) {
-        std::snprintf(reason, sizeof(reason),
-          "SEGMENTS OF %.3g WAVELENGTHS ARE TOO LONG FOR THE PERIODIC TOLERANCE:"
-          " THE PERIODIC CORRECTION NEEDS SEGMENTS OF AT MOST ABOUT 0.3 WAVELENGTHS",
-          longest);
-        throw nec_geometry_exception(reason);
-      }
       std::snprintf(reason, sizeof(reason),
-        "SCAN STATE ON A WOOD ANOMALY: FLOQUET MODE (%ld, %ld) IS AT CUT-OFF"
-        " (KZ = 0), WHERE THE PERIODIC TOLERANCE CANNOT BE REACHED",
-        cutoff.p, cutoff.q);
-      throw nec_exception(reason);
+        "SEGMENTS OF %.3g WAVELENGTHS ARE TOO LONG FOR THE PERIODIC TOLERANCE:"
+        " THE PERIODIC CORRECTION NEEDS SEGMENTS OF AT MOST ABOUT 0.3 WAVELENGTHS",
+        longest);
+      throw nec_geometry_exception(reason);
     }
     m_periodic_green = green;
 
@@ -553,6 +550,7 @@ void nec_context::stateful_set_periodic(
   static_cast<void>(checked_lattice(a1x_m, a1y_m, a2x_m, a2y_m));
   m_periodic = {true, a1x_m, a1y_m, a2x_m, a2y_m, psi1_rad, psi2_rad};
   m_periodic_green.reset();
+  m_periodic_low_rank.reset();
 }
 
 std::vector<nec_periodic::wire_segment> nec_context::periodic_wire_segments_m() const
@@ -597,6 +595,7 @@ void nec_context::stateful_clear_periodic()
 {
   m_periodic = {};
   m_periodic_green.reset();
+  m_periodic_low_rank.reset();
 }
 
 /*! Add the field of the other cells, radiated by the current source segment
@@ -685,6 +684,115 @@ void nec_context::add_periodic_images(
   exc += sign * field.cosine[0];
   eyc += sign * field.cosine[1];
   ezc += sign * field.cosine[2];
+}
+
+/*! Fill the singular parts of the Floquet modes split out of the periodic
+ * kernel (near cut-off) as a low-rank update instead of through the kernel.
+ *
+ * The singular part S = exp(-j kt . r) / (2 j A kz) of a mode gives a segment
+ * the field (-j eta / k) [k^2 s - kt (kt . s)] int I S ds' (the kernel's
+ * gradient -j kt S, integrated by parts), so it adds to the matrix entry of
+ * observation segment i and basis function x
+ *
+ *   -eta k / (2 A kz) sum_p (p . o_i) exp(-j kt . r_i) V_p[x]
+ *   -eta kz / (2 A k) (t . o_i) exp(-j kt . r_i) V_t[x],
+ *
+ * p over e = z x t (TE) and z (TM), t = kt / |kt|, with V_p[x] the sum over
+ * the segments of the basis function of (p . s) times the moments of its
+ * current against exp(j kt . r'). The TE and TM terms, of size 1 / kz, go to
+ * the low-rank update, the longitudinal one, of size kz, into the matrix.
+ * Over perfect ground the ground image, the source mirrored with the
+ * opposite current, cancels the TE and longitudinal terms and doubles TM.
+ */
+void nec_context::periodic_low_rank_fill()
+{
+  m_periodic_low_rank.reset();
+  const std::vector<nec_periodic::floquet_mode>& modes = m_periodic_green->split_modes();
+  if (modes.empty())
+    return;
+  const int64_t n = m_geometry->n_segments;
+  const nec_float k = two_pi();
+  const nec_float area = m_periodic_green->lattice().cell_area();
+  const nec_float eta = nec_periodic::nec_segment_field_impedance;
+  const bool perfect = ground.type_perfect();
+  auto update = std::make_shared<nec_periodic::low_rank_update>();
+  for (const nec_periodic::floquet_mode& mode : modes) {
+    const nec_float transverse = std::hypot(mode.kt.x, mode.kt.y);
+    const nec_float tx = mode.kt.x / transverse, ty = mode.kt.y / transverse;
+    std::vector<nec_complex> phase(static_cast<size_t>(n));
+    std::vector<nec_periodic::floquet_moments> moments(static_cast<size_t>(n));
+    for (int64_t i = 0; i < n; ++i) {
+      const nec_float xs = m_geometry->x[i], ys = m_geometry->y[i], zs = m_geometry->z[i];
+      phase[size_t(i)] = std::exp(nec_complex(0.0, -(mode.kt.x * xs + mode.kt.y * ys)));
+      moments[size_t(i)] = nec_periodic::segment_floquet_moments(
+        {{xs, ys, zs}, {m_geometry->cab[i], m_geometry->sab[i], m_geometry->salp[i]},
+         m_geometry->segment_length[i]}, mode.kt, k);
+    }
+    struct polarization {
+      nec_float x, y, z;
+      nec_float source_factor;  // direct plus ground image
+      bool low_rank;  // of size 1 / kz, else kz
+    };
+    const polarization polarizations[] = {
+      {-ty, tx, 0.0, perfect ? 0.0 : 1.0, true},   // TE
+      {0.0, 0.0, 1.0, perfect ? 2.0 : 1.0, true},  // TM
+      {tx, ty, 0.0, perfect ? 0.0 : 1.0, false},   // longitudinal
+    };
+    for (const polarization& p : polarizations) {
+      if (p.source_factor == 0.0)
+        continue;
+      nec_periodic::low_rank_update::vector u(static_cast<size_t>(n)), v(static_cast<size_t>(n));
+      nec_float largest = 0;
+      for (int64_t i = 0; i < n; ++i) {
+        const nec_float projection =
+          p.x * m_geometry->cab[i] + p.y * m_geometry->sab[i] + p.z * m_geometry->salp[i];
+        largest = std::max(largest, std::abs(projection));
+        u[size_t(i)] = phase[size_t(i)] * projection;
+      }
+      // No segment couples to this polarization.
+      if (largest < 1e-12)
+        continue;
+      for (int j = 1; j <= n; ++j) {
+        m_geometry->trio(j);
+        const nec_float projection = p.source_factor * (p.x * m_geometry->cab[j - 1] +
+          p.y * m_geometry->sab[j - 1] + p.z * m_geometry->salp[j - 1]);
+        const nec_periodic::floquet_moments& m = moments[size_t(j - 1)];
+        for (int entry = 0; entry < m_geometry->jsno; ++entry)
+          v[size_t(m_geometry->jco[entry] - 1)] += projection *
+            (m_geometry->ax[entry] * m.constant + m_geometry->bx[entry] * m.sine +
+             m_geometry->cx[entry] * m.cosine);
+      }
+      if (p.low_rank) {
+        update->add(std::move(u), std::move(v), -2.0 * area * mode.kz / (eta * k));
+        continue;
+      }
+      // cmset's transposed fill: basis function x, observation i.
+      const nec_complex coefficient = -eta * mode.kz / (2.0 * area * k);
+      for (int64_t i = 0; i < n; ++i)
+        for (int64_t basis = 0; basis < n; ++basis)
+          cm[basis + i * neq] += coefficient * u[size_t(i)] * v[size_t(basis)];
+    }
+  }
+  if (!update->empty())
+    m_periodic_low_rank = update;
+}
+
+bool nec_context::stateful_periodic_near_cutoff() const
+{
+  return m_periodic_green && !m_periodic_green->split_modes().empty();
+}
+
+void nec_context::solve_regular(complex_array& in_cm, int_array& in_ip, complex_array& b)
+{
+  solves(in_cm, in_ip, b, neq, 1, m_geometry->np, m_geometry->n_segments,
+    m_geometry->mp, m_geometry->m, nop, symmetry_array);
+}
+
+void nec_context::solve_structure(complex_array& in_cm, int_array& in_ip, complex_array& b)
+{
+  solve_regular(in_cm, in_ip, b);
+  if (m_periodic_low_rank)
+    m_periodic_low_rank->correct(b.data());
 }
 
 nec_power_budget nec_context::stateful_power_budget() const
@@ -1979,9 +2087,21 @@ void nec_context::structure_segment_loading()
   /* fill and factor primary interaction matrix */
   secnds( &tim1 );
   cmset( neq, cm, rkh );
+  if (m_periodic_green)
+    periodic_low_rank_fill();
   secnds( &tim2 );
   tim= tim2- tim1;
   factrs(m_output, npeq, neq, cm, ip );
+  if (m_periodic_low_rank)
+    m_periodic_low_rank->factor([this](nec_periodic::low_rank_update::vector& b) {
+      complex_array rhs;
+      rhs.resize(neq);
+      for (int64_t i = 0; i < neq; ++i)
+        rhs[i] = b[size_t(i)];
+      solve_regular(cm, ip, rhs);
+      for (int64_t i = 0; i < neq; ++i)
+        b[size_t(i)] = rhs[i];
+    });
   secnds( &tim1 );
   tim2= tim1- tim2;
 /* ====================================================================
@@ -5076,7 +5196,7 @@ void nec_context::netwk_build_matrix( complex_array& in_cm, int_array& in_ip,
           vector_fill(st.rhs, 0, st.neqt, cplx_00());
 
           st.rhs[isc1] = cplx_10();
-          solves( in_cm, in_ip, st.rhs, neq, 1, m_geometry->np, m_geometry->n_segments, m_geometry->mp, m_geometry->m, nop, symmetry_array);
+          solve_structure( in_cm, in_ip, st.rhs );
           m_geometry->get_current_coefficients(_wavelength, st.rhs, air, aii, bir, bii, cir, cii, vqds, nqds, iqds);
 
           for (int j = 0; j < irow1; j++ )
@@ -5314,7 +5434,7 @@ void nec_context::netwk_solve_and_check( complex_array& in_cm, int_array& in_ip,
 
     irow1 = st.nteqa[i]-1;
     st.rhs[irow1] = cplx_10();
-    solves( in_cm, in_ip, st.rhs, neq, 1, m_geometry->np, m_geometry->n_segments, m_geometry->mp, m_geometry->m, nop, symmetry_array);
+    solve_structure( in_cm, in_ip, st.rhs );
     m_geometry->get_current_coefficients(_wavelength, st.rhs, air, aii, bir, bii, cir, cii, vqds, nqds, iqds);
 
     for (int j = 0; j < st.nteq; j++ )
@@ -5337,7 +5457,7 @@ void nec_context::netwk_compute_currents( complex_array& in_cm, int_array& in_ip
   if (0 == network_count)
   {
     /* solve for currents when no networks are present */
-    solves( in_cm, in_ip, einc, neq, 1, m_geometry->np, m_geometry->n_segments, m_geometry->mp, m_geometry->m, nop, symmetry_array);
+    solve_structure( in_cm, in_ip, einc );
     m_geometry->get_current_coefficients(_wavelength, einc, air, aii, bir, bii, cir, cii, vqds, nqds, iqds);
     st.ntsc = 0;
     return;
@@ -5350,7 +5470,7 @@ void nec_context::netwk_compute_currents( complex_array& in_cm, int_array& in_ip
   for (int i = 0; i < st.neqt; i++)
     st.rhs[i] = einc[i];
 
-  solves( in_cm, in_ip, st.rhs, neq, 1, m_geometry->np, m_geometry->n_segments, m_geometry->mp, m_geometry->m, nop, symmetry_array);
+  solve_structure( in_cm, in_ip, st.rhs );
   m_geometry->get_current_coefficients(_wavelength, st.rhs, air, aii, bir, bii, cir, cii, vqds, nqds, iqds);
 
   for( int i = 0; i < st.nteq; i++ )
@@ -5372,7 +5492,7 @@ void nec_context::netwk_compute_currents( complex_array& in_cm, int_array& in_ip
     einc[irow1] -= st.rhnt[i];
   }
 
-  solves( in_cm, in_ip, einc, neq, 1, m_geometry->np, m_geometry->n_segments, m_geometry->mp, m_geometry->m, nop, symmetry_array);
+  solve_structure( in_cm, in_ip, einc );
   m_geometry->get_current_coefficients(_wavelength, einc, air, aii, bir, bii, cir, cii, vqds, nqds, iqds);
 
 

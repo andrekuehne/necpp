@@ -20,6 +20,7 @@
 */
 
 #include <memory>
+#include <optional>
 
 #include "common.h"
 #include "c_ggrid.h"
@@ -37,7 +38,7 @@
 class c_geometry;
 class nec_stateful_model;
 struct nec_far_field_evaluation_input;
-namespace nec_periodic { class periodic_green; struct wire_segment; }
+namespace nec_periodic { class periodic_green; struct wire_segment; class low_rank_update; }
 
 enum excitation_return {
     FREQ_PRINT_NORMALIZATION = 0,
@@ -140,10 +141,14 @@ public:
   void stateful_check_periodic_ground_clearance() const;
   /*! Periodic mode: the estimated numerical error of the prepared periodic
    * correction relative to the largest scan-impedance entry (kernel and
-   * Gauss rule, and the rounding near the Floquet mode nearest to cut-off).
+   * Gauss rule, and the rounding near the nearest Floquet mode to cut-off
+   * that is not split out).
    */
   nec_float stateful_periodic_estimated_error() const
   { return m_periodic_estimated_error; }
+  /*! Periodic mode: whether the prepared scan state is on or near a Wood
+   * anomaly, a Floquet mode split out of the kernel (|kz| < 1e-3 k). */
+  bool stateful_periodic_near_cutoff() const;
 
   /*! Result ownership helpers for the stateful layer. */
   void stateful_clear_results()  { m_results.clear(); }
@@ -999,6 +1004,9 @@ private:
   periodic_state m_periodic;
   // Built for the prepared frequency; null outside periodic mode.
   std::shared_ptr<const nec_periodic::periodic_green> m_periodic_green;
+  // The singular parts of the Floquet modes split out of m_periodic_green
+  // (near cut-off), solved by a low-rank update; null when none is split.
+  std::shared_ptr<nec_periodic::low_rank_update> m_periodic_low_rank;
   // Lattice translations, in wavelengths, under which some periodic image
   // comes close to the unit cell, with their scan phase factors. For each
   // observation point and source segment, the images within reach go
@@ -1009,16 +1017,28 @@ private:
   };
   std::vector<periodic_close_image> m_periodic_close_images;
   nec_float m_periodic_estimated_error = 0;
+  // Replaces nec_periodic::near_cutoff, the fraction of k below which |kz|
+  // splits a Floquet mode out of the kernel into the low-rank update; set
+  // only by the periodic model test.
+  std::optional<nec_float> m_periodic_near_cutoff;
   std::vector<nec_periodic::wire_segment> periodic_wire_segments_m() const;
   void add_periodic_correction(nec_float xi, nec_float yi, nec_float zi, nec_float ai);
   void add_periodic_images(nec_float xi, nec_float yi, nec_float zi, nec_float ai,
     bool ground_image);
   void refuse_unsupported_periodic_configuration() const;
+  void periodic_low_rank_fill();
+  // Solves the factored interaction matrix for b in place, including the
+  // periodic low-rank update; solve_regular leaves the update out.
+  void solve_structure(complex_array& in_cm, int_array& in_ip, complex_array& b);
+  void solve_regular(complex_array& in_cm, int_array& in_ip, complex_array& b);
 
   friend class nec_stateful_model;
   // Defined only in the periodic segment-field test, which checks the
   // periodic kernel's segment field against efld_compute.
   friend struct nec_context_segment_field_access;
+  // Defined only in the periodic model test, which widens the split of
+  // Floquet modes near cut-off (m_periodic_near_cutoff).
+  friend struct nec_periodic_split_access;
 
   /*! Return a read-only view for raw ordinary far-field evaluation. */
   nec_far_field_evaluation_input far_field_evaluation_input(
