@@ -7,6 +7,7 @@ import {
 import type {
   CompleteGeometryOptions,
   ComplexVector,
+  CreateNecPeriodicWorkerModelOptions,
   CreateNecWorkerModelOptions,
   EmbeddedFarFieldResult,
   EmbeddedFieldNormalization,
@@ -22,15 +23,31 @@ import type {
   LoadDefinition,
   NecCurrentDistribution,
   NecModelState,
+  NecPeriodicWorkerModel,
   NecWorkerModel,
   NecWorkerProgressListener,
+  PeriodicGround,
+  PeriodicLattice,
   PortDefinition,
   PortSolution,
   PrepareOptions,
   PreparedQuadratureRequest,
   PreparedTransferHandle,
+  ScanImpedanceRequest,
+  ScanImpedanceResult,
+  ScanSweepChunk,
+  ScanSweepOptions,
+  ScanSweepRequest,
+  WasmAssetOptions,
   WireDefinition,
 } from "./types.js";
+import {
+  ScanSweepPool,
+  recordedCall,
+  validSweep,
+  type PeriodicCellCall,
+  type ValidSweep,
+} from "./periodic-sweep.js";
 import {
   cloneFloat64,
   isNodeRuntime,
@@ -46,6 +63,7 @@ import {
   reviveCurrentDistribution,
   revivePortSolution,
   revivePreparedTransferHandle,
+  reviveScanImpedanceResult,
   serializeCreateOptions,
   type SerializedCreateOptions,
   type WorkerFieldPoolOptions,
@@ -153,6 +171,24 @@ async function openWorkerHost(): Promise<WorkerHost> {
   };
 }
 
+/**
+ * @internal Sends one method call over a worker model's ordered request
+ * channel. Keyed by a symbol that is not exported from the package, so that
+ * only the periodic worker model can reach methods outside `NecWorkerModel`.
+ */
+const invokeEntry: unique symbol = Symbol("necpp.workerInvoke");
+
+/** A copy of the asset options, so that the caller's WASM bytes are not retained. */
+export function copyAssetOptions(options: WasmAssetOptions | undefined): WasmAssetOptions | undefined {
+  if (options?.wasmBinary !== undefined) {
+    const bytes = options.wasmBinary instanceof Uint8Array
+      ? Uint8Array.from(options.wasmBinary)
+      : new Uint8Array(options.wasmBinary.slice(0));
+    return { wasmBinary: bytes };
+  }
+  return options?.wasmUrl === undefined ? undefined : { wasmUrl: options.wasmUrl };
+}
+
 function cloneComplexVector(vector: ComplexVector): {
   readonly vector: ComplexVector;
   readonly transfer: ArrayBuffer[];
@@ -220,8 +256,9 @@ class WorkerNecModel implements NecWorkerModel {
   async initialize(
     options?: CreateNecWorkerModelOptions,
     fieldPool?: WorkerFieldPoolOptions,
+    model?: "periodic",
   ): Promise<void> {
-    const serialized = serializeCreateOptions(options, fieldPool);
+    const serialized = serializeCreateOptions(options, fieldPool, model);
     await this.#request(
       serialized.payload === undefined
         ? { kind: "create" }
@@ -376,6 +413,11 @@ class WorkerNecModel implements NecWorkerModel {
 
   cancelFarField(): void {
     this.#cancelField();
+  }
+
+  /** @internal See `invokeEntry`. */
+  [invokeEntry](method: WorkerMethod, args: readonly unknown[]): Promise<unknown> {
+    return this.#invoke(method, args);
   }
 
   async dispose(): Promise<void> {
@@ -558,10 +600,123 @@ class WorkerNecModel implements NecWorkerModel {
   }
 }
 
+/** Worker-backed periodic unit cell over a worker model's request channel. */
+class WorkerNecPeriodicModel implements NecPeriodicWorkerModel {
+  readonly #channel: WorkerNecModel;
+  readonly #assets: WasmAssetOptions | undefined;
+  // Every configuration call in issue order; the sweep workers replay those
+  // that succeeded.
+  readonly #issued: { readonly call: PeriodicCellCall; succeeded: boolean }[] = [];
+  // Settles once every call so far has settled.
+  #settled: Promise<void> = Promise.resolve();
+  #sweepPool: ScanSweepPool | undefined;
+
+  constructor(channel: WorkerNecModel, assets?: WasmAssetOptions) {
+    this.#channel = channel;
+    this.#assets = assets;
+  }
+
+  get state(): NecModelState {
+    return this.#channel.state;
+  }
+
+  addWire(wire: WireDefinition): Promise<void> {
+    return this.#configure({ method: "addWire", argument: wire }, [wire]);
+  }
+
+  completeGeometry(): Promise<void> {
+    return this.#configure({ method: "completeGeometry" }, []);
+  }
+
+  definePorts(ports: readonly PortDefinition[]): Promise<void> {
+    return this.#configure({ method: "definePorts", argument: ports }, [ports]);
+  }
+
+  addLoad(load: LoadDefinition): Promise<void> {
+    return this.#configure({ method: "addLoad", argument: load }, [load]);
+  }
+
+  clearLoads(): Promise<void> {
+    return this.#configure({ method: "clearLoads" }, []);
+  }
+
+  setGround(ground: PeriodicGround): Promise<void> {
+    return this.#configure({ method: "setGround", argument: ground }, [ground]);
+  }
+
+  setLattice(lattice: PeriodicLattice): Promise<void> {
+    return this.#configure({ method: "setLattice", argument: lattice }, [lattice]);
+  }
+
+  async computeScanImpedance(request: ScanImpedanceRequest): Promise<ScanImpedanceResult> {
+    return reviveScanImpedanceResult(
+      await this.#channel[invokeEntry]("computeScanImpedance", [request]),
+    );
+  }
+
+  sweepScanImpedance(
+    request: ScanSweepRequest,
+    options?: ScanSweepOptions,
+  ): AsyncIterable<ScanSweepChunk> {
+    if (this.state === "disposed") {
+      throw new NecStateError("sweepScanImpedance", "disposed");
+    }
+    // The cell as of this call: the calls issued so far, once they settle.
+    return this.#sweepAfterCalls(validSweep(request, options), this.#settled, this.#issued.slice());
+  }
+
+  async *#sweepAfterCalls(
+    sweep: ValidSweep,
+    settled: Promise<void>,
+    issued: readonly { readonly call: PeriodicCellCall; readonly succeeded: boolean }[],
+  ): AsyncGenerator<ScanSweepChunk> {
+    await settled;
+    if (this.state === "disposed") {
+      throw new NecStateError("sweepScanImpedance", "disposed");
+    }
+    const calls = issued.filter((entry) => entry.succeeded).map((entry) => entry.call);
+    if (!calls.some((call) => call.method === "setLattice")) {
+      throw new NecStateError(
+        "sweepScanImpedance",
+        this.state,
+        "sweepScanImpedance requires a lattice; call setLattice first",
+      );
+    }
+    const assets = this.#assets;
+    this.#sweepPool ??= new ScanSweepPool(() => createNecPeriodicWorkerModel(assets));
+    yield* this.#sweepPool.sweep(calls, sweep);
+  }
+
+  dispose(): Promise<void> {
+    this.#sweepPool?.dispose();
+    return this.#channel.dispose();
+  }
+
+  terminate(): void {
+    this.#sweepPool?.dispose();
+    this.#channel.terminate();
+  }
+
+  subscribeProgress(listener: NecWorkerProgressListener): () => void {
+    return this.#channel.subscribeProgress(listener);
+  }
+
+  #configure(call: PeriodicCellCall, args: readonly unknown[]): Promise<void> {
+    const entry = { call: recordedCall(call), succeeded: false };
+    this.#issued.push(entry);
+    const done = this.#channel[invokeEntry](call.method, args).then(() => {
+      entry.succeeded = true;
+    });
+    this.#settled = done.catch(() => undefined);
+    return done;
+  }
+}
+
 export async function createNecWorkerModelFromHost(
   host: WorkerHost,
   options?: CreateNecWorkerModelOptions,
   fieldPool?: WorkerFieldPoolOptions,
+  model?: "periodic",
 ): Promise<NecWorkerModel> {
   const signal = options?.signal;
   if (signal !== undefined
@@ -576,20 +731,20 @@ export async function createNecWorkerModelFromHost(
     host.terminate();
     throw new NecCancellationError("aborted");
   }
-  const model = new WorkerNecModel(
+  const worker = new WorkerNecModel(
     host,
     options?.onProgress,
     fieldPool !== undefined,
   );
   const abort = (): void => {
-    model.terminate();
+    worker.terminate();
   };
   signal?.addEventListener("abort", abort, { once: true });
   try {
-    await model.initialize(options, fieldPool);
-    return model;
+    await worker.initialize(options, fieldPool, model);
+    return worker;
   } catch (error) {
-    model.terminate();
+    worker.terminate();
     if (isAborted(signal) && error instanceof NecCancellationError) {
       throw new NecCancellationError("aborted");
     }
@@ -608,6 +763,18 @@ export async function createNecWorkerModel(
   }
   const host = await openWorkerHost();
   return createNecWorkerModelFromHost(host, options);
+}
+
+/** Create the unit cell of an infinite periodic array inside a dedicated worker. */
+export async function createNecPeriodicWorkerModel(
+  options?: CreateNecPeriodicWorkerModelOptions,
+): Promise<NecPeriodicWorkerModel> {
+  if (options !== undefined && (typeof options !== "object" || options === null)) {
+    throw new NecInputError("WASM loading options must be an object");
+  }
+  const host = await openWorkerHost();
+  const channel = await createNecWorkerModelFromHost(host, options, undefined, "periodic");
+  return new WorkerNecPeriodicModel(channel as WorkerNecModel, copyAssetOptions(options));
 }
 
 /** @internal Array facade: create an outer worker that owns evaluator children. */

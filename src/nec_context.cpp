@@ -43,11 +43,14 @@
 #include "nec_periodic_low_rank.h"
 #include "nec_periodic_clearance.h"
  
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <set>
+#include <utility>
 
 nec_context::nec_context() : fnorm(0,0), current_vector(0) {
   m_output_fp=NULL;
@@ -461,11 +464,8 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
     const nec_periodic::lattice_2d lattice_m(
       {m_periodic.a1x_m, m_periodic.a1y_m}, {m_periodic.a2x_m, m_periodic.a2y_m});
     for (const nec_periodic::vec2& translation : nec_periodic::close_image_translations(
-           periodic_wire_segments_m(), lattice_m, reach * metres_per_wavelength)) {
-      const nec_float x = translation.x * per_metre, y = translation.y * per_metre;
-      m_periodic_close_images.push_back({x, y,
-        std::exp(nec_complex(0.0, -(scan_wavevector.x * x + scan_wavevector.y * y)))});
-    }
+           periodic_wire_segments_m(), lattice_m, reach * metres_per_wavelength))
+      m_periodic_close_images.push_back({translation.x * per_metre, translation.y * per_metre});
   }
 
   processing_state = PROCESSING_STRUCTURE_LOADING;
@@ -548,6 +548,9 @@ void nec_context::stateful_set_periodic(
   if (!std::isfinite(psi1_rad) || !std::isfinite(psi2_rad))
     throw nec_exception("SCAN PHASES MUST BE FINITE");
   static_cast<void>(checked_lattice(a1x_m, a1y_m, a2x_m, a2y_m));
+  if (!m_periodic.active || m_periodic.a1x_m != a1x_m || m_periodic.a1y_m != a1y_m ||
+      m_periodic.a2x_m != a2x_m || m_periodic.a2y_m != a2y_m)
+    m_periodic_fill.reset();
   m_periodic = {true, a1x_m, a1y_m, a2x_m, a2y_m, psi1_rad, psi2_rad};
   m_periodic_green.reset();
   m_periodic_low_rank.reset();
@@ -594,96 +597,236 @@ void nec_context::stateful_check_periodic_clearance(
 void nec_context::stateful_clear_periodic()
 {
   m_periodic = {};
+  m_periodic_fill.reset();
   m_periodic_green.reset();
   m_periodic_low_rank.reset();
 }
 
-/*! Add the field of the other cells, radiated by the current source segment
- * (xj, yj, zj, m_s, m_b, ...), to the nine field components just computed by
- * efld(). Over perfect ground the ground images of the other cells are added
- * the same way, as efld() adds the ground image of the source itself.
- */
-void nec_context::add_periodic_correction(
-  nec_float xi, nec_float yi, nec_float zi, nec_float ai)
+namespace {
+// The nine components of a segment field in the order of exk..ezc.
+std::array<nec_complex, 9> components(const nec_periodic::segment_field& field)
 {
-  add_periodic_images(xi, yi, zi, ai, false);
-  if (ground.type_perfect())
-    add_periodic_images(xi, yi, zi, ai, true);
+  std::array<nec_complex, 9> value;
+  for (int axis = 0; axis < 3; ++axis) {
+    value[axis] = field.constant[axis];
+    value[3 + axis] = field.sine[axis];
+    value[6 + axis] = field.cosine[axis];
+  }
+  return value;
+}
 }
 
-/*! Add the field of the images in the other cells of the current source
- * segment (xj, yj, zj, m_s, m_b, ...), or with ground_image of its ground
- * image: the segment reflected in z = 0, with the opposite current along the
- * reflected segment (efld's frati = 1 for perfect ground). Images within
- * periodic_close_image_reach of the observation point go through
- * efld_compute, the thin-wire segment field of the finite model, displaced
- * and phase-shifted. The rest of G_p - G_free is smooth along the segment
- * and goes through a Gauss rule.
- */
-void nec_context::add_periodic_images(
-  nec_float xi, nec_float yi, nec_float zi, nec_float ai, bool ground_image)
+void nec_context::add_segment_field(nec_float sign, const std::array<nec_complex, 9>& field)
 {
-  const nec_float source_z = ground_image ? -zj : zj;
-  const nec_float source_salp = ground_image ? -salpj : salpj;
-  const nec_float sign = ground_image ? -1.0 : 1.0;
+  exk += sign * field[0];
+  eyk += sign * field[1];
+  ezk += sign * field[2];
+  exs += sign * field[3];
+  eys += sign * field[4];
+  ezs += sign * field[5];
+  exc += sign * field[6];
+  eyc += sign * field[7];
+  ezc += sign * field[8];
+}
+
+/*! Fill one part of the interaction matrix (cmset with m_fill_part). */
+void nec_context::fill_part_matrix(fill_part part, complex_array& matrix)
+{
+  m_fill_part = part;
+  try {
+    cmset(neq, matrix, rkh);
+  } catch (...) {
+    m_fill_part = fill_part::free_space;
+    throw;
+  }
+  m_fill_part = fill_part::free_space;
+}
+
+/*! The periodic interaction matrix in cm: the free-space fill, the sum over
+ * lattice points rho of exp(-j kt0 . rho) times the image's contribution, and
+ * the spectral sum. The first two are kept per frequency
+ * (m_periodic_fill), so a scan change at the same frequency fills only the
+ * spectral sum.
+ */
+void nec_context::periodic_fill()
+{
+  const int64_t size = cm.size();
+  if (!m_periodic_fill || m_periodic_fill->frequency_mhz != freq_mhz) {
+    m_periodic_fill.reset();
+    auto fill = std::make_unique<periodic_scan_independent_fill>();
+    fill->frequency_mhz = freq_mhz;
+    fill->free_space.resize(size);
+    fill_part_matrix(fill_part::free_space, fill->free_space);
+    fill->points = periodic_fill_points();
+    if (double(fill->points.size()) * double(size) * sizeof(nec_complex) <= periodic_fill_cache_bytes) {
+      fill->point_matrices.resize(fill->points.size());
+      for (size_t index = 0; index < fill->points.size(); ++index) {
+        m_fill_point = &fill->points[index];
+        fill->point_matrices[index].resize(size);
+        fill_part_matrix(fill_part::periodic_point, fill->point_matrices[index]);
+      }
+      m_fill_point = nullptr;
+    }
+    m_periodic_fill = std::move(fill);
+  }
+  const periodic_scan_independent_fill& fill = *m_periodic_fill;
+
+  fill_part_matrix(fill_part::periodic_spectral, cm);
+  for (int64_t entry = 0; entry < size; ++entry)
+    cm[entry] += fill.free_space[entry];
+  const nec_periodic::vec2 scan_wavevector = m_periodic_green->lattice().scan_wavevector(
+    m_periodic.psi1_rad, m_periodic.psi2_rad);
+  complex_array image_matrix;
+  for (size_t index = 0; index < fill.points.size(); ++index) {
+    const periodic_fill_point& image = fill.points[index];
+    const nec_complex phase = std::exp(
+      nec_complex(0.0, -(scan_wavevector.x * image.x + scan_wavevector.y * image.y)));
+    const complex_array* matrix = &image_matrix;
+    if (fill.point_matrices.empty()) {
+      image_matrix.resize(size);
+      m_fill_point = &image;
+      fill_part_matrix(fill_part::periodic_point, image_matrix);
+      m_fill_point = nullptr;
+    } else {
+      matrix = &fill.point_matrices[index];
+    }
+    for (int64_t entry = 0; entry < size; ++entry)
+      cm[entry] += phase * (*matrix)[entry];
+  }
+}
+
+/*! The lattice points whose spatial Ewald term reaches some pair of
+ * observation point and source segment (or its ground image), the origin,
+ * and the translations of the close images.
+ */
+std::vector<nec_context::periodic_fill_point> nec_context::periodic_fill_points() const
+{
+  const nec_periodic::periodic_green& green = *m_periodic_green;
+  const nec_periodic::lattice_2d& lattice = green.lattice();
+  const nec_periodic::vec2 a1 = lattice.a1(), a2 = lattice.a2();
+  const nec_periodic::vec2 b1 = lattice.b1(), b2 = lattice.b2();
+  // Indices along the given lattice vectors.
+  std::set<std::pair<long, long>> indices;
+  const auto index_of = [&](nec_float x, nec_float y) {
+    return std::make_pair(std::lround((x * b1.x + y * b1.y) / two_pi()),
+                          std::lround((x * b2.x + y * b2.y) / two_pi()));
+  };
+  indices.insert({0, 0});
+  for (const periodic_close_image& image : m_periodic_close_images)
+    indices.insert(index_of(image.x, image.y));
+  const bool perfect = ground.type_perfect();
+  const int64_t n = m_geometry->n_segments;
+  for (int64_t i = 0; i < n; ++i)
+    for (int64_t j = 0; j < n; ++j)
+      for (const nec_float mirror : {1.0, -1.0}) {
+        if (mirror < 0 && !perfect)
+          continue;
+        const nec_float reach = green.spatial_radius() + 0.5 * m_geometry->segment_length[j];
+        const nec_float dz = m_geometry->z[i] - mirror * m_geometry->z[j];
+        if (std::abs(dz) > reach)
+          continue;
+        for (const nec_periodic::vec2& rho : green.lattice_points_within(
+               {m_geometry->x[i] - m_geometry->x[j], m_geometry->y[i] - m_geometry->y[j]},
+               std::sqrt(reach * reach - dz * dz)))
+          indices.insert(index_of(rho.x, rho.y));
+      }
+  std::vector<periodic_fill_point> images;
+  images.reserve(indices.size());
+  for (const auto& [m, n_index] : indices) {
+    periodic_fill_point image;
+    image.x = nec_float(m) * a1.x + nec_float(n_index) * a2.x;
+    image.y = nec_float(m) * a1.y + nec_float(n_index) * a2.y;
+    for (const periodic_close_image& close : m_periodic_close_images)
+      image.close = image.close || index_of(close.x, close.y) == std::make_pair(m, n_index);
+    images.push_back(image);
+  }
+  return images;
+}
+
+/*! Add the field of the image of the current source segment (xj, yj, zj,
+ * m_s, m_b, ...) under the lattice point m_fill_point, without its scan
+ * phase, to the nine field components; over perfect ground also that of its
+ * ground image, the segment reflected in z = 0 with the opposite current
+ * along the reflected segment (efld's frati = 1 for perfect ground). Close
+ * images (within periodic_close_image_reach of the observation point) go
+ * through efld_compute, the thin-wire segment field of the finite model; the
+ * rest of the image's spatial Ewald term is smooth along the segment and
+ * goes through a Gauss rule. The image of the origin is the spatial term
+ * minus the free-space field, which efld adds.
+ */
+void nec_context::add_periodic_point(
+  nec_float xi, nec_float yi, nec_float zi, nec_float ai)
+{
+  const periodic_fill_point& image = *m_fill_point;
+  const nec_periodic::periodic_green& green = *m_periodic_green;
+  const bool origin = image.x == 0.0 && image.y == 0.0;
   // Kept below rkh, where efld_compute would switch to its lumped
   // approximation and be less accurate than the Gauss rule.
   const nec_float reach = std::min(periodic_close_image_reach(m_s, m_b), 0.5 * rkh);
-  const nec_float half_x = 0.5 * m_s * cabj, half_y = 0.5 * m_s * sabj;
-  const nec_float half_z = 0.5 * m_s * source_salp;
-  std::vector<const periodic_close_image*> close;
-  for (const periodic_close_image& image : m_periodic_close_images) {
+  for (const bool ground_image : {false, true}) {
+    if (ground_image && !ground.type_perfect())
+      continue;
+    const nec_float source_z = ground_image ? -zj : zj;
+    const nec_float source_salp = ground_image ? -salpj : salpj;
+    const nec_float sign = ground_image ? -1.0 : 1.0;
     const nec_float cx = xj + image.x, cy = yj + image.y;
-    const nec_float distance = nec_periodic::segment_distance(
-      {xi, yi, zi}, {xi, yi, zi},
-      {cx - half_x, cy - half_y, source_z - half_z},
-      {cx + half_x, cy + half_y, source_z + half_z});
-    if (distance < reach)
-      close.push_back(&image);
-  }
+    bool close = false;
+    if (image.close) {
+      const nec_float half_x = 0.5 * m_s * cabj, half_y = 0.5 * m_s * sabj;
+      const nec_float half_z = 0.5 * m_s * source_salp;
+      close = nec_periodic::segment_distance(
+        {xi, yi, zi}, {xi, yi, zi},
+        {cx - half_x, cy - half_y, source_z - half_z},
+        {cx + half_x, cy + half_y, source_z + half_z}) < reach;
+    }
+    if (!origin && !close &&
+        std::hypot(xi - cx, yi - cy, zi - source_z) > green.spatial_radius() + 0.5 * m_s)
+      continue;
 
-  const nec_periodic::periodic_green& green = *m_periodic_green;
-  const nec_periodic::source_segment segment{
-    {xj, yj, source_z}, {cabj, sabj, source_salp}, m_s};
-  const nec_periodic::segment_field field = nec_periodic::segment_field_of_kernel(
-    [&green, &close](const nec_periodic::point& r) {
-      nec_periodic::green_value value = green.smooth(r);
-      for (const periodic_close_image* image : close) {
-        const nec_periodic::green_value free = nec_periodic::free_space_green(
-          {r[0] - image->x, r[1] - image->y, r[2]}, two_pi());
-        value.value -= image->phase * free.value;
-        for (int axis = 0; axis < 3; ++axis)
-          value.gradient[axis] -= image->phase * free.gradient[axis];
-      }
-      return value;
-    },
-    segment, {xi, yi, zi}, two_pi());
-  nec_complex image_field[9];
-  for (const periodic_close_image* close_image : close) {
-    const periodic_close_image& image = *close_image;
-    // The image source sits at (xj + x, yj + y, source_z).
-    efld_compute(xi - xj - image.x, yi - yj - image.y, ai, source_salp,
-      zi - source_z, true, image_field);
-    const nec_complex weight = sign * image.phase;
-    exk += weight * image_field[0];
-    eyk += weight * image_field[1];
-    ezk += weight * image_field[2];
-    exs += weight * image_field[3];
-    eys += weight * image_field[4];
-    ezs += weight * image_field[5];
-    exc += weight * image_field[6];
-    eyc += weight * image_field[7];
-    ezc += weight * image_field[8];
+    const nec_periodic::vec2 rho{image.x, image.y};
+    const nec_periodic::source_segment segment{
+      {xj, yj, source_z}, {cabj, sabj, source_salp}, m_s};
+    const nec_periodic::segment_field field = nec_periodic::segment_field_of_kernel(
+      [&green, rho, close](const nec_periodic::point& r) {
+        nec_periodic::green_value value = green.spatial_term(rho, r, true);
+        if (close) {
+          const nec_periodic::green_value free = nec_periodic::free_space_green(
+            {r[0] - rho.x, r[1] - rho.y, r[2]}, two_pi());
+          value.value -= free.value;
+          for (int axis = 0; axis < 3; ++axis)
+            value.gradient[axis] -= free.gradient[axis];
+        }
+        return value;
+      },
+      segment, {xi, yi, zi}, two_pi());
+    if (close) {
+      std::array<nec_complex, 9> image_field;
+      // The image source sits at (xj + x, yj + y, source_z).
+      efld_compute(xi - cx, yi - cy, ai, source_salp, zi - source_z, true, image_field.data());
+      add_segment_field(sign, image_field);
+    }
+    add_segment_field(sign, components(field));
   }
-  exk += sign * field.constant[0];
-  eyk += sign * field.constant[1];
-  ezk += sign * field.constant[2];
-  exs += sign * field.sine[0];
-  eys += sign * field.sine[1];
-  ezs += sign * field.sine[2];
-  exc += sign * field.cosine[0];
-  eyc += sign * field.cosine[1];
-  ezc += sign * field.cosine[2];
+}
+
+/*! Add the field of the spectral Ewald sum of the current source segment
+ * (and over perfect ground of its ground image, as add_periodic_point) to the
+ * nine field components.
+ */
+void nec_context::add_periodic_spectral(nec_float xi, nec_float yi, nec_float zi)
+{
+  const nec_periodic::periodic_green& green = *m_periodic_green;
+  for (const bool ground_image : {false, true}) {
+    if (ground_image && !ground.type_perfect())
+      continue;
+    const nec_float source_z = ground_image ? -zj : zj;
+    const nec_float source_salp = ground_image ? -salpj : salpj;
+    const nec_float sign = ground_image ? -1.0 : 1.0;
+    const nec_periodic::segment_field field = nec_periodic::segment_field_of_kernel(
+      [&green](const nec_periodic::point& r) { return green.spectral(r); },
+      {{xj, yj, source_z}, {cabj, sabj, source_salp}, m_s}, {xi, yi, zi}, two_pi());
+    add_segment_field(sign, components(field));
+  }
 }
 
 /*! Fill the singular parts of the Floquet modes split out of the periodic
@@ -2086,9 +2229,12 @@ void nec_context::structure_segment_loading()
 
   /* fill and factor primary interaction matrix */
   secnds( &tim1 );
-  cmset( neq, cm, rkh );
-  if (m_periodic_green)
+  if (m_periodic_green) {
+    periodic_fill();
     periodic_low_rank_fill();
+  } else {
+    cmset( neq, cm, rkh );
+  }
   secnds( &tim2 );
   tim= tim2- tim1;
   factrs(m_output, npeq, neq, cm, ip );
@@ -2684,7 +2830,7 @@ void nec_context::cmset( int64_t nrow, complex_array& in_cm, nec_float rkhx) {
       /* CMWS (J,IM1,IM2,CM(1,IST),NROW,CM,NROW,1) */
     }
     /* matrix elements modified by loading */
-    if ( nload == 0)
+    if ( nload == 0 || m_fill_part != fill_part::free_space)
       continue;
 
     if ( j > np)
@@ -3172,9 +3318,15 @@ void nec_context::cmww( int j, int i1, int i2, complex_array& in_cm,
     sabi= m_geometry->sab[i];
     salpi= m_geometry->salp[i];
 
-    efld( xi, yi, zi, ai, i != j);
-    if (m_periodic_green)
-      add_periodic_correction(xi, yi, zi, ai);
+    if (m_fill_part == fill_part::free_space) {
+      efld( xi, yi, zi, ai, i != j);
+    } else {
+      exk = eyk = ezk = exs = eys = ezs = exc = eyc = ezc = cplx_00();
+      if (m_fill_part == fill_part::periodic_point)
+        add_periodic_point(xi, yi, zi, ai);
+      else
+        add_periodic_spectral(xi, yi, zi);
+    }
 
     etk= exk* cabi+ eyk* sabi+ ezk* salpi;
     ets= exs* cabi+ eys* sabi+ ezs* salpi;

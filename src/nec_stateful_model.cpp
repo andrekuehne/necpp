@@ -211,6 +211,12 @@ void nec_stateful_model::require_configurable(const char* operation) const
 
 void nec_stateful_model::invalidate_factorization()
 {
+  m_context->stateful_drop_periodic_fill();
+  invalidate_for_scan_change();
+}
+
+void nec_stateful_model::invalidate_for_scan_change()
+{
   m_configuration_dirty = true;
   m_frequency_mhz = 0.0;
   clear_matrix_cache();
@@ -323,6 +329,7 @@ const nec_geometry_completion_result& nec_stateful_model::complete_geometry(
   m_ground_connection = connection;
   m_state = nec_model_state::geometry_complete;
   m_configuration_dirty = true;
+  m_context->stateful_drop_periodic_fill();
   return m_geometry_completion;
 }
 
@@ -629,7 +636,7 @@ void nec_stateful_model::set_scan_phases(nec_float psi1_rad, nec_float psi2_rad)
   m_scan_psi1_rad = psi1_rad;
   m_scan_psi2_rad = psi2_rad;
   apply_periodic_state();
-  invalidate_factorization();
+  invalidate_for_scan_change();
 }
 
 void nec_stateful_model::prepare(nec_float frequency_mhz)

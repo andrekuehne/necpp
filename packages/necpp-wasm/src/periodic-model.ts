@@ -1,5 +1,7 @@
 import { NecStateError } from "./errors.js";
 import { instantiateNecModule } from "./loader.js";
+import { ScanSweepPool, recordedCall, validSweep, type PeriodicCellCall } from "./periodic-sweep.js";
+import { copyAssetOptions, createNecPeriodicWorkerModel } from "./worker-client.js";
 import {
   finitePair,
   scanPhasesForDirection,
@@ -26,6 +28,9 @@ import type {
   ScanImpedanceRequest,
   ScanImpedanceResult,
   ScanPhasesRad,
+  ScanSweepChunk,
+  ScanSweepOptions,
+  ScanSweepRequest,
   WasmAssetOptions,
   WireDefinition,
 } from "./types.js";
@@ -38,10 +43,15 @@ import type { NecWasmModule } from "./wasm-internal.js";
  */
 export class WasmNecPeriodicModel implements NecPeriodicModel {
   readonly #cell: WasmNecModel;
+  readonly #assets: WasmAssetOptions | undefined;
   #lattice: PeriodicLattice | undefined;
+  // The configuration calls that succeeded, replayed by the sweep workers.
+  readonly #calls: PeriodicCellCall[] = [];
+  #sweepPool: ScanSweepPool | undefined;
 
-  constructor(cell: WasmNecModel) {
+  constructor(cell: WasmNecModel, assets?: WasmAssetOptions) {
     this.#cell = cell;
+    this.#assets = assets;
   }
 
   get state(): NecModelState {
@@ -50,45 +60,57 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
 
   addWire(wire: WireDefinition): void {
     this.#cell.addWire(wire);
+    this.#calls.push(recordedCall({ method: "addWire", argument: wire }));
   }
 
   completeGeometry(): void {
     this.#cell.completeGeometry();
+    this.#calls.push({ method: "completeGeometry" });
   }
 
   definePorts(ports: readonly PortDefinition[]): void {
     this.#cell.definePorts(ports);
+    this.#calls.push(recordedCall({ method: "definePorts", argument: ports }));
   }
 
   addLoad(load: LoadDefinition): void {
     this.#cell.addLoad(load);
+    this.#calls.push(recordedCall({ method: "addLoad", argument: load }));
   }
 
   clearLoads(): void {
     this.#cell.clearLoads();
+    this.#calls.push({ method: "clearLoads" });
   }
 
   setGround(ground: PeriodicGround): void {
     this.#cell.setGround(ground);
+    this.#calls.push(recordedCall({ method: "setGround", argument: ground }));
   }
 
   setLattice(lattice: PeriodicLattice): void {
     const valid = validLattice(lattice, "lattice");
     this.#cell[setLatticeEntry](valid.a1M, valid.a2M);
     this.#lattice = valid;
+    this.#calls.push(recordedCall({ method: "setLattice", argument: valid }));
   }
 
-  computeScanImpedance(request: ScanImpedanceRequest): ScanImpedanceResult {
+  #requireLattice(operation: "computeScanImpedance" | "sweepScanImpedance"): PeriodicLattice {
     const lattice = this.#lattice;
     if (this.state === "disposed" || lattice === undefined) {
       throw new NecStateError(
-        "computeScanImpedance",
+        operation,
         this.state,
         this.state === "disposed"
           ? undefined
-          : "computeScanImpedance requires a lattice; call setLattice first",
+          : `${operation} requires a lattice; call setLattice first`,
       );
     }
+    return lattice;
+  }
+
+  computeScanImpedance(request: ScanImpedanceRequest): ScanImpedanceResult {
+    const lattice = this.#requireLattice("computeScanImpedance");
     const record = requireRecord(request, "request");
     const frequencyMHz = positiveNumber(record.frequencyMHz, "request.frequencyMHz");
     const scanPhasesRad = requestedScanPhases(record, lattice, frequencyMHz);
@@ -105,7 +127,20 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
     };
   }
 
+  sweepScanImpedance(
+    request: ScanSweepRequest,
+    options?: ScanSweepOptions,
+  ): AsyncIterable<ScanSweepChunk> {
+    this.#requireLattice("sweepScanImpedance");
+    const sweep = validSweep(request, options);
+    const assets = this.#assets;
+    this.#sweepPool ??= new ScanSweepPool(() => createNecPeriodicWorkerModel(assets));
+    return this.#sweepPool.sweep(this.#calls.slice(), sweep);
+  }
+
   dispose(): void {
+    this.#sweepPool?.dispose();
+    this.#sweepPool = undefined;
     this.#cell.dispose();
   }
 }
@@ -130,8 +165,11 @@ function requestedScanPhases(
   return scanPhasesForDirection({ lattice, frequencyMHz, ...direction });
 }
 
-export function createPeriodicModelFromModule(module: NecWasmModule): NecPeriodicModel {
-  return new WasmNecPeriodicModel(createModelFromModule(module) as WasmNecModel);
+export function createPeriodicModelFromModule(
+  module: NecWasmModule,
+  assets?: WasmAssetOptions,
+): NecPeriodicModel {
+  return new WasmNecPeriodicModel(createModelFromModule(module) as WasmNecModel, assets);
 }
 
 /** Create the unit cell of an infinite periodic array, backed by a new WASM module instance. */
@@ -139,5 +177,5 @@ export async function createNecPeriodicModel(
   options?: WasmAssetOptions,
 ): Promise<NecPeriodicModel> {
   const module = await instantiateNecModule(options);
-  return createPeriodicModelFromModule(module);
+  return createPeriodicModelFromModule(module, copyAssetOptions(options));
 }

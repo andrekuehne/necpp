@@ -584,21 +584,59 @@ export interface ScanDirection {
 }
 
 /**
- * One scan state at one frequency: either scan phases along the lattice
- * vectors (any scan state, including invisible space) or a scan direction
- * (visible space only). Exactly one of the two.
+ * One scan state: either scan phases along the lattice vectors (any scan
+ * state, including invisible space) or a scan direction (visible space
+ * only). Exactly one of the two.
  */
-export type ScanImpedanceRequest =
+export type ScanState =
   | {
-    readonly frequencyMHz: number;
     readonly scanPhasesRad: ScanPhasesRad;
     readonly scanDirection?: never;
   }
   | {
-    readonly frequencyMHz: number;
     readonly scanDirection: ScanDirection;
     readonly scanPhasesRad?: never;
   };
+
+/** One scan state at one frequency. */
+export type ScanImpedanceRequest = { readonly frequencyMHz: number } & ScanState;
+
+/** Many scan states at one frequency. */
+export interface ScanSweepRequest {
+  readonly frequencyMHz: number;
+  readonly scanStates: readonly ScanState[];
+}
+
+export interface ScanSweepOptions {
+  /**
+   * Aborting cancels the sweep: iteration rejects with a
+   * `NecCancellationError`, no further scan states are dispatched, and the
+   * result of each scan state still being solved is dropped. Each worker
+   * finishes at most that one scan state before it is free again.
+   */
+  readonly signal?: AbortSignal;
+  /**
+   * Number of sweep workers, 1 through 8, or `"auto"` (the default): one per
+   * logical core minus one, at most 8. Never more than the scan states.
+   */
+  readonly workers?: "auto" | number;
+}
+
+/** The result of one scan state of a sweep. */
+export interface ScanSweepPoint {
+  /** Index of the scan state in `ScanSweepRequest.scanStates`. */
+  readonly index: number;
+  readonly result: ScanImpedanceResult;
+}
+
+/** The scan states solved since the previous chunk, in completion order. */
+export interface ScanSweepChunk {
+  readonly points: readonly ScanSweepPoint[];
+  /** Scan states delivered so far, this chunk included. */
+  readonly completed: number;
+  /** Scan states in the request. */
+  readonly total: number;
+}
 
 /**
  * How a periodic result relates to the tolerance; every returned result is
@@ -661,8 +699,22 @@ export interface NecPeriodicModel {
    */
   setGround(ground: PeriodicGround): void;
   setLattice(lattice: PeriodicLattice): void;
-  /** Fill, factor and return the scan impedance for one scan state. */
+  /**
+   * Fill, factor and return the scan impedance for one scan state. A scan
+   * change at the previous frequency fills only the scan-dependent part of
+   * the interaction matrix and is about twice as fast as a new frequency.
+   */
   computeScanImpedance(request: ScanImpedanceRequest): ScanImpedanceResult;
+  /**
+   * Solve many scan states on a pool of workers, each with a copy of this
+   * unit cell, delivering results in chunks as they finish. The results equal
+   * those of `computeScanImpedance`. The workers start on the first sweep and
+   * stay until `dispose()`.
+   */
+  sweepScanImpedance(
+    request: ScanSweepRequest,
+    options?: ScanSweepOptions,
+  ): AsyncIterable<ScanSweepChunk>;
   /** Idempotent. After disposal, every operation except `state` and `dispose` fails. */
   dispose(): void;
 }
@@ -685,6 +737,8 @@ export type NecWorkerOperation =
   | "getCurrentDistribution"
   | "prepareCurrentQuadrature"
   | "characterizeIsolatedElement"
+  | "setLattice"
+  | "computeScanImpedance"
   | "dispose";
 
 export interface NecWorkerProgressEvent {
@@ -747,6 +801,48 @@ export interface NecWorkerModel {
    */
   cancelFarField(): void;
   /** Idempotent. Disposes the native model, then releases the worker thread. */
+  dispose(): Promise<void>;
+  /**
+   * Immediately kills the worker and rejects outstanding operations.
+   * Idempotent. The `state` getter afterwards is `"disposed"`.
+   */
+  terminate(): void;
+  /** Register a progress listener. Returns an unsubscribe function. */
+  subscribeProgress(listener: NecWorkerProgressListener): () => void;
+}
+
+export interface CreateNecPeriodicWorkerModelOptions extends WasmAssetOptions {
+  /** Invoked on the client thread at worker operation start and completion. */
+  readonly onProgress?: NecWorkerProgressListener;
+  /**
+   * Cancels only pending worker creation. Once creation resolves, call
+   * `terminate()` on the returned model for immediate hard cancellation.
+   */
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * Worker-backed unit cell of an infinite periodic array. Methods are
+ * asynchronous, serialized per instance, and otherwise match
+ * `NecPeriodicModel`. `terminate()` is the cancellation mechanism.
+ */
+export interface NecPeriodicWorkerModel {
+  readonly state: NecModelState;
+
+  addWire(wire: WireDefinition): Promise<void>;
+  completeGeometry(): Promise<void>;
+  definePorts(ports: readonly PortDefinition[]): Promise<void>;
+  addLoad(load: LoadDefinition): Promise<void>;
+  clearLoads(): Promise<void>;
+  setGround(ground: PeriodicGround): Promise<void>;
+  setLattice(lattice: PeriodicLattice): Promise<void>;
+  computeScanImpedance(request: ScanImpedanceRequest): Promise<ScanImpedanceResult>;
+  /** As `NecPeriodicModel.sweepScanImpedance`; starts after the calls before it. */
+  sweepScanImpedance(
+    request: ScanSweepRequest,
+    options?: ScanSweepOptions,
+  ): AsyncIterable<ScanSweepChunk>;
+  /** Idempotent. Disposes the native model and the sweep workers, then releases the worker thread. */
   dispose(): Promise<void>;
   /**
    * Immediately kills the worker and rejects outstanding operations.

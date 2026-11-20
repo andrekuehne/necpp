@@ -110,6 +110,22 @@ public:
   // G_p minus the singular parts of the split modes; singular at every
   // lattice point including the origin.
   green_value full(const point& r) const;
+
+  // smooth() is the spectral sum plus the sum over lattice points rho of
+  // exp(-j kt0 . rho) spatial_term(rho, r, true). The spatial terms do not
+  // depend on the scan state, so a scan sweep can keep their contribution and
+  // reapply the phases.
+  //
+  // The spatial term of lattice point rho, without its scan phase. With
+  // subtract_origin_free_term, the term of rho = 0 is taken minus the
+  // free-space term exp(-jkR)/(4 pi R), R = |r|. Negligible (below the
+  // kernel's accuracy) for |r - rho| beyond spatial_radius().
+  green_value spatial_term(vec2 rho, const point& r, bool subtract_origin_free_term) const;
+  double spatial_radius() const { return spatial_radius_; }
+  // The lattice points within radius of centre (in the lattice plane).
+  std::vector<vec2> lattice_points_within(vec2 centre, double radius) const;
+  // The spectral sum alone, without the singular parts of the split modes.
+  green_value spectral(const point& r) const;
   // The modes with |kz| < near_cutoff_ratio |k|, whose singular parts smooth()
   // and full() leave out.
   const std::vector<floquet_mode>& split_modes() const { return split_modes_; }

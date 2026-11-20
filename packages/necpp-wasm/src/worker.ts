@@ -40,7 +40,14 @@ export type {
 export { transferIsolatedElementCharacterization } from "./handoff.js";
 export type { IsolatedElementHandoffMessage } from "./handoff.js";
 
-export { createNecWorkerModel } from "./worker-client.js";
+export { createNecPeriodicWorkerModel, createNecWorkerModel } from "./worker-client.js";
+export {
+  centeredRectangularLattice,
+  hexagonalLattice,
+  rectangularLattice,
+  scanPhasesForDirection,
+  squareLattice,
+} from "./periodic-lattice.js";
 
 export type {
   AngleSweep,
@@ -57,6 +64,7 @@ export type {
   ConductivityLoad,
   CreateArraySolverOptions,
   CreateNecModelOptions,
+  CreateNecPeriodicWorkerModelOptions,
   CurrentModeKind,
   CreateNecWorkerModelOptions,
   DistributedParallelRlcLoad,
@@ -69,6 +77,7 @@ export type {
   FarFieldResult,
   FiniteGround,
   FreeSpaceGround,
+  LatticeVectorM,
   FullArrayDescription,
   GeometryCompletionResult,
   GeometrySymmetry,
@@ -84,6 +93,7 @@ export type {
   NecArraySolver,
   NecCurrentDistribution,
   NecModelState,
+  NecPeriodicWorkerModel,
   NecSegmentEnd,
   NecSegmentIdentity,
   NecWorkerModel,
@@ -92,6 +102,10 @@ export type {
   NecWorkerProgressListener,
   ParallelRlcLoad,
   PerfectGround,
+  PeriodicGround,
+  PeriodicLattice,
+  PeriodicPointDiagnostics,
+  PeriodicPointStatus,
   PortDefinition,
   PortSolution,
   PositionCanonicalization,
@@ -109,6 +123,15 @@ export type {
   RotationalOrder,
   RotationalSymmetry,
   RotateZTransform,
+  ScanDirection,
+  ScanImpedanceRequest,
+  ScanImpedanceResult,
+  ScanPhasesRad,
+  ScanState,
+  ScanSweepChunk,
+  ScanSweepOptions,
+  ScanSweepPoint,
+  ScanSweepRequest,
   SegmentSelection,
   SeriesRlcLoad,
   SymmetryCopy,

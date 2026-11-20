@@ -1804,7 +1804,7 @@ export class WasmNecModel implements NecModel {
     if (status === undefined) {
       throw new NecRuntimeError("The native point status is invalid");
     }
-    return { estimatedError, status };
+    return Object.freeze({ estimatedError, status });
   }
 
   #assertNotDisposed(operation: PeriodicOperation): void {

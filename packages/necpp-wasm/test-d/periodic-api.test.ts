@@ -14,7 +14,15 @@ import {
   type ScanDirection,
   type ScanImpedanceResult,
   type ScanPhasesRad,
+  type ScanState,
+  type ScanSweepChunk,
+  type ScanSweepPoint,
 } from "../src/index.js";
+import {
+  createNecPeriodicWorkerModel,
+  hexagonalLattice as workerHexagonalLattice,
+  type NecPeriodicWorkerModel,
+} from "../src/worker.js";
 
 export async function periodicModelTypes(): Promise<void> {
   const cell: NecPeriodicModel = await createNecPeriodicModel();
@@ -124,4 +132,65 @@ export async function periodicModelTypes(): Promise<void> {
   cell.completeGeometry({ symmetry: { kind: "reflection", planes: ["x=0"], tagIncrement: 10 } });
 
   cell.dispose();
+}
+
+export async function periodicSweepTypes(cell: NecPeriodicModel): Promise<void> {
+  const states: readonly ScanState[] = [
+    { scanPhasesRad: [0, 0] },
+    { scanDirection: { thetaDeg: 30, phiDeg: 0 } },
+  ];
+  const controller = new AbortController();
+  for await (const chunk of cell.sweepScanImpedance(
+    { frequencyMHz: 300, scanStates: states },
+    { workers: 2, signal: controller.signal },
+  )) {
+    const typed: ScanSweepChunk = chunk;
+    const point: ScanSweepPoint | undefined = typed.points[0];
+    const index: number | undefined = point?.index;
+    const result: ScanImpedanceResult | undefined = point?.result;
+    const progress: number = typed.completed / typed.total;
+    void index;
+    void result;
+    void progress;
+  }
+  cell.sweepScanImpedance({ frequencyMHz: 300, scanStates: states }, { workers: "auto" });
+  // @ts-expect-error a scan state is either scan phases or a scan direction, not both.
+  cell.sweepScanImpedance({ frequencyMHz: 300, scanStates: [{ scanPhasesRad: [0, 0], scanDirection: { thetaDeg: 0, phiDeg: 0 } }] });
+  // @ts-expect-error the frequency is fixed for the whole sweep, not per scan state.
+  cell.sweepScanImpedance({ scanStates: [{ frequencyMHz: 300, scanPhasesRad: [0, 0] }] });
+  // @ts-expect-error no chunk-size or tolerance knob.
+  cell.sweepScanImpedance({ frequencyMHz: 300, scanStates: states }, { chunkSize: 4 });
+}
+
+export async function periodicWorkerTypes(): Promise<void> {
+  const cell: NecPeriodicWorkerModel = await createNecPeriodicWorkerModel({ onProgress: () => undefined });
+  await cell.addWire({ tag: 1, segments: 11, start: [-0.24, 0, 0.2], end: [0.24, 0, 0.2], radiusM: 0.001 });
+  await cell.completeGeometry();
+  await cell.definePorts([{ tag: 1, segment: 6 }]);
+  await cell.setGround({ kind: "perfect" });
+  await cell.setLattice(workerHexagonalLattice({ spacingM: 0.6 }));
+  const result: ScanImpedanceResult = await cell.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: [0, 0] });
+  void result;
+  const chunks: AsyncIterable<ScanSweepChunk> = cell.sweepScanImpedance({
+    frequencyMHz: 300,
+    scanStates: [{ scanPhasesRad: [0, 0] }],
+  });
+  void chunks;
+  // @ts-expect-error worker methods are asynchronous.
+  const synchronous: ScanImpedanceResult = cell.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: [0, 0] });
+  void synchronous;
+  // @ts-expect-error no far fields on the periodic worker model.
+  void cell.computeFarField;
+  // @ts-expect-error no embedded far fields on the periodic worker model.
+  void cell.computeEmbeddedFarFields;
+  // @ts-expect-error no isolated-element characterization on the periodic worker model.
+  void cell.characterizeIsolatedElement;
+  // @ts-expect-error no prepare step: the scan request names the frequency.
+  void cell.prepare;
+  cell.setGround(
+    // @ts-expect-error no finite ground on the periodic worker model.
+    { kind: "finite", method: "reflection-coefficient", relativePermittivity: 13, conductivitySPerM: 0.005 },
+  );
+  cell.terminate();
+  await cell.dispose();
 }

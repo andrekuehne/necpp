@@ -23,10 +23,15 @@ import type {
   IsolatedElementRequest,
   NecModel,
   NecModelState,
+  NecPeriodicModel,
   NecWorkerProgressEvent,
+  PeriodicGround,
+  PeriodicLattice,
   PortDefinition,
   PrepareOptions,
   PreparedQuadratureRequest,
+  ScanImpedanceRequest,
+  WasmAssetOptions,
   WireDefinition,
 } from "./types.js";
 import {
@@ -41,6 +46,8 @@ import { transferIsolatedElementCharacterization } from "./handoff.js";
 
 export interface WorkerSession {
   model: NecModel | undefined;
+  /** Set instead of `model` for the unit cell of an infinite periodic array. */
+  periodicModel?: NecPeriodicModel | undefined;
   fieldWorkers?: "auto" | number;
   farFieldEvaluator?: "exact" | "ring";
   fieldWorkerAssetBaseUrl?: string;
@@ -55,8 +62,14 @@ export type ModelFactory = (
   options?: CreateNecModelOptions,
 ) => Promise<NecModel>;
 
+export type PeriodicModelFactory = (
+  options?: WasmAssetOptions,
+) => Promise<NecPeriodicModel>;
+
 export interface WorkerRuntimeDependencies {
   readonly createModel: ModelFactory;
+  /** Required for create requests with `model: "periodic"`. */
+  readonly createPeriodicModel?: PeriodicModelFactory;
   readonly emitProgress: (event: NecWorkerProgressEvent) => void;
 }
 
@@ -321,6 +334,13 @@ async function invokeModel(
     return model.prepareCurrentQuadrature(args[0] as PreparedQuadratureRequest);
   case "characterizeIsolatedElement":
     return model.characterizeIsolatedElement(args[0] as IsolatedElementRequest);
+  case "setLattice":
+  case "computeScanImpedance":
+    throw new NecStateError(
+      method,
+      model.state,
+      `${method} needs the unit cell of a periodic array; create the worker model with createNecPeriodicWorkerModel`,
+    );
   case "dispose":
     session.fieldPool?.dispose();
     delete session.fieldPool;
@@ -330,6 +350,47 @@ async function invokeModel(
     const unexpected: never = method;
     throw new NecRuntimeError(`Unsupported worker method ${String(unexpected)}`);
   }
+  }
+}
+
+function invokePeriodicModel(
+  model: NecPeriodicModel,
+  method: WorkerMethod,
+  args: readonly unknown[],
+): unknown {
+  switch (method) {
+  case "addWire":
+    model.addWire(args[0] as WireDefinition);
+    return undefined;
+  case "completeGeometry":
+    model.completeGeometry();
+    return undefined;
+  case "definePorts":
+    model.definePorts(args[0] as readonly PortDefinition[]);
+    return undefined;
+  case "addLoad":
+    model.addLoad(args[0] as LoadDefinition);
+    return undefined;
+  case "clearLoads":
+    model.clearLoads();
+    return undefined;
+  case "setGround":
+    model.setGround(args[0] as PeriodicGround);
+    return undefined;
+  case "setLattice":
+    model.setLattice(args[0] as PeriodicLattice);
+    return undefined;
+  case "computeScanImpedance":
+    return model.computeScanImpedance(args[0] as ScanImpedanceRequest);
+  case "dispose":
+    model.dispose();
+    return undefined;
+  default:
+    throw new NecStateError(
+      method,
+      model.state,
+      `${method} is not available for the unit cell of a periodic array`,
+    );
   }
 }
 
@@ -358,12 +419,13 @@ export async function handleWorkerRequest(
   deps: WorkerRuntimeDependencies,
 ): Promise<{ response: WorkerResponse; transfer: ArrayBuffer[] }> {
   if (request.kind === "create") {
-    if (session.model !== undefined) {
+    const existing = session.model ?? session.periodicModel;
+    if (existing !== undefined) {
       return {
         response: {
           id: request.id,
           kind: "error",
-          state: session.model.state,
+          state: existing.state,
           error: serializeError(
             new NecRuntimeError("The worker model has already been created"),
           ),
@@ -376,6 +438,27 @@ export async function handleWorkerRequest(
       if (fieldWorkers !== undefined && fieldWorkers !== "auto"
           && (!Number.isInteger(fieldWorkers) || fieldWorkers < 1 || fieldWorkers > 8)) {
         throw new NecRuntimeError("Invalid evaluator worker configuration");
+      }
+      if (request.options?.model === "periodic") {
+        const createPeriodicModel = deps.createPeriodicModel;
+        if (createPeriodicModel === undefined) {
+          throw new NecRuntimeError("This worker cannot create a periodic model");
+        }
+        const periodicModel = await withProgress(
+          deps.emitProgress,
+          "create",
+          () => createPeriodicModel(toCreateNecModelOptions(request.options)),
+        );
+        session.periodicModel = periodicModel;
+        return {
+          response: {
+            id: request.id,
+            kind: "ok",
+            state: periodicModel.state,
+            transferredBufferCount: 0,
+          },
+          transfer: [],
+        };
       }
       const model = await withProgress(
         deps.emitProgress,
@@ -414,7 +497,7 @@ export async function handleWorkerRequest(
     }
   }
 
-  const model = session.model;
+  const model = session.model ?? session.periodicModel;
   if (model === undefined) {
     return {
       response: {
@@ -432,10 +515,13 @@ export async function handleWorkerRequest(
     const result = await withProgress(
       deps.emitProgress,
       request.method,
-      () => invokeModel(session, model, request.method, request.args),
+      () => session.periodicModel === undefined
+        ? invokeModel(session, model as NecModel, request.method, request.args)
+        : invokePeriodicModel(session.periodicModel, request.method, request.args),
     );
     if (request.method === "dispose") {
       session.model = undefined;
+      session.periodicModel = undefined;
     }
     if (
       request.method === "characterizeIsolatedElement"
