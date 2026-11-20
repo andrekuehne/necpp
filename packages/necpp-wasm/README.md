@@ -854,7 +854,15 @@ lattice points) and costs about half of a call at a new frequency. To map the
 scan impedance over many scan states, sweep them on a pool of workers:
 
 ```ts
-const states = [];
+import { createNecPeriodicModel, squareLattice, type ScanState } from "@necpp-engine/wasm";
+
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 11, start: [-0.24, 0, 0], end: [0.24, 0, 0], radiusM: 0.001 });
+cell.completeGeometry();
+cell.definePorts([{ tag: 1, segment: 6 }]);
+cell.setLattice(squareLattice({ spacingM: 0.7 }));
+
+const states: ScanState[] = [];
 for (let theta = 0; theta <= 60; theta += 5) states.push({ scanDirection: { thetaDeg: theta, phiDeg: 0 } });
 
 const controller = new AbortController();
@@ -862,9 +870,12 @@ for await (const chunk of cell.sweepScanImpedance(
   { frequencyMHz: 300, scanStates: states },
   { workers: "auto", signal: controller.signal },
 )) {
-  for (const { index, result } of chunk.points) plot(states[index], result.impedance);
+  for (const { index, result } of chunk.points) {
+    console.log(states[index], result.impedance.real[0], result.impedance.imag[0]);
+  }
   console.log(`${chunk.completed} of ${chunk.total}`);
 }
+cell.dispose();
 ```
 
 - Each chunk holds the scan states solved since the previous one, in
