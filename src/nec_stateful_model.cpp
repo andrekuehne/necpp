@@ -515,14 +515,14 @@ void nec_stateful_model::validate_symmetric_load_orbits() const
   }
 }
 
-/*! The reason periodic mode refuses a ground model, or null for free space. */
+/*! The reason periodic mode refuses a ground model, or null for free space
+ * and perfect ground. */
 static const char* periodic_ground_refusal(const nec_ground_definition& ground)
 {
   switch (ground.kind) {
   case nec_ground_kind::free_space:
-    return nullptr;
   case nec_ground_kind::perfect:
-    return "PERFECT GROUND IS NOT YET SUPPORTED IN PERIODIC MODE";
+    return nullptr;
   default:
     return "FINITE GROUND IS NOT SUPPORTED IN PERIODIC MODE UNTIL LAYERED STACKS ARRIVE";
   }
@@ -532,8 +532,12 @@ void nec_stateful_model::set_ground(const nec_ground_definition& ground)
 {
   require_configurable("SET GROUND");
   validate_symmetry_ground(ground, "SET GROUND");
-  if (const char* refusal = m_periodic ? periodic_ground_refusal(ground) : nullptr)
-    fail_geometry("SET GROUND", refusal);
+  if (m_periodic) {
+    if (const char* refusal = periodic_ground_refusal(ground))
+      fail_geometry("SET GROUND", refusal);
+    if (ground.kind == nec_ground_kind::perfect)
+      m_context->stateful_check_periodic_ground_clearance();
+  }
 
   int ground_type = -1;
   switch (ground.kind) {
@@ -590,9 +594,11 @@ void nec_stateful_model::set_lattice(const nec_lattice_definition& lattice)
     fail_geometry("SET LATTICE", refusal);
 
   // The context validates the vectors and the clearance of every conductor
-  // from its periodic images before anything changes.
+  // from its periodic images (and ground images) before anything changes.
   m_context->stateful_check_periodic_clearance(
     lattice.a1x_m, lattice.a1y_m, lattice.a2x_m, lattice.a2y_m);
+  if (m_ground.kind == nec_ground_kind::perfect)
+    m_context->stateful_check_periodic_ground_clearance();
   m_context->stateful_set_periodic(
     lattice.a1x_m, lattice.a1y_m, lattice.a2x_m, lattice.a2y_m, 0.0, 0.0);
   m_periodic = true;

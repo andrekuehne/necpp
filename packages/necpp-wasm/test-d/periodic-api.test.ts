@@ -7,6 +7,7 @@ import {
   squareLattice,
   type ComplexMatrix,
   type NecPeriodicModel,
+  type PeriodicGround,
   type PeriodicLattice,
   type PeriodicPointDiagnostics,
   type PeriodicPointStatus,
@@ -105,8 +106,14 @@ export async function periodicModelTypes(): Promise<void> {
   void cell.computeEmbeddedFarFields;
   // @ts-expect-error no isolated-element (ring-field) characterization on the periodic model.
   void cell.characterizeIsolatedElement;
-  // @ts-expect-error no ground: free space only until perfect ground arrives; finite ground needs layered stacks.
-  void cell.setGround;
+  // Free space or perfect ground; finite ground needs layered stacks.
+  const ground: PeriodicGround = { kind: "perfect" };
+  cell.setGround(ground);
+  cell.setGround({ kind: "free-space" });
+  cell.setGround(
+    // @ts-expect-error no finite ground on the periodic model.
+    { kind: "finite", method: "reflection-coefficient", relativePermittivity: 13, conductivitySPerM: 0.005 },
+  );
   // @ts-expect-error unit cells take no symmetry options.
   cell.completeGeometry({ symmetry: { kind: "reflection", planes: ["x=0"], tagIncrement: 10 } });
 

@@ -779,11 +779,11 @@ additional native solves.
 ## Infinite periodic arrays
 
 `createNecPeriodicModel()` models one **unit cell** of an infinite planar
-array in free space. Wires, ports and loads use the same definitions as
-`NecModel`; the lattice is two vectors in the xy-plane, in metres. For each
-**scan state** it returns the P x P **scan impedance** and **scan admittance**
-of the unit-cell ports: the port matrices of the cell inside the infinite
-array.
+array in free space or above a perfect ground plane. Wires, ports and loads
+use the same definitions as `NecModel`; the lattice is two vectors in the
+xy-plane, in metres. For each **scan state** it returns the P x P **scan
+impedance** and **scan admittance** of the unit-cell ports: the port matrices
+of the cell inside the infinite array.
 
 ```ts
 import { createNecPeriodicModel, squareLattice } from "@necpp-engine/wasm";
@@ -853,8 +853,12 @@ all ports of the cell.
   `Z(psi) = Z(-psi)^T`.
 - A single cell of an infinite array has no far field of its own, so the
   periodic model has no far-field, embedded-field or isolated-element methods.
-- Free space only, and no geometry symmetry. Each call fills and factors the
-  interaction matrix again.
+- Free space, or perfect ground with `cell.setGround({ kind: "perfect" })`:
+  a ground plane at z=0 under every cell. Every conductor must stay above it;
+  one that touches, nearly touches or crosses the plane is refused with a
+  `NecGeometryError` (ground connections, such as monopoles on the plane,
+  are not supported). Finite ground waits for layered stacks. No geometry
+  symmetry. Each call fills and factors the interaction matrix again.
 - Accuracy: one fixed internal tolerance, `1e-5` relative to the largest
   scan-impedance entry, and no numerical parameters. Each result carries
   `diagnostics.estimatedError` (the solver's numerical error: periodic

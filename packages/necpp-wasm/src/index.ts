@@ -103,6 +103,7 @@ export type {
   NecWorkerProgressListener,
   ParallelRlcLoad,
   PerfectGround,
+  PeriodicGround,
   PeriodicLattice,
   PeriodicPointDiagnostics,
   PeriodicPointStatus,

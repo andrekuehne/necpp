@@ -8,12 +8,12 @@ export const RADIUS_M = 0.001;
 export const SEGMENTS = 11;
 export const FEED_SEGMENT = 6;
 
-/** A half-wave dipole along x, centred at `centre`, as a finite-array pattern wire. */
-export const dipoleWire = (id, [x, y], radiusM = RADIUS_M) => ({
+/** A half-wave dipole along x, centred at `centre` (z defaults to 0), as a finite-array pattern wire. */
+export const dipoleWire = (id, [x, y, z = 0], radiusM = RADIUS_M) => ({
   id,
   segments: SEGMENTS,
-  startM: [x - HALF_LENGTH_M, y, 0],
-  endM: [x + HALF_LENGTH_M, y, 0],
+  startM: [x - HALF_LENGTH_M, y, z],
+  endM: [x + HALF_LENGTH_M, y, z],
   radiusM,
 });
 
@@ -73,7 +73,7 @@ export function relativeMatrixError(matrix, reference) {
  * are open; the centre cell then carries unit current, so its port voltages
  * are column p of the scan impedance. The Gaussian taper suppresses the edge
  * waves that make the centre of a uniformly driven array converge only like
- * N^(-1/2).
+ * N^(-1/2). `ground` is the array's ground model.
  *
  * Returns { rows, columns, real, imag } like the periodic model's impedance.
  */
@@ -87,6 +87,7 @@ export async function finiteArrayCentreImpedance({
   psi,
   wires,
   ports,
+  ground = { kind: "free-space" },
 }) {
   const elements = [];
   const phases = [];
@@ -109,7 +110,7 @@ export async function finiteArrayCentreImpedance({
   const solver = await createNecArraySolver({
     elements,
     patterns: [{ id: "cell", kind: "straight-wire-pattern", wires, ports }],
-    ground: { kind: "free-space" },
+    ground,
   }, { symmetry: "auto", symmetrizer: { positionEpsilonM: 1e-9 } });
   try {
     await solver.prepare({ frequencyMHz });

@@ -112,6 +112,25 @@ Stage 2 so far:
   end gaps), 1e-5 (10 cm gaps), 3e-5 (5 mm gaps), 6e-5 (stack with 10 mm
   pitch) and 3e-4 (5 mm wires, 2 cm gaps). That is the order by which a
   finite NEC array differs from the periodic result for this reason alone.
+- issue #26: perfect ground. The ground images of the other cells, mirrored
+  in z=0 with the opposite current along the mirrored segment (NEC's
+  `frati = 1`), go through the same correction as the direct images:
+  `add_periodic_images` runs once for the source and once for its mirror,
+  with close images through `efld_compute` at `zi + zj` and `-salpj`. The
+  close-image list of the direct images serves both, since for conductors
+  above the plane `|p - q'| >= |p - q|` for every pair of points; conductors
+  that touch, nearly touch or cross the plane are refused by the image-contact
+  rule against their own ground image. Ground connections stay unsupported.
+  Image theory: a dipole over ground equals a free-space cell with the dipole
+  and its mirror driven oppositely, `Z = Z00 - Z01`, to 8e-14 (horizontal)
+  and 5e-14 (tilted). A tapered 15 x 15 finite array over the same ground
+  (horizontal dipoles at a quarter wavelength, off broadside) matches the
+  centre element to 1.9 %, 0.9 % at 21 x 21; without the ground images of the
+  other cells the periodic result is 86 % off. Reciprocity
+  `Z(psi) = Z(-psi)^T` holds to 7.8e-5. At broadside, half-wave dipoles in a
+  0.5 wavelength square lattice a quarter wavelength above ground give
+  `154.3 - j21.9` ohm, against 152.7 ohm from the current-sheet estimate
+  `eta l_e^2 sin^2(kh) / A` with `l_e = lambda / pi`.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
