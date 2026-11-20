@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import test from "node:test";
 
 import { NecGeometryError } from "../.test-build/src/index.js";
-import { FREQUENCY_MHZ, RADIUS_M, dipoleCell, entry } from "./periodic-reference.mjs";
+import { FREQUENCY_MHZ, RADIUS_M, WAVENUMBER_PER_M, dipoleCell, entry } from "./periodic-reference.mjs";
 
 const hasWasm = existsSync(new URL("../.test-build/src/nec2pp.wasm", import.meta.url));
 const skip = !hasWasm && "WASM artifacts have not been built";
@@ -69,20 +69,20 @@ test("the estimated error grows with the segment length", {
   assert.ok(long > 10 * short && long <= TOLERANCE, `3 segments: ${long}, 11 segments: ${short}`);
 });
 
-test("scan states next to a Wood anomaly give finite results within the tolerance", {
+test("scan states on and next to a Wood anomaly give finite results within the tolerance", {
   skip,
   timeout: 120_000,
 }, async () => {
   // Square lattice of 0.7 m at about one-metre wavelength: the Floquet mode
   // (-1, 0) grazes the lattice plane at psi1 = 2 pi - k d. The scan impedance
   // has a square-root kink there, so neighbouring states differ steeply, but
-  // every value is finite and none is refused.
-  const k = (2 * Math.PI * FREQUENCY_MHZ * 1e6) / (1 / Math.sqrt(8.854e-12 * 4e-7 * Math.PI));
-  const onset = 2 * Math.PI - k * 0.7;
+  // every value is finite and none is refused. Within |kz| < 1e-3 k (offsets
+  // below about 1e-6 here) the status says so.
+  const onset = 2 * Math.PI - WAVENUMBER_PER_M * 0.7;
   const cell = await dipoleCell([[0, 0]]);
   try {
     cell.setLattice({ a1M: [0.7, 0], a2M: [0, 0.7] });
-    for (const offset of [-1e-6, -1e-12, 0, 1e-12, 1e-6]) {
+    for (const offset of [-1e-5, -1e-12, 0, 1e-12, 1e-5]) {
       const result = cell.computeScanImpedance({
         frequencyMHz: FREQUENCY_MHZ,
         scanPhasesRad: [onset * (1 + offset), 0],
@@ -90,7 +90,7 @@ test("scan states next to a Wood anomaly give finite results within the toleranc
       const [real, imag] = entry(result.impedance, 0, 0);
       assert.ok(Number.isFinite(real) && Number.isFinite(imag), `offset ${offset}: ${real}, ${imag}`);
       assert.ok(result.diagnostics.estimatedError <= TOLERANCE, `offset ${offset}`);
-      assert.equal(result.diagnostics.status, "ok");
+      assert.equal(result.diagnostics.status, Math.abs(offset) < 1e-6 ? "near-cutoff" : "ok", `offset ${offset}`);
     }
   } finally {
     cell.dispose();

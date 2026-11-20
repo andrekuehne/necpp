@@ -59,7 +59,7 @@ export const setLatticeEntry: unique symbol = Symbol("necpp.setLattice");
 export const setScanPhasesEntry: unique symbol = Symbol("necpp.setScanPhases");
 export const periodicDiagnosticsEntry: unique symbol = Symbol("necpp.periodicDiagnostics");
 
-const POINT_STATUS: Readonly<Record<number, PeriodicPointStatus>> = { 0: "ok" };
+const POINT_STATUS: Readonly<Record<number, PeriodicPointStatus>> = { 0: "ok", 1: "near-cutoff" };
 
 const STATUS_OK = 0;
 const STATUS_STATE = 1;

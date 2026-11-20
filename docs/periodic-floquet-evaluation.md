@@ -139,13 +139,43 @@ Stage 2 so far:
   against the sinusoid (the isolated half-wave dipole is 6 % above its EMF
   value at this radius, 16 % at 1e-3). The scanning factor agrees to 0.4 % in
   free space (E, H and D planes to 40 degrees, H 40: 1.9 %) and to 1 to 6 %
-  over ground (6.4 % at H 40). Beyond a grating-lobe onset Stark's curves
+  over ground (6.4 % at H 40). Beyond a Wood anomaly Stark's curves
   part from the moment method: at 0.6 wavelengths over ground, H-plane 56
   degrees, the periodic solver gives `272.9 + j145.1` ohm against about 223
   ohm read from his figure 9, while the centre of a tapered finite array
   over the same ground goes from `249.7 + j156.6` (17 x 17) to `264.0 + j152.0`
   (25 x 25), towards the periodic value. Stark's crosses come from Carter's
   mutual impedances, which assume the same sinusoidal current.
+- issue #27: Wood anomalies. Floquet modes with `|kz| < 1e-3 k` are split
+  out of the spectral sum: the kernel keeps only the remainder
+  `(f(kz) - 2) / kz` of each (by a Taylor series through `kz^3` where
+  `|kz| (|dz| + 1/E) < 1e-3`), and the singular part
+  `exp(-j kt . r) / (2 j A kz)` enters the matrix analytically. Its segment
+  field is `(-j eta / k) [k^2 s - kt (kt . s)] int I S`, so the matrix gains
+  `-eta k / (2 A kz)` times a TE and a TM rank-one term (`e = z x t` and `z`)
+  and `-eta kz / (2 A k)` times a longitudinal one. The longitudinal term is
+  added to the matrix; the TE and TM terms form a low-rank update solved by
+  the Woodbury identity on the LU of the rest, which needs only
+  `C^-1 = -2 A kz / (eta k)`, zero on cut-off. Over perfect ground the
+  ground image cancels the TE and longitudinal terms and doubles TM.
+  Several modes at cut-off at once couple through linearly dependent columns
+  (a straight dipole sees `(0, 1)` and `(0, -1)` alike), which makes the
+  small matrix singular exactly there; a pseudo-inverse that drops singular
+  values below `1e-11` of the largest solves it, the dropped directions being
+  those the columns map to zero. Splitting every mode within `|kz| < 1.3 k`
+  instead changes the scan impedance by 5e-14 (2e-14 over ground). Exactly on
+  cut-off (searched in floating point) the scan impedance is finite and
+  approaches its neighbours like `24.7 sqrt(delta)` from both sides, through
+  the split boundary. Along sweeps of the scan phases on a rectangular and a
+  hexagonal lattice, the kinks of the scan impedance (outstanding local
+  maxima of its second difference) coincide with the Wood circles predicted
+  from the reciprocal lattice, four per sweep. The refusal of a scan state
+  exactly on a Wood anomaly is lifted; results within `|kz| < 1e-3 k` carry
+  the point status `near-cutoff`, and the rounding term of the estimated
+  error is at most `eps / 1e-3`. NEC's `pi()` and its speed of light (from
+  `8.854e-12`) both differ from the exact values, so a Wood circle computed
+  outside the engine is off by about `1e-5` in `k` unless it uses the
+  engine's constants.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section

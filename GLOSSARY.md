@@ -48,7 +48,7 @@ The one fixed internal tolerance (1e-5) that governs the periodic solver. A conf
 _Avoid_: precision setting, truncation parameter
 
 **Point status**:
-How one periodic result relates to the periodic tolerance, reported with its estimated error. Every returned result is `ok`; results on or near a Wood anomaly get their own status.
+How one periodic result relates to the periodic tolerance, reported with its estimated error. Every returned result is within the tolerance: `near-cutoff` on or near a Wood anomaly (a Floquet mode within `|kz| < 1e-3 k` of cut-off, split out of the kernel), otherwise `ok`.
 
 **Clearance**:
 The separation between the unit cell's conductors and the periodic images of all of them. A lattice under which a conductor touches or nearly touches a periodic image is refused: that would be a connected array.
@@ -81,6 +81,9 @@ A plane parallel to the lattice, clear of all conductors, on which Floquet-mode 
 **Wood anomaly**:
 A scan state and frequency at which one Floquet mode grazes the lattice plane (`kz = 0`): the boundary where a grating lobe appears or disappears.
 _Avoid_: Rayleigh anomaly, grating-lobe onset (as a noun for the singular point)
+
+**Wood circle**:
+The Wood anomalies of one Floquet mode at one frequency, seen in the plane of the scan wavevector: the circle of radius `k` around that mode's reciprocal-lattice point. The scan impedance has a square-root kink along it, so sampling and interpolation should not cross it.
 
 **Scan element pattern**:
 The far-field pattern of one unit-cell port inside the infinite array, with the other ports shorted or open. In each direction it equals the (0,0) Floquet-mode amplitude at the scan state pointing that way.

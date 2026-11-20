@@ -76,8 +76,14 @@ export async function periodicModelTypes(): Promise<void> {
   const diagnostics: PeriodicPointDiagnostics = result.diagnostics;
   const estimatedError: number = diagnostics.estimatedError;
   const status: PeriodicPointStatus = diagnostics.status;
+  // On or near a Wood anomaly a result is flagged, never refused or NaN.
+  const statuses: readonly PeriodicPointStatus[] = ["ok", "near-cutoff"];
+  // @ts-expect-error there is no refused or failed point status.
+  const refused: PeriodicPointStatus = "refused";
   void estimatedError;
   void status;
+  void statuses;
+  void refused;
   // @ts-expect-error diagnostics are read-only.
   result.diagnostics.estimatedError = 0;
   // @ts-expect-error no tolerance in a scan request.

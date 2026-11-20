@@ -766,8 +766,9 @@ Accuracy policy: one fixed internal tolerance, `1e-5` relative to the
 largest scan-impedance entry, governs the periodic solver. There are no
 truncation, Ewald or quadrature parameters. Every result carries
 `diagnostics.estimatedError`, the solver's numerical error on that scale,
-and `diagnostics.status` (`"ok"`; Wood-anomaly handling is to add a status
-for results near cut-off). The estimate is the sum of
+and `diagnostics.status`: `"near-cutoff"` on or near a Wood anomaly (a
+Floquet mode within `|kz| < 1e-3 k` of cut-off), otherwise `"ok"`. The
+estimate is the sum of
 
 - the Ewald kernel's error, `1e-10` (kernel tests against direct lattice
   sums and the spectral series);
@@ -776,7 +777,19 @@ for results near cut-off). The estimate is the sum of
   four times the error measured on lattices of 0.5, 1 and 3 wavelengths;
 - the rounding near the Floquet mode nearest to cut-off, `eps / (|kz| / k)`:
   the spectral sum carries a term of size `1 / kz` there, which the solution
-  cancels.
+  cancels. Modes nearer than `1e-3 k` are split out and solved without it,
+  so this term is at most `eps / 1e-3`.
+
+At a Wood anomaly the spectral sum is singular. The singular part of each
+Floquet mode within `|kz| < 1e-3 k` of cut-off is split out of the kernel
+and solved as a low-rank update of the factored matrix (Woodbury identity),
+whose coefficients are finite and zero exactly on cut-off. The scan
+impedance is therefore finite and continuous through and exactly on a Wood
+anomaly, with a square-root kink there; such results carry the status
+`"near-cutoff"`, and regular scan grids that hit a Wood anomaly have no
+holes. Wood circles computed outside the engine should use its
+wavenumber: the engine's speed of light follows from NEC's permittivity
+`8.854e-12`, so one metre at 299.792458 MHz is 1.00001 wavelengths.
 
 Typical cells report about `2e-10`; 0.16 wavelength segments about `1e-8`.
 These are errors of the interaction-matrix entries, taken over to the scan
@@ -799,7 +812,6 @@ reason, never solved with a looser one:
 |---|---|---|
 | Unit cell above about 320 square wavelengths | `NecGeometryError` | A work bound: the kernel stays accurate by widening its spectral sum, which would need more than 10000 Floquet modes per evaluation; model the array as a finite array |
 | Segments longer than about 0.3 wavelengths | `NecGeometryError` | The Gauss rule of the periodic correction |
-| Scan state exactly on a Wood anomaly (`kz = 0` in floating point) | `NecSolverError` | The spectral sum is singular; states next to it are solved (measured finite to within 1e-12 of cut-off) |
 
 Unsupported configurations are refused with a reason through the same error
 types as the finite model. The periodic model has no patch, network or
