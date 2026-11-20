@@ -19,6 +19,7 @@
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
+#include <array>
 #include <memory>
 #include <optional>
 
@@ -128,6 +129,12 @@ public:
     nec_float a1x_m, nec_float a1y_m, nec_float a2x_m, nec_float a2y_m,
     nec_float psi1_rad, nec_float psi2_rad);
   void stateful_clear_periodic();
+  /*! Drop the scan-independent part of the periodic fill kept from the last
+   * prepare. Every change other than the scan phases (geometry, loads,
+   * ground, lattice) must call it; a scan change at the same frequency then
+   * fills only the scan-dependent part.
+   */
+  void stateful_drop_periodic_fill() { m_periodic_fill.reset(); }
   /*! Refuse a lattice under which a conductor touches or nearly touches a
    * periodic image (nec_geometry_exception), or whose vectors are invalid
    * (nec_exception). Changes nothing.
@@ -1008,23 +1015,52 @@ private:
   // (near cut-off), solved by a low-rank update; null when none is split.
   std::shared_ptr<nec_periodic::low_rank_update> m_periodic_low_rank;
   // Lattice translations, in wavelengths, under which some periodic image
-  // comes close to the unit cell, with their scan phase factors. For each
-  // observation point and source segment, the images within reach go
-  // through efld_compute instead of the smooth kernel, like the ground image.
+  // comes close to the unit cell. For each observation point and source
+  // segment, the images within reach go through efld_compute instead of the
+  // smooth kernel, like the ground image.
   struct periodic_close_image {
     nec_float x = 0, y = 0;
-    nec_complex phase;
   };
   std::vector<periodic_close_image> m_periodic_close_images;
+
+  // The periodic fill is split into parts so that a scan change at a fixed
+  // frequency keeps the scan-independent ones (periodic_fill): the free-space
+  // fill, and the contribution of each lattice point rho to the sum over
+  // images, which changes with the scan state only through the phase
+  // exp(-j kt0 . rho). cmset/cmww fill the part m_fill_part.
+  enum class fill_part { free_space, periodic_point, periodic_spectral };
+  fill_part m_fill_part = fill_part::free_space;
+  // A lattice point in wavelengths; close when some periodic image under it
+  // comes close to the unit cell (m_periodic_close_images).
+  struct periodic_fill_point {
+    nec_float x = 0, y = 0;
+    bool close = false;
+  };
+  // The lattice point of fill_part::periodic_point.
+  const periodic_fill_point* m_fill_point = nullptr;
+  struct periodic_scan_independent_fill {
+    nec_float frequency_mhz = 0;
+    complex_array free_space;
+    std::vector<periodic_fill_point> points;
+    // One matrix per image, or empty when they would take more than
+    // periodic_fill_cache_bytes; then each scan state fills them again.
+    std::vector<complex_array> point_matrices;
+  };
+  std::unique_ptr<periodic_scan_independent_fill> m_periodic_fill;
+  static constexpr double periodic_fill_cache_bytes = 256.0 * 1024 * 1024;
   nec_float m_periodic_estimated_error = 0;
   // Replaces nec_periodic::near_cutoff, the fraction of k below which |kz|
   // splits a Floquet mode out of the kernel into the low-rank update; set
   // only by the periodic model test.
   std::optional<nec_float> m_periodic_near_cutoff;
   std::vector<nec_periodic::wire_segment> periodic_wire_segments_m() const;
-  void add_periodic_correction(nec_float xi, nec_float yi, nec_float zi, nec_float ai);
-  void add_periodic_images(nec_float xi, nec_float yi, nec_float zi, nec_float ai,
-    bool ground_image);
+  void periodic_fill();
+  void fill_part_matrix(fill_part part, complex_array& matrix);
+  std::vector<periodic_fill_point> periodic_fill_points() const;
+  void add_periodic_point(nec_float xi, nec_float yi, nec_float zi, nec_float ai);
+  void add_periodic_spectral(nec_float xi, nec_float yi, nec_float zi);
+  // Add sign times the nine segment field components exk..ezc of field.
+  void add_segment_field(nec_float sign, const std::array<nec_complex, 9>& field);
   void refuse_unsupported_periodic_configuration() const;
   void periodic_low_rank_fill();
   // Solves the factored interaction matrix for b in place, including the

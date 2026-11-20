@@ -15,9 +15,11 @@ import {
   reviveIsolatedElementHandoff,
   revivePortSolution,
   revivePreparedTransferHandle,
+  reviveScanImpedanceResult,
   serializeCreateOptions,
   serializeError,
 } from "../.test-build/src/worker-protocol.js";
+import { handleWorkerRequest } from "../.test-build/src/worker-runtime.js";
 
 function portSolution(powerBudget) {
   return {
@@ -341,4 +343,114 @@ test("characterization handles transfer to a MessagePort without cloning large b
     }),
     (error) => error instanceof NecInputError,
   );
+});
+
+function scanImpedanceResult(diagnostics) {
+  const matrix = (value) => ({
+    rows: 1,
+    columns: 1,
+    order: "row-major",
+    real: Float64Array.of(value),
+    imag: Float64Array.of(-value),
+  });
+  return {
+    impedance: matrix(70),
+    admittance: matrix(0.01),
+    frequencyMHz: 300,
+    scanPhasesRad: [0.5, -0.25],
+    diagnostics,
+  };
+}
+
+test("worker scan-impedance results validate the diagnostics and freeze them", () => {
+  const revived = reviveScanImpedanceResult(
+    scanImpedanceResult({ estimatedError: 3e-7, status: "near-cutoff" }),
+  );
+  assert.deepEqual(revived.diagnostics, { estimatedError: 3e-7, status: "near-cutoff" });
+  assert.equal(Object.isFrozen(revived.diagnostics), true);
+  assert.deepEqual(revived.scanPhasesRad, [0.5, -0.25]);
+  assert.equal(Object.isFrozen(revived.scanPhasesRad), true);
+  assert.equal(revived.impedance.real[0], 70);
+
+  for (const diagnostics of [
+    { estimatedError: Number.NaN, status: "ok" },
+    { estimatedError: 1e-7, status: "refused" },
+    undefined,
+  ]) {
+    assert.throws(() => reviveScanImpedanceResult(scanImpedanceResult(diagnostics)), NecRuntimeError);
+  }
+  assert.throws(
+    () => reviveScanImpedanceResult({ ...scanImpedanceResult({ estimatedError: 1e-7, status: "ok" }), scanPhasesRad: [1] }),
+    NecRuntimeError,
+  );
+});
+
+test("create options name the periodic model", () => {
+  assert.deepEqual(serializeCreateOptions(undefined, undefined, "periodic").payload, { model: "periodic" });
+  assert.equal(serializeCreateOptions(undefined).payload, undefined);
+});
+
+/** A periodic model that records its calls. */
+function recordingPeriodicModel(calls) {
+  const record = (name) => (...args) => { calls.push([name, ...args]); };
+  return {
+    state: "empty",
+    addWire: record("addWire"),
+    completeGeometry: record("completeGeometry"),
+    definePorts: record("definePorts"),
+    addLoad: record("addLoad"),
+    clearLoads: record("clearLoads"),
+    setGround: record("setGround"),
+    setLattice: record("setLattice"),
+    computeScanImpedance(request) {
+      calls.push(["computeScanImpedance", request]);
+      return scanImpedanceResult({ estimatedError: 1e-7, status: "ok" });
+    },
+    dispose: record("dispose"),
+  };
+}
+
+test("the worker runtime sends periodic calls to the periodic model and refuses finite-only calls", async () => {
+  const calls = [];
+  const session = { model: undefined };
+  const deps = {
+    createModel: async () => { throw new Error("not a finite model"); },
+    createPeriodicModel: async () => recordingPeriodicModel(calls),
+    emitProgress() {},
+  };
+  const created = await handleWorkerRequest(session, { id: 1, kind: "create", options: { model: "periodic" } }, deps);
+  assert.equal(created.response.kind, "ok");
+
+  const lattice = { a1M: [0.6, 0], a2M: [0, 0.5] };
+  const request = { frequencyMHz: 300, scanPhasesRad: [0.1, 0.2] };
+  assert.equal((await handleWorkerRequest(session, { id: 2, kind: "invoke", method: "setLattice", args: [lattice] }, deps)).response.kind, "ok");
+  const solved = await handleWorkerRequest(session, { id: 3, kind: "invoke", method: "computeScanImpedance", args: [request] }, deps);
+  assert.equal(solved.response.kind, "ok");
+  assert.equal(solved.response.result.diagnostics.status, "ok");
+  assert.deepEqual(calls, [["setLattice", lattice], ["computeScanImpedance", request]]);
+
+  for (const method of ["prepare", "computeImpedanceMatrix", "computeFarField", "computeEmbeddedFarFields"]) {
+    const refused = await handleWorkerRequest(session, { id: 4, kind: "invoke", method, args: [{}] }, deps);
+    assert.equal(refused.response.kind, "error");
+    assert.equal(refused.response.error.code, "NEC_STATE");
+  }
+
+  const disposed = await handleWorkerRequest(session, { id: 5, kind: "invoke", method: "dispose", args: [] }, deps);
+  assert.equal(disposed.response.state, "disposed");
+  assert.equal(session.periodicModel, undefined);
+});
+
+test("a finite worker refuses the periodic calls, and a worker without a periodic factory refuses to create one", async () => {
+  const session = { model: undefined };
+  const finite = { state: "empty", dispose() {} };
+  const deps = { createModel: async () => finite, emitProgress() {} };
+  const refused = await handleWorkerRequest({ model: undefined }, { id: 1, kind: "create", options: { model: "periodic" } }, deps);
+  assert.equal(refused.response.kind, "error");
+
+  await handleWorkerRequest(session, { id: 2, kind: "create" }, deps);
+  for (const method of ["setLattice", "computeScanImpedance"]) {
+    const response = (await handleWorkerRequest(session, { id: 3, kind: "invoke", method, args: [{}] }, deps)).response;
+    assert.equal(response.kind, "error");
+    assert.equal(response.error.code, "NEC_STATE");
+  }
 });

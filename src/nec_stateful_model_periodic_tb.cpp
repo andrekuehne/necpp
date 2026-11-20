@@ -378,6 +378,116 @@ TEST_CASE("Splitting more Floquet modes into the low-rank update leaves the scan
   }
 }
 
+namespace {
+
+// Two tilted wires with a port each, so that every field component couples.
+void build_tilted_cell(nec_stateful_model& model)
+{
+  model.add_wire({1, 11, -0.2, -0.05, 0.12, 0.2, 0.05, 0.36, 0.001});
+  model.add_wire({2, 9, 0.1, 0.15, 0.3, 0.3, 0.35, 0.15, 0.001});
+  model.complete_geometry();
+  model.define_ports({{1, 6}, {2, 5}});
+}
+
+struct periodic_setup {
+  bool perfect = false;
+  nec_lattice_definition lattice{0.8, 0.0, 0.0, 0.7};
+  bool loaded = false;
+};
+
+// The scan impedance of a newly built model, the reference for one that
+// changed state on the way.
+nec_complex_matrix fresh_scan_impedance(
+  const periodic_setup& setup, nec_float psi1, nec_float psi2, nec_float frequency)
+{
+  nec_stateful_model model;
+  build_tilted_cell(model);
+  if (setup.perfect)
+    model.set_ground({nec_ground_kind::perfect});
+  if (setup.loaded)
+    model.add_load({nec_load_kind::series_rlc, 1, 3, 3, 25.0, 0.0, 0.0});
+  model.set_lattice(setup.lattice);
+  model.set_scan_phases(psi1, psi2);
+  model.prepare(frequency);
+  return model.compute_impedance_matrix().impedance;
+}
+
+nec_float relative_difference(const nec_complex_matrix& a, const nec_complex_matrix& b)
+{
+  nec_float difference = 0, size = 0;
+  for (size_t row = 0; row < b.rows; ++row)
+    for (size_t column = 0; column < b.columns; ++column) {
+      difference = std::max(difference, std::abs(a.at(row, column) - b.at(row, column)));
+      size = std::max(size, std::abs(b.at(row, column)));
+    }
+  return difference / size;
+}
+
+} // namespace
+
+TEST_CASE("Scan changes at a fixed frequency give the scan impedance of a fresh solve", "[periodic_model]")
+{
+  // A scan-only change reuses the scan-independent part of the fill; every
+  // other change must drop it. Each state is checked against a new model.
+  for (const bool perfect : {false, true}) {
+    INFO((perfect ? "over perfect ground" : "in free space"));
+    periodic_setup setup;
+    setup.perfect = perfect;
+    nec_stateful_model model;
+    build_tilted_cell(model);
+    if (perfect)
+      model.set_ground({nec_ground_kind::perfect});
+    model.set_lattice(setup.lattice);
+    const auto check = [&](nec_float psi1, nec_float psi2, nec_float frequency) {
+      INFO("psi = (" << psi1 << ", " << psi2 << "), f = " << frequency);
+      model.set_scan_phases(psi1, psi2);
+      model.prepare(frequency);
+      CHECK(relative_difference(model.compute_impedance_matrix().impedance,
+        fresh_scan_impedance(setup, psi1, psi2, frequency)) < 1e-12);
+    };
+    check(0.0, 0.0, frequency_mhz);
+    check(1.1, -0.4, frequency_mhz);
+    // (-1, 0) on cut-off: 2 pi - 0.8 k  (k = 2 pi / 1.00001 at this frequency).
+    check(2.0 * pi() - 0.8 * two_pi() / 1.00001, 0.3, frequency_mhz);
+    check(-2.5, 2.9, frequency_mhz);
+    check(-2.5, 2.9, 0.9 * frequency_mhz);
+    check(0.7, 0.2, frequency_mhz);
+
+    model.add_load({nec_load_kind::series_rlc, 1, 3, 3, 25.0, 0.0, 0.0});
+    setup.loaded = true;
+    check(0.7, 0.2, frequency_mhz);
+    check(-1.3, 0.6, frequency_mhz);
+
+    setup.lattice = {0.75, 0.1, 0.05, 0.72};
+    model.set_lattice(setup.lattice);
+    check(-1.3, 0.6, frequency_mhz);
+    check(0.4, 1.9, frequency_mhz);
+
+    model.clear_loads();
+    setup.loaded = false;
+    check(0.4, 1.9, frequency_mhz);
+  }
+}
+
+TEST_CASE("A ground change between scan states gives the scan impedance of a fresh solve", "[periodic_model]")
+{
+  nec_stateful_model model;
+  build_tilted_cell(model);
+  periodic_setup setup;
+  model.set_lattice(setup.lattice);
+  model.set_scan_phases(1.1, -0.4);
+  model.prepare(frequency_mhz);
+  REQUIRE(relative_difference(model.compute_impedance_matrix().impedance,
+    fresh_scan_impedance(setup, 1.1, -0.4, frequency_mhz)) < 1e-12);
+
+  model.set_ground({nec_ground_kind::perfect});
+  setup.perfect = true;
+  model.set_scan_phases(-0.9, 0.5);
+  model.prepare(frequency_mhz);
+  CHECK(relative_difference(model.compute_impedance_matrix().impedance,
+    fresh_scan_impedance(setup, -0.9, 0.5, frequency_mhz)) < 1e-12);
+}
+
 TEST_CASE("A unit cell too large for the tolerance is refused with the reason", "[periodic_model]")
 {
   // 400 square wavelengths: the spectral sum would need about 12600 modes.

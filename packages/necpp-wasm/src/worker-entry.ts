@@ -1,4 +1,4 @@
-import { createNecModel } from "./index.js";
+import { createNecModel, createNecPeriodicModel } from "./index.js";
 import { NecRuntimeError } from "./errors.js";
 import {
   isNodeRuntime,
@@ -112,6 +112,7 @@ async function startWorker(): Promise<void> {
           value,
           {
             createModel: createNecModel,
+            createPeriodicModel: createNecPeriodicModel,
             emitProgress(event) {
               post({
                 kind: "progress",

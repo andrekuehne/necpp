@@ -24,8 +24,10 @@ import type {
   NecCurrentDistribution,
   NecModelState,
   NecWorkerOperation,
+  PeriodicPointStatus,
   PortDefinition,
   PortSolution,
+  ScanImpedanceResult,
 } from "./types.js";
 
 export function isNodeRuntime(): boolean {
@@ -50,6 +52,8 @@ export interface SerializedCreateOptions {
   /** Internal array-facade configuration; not exposed by createNecWorkerModel. */
   readonly fieldWorkers?: "auto" | number;
   readonly fieldWorkerAssetBaseUrl?: string;
+  /** The unit cell of an infinite periodic array instead of a finite model. */
+  readonly model?: "periodic";
 }
 
 export interface WorkerFieldPoolOptions {
@@ -520,6 +524,39 @@ export function reviveImpedanceResult(value: unknown): ImpedanceResult {
   return result;
 }
 
+const POINT_STATUSES: readonly PeriodicPointStatus[] = ["ok", "near-cutoff"];
+
+/** Validate and copy a structured-cloned scan-impedance result. */
+export function reviveScanImpedanceResult(value: unknown): ScanImpedanceResult {
+  if (typeof value !== "object" || value === null) {
+    throw new NecRuntimeError("Worker scan-impedance result is not an object");
+  }
+  const record = value as ScanImpedanceResult;
+  const matrices = reviveImpedanceResult({ ...record, factorizationGeneration: 0 });
+  const phases = record.scanPhasesRad;
+  if (!Array.isArray(phases) || phases.length !== 2) {
+    throw new NecRuntimeError("Worker result scanPhasesRad is not a pair");
+  }
+  const estimatedError = finiteWorkerNumber(
+    record.diagnostics?.estimatedError,
+    "diagnostics.estimatedError",
+  );
+  const status = record.diagnostics?.status as unknown;
+  if (!(POINT_STATUSES as readonly unknown[]).includes(status)) {
+    throw new NecRuntimeError("Worker result diagnostics.status is invalid");
+  }
+  return {
+    impedance: matrices.impedance,
+    admittance: matrices.admittance,
+    frequencyMHz: finiteWorkerNumber(record.frequencyMHz, "frequencyMHz"),
+    scanPhasesRad: Object.freeze([
+      finiteWorkerNumber(phases[0], "scanPhasesRad[0]"),
+      finiteWorkerNumber(phases[1], "scanPhasesRad[1]"),
+    ] as const),
+    diagnostics: Object.freeze({ estimatedError, status: status as PeriodicPointStatus }),
+  };
+}
+
 export function reviveFarFieldResult(value: unknown): FarFieldResult {
   const record = value as FarFieldResult;
   const result: FarFieldResult = {
@@ -795,11 +832,12 @@ export function cloneFloat64(
 export function serializeCreateOptions(
   options: CreateNecWorkerModelOptions | undefined,
   fieldPool?: WorkerFieldPoolOptions,
+  model?: "periodic",
 ): {
   readonly payload?: SerializedCreateOptions;
   readonly transfer: ArrayBuffer[];
 } {
-  if (options === undefined && fieldPool === undefined) {
+  if (options === undefined && fieldPool === undefined && model === undefined) {
     return { transfer: [] };
   }
   const payload: {
@@ -808,7 +846,9 @@ export function serializeCreateOptions(
     wasmBinary?: ArrayBuffer;
     fieldWorkers?: "auto" | number;
     fieldWorkerAssetBaseUrl?: string;
+    model?: "periodic";
   } = {};
+  if (model !== undefined) payload.model = model;
   const transfer: ArrayBuffer[] = [];
   if (options?.farFieldEvaluator !== undefined) payload.farFieldEvaluator = selectEvaluator(options.farFieldEvaluator);
 
@@ -850,7 +890,8 @@ export function serializeCreateOptions(
   }
 
   if (payload.wasmUrl === undefined && payload.wasmBinary === undefined
-      && payload.fieldWorkers === undefined && payload.farFieldEvaluator === undefined) {
+      && payload.fieldWorkers === undefined && payload.farFieldEvaluator === undefined
+      && payload.model === undefined) {
     return { transfer };
   }
   return { payload, transfer };

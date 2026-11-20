@@ -187,8 +187,6 @@ void periodic_green::add_spatial(const point& r, bool subtract_origin_free_term,
     m_range = {std::min(m_range.first, 0L), std::max(m_range.last, 0L)};
     n_range = {std::min(n_range.first, 0L), std::max(n_range.last, 0L)};
   }
-  const double e = splitting_;
-  const complex_d two_over_root_pi = 2 / std::sqrt(pi);
   for(long m = m_range.first; m <= m_range.last; ++m)
     for(long n = n_range.first; n <= n_range.last; ++n) {
       const bool origin = m == 0 && n == 0;
@@ -197,35 +195,60 @@ void periodic_green::add_spatial(const point& r, bool subtract_origin_free_term,
       const double distance = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
       if(distance > spatial_radius_ && !(origin && subtract_origin_free_term)) continue;
       const complex_d phase = std::exp(-j * dot(kt0_, rho));
-      const complex_d gauss = std::exp(-distance * distance * e * e + kappa_ * kappa_);
-      radial_term term;
-      if(origin && subtract_origin_free_term) {
-        if(distance * (e + std::abs(k_)) < origin_series_limit) {
-          // T = (1/4pi) sum_n c_n R^(n-1), T'/R = (1/4pi) sum_n c_n (n-1) R^(n-3),
-          // n odd, c_n = f^(n)(0) / n!.
-          const double distance2 = distance * distance;
-          complex_d value = 0, derivative = 0;
-          for(int slot = origin_series_terms - 1; slot >= 0; --slot) {
-            value = value * distance2 + origin_series_[slot];
-            if(slot > 0) derivative = derivative * distance2 + double(2 * slot) * origin_series_[slot];
-          }
-          term = {value / (4 * pi), derivative / (4 * pi)};
-        } else {
-          // (f(R) - f(-R)) / (8 pi R): the spatial origin term minus exp(-jkR)/(4 pi R).
-          const complex_d f_plus = exp_erfc(j * k_ * distance, distance * e + j * kappa_);
-          const complex_d f_minus = exp_erfc(-j * k_ * distance, -distance * e + j * kappa_);
-          term = over_eight_pi_r(f_plus - f_minus, j * k_ * (f_plus + f_minus) - 2.0 * e * two_over_root_pi * gauss,
-                                 distance);
-        }
-      } else {
-        const complex_d outgoing = exp_erfc(-j * k_ * distance, distance * e - j * kappa_);
-        const complex_d incoming = exp_erfc(j * k_ * distance, distance * e + j * kappa_);
-        term = over_eight_pi_r(outgoing + incoming,
-                               j * k_ * (incoming - outgoing) - 2.0 * e * two_over_root_pi * gauss, distance);
-      }
+      const green_value term = spatial_term(rho, r, subtract_origin_free_term);
       sum.value += phase * term.value;
-      for(int i = 0; i < 3; ++i) sum.gradient[i] += phase * term.derivative_over_distance * d[i];
+      for(int i = 0; i < 3; ++i) sum.gradient[i] += phase * term.gradient[i];
     }
+}
+
+green_value periodic_green::spatial_term(vec2 rho, const point& r, bool subtract_origin_free_term) const {
+  const bool origin = rho.x == 0 && rho.y == 0;
+  const point d = {r[0] - rho.x, r[1] - rho.y, r[2]};
+  const double distance = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+  const double e = splitting_;
+  const complex_d two_over_root_pi = 2 / std::sqrt(pi);
+  const complex_d gauss = std::exp(-distance * distance * e * e + kappa_ * kappa_);
+  radial_term term;
+  if(origin && subtract_origin_free_term) {
+    if(distance * (e + std::abs(k_)) < origin_series_limit) {
+      // T = (1/4pi) sum_n c_n R^(n-1), T'/R = (1/4pi) sum_n c_n (n-1) R^(n-3),
+      // n odd, c_n = f^(n)(0) / n!.
+      const double distance2 = distance * distance;
+      complex_d value = 0, derivative = 0;
+      for(int slot = origin_series_terms - 1; slot >= 0; --slot) {
+        value = value * distance2 + origin_series_[slot];
+        if(slot > 0) derivative = derivative * distance2 + double(2 * slot) * origin_series_[slot];
+      }
+      term = {value / (4 * pi), derivative / (4 * pi)};
+    } else {
+      // (f(R) - f(-R)) / (8 pi R): the spatial origin term minus exp(-jkR)/(4 pi R).
+      const complex_d f_plus = exp_erfc(j * k_ * distance, distance * e + j * kappa_);
+      const complex_d f_minus = exp_erfc(-j * k_ * distance, -distance * e + j * kappa_);
+      term = over_eight_pi_r(f_plus - f_minus, j * k_ * (f_plus + f_minus) - 2.0 * e * two_over_root_pi * gauss,
+                             distance);
+    }
+  } else {
+    const complex_d outgoing = exp_erfc(-j * k_ * distance, distance * e - j * kappa_);
+    const complex_d incoming = exp_erfc(j * k_ * distance, distance * e + j * kappa_);
+    term = over_eight_pi_r(outgoing + incoming, j * k_ * (incoming - outgoing) - 2.0 * e * two_over_root_pi * gauss,
+                           distance);
+  }
+  return {term.value, {term.derivative_over_distance * d[0], term.derivative_over_distance * d[1],
+                       term.derivative_over_distance * d[2]}};
+}
+
+std::vector<vec2> periodic_green::lattice_points_within(vec2 centre, double radius) const {
+  const vec2 a1 = lattice_.reduced_a1(), a2 = lattice_.reduced_a2();
+  const vec2 b1 = lattice_.reduced_b1(), b2 = lattice_.reduced_b2();
+  const index_range m_range = indices_within(dot(centre, b1) / (2 * pi), radius * norm(b1) / (2 * pi));
+  const index_range n_range = indices_within(dot(centre, b2) / (2 * pi), radius * norm(b2) / (2 * pi));
+  std::vector<vec2> points;
+  for(long m = m_range.first; m <= m_range.last; ++m)
+    for(long n = n_range.first; n <= n_range.last; ++n) {
+      const vec2 rho{m * a1.x + n * a2.x, m * a1.y + n * a2.y};
+      if(norm(rho - centre) <= radius) points.push_back(rho);
+    }
+  return points;
 }
 
 // Calls visit(kt, kz) for every Floquet mode kt = kt0 + p b1 + q b2 (reduced
@@ -341,6 +364,12 @@ void periodic_green::add_spectral(const point& r, green_value& sum) const {
     // The Gaussian parts of d/dz cancel between the two terms.
     sum.gradient[2] += mode * j * (above - below);
   });
+}
+
+green_value periodic_green::spectral(const point& r) const {
+  green_value sum{};
+  add_spectral(r, sum);
+  return sum;
 }
 
 green_value periodic_green::smooth(const point& r) const {

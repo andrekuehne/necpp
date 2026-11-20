@@ -176,6 +176,22 @@ Stage 2 so far:
   `8.854e-12`) both differ from the exact values, so a Wood circle computed
   outside the engine is off by about `1e-5` in `k` unless it uses the
   engine's constants.
+- issue #28: scan sweeps. The fill (about 12 us per kernel evaluation for the
+  spatial and as much for the spectral sum, at the automatic splitting) was
+  measured at 40 to 250 times a finite solve of the same cell, so caching
+  only the free-space matrix, as first planned, saves about 1 %. The spatial
+  term of each lattice point rho depends on the scan state only through the
+  phase `exp(-j kt0 . rho)`, and the splitting parameter depends only on the
+  lattice and k, so the fill is split into the free-space matrix, one matrix
+  per lattice point (its spatial term, with close images through NEC's
+  thin-wire segment field and ground images, integrated per image) and the
+  spectral sum. The first two are kept per frequency (256 MiB at most); a scan
+  change fills only the spectral sum and adds the phase-weighted image
+  matrices. In WASM, 84 segments: 2.2 s per scan state before, 1.85 s at a
+  new frequency and 0.97 s for a scan change after; 22 segments: 155 ms
+  before, 130 ms and 67 ms after. Scan changes, frequency, load, ground and
+  lattice changes in sequence match a new model to 1e-12. Sweeps run on a
+  pool of worker periodic models that replay the cell's configuration.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section

@@ -71,6 +71,9 @@ The angles `(theta, phi)` of the main beam that correspond to a scan state in vi
 The P x P port impedance / admittance matrix of the unit cell inside the infinite array, at one scan state and frequency. Consumers of the package may use other words for it.
 _Avoid_: active impedance, active admittance, periodic impedance
 
+**Scan sweep**:
+Many scan states at one frequency in one request, solved on a pool of workers that each hold a copy of the unit cell, and delivered in chunks as they finish.
+
 **Floquet mode**:
 One of the discrete plane waves, indexed `(p, q)` on the reciprocal lattice and split into TE and TM with respect to z, into which the field above or below an infinite array decomposes. Either propagating or evanescent.
 _Avoid_: grating lobe (that is only a propagating Floquet mode other than (0,0))

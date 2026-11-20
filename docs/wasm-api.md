@@ -689,6 +689,7 @@ z=0. It shares the loading options, error taxonomy and lifecycle states of
 | `setLattice({ a1M, a2M })` | Two finite, non-parallel `[x, y]` vectors in m, in the xy-plane | `void`; resets the scan phases, invalidates prepared data | `NecInputError` for malformed or parallel vectors; `NecGeometryError` when a conductor touches or nearly touches a periodic image, or over perfect ground the ground plane (see clearance below) |
 | `computeScanImpedance({ frequencyMHz, scanPhasesRad })` | Positive MHz; finite `[psi1, psi2]` in radians per cell along `a1M`, `a2M` | P x P scan impedance and admittance, frequency, the scan phases and `diagnostics: { estimatedError, status }`; the model is `prepared` afterwards | `NecStateError` before `setLattice`; refusals of the accuracy policy below; otherwise as `prepare` and `computeImpedanceMatrix` |
 | `computeScanImpedance({ frequencyMHz, scanDirection })` | Positive MHz; `{ thetaDeg, phiDeg }`, finite, `thetaDeg` 0 to 90 | As above; `scanPhasesRad` reports the phases the direction maps to | As above; `NecInputError` for a direction outside visible space or with both or neither of `scanPhasesRad` and `scanDirection` |
+| `sweepScanImpedance({ frequencyMHz, scanStates }, { signal?, workers? }?)` | Positive MHz; an array of scan states, each `{ scanPhasesRad }` or `{ scanDirection }` as above; `workers` 1 through 8 or `"auto"` (default); an `AbortSignal` | `AsyncIterable` of chunks `{ points: [{ index, result }], completed, total }`, each with the scan states solved since the previous chunk, in completion order; `result` as from `computeScanImpedance`. The model's own state is unchanged | Thrown on the call: `NecStateError` before `setLattice` or after `dispose`, `NecInputError` for a malformed request or options. On iteration: `NecCancellationError` (`details.reason === "aborted"`) after the signal aborts; the first scan state's failure, as `computeScanImpedance` would raise it |
 
 Pure helpers, without a model:
 
@@ -716,7 +717,37 @@ shared with `NecModel` follow that table):
 
 A periodic model never reaches `solved`: it has no excitation calls.
 `computeScanImpedance` sets the scan phases, which always invalidates the
-factorization, then fills, factors and extracts Z and Y.
+factorization, then fills, factors and extracts Z and Y. The fill is split
+into the free-space matrix, one matrix per lattice point rho (its share of the
+spatial Ewald sum, which depends on the scan state only through the phase
+`exp(-j kt0 . rho)`) and the spectral sum. The engine keeps the first two at
+the prepared frequency, so a scan change at the same frequency fills only the
+spectral sum and adds the phase-weighted image matrices, about half the work
+of a new frequency; any change other than the scan phases drops them. Above
+256 MiB for the image matrices it fills them again for each scan state.
+
+Scan sweeps: `sweepScanImpedance` solves the scan states on a pool of worker
+periodic models. Each worker gets the unit cell by replaying the
+configuration calls that succeeded on the model, in order, and keeps its
+scan-independent fill between sweeps. A scan state goes to the next free
+worker. Aborting dispatches nothing more and rejects the iteration at once; a
+worker finishes at most the scan state it is solving, drops the result and is
+free again. The pool starts on the first sweep and is terminated by
+`dispose()` (and by `terminate()` on the worker model). Leaving the
+iteration early (`break`) stops dispatch the same way.
+
+`createNecPeriodicWorkerModel(options?)` from `@necpp-engine/wasm/worker` runs
+the periodic model in a dedicated worker. It takes the loading options plus
+`onProgress` and a creation-only `signal`, like `createNecWorkerModel`; its
+methods are those above, asynchronous and serialized, plus `terminate()` and
+`subscribeProgress()`. A sweep solves the cell as of the call to
+`sweepScanImpedance`: it waits for the calls issued before it to settle and
+replays those that succeeded, so its missing-lattice `NecStateError` arrives
+on iteration rather than on the call.
+The worker protocol adds `setLattice` and `computeScanImpedance`
+(`NecWorkerOperation`) and a periodic `create` option; a finite worker refuses
+the periodic calls and a periodic worker the finite-only ones with a
+`NecStateError`.
 
 Scan-phase convention: cell (m, n) sits at `m * a1M + n * a2M` and carries
 the unit-cell currents times `exp(j (m psi1 + n psi2))`. The scan impedance is

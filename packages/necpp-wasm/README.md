@@ -846,6 +846,53 @@ all ports of the cell.
   lattice, frequencyMHz, thetaDeg, phiDeg })` gives the same mapping without
   a solve. A request takes exactly one of `scanPhasesRad` and `scanDirection`.
 
+### Scan sweeps and workers
+
+A scan change at the frequency of the previous call keeps the
+scan-independent part of the fill (the free-space matrix and the sum over
+lattice points) and costs about half of a call at a new frequency. To map the
+scan impedance over many scan states, sweep them on a pool of workers:
+
+```ts
+import { createNecPeriodicModel, squareLattice, type ScanState } from "@necpp-engine/wasm";
+
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 11, start: [-0.24, 0, 0], end: [0.24, 0, 0], radiusM: 0.001 });
+cell.completeGeometry();
+cell.definePorts([{ tag: 1, segment: 6 }]);
+cell.setLattice(squareLattice({ spacingM: 0.7 }));
+
+const states: ScanState[] = [];
+for (let theta = 0; theta <= 60; theta += 5) states.push({ scanDirection: { thetaDeg: theta, phiDeg: 0 } });
+
+const controller = new AbortController();
+for await (const chunk of cell.sweepScanImpedance(
+  { frequencyMHz: 300, scanStates: states },
+  { workers: "auto", signal: controller.signal },
+)) {
+  for (const { index, result } of chunk.points) {
+    console.log(states[index], result.impedance.real[0], result.impedance.imag[0]);
+  }
+  console.log(`${chunk.completed} of ${chunk.total}`);
+}
+cell.dispose();
+```
+
+- Each chunk holds the scan states solved since the previous one, in
+  completion order; `index` points into `scanStates`. The results equal those
+  of `computeScanImpedance`.
+- `workers`: 1 through 8, or `"auto"` (the default, one per logical core
+  minus one). Each worker holds a copy of the unit cell; they start on the
+  first sweep, keep their fill between sweeps and stop on `dispose()`.
+- Aborting the signal rejects the iteration with a `NecCancellationError`
+  and dispatches nothing more. A worker finishes at most the scan state it
+  is solving, whose result is dropped, and is then free for the next sweep.
+
+The periodic model also runs in a worker of its own:
+`createNecPeriodicWorkerModel()` from `@necpp-engine/wasm/worker` has the same
+methods, asynchronous, plus `terminate()` and `subscribeProgress()`. The
+lattice presets and `scanPhasesForDirection` are exported there too.
+
 ### Conventions and limits
 
 - Scan impedance is not the active impedance of any finite array: it belongs
@@ -858,7 +905,7 @@ all ports of the cell.
   one that touches, nearly touches or crosses the plane is refused with a
   `NecGeometryError` (ground connections, such as monopoles on the plane,
   are not supported). Finite ground waits for layered stacks. No geometry
-  symmetry. Each call fills and factors the interaction matrix again.
+  symmetry.
 - Accuracy: one fixed internal tolerance, `1e-5` relative to the largest
   scan-impedance entry, and no numerical parameters. Each result carries
   `diagnostics.estimatedError` (the solver's numerical error: periodic

@@ -419,6 +419,8 @@ private:
   void require_state(nec_model_state expected, const char* operation) const;
   void require_configurable(const char* operation) const;
   void invalidate_factorization();
+  // A scan change keeps the scan-independent part of the periodic fill.
+  void invalidate_for_scan_change();
   void validate_load_target(const nec_load_definition& load) const;
   void validate_symmetric_load_orbits() const;
   void refuse_periodic(const char* operation) const;

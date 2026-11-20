@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import test from "node:test";
 
-import { createNecModel, NecGeometryError } from "../.test-build/src/index.js";
-import { createNecWorkerModel } from "../.test-build/src/worker.js";
+import {
+  createNecModel,
+  createNecPeriodicModel,
+  NecGeometryError,
+  NecStateError,
+} from "../.test-build/src/index.js";
+import { createNecPeriodicWorkerModel, createNecWorkerModel } from "../.test-build/src/worker.js";
 import { createReferenceArrayFixture } from "./fixtures/reference-array.mjs";
 
 const generatedLoader = new URL(
@@ -292,4 +297,81 @@ test("terminating a real worker rejects outstanding work", {
   model.terminate();
   await assert.rejects(pending, (error) => error.message.includes("terminated"));
   assert.equal(model.state, "disposed");
+});
+
+// Two dipoles in a unit cell over perfect ground, on an oblique lattice.
+async function buildPeriodicCell(cell) {
+  await Promise.resolve(cell.addWire({ tag: 1, segments: 11, start: [-0.24, 0, 0.25], end: [0.24, 0, 0.25], radiusM: 0.001 }));
+  await Promise.resolve(cell.addWire({ tag: 2, segments: 11, start: [0.05, 0.05, 0.3], end: [0.05, 0.4, 0.3], radiusM: 0.001 }));
+  await Promise.resolve(cell.completeGeometry());
+  await Promise.resolve(cell.definePorts([{ tag: 1, segment: 6 }, { tag: 2, segment: 6 }]));
+  await Promise.resolve(cell.addLoad({
+    kind: "series-rlc",
+    target: { tag: 2, firstSegment: 2 },
+    resistanceOhm: 10,
+    inductanceH: 0,
+    capacitanceF: 0,
+  }));
+  await Promise.resolve(cell.setGround({ kind: "perfect" }));
+  await Promise.resolve(cell.setLattice({ a1M: [0.6, 0], a2M: [0.15, 0.55] }));
+}
+
+test("the periodic model in a worker returns the direct model's scan impedance", {
+  skip: !hasWasm && "WASM artifacts have not been built",
+}, async () => {
+  const operations = [];
+  const worker = await createNecPeriodicWorkerModel({
+    onProgress(event) {
+      if (event.phase === "complete") operations.push(event.operation);
+    },
+  });
+  const direct = await createNecPeriodicModel();
+  try {
+    await buildPeriodicCell(worker);
+    await buildPeriodicCell(direct);
+    assert.equal(worker.state, direct.state);
+    for (const request of [
+      { frequencyMHz: 299.792458, scanPhasesRad: [0.8, -1.9] },
+      { frequencyMHz: 299.792458, scanDirection: { thetaDeg: 30, phiDeg: 45 } },
+      { frequencyMHz: 280, scanPhasesRad: [0, 0] },
+    ]) {
+      const expected = direct.computeScanImpedance(request);
+      const actual = await worker.computeScanImpedance(request);
+      assert.deepEqual(actual, expected);
+      assert.equal(Object.isFrozen(actual.diagnostics), true);
+    }
+    assert.equal(worker.state, direct.state);
+    assert.ok(operations.includes("setLattice"));
+    assert.ok(operations.includes("computeScanImpedance"));
+  } finally {
+    await worker.dispose();
+    direct.dispose();
+  }
+  assert.equal(worker.state, "disposed");
+  await assert.rejects(
+    worker.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: [0, 0] }),
+    NecStateError,
+  );
+});
+
+test("periodic refusals in a worker arrive as the direct model's error types", {
+  skip: !hasWasm && "WASM artifacts have not been built",
+}, async () => {
+  const worker = await createNecPeriodicWorkerModel();
+  try {
+    await worker.addWire(dipole);
+    await worker.completeGeometry();
+    await worker.definePorts([{ tag: 1, segment: 6 }]);
+    // At 1 mm spacing along x, the dipole (along z) touches its neighbour.
+    await assert.rejects(
+      worker.setLattice({ a1M: [0.001, 0], a2M: [0, 0.7] }),
+      (error) => error instanceof NecGeometryError && /PERIODIC IMAGE/.test(error.message),
+    );
+    await assert.rejects(
+      worker.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: [0, 0] }),
+      NecStateError,
+    );
+  } finally {
+    await worker.dispose();
+  }
 });
