@@ -251,6 +251,65 @@ struct nec_periodic_diagnostics {
   nec_periodic_point_status status = nec_periodic_point_status::ok;
 };
 
+/*! Which side of the unit cell a Floquet mode radiates to. */
+enum class nec_floquet_side {
+  above = 0,
+  below = 1,
+};
+
+/*! A Floquet mode index (p, q): kt = kt0 + p b1 + q b2 along the reciprocal
+ * vectors of the given lattice vectors. */
+struct nec_floquet_mode_index {
+  int p = 0;
+  int q = 0;
+};
+
+/*! One Floquet mode radiated by the unit cell, with one amplitude per port.
+ *
+ * Above the cell the field is the sum of the modes
+ * E exp(-j (kt . r + kz z)), below it exp(-j (kt . r - kz z)), with r the
+ * absolute position, so the phase is referred to the origin as in NEC's far
+ * fields. te and tm are the components along phi-hat and theta-hat of the
+ * mode direction (kt, +-kz) (phi = 0 when kt = 0), power-normalized: a
+ * propagating mode carries |te|^2 / 2 + |tm|^2 / 2 watts per cell, an
+ * evanescent mode as much reactive power (|kz| in place of kz). */
+struct nec_floquet_mode {
+  int p = 0;
+  int q = 0;
+  nec_floquet_side side = nec_floquet_side::above;
+  bool propagating = false;
+  nec_float kt_x_rad_per_m = 0.0;
+  nec_float kt_y_rad_per_m = 0.0;
+  /*! sqrt(k^2 - kt^2) with Im kz <= 0. */
+  nec_complex kz_rad_per_m;
+  /*! Per port, in square-root watts. */
+  std::vector<nec_complex> te;
+  std::vector<nec_complex> tm;
+  /*! Per port: watts per cell, zero for an evanescent mode. */
+  std::vector<nec_float> power_w;
+};
+
+/*! Power per cell of one port's basis solve: the input power returns as the
+ * power of the propagating modes plus the loss in the loads. */
+struct nec_floquet_port_power {
+  nec_float input_w = 0.0;
+  nec_float propagating_w = 0.0;
+  nec_float loss_w = 0.0;
+};
+
+/*! Floquet-mode amplitudes of every port's basis solve, normalized as the
+ * embedded fields: unit voltage with the other ports shorted, or unit current
+ * with them open. */
+struct nec_floquet_result {
+  nec_embedded_field_normalization normalization =
+    nec_embedded_field_normalization::unit_voltage;
+  /*! The propagating modes above the cell, then below it (free space only),
+   * then the requested evanescent modes above, then below. */
+  std::vector<nec_floquet_mode> modes;
+  /*! Per port. */
+  std::vector<nec_floquet_port_power> power;
+};
+
 struct nec_impedance_result {
   nec_complex_matrix impedance;
   nec_complex_matrix admittance;
@@ -347,6 +406,14 @@ public:
 
   /*! Return cached row-major Z and Y matrices for the prepared configuration. */
   const nec_impedance_result& compute_impedance_matrix();
+
+  /*! Floquet-mode amplitudes per port of a prepared periodic model: every
+   * propagating mode, plus the evanescent modes asked for (indices of
+   * propagating modes are ignored). Internal solves preserve a prior consumer
+   * solution, as for embedded fields. */
+  const nec_floquet_result& compute_floquet_amplitudes(
+    nec_embedded_field_normalization normalization,
+    const std::vector<nec_floquet_mode_index>& evanescent = {});
 
   /*! Convert requested currents through V=ZI and execute one voltage solve. */
   const nec_port_solution& solve_port_currents(
@@ -478,6 +545,7 @@ private:
   nec_far_field_result m_far_field_result;
   nec_far_field_result m_far_field_scratch_result;
   nec_embedded_far_field_result m_embedded_far_field_result;
+  nec_floquet_result m_floquet_result;
   std::vector<nec_float> m_far_field_segment_half_lengths;
   nec_ground_definition m_ground;
   nec_model_ground_connection m_ground_connection = nec_model_ground_connection::none;

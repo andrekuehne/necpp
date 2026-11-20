@@ -115,6 +115,10 @@ for (const entry of [
   "_necpp_wasm_v1_set_scan_phases",
   "_necpp_wasm_v1_impedance_estimated_error",
   "_necpp_wasm_v1_impedance_point_status",
+  "_necpp_wasm_v1_compute_floquet_amplitudes",
+  "_necpp_wasm_v1_floquet_mode_count",
+  "_necpp_wasm_v1_floquet_port_count",
+  "_necpp_wasm_v1_floquet_normalization",
 ]) {
   check(typeof module[entry] === "function", `${entry} was not exported`);
 }

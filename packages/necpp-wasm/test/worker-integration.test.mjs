@@ -334,11 +334,19 @@ test("the periodic model in a worker returns the direct model's scan impedance",
       { frequencyMHz: 299.792458, scanPhasesRad: [0.8, -1.9] },
       { frequencyMHz: 299.792458, scanDirection: { thetaDeg: 30, phiDeg: 45 } },
       { frequencyMHz: 280, scanPhasesRad: [0, 0] },
+      {
+        frequencyMHz: 299.792458,
+        scanPhasesRad: [0.8, -1.9],
+        normalization: { kind: "unit-current", valueA: 1 },
+        evanescentModes: [{ p: 1, q: -1 }],
+      },
     ]) {
       const expected = direct.computeScanImpedance(request);
       const actual = await worker.computeScanImpedance(request);
       assert.deepEqual(actual, expected);
       assert.equal(Object.isFrozen(actual.diagnostics), true);
+      assert.equal(Object.isFrozen(actual.floquet), true);
+      assert.equal(Object.isFrozen(actual.floquet.modes[0]), true);
     }
     assert.equal(worker.state, direct.state);
     assert.ok(operations.includes("setLattice"));

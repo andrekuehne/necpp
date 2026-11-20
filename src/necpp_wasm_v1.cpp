@@ -165,6 +165,27 @@ struct embedded_buffers : far_field_buffers {
   }
 };
 
+struct floquet_buffers {
+  std::vector<int32_t> p;
+  std::vector<int32_t> q;
+  std::vector<int32_t> side;
+  std::vector<int32_t> propagating;
+  std::vector<double> kt_x;
+  std::vector<double> kt_y;
+  split_complex_buffer kz;
+  split_complex_buffer te;
+  split_complex_buffer tm;
+  std::vector<double> mode_power_w;
+  std::vector<double> input_power_w;
+  std::vector<double> propagating_power_w;
+  std::vector<double> loss_w;
+  size_t port_count = 0;
+  int32_t normalization = NECPP_WASM_V1_UNIT_VOLTAGE;
+  bool available = false;
+
+  void clear() { *this = floquet_buffers(); }
+};
+
 struct far_field_snapshot_buffers {
   nec_far_field_snapshot value;
   bool available = false;
@@ -282,6 +303,7 @@ struct necpp_wasm_v1_model {
   solution_buffers solution;
   far_field_buffers far_field;
   embedded_buffers embedded;
+  floquet_buffers floquet;
   far_field_snapshot_buffers field_snapshot;
   nec_ring::Stats ring_evaluation;
   current_distribution_buffers current;
@@ -428,6 +450,7 @@ void clear_calculated_results(necpp_wasm_v1_model& model)
   model.solution.clear();
   model.far_field.clear();
   model.embedded.clear();
+  model.floquet.clear();
   model.field_snapshot.clear();
   model.current.clear();
   model.packed.clear();
@@ -950,6 +973,36 @@ const std::vector<double>* result_buffer(
   case NECPP_WASM_V1_CURRENT_C_IMAG:
     return model->current.available ? &model->current.c_imag : nullptr;
   default:
+    break;
+  }
+  if (!model->floquet.available)
+    return nullptr;
+  switch (kind) {
+  case NECPP_WASM_V1_FLOQUET_KT_X:
+    return &model->floquet.kt_x;
+  case NECPP_WASM_V1_FLOQUET_KT_Y:
+    return &model->floquet.kt_y;
+  case NECPP_WASM_V1_FLOQUET_KZ_REAL:
+    return &model->floquet.kz.real;
+  case NECPP_WASM_V1_FLOQUET_KZ_IMAG:
+    return &model->floquet.kz.imag;
+  case NECPP_WASM_V1_FLOQUET_TE_REAL:
+    return &model->floquet.te.real;
+  case NECPP_WASM_V1_FLOQUET_TE_IMAG:
+    return &model->floquet.te.imag;
+  case NECPP_WASM_V1_FLOQUET_TM_REAL:
+    return &model->floquet.tm.real;
+  case NECPP_WASM_V1_FLOQUET_TM_IMAG:
+    return &model->floquet.tm.imag;
+  case NECPP_WASM_V1_FLOQUET_MODE_POWER_W:
+    return &model->floquet.mode_power_w;
+  case NECPP_WASM_V1_FLOQUET_INPUT_POWER_W:
+    return &model->floquet.input_power_w;
+  case NECPP_WASM_V1_FLOQUET_PROPAGATING_POWER_W:
+    return &model->floquet.propagating_power_w;
+  case NECPP_WASM_V1_FLOQUET_LOSS_W:
+    return &model->floquet.loss_w;
+  default:
     return nullptr;
   }
 }
@@ -957,7 +1010,21 @@ const std::vector<double>* result_buffer(
 const std::vector<int32_t>* int32_result_buffer(
   const necpp_wasm_v1_model* model, int32_t kind) noexcept
 {
-  if (model == nullptr || !model->current.available)
+  if (model == nullptr)
+    return nullptr;
+  switch (kind) {
+  case NECPP_WASM_V1_FLOQUET_P:
+    return model->floquet.available ? &model->floquet.p : nullptr;
+  case NECPP_WASM_V1_FLOQUET_Q:
+    return model->floquet.available ? &model->floquet.q : nullptr;
+  case NECPP_WASM_V1_FLOQUET_SIDE:
+    return model->floquet.available ? &model->floquet.side : nullptr;
+  case NECPP_WASM_V1_FLOQUET_PROPAGATING:
+    return model->floquet.available ? &model->floquet.propagating : nullptr;
+  default:
+    break;
+  }
+  if (!model->current.available)
     return nullptr;
   switch (kind) {
   case NECPP_WASM_V1_CURRENT_TAG:
@@ -1037,6 +1104,38 @@ int32_t invoke_deck(
   } catch (...) {
     return set_error(deck, failure_status, "Unknown native exception");
   }
+}
+
+void sync_floquet(necpp_wasm_v1_model& model, const nec_floquet_result& result)
+{
+  floquet_buffers next;
+  next.port_count = result.power.size();
+  next.normalization = result.normalization == nec_embedded_field_normalization::unit_current
+    ? NECPP_WASM_V1_UNIT_CURRENT : NECPP_WASM_V1_UNIT_VOLTAGE;
+  std::vector<nec_complex> kz, te, tm;
+  for (const nec_floquet_mode& mode : result.modes) {
+    next.p.push_back(mode.p);
+    next.q.push_back(mode.q);
+    next.side.push_back(mode.side == nec_floquet_side::below
+      ? NECPP_WASM_V1_FLOQUET_BELOW : NECPP_WASM_V1_FLOQUET_ABOVE);
+    next.propagating.push_back(mode.propagating ? 1 : 0);
+    next.kt_x.push_back(mode.kt_x_rad_per_m);
+    next.kt_y.push_back(mode.kt_y_rad_per_m);
+    kz.push_back(mode.kz_rad_per_m);
+    te.insert(te.end(), mode.te.begin(), mode.te.end());
+    tm.insert(tm.end(), mode.tm.begin(), mode.tm.end());
+    next.mode_power_w.insert(next.mode_power_w.end(), mode.power_w.begin(), mode.power_w.end());
+  }
+  next.kz.assign(kz);
+  next.te.assign(te);
+  next.tm.assign(tm);
+  for (const nec_floquet_port_power& power : result.power) {
+    next.input_power_w.push_back(power.input_w);
+    next.propagating_power_w.push_back(power.propagating_w);
+    next.loss_w.push_back(power.loss_w);
+  }
+  next.available = true;
+  model.floquet = std::move(next);
 }
 
 } // namespace
@@ -1514,6 +1613,60 @@ int32_t necpp_wasm_v1_compute_far_field(
   if (status != NECPP_WASM_V1_OK && native_succeeded)
     model->far_field.clear();
   return status;
+}
+
+int32_t necpp_wasm_v1_compute_floquet_amplitudes(
+  necpp_wasm_v1_model* model, int32_t normalization,
+  const int32_t* evanescent_p, const int32_t* evanescent_q,
+  size_t evanescent_count)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_prepared(model) || !model->native.periodic())
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "computeFloquetAmplitudes requires a prepared periodic model");
+  if (normalization != NECPP_WASM_V1_UNIT_VOLTAGE &&
+      normalization != NECPP_WASM_V1_UNIT_CURRENT)
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Invalid Floquet amplitude normalization");
+  if (evanescent_count > 0 && (evanescent_p == nullptr || evanescent_q == nullptr))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR,
+      "Evanescent Floquet mode indices are missing");
+  const int32_t matrix_status = ensure_impedance(model);
+  if (matrix_status != NECPP_WASM_V1_OK)
+    return matrix_status;
+  bool native_succeeded = false;
+  const int32_t status = invoke(model, NECPP_WASM_V1_SOLVER_ERROR, [&] {
+    std::vector<nec_floquet_mode_index> evanescent(evanescent_count);
+    for (size_t index = 0; index < evanescent_count; ++index)
+      evanescent[index] = {evanescent_p[index], evanescent_q[index]};
+    const nec_floquet_result& result = model->native.compute_floquet_amplitudes(
+      static_cast<nec_embedded_field_normalization>(normalization), evanescent);
+    native_succeeded = true;
+    sync_floquet(*model, result);
+  });
+  if (status != NECPP_WASM_V1_OK && native_succeeded) {
+    model->floquet.clear();
+  } else if (status != NECPP_WASM_V1_OK) {
+    reconcile_consumer_results_after_failure(*model);
+  }
+  return status;
+}
+
+size_t necpp_wasm_v1_floquet_mode_count(const necpp_wasm_v1_model* model)
+{
+  return model == nullptr || !model->floquet.available ? 0 : model->floquet.p.size();
+}
+
+size_t necpp_wasm_v1_floquet_port_count(const necpp_wasm_v1_model* model)
+{
+  return model == nullptr || !model->floquet.available ? 0 : model->floquet.port_count;
+}
+
+int32_t necpp_wasm_v1_floquet_normalization(const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->floquet.available
+    ? model->floquet.normalization : -1;
 }
 
 int32_t necpp_wasm_v1_compute_embedded_far_fields(

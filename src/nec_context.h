@@ -39,7 +39,9 @@
 class c_geometry;
 class nec_stateful_model;
 struct nec_far_field_evaluation_input;
-namespace nec_periodic { class periodic_green; struct wire_segment; class low_rank_update; }
+namespace nec_periodic {
+class periodic_green; struct wire_segment; class low_rank_update; struct floquet_mode; struct vec2;
+}
 
 enum excitation_return {
     FREQ_PRINT_NORMALIZATION = 0,
@@ -156,6 +158,18 @@ public:
   /*! Periodic mode: whether the prepared scan state is on or near a Wood
    * anomaly, a Floquet mode split out of the kernel (|kz| < 1e-3 k). */
   bool stateful_periodic_near_cutoff() const;
+  /*! Periodic mode: the Floquet modes of the prepared scan state with
+   * kt^2 <= k^2 (propagating, kz >= 0), then the modes of `evanescent`
+   * (indices along the given lattice vectors) that are not, with Im kz < 0.
+   * In NEC's wavelength units (k = 2 pi). */
+  std::vector<nec_periodic::floquet_mode> stateful_periodic_floquet_modes(
+    const std::vector<std::pair<long, long>>& evanescent) const;
+  /*! Periodic mode: the TE (phi-hat) and TM (theta-hat) amplitude of one
+   * mode radiated by the latest solve above (or below) the cell, in
+   * square-root watts, power-normalized: a propagating mode carries
+   * (|te|^2 + |tm|^2) / 2 watts per cell. Phase referred to the origin. */
+  std::pair<nec_complex, nec_complex> stateful_periodic_floquet_amplitudes(
+    const nec_periodic::floquet_mode& mode, bool above) const;
 
   /*! Result ownership helpers for the stateful layer. */
   void stateful_clear_results()  { m_results.clear(); }
@@ -1011,6 +1025,11 @@ private:
   periodic_state m_periodic;
   // Built for the prepared frequency; null outside periodic mode.
   std::shared_ptr<const nec_periodic::periodic_green> m_periodic_green;
+  // The radiation vector N = int J(r') exp(j (kt, kz) . r') dr' of the
+  // unit-cell current of the latest solve, with its ground image over
+  // perfect ground, in wavelength units and native current coefficients
+  // (amperes per wavelength).
+  std::array<nec_complex, 3> periodic_radiation_vector(nec_periodic::vec2 kt, nec_complex kz) const;
   // The singular parts of the Floquet modes split out of m_periodic_green
   // (near cut-off), solved by a low-rank update; null when none is split.
   std::shared_ptr<nec_periodic::low_rank_update> m_periodic_low_rank;

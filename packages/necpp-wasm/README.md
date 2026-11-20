@@ -893,6 +893,61 @@ The periodic model also runs in a worker of its own:
 methods, asynchronous, plus `terminate()` and `subscribeProgress()`. The
 lattice presets and `scanPhasesForDirection` are exported there too.
 
+### Floquet modes and power
+
+Above and below the array the field is a sum of **Floquet modes**: plane
+waves with transverse wavevector `kt = kt0 + p b1 + q b2`, where `b1`, `b2`
+are the reciprocal vectors of the lattice vectors as given. Every scan result
+carries, per port, the amplitudes of all propagating modes and of any
+evanescent modes you ask for:
+
+```ts
+import { createNecPeriodicModel, rectangularLattice, terminatedFloquetAmplitudes } from "@necpp-engine/wasm";
+
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 21, start: [-0.24, 0, 0], end: [0.24, 0, 0], radiusM: 0.001 });
+cell.completeGeometry();
+cell.definePorts([{ tag: 1, segment: 11 }]);
+cell.setLattice(rectangularLattice({ spacingXM: 0.7, spacingYM: 0.5 }));
+
+const scan = cell.computeScanImpedance({
+  frequencyMHz: 300,
+  scanDirection: { thetaDeg: 45, phiDeg: 0 },
+  evanescentModes: [{ p: 1, q: 0 }],
+});
+for (const mode of scan.floquet.modes) {
+  // At 45 degrees mode (-1, 0) is a grating lobe.
+  console.log(mode.p, mode.q, mode.side, mode.propagating, mode.powerW[0]);
+}
+const [budget] = scan.floquet.powerBudget;
+console.log(budget?.inputW, budget?.propagatingW, budget?.lossW);
+
+// Every port terminated in 50 ohm, one driven with 1 W available power.
+const terminated = terminatedFloquetAmplitudes(scan, { generatorImpedanceOhm: 50 });
+console.log(terminated.modes.map((mode) => mode.powerW[0]));
+cell.dispose();
+```
+
+- `te` and `tm` are the components along phi-hat and theta-hat of the mode
+  direction, in square-root watts: a propagating mode carries
+  `(|te|^2 + |tm|^2) / 2` watts per cell. Their phase is referred to the
+  origin, like the far fields of a finite model, so the (0, 0) mode above the
+  cell is the **scan element pattern** in the scan direction:
+  `R exp(j k R) E_theta = j sqrt(eta A cos(theta)) tm / wavelength`
+  (likewise `E_phi` and `te`), A the cell area.
+- `normalization` (default unit voltage with the other ports shorted, or
+  `{ kind: "unit-current", valueA: 1 }` with them open) is that of embedded
+  far fields. `powerBudget` checks each port's drive: the input power returns
+  as propagating Floquet power plus the loss in the loads, to the
+  discretization error of the wires (about 1e-3 at 21 segments per
+  half-wave, falling with the square of the segment length).
+- Over perfect ground only modes above the cell exist.
+- `terminatedFloquetAmplitudes(result, { generatorImpedanceOhm })` terminates
+  every port in the same generator impedance (ohms, or `[resistance,
+  reactance]`) and drives one port at a time with 1 W of available power,
+  without a new solve; `powerW` is then the fraction of the available power
+  in each mode.
+
 ### Conventions and limits
 
 - Scan impedance is not the active impedance of any finite array: it belongs

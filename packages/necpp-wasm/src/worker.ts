@@ -48,6 +48,7 @@ export {
   scanPhasesForDirection,
   squareLattice,
 } from "./periodic-lattice.js";
+export { terminatedFloquetAmplitudes } from "./periodic-floquet.js";
 
 export type {
   AngleSweep,
@@ -76,6 +77,12 @@ export type {
   FarFieldDiagnostics,
   FarFieldResult,
   FiniteGround,
+  FloquetAmplitudes,
+  FloquetMode,
+  FloquetModeIndex,
+  FloquetPortPower,
+  FloquetRequestOptions,
+  FloquetSide,
   FreeSpaceGround,
   LatticeVectorM,
   FullArrayDescription,
@@ -144,6 +151,9 @@ export type {
   SymmetrizerDiagnostics,
   SymmetrizerOptions,
   SymmetryCandidateDiagnostics,
+  TerminatedFloquetAmplitudes,
+  TerminatedFloquetMode,
+  TerminatedFloquetOptions,
   WireDefinition,
 } from "./types.js";
 

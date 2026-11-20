@@ -23,6 +23,10 @@ import type {
   EmbeddedFieldNormalization,
   FarFieldRequest,
   FarFieldResult,
+  FloquetAmplitudes,
+  FloquetMode,
+  FloquetModeIndex,
+  FloquetPortPower,
   GeometryCompletionResult,
   GroundModel,
   ImpedanceResult,
@@ -48,7 +52,7 @@ import type {
 import type { NecWasmModule } from "./wasm-internal.js";
 
 /** Operations of the periodic model that reach the native model directly. */
-type PeriodicOperation = "setLattice" | "setScanPhases";
+type PeriodicOperation = "setLattice" | "setScanPhases" | "computeScanImpedance";
 
 /**
  * @internal Keys of the periodic entry points on `WasmNecModel`. They are not
@@ -58,6 +62,13 @@ type PeriodicOperation = "setLattice" | "setScanPhases";
 export const setLatticeEntry: unique symbol = Symbol("necpp.setLattice");
 export const setScanPhasesEntry: unique symbol = Symbol("necpp.setScanPhases");
 export const periodicDiagnosticsEntry: unique symbol = Symbol("necpp.periodicDiagnostics");
+export const floquetAmplitudesEntry: unique symbol = Symbol("necpp.floquetAmplitudes");
+
+/** @internal A validated Floquet request: the native normalization and the evanescent modes. */
+export interface NativeFloquetRequest {
+  readonly normalization: 0 | 1;
+  readonly evanescentModes: readonly FloquetModeIndex[];
+}
 
 const POINT_STATUS: Readonly<Record<number, PeriodicPointStatus>> = { 0: "ok", 1: "near-cutoff" };
 
@@ -86,6 +97,10 @@ const INT32_BUFFER = {
   currentEndTag: 8,
   currentEndSegment: 9,
   currentEndEnd: 10,
+  floquetP: 11,
+  floquetQ: 12,
+  floquetSide: 13,
+  floquetPropagating: 14,
 } as const;
 
 const PACKED_BUFFER = {
@@ -144,6 +159,18 @@ const BUFFER = {
   currentBImag: 47,
   currentCReal: 48,
   currentCImag: 49,
+  floquetKtX: 50,
+  floquetKtY: 51,
+  floquetKzReal: 52,
+  floquetKzImag: 53,
+  floquetTeReal: 54,
+  floquetTeImag: 55,
+  floquetTmReal: 56,
+  floquetTmImag: 57,
+  floquetModePowerW: 58,
+  floquetInputPowerW: 59,
+  floquetPropagatingPowerW: 60,
+  floquetLossW: 61,
 } as const;
 
 export type FarFieldSnapshotCapability =
@@ -225,6 +252,23 @@ export function requireRecord(
     inputError(`${name} must be an object`, { name });
   }
   return value as Readonly<Record<string, unknown>>;
+}
+
+/** The normalization of a native code: 0 unit voltage, 1 unit current. */
+export function embeddedNormalization(code: 0 | 1): EmbeddedFieldNormalization {
+  return code === 0
+    ? Object.freeze({ kind: "unit-voltage", valueV: 1 } as const)
+    : Object.freeze({ kind: "unit-current", valueA: 1 } as const);
+}
+
+/** The native normalization of an embedded-field or Floquet request: 0 unit voltage, 1 unit current. */
+export function nativeNormalization(value: unknown, name: string): 0 | 1 {
+  const record = requireRecord(value, name);
+  return record.kind === "unit-voltage" && record.valueV === 1
+    ? 0
+    : record.kind === "unit-current" && record.valueA === 1
+      ? 1
+      : inputError(`${name} must request exactly one volt or one ampere`, { name });
 }
 
 function validatePoint(value: unknown, name: string): readonly [number, number, number] {
@@ -677,7 +721,7 @@ export class WasmNecModel implements NecModel {
     });
   }
 
-  #readResult<T>(operation: ModelOperation, read: () => T): T {
+  #readResult<T>(operation: ModelOperation | PeriodicOperation, read: () => T): T {
     try {
       return read();
     } catch (cause) {
@@ -1469,13 +1513,7 @@ export class WasmNecModel implements NecModel {
     const available = typeof this.#module._necpp_wasm_v1_compute_embedded_far_fields_ring === "function"
       && typeof this.#module._necpp_wasm_v1_ring_diagnostic === "function";
     const compute = ring && available ? this.#module._necpp_wasm_v1_compute_embedded_far_fields_ring! : this.#module._necpp_wasm_v1_compute_embedded_far_fields;
-    const record = requireRecord(normalization, "normalization");
-    const nativeNormalization = record.kind === "unit-voltage"
-      && record.valueV === 1
-      ? 0
-      : record.kind === "unit-current" && record.valueA === 1
-        ? 1
-        : inputError("normalization must request exactly one volt or one ampere");
+    const normalizationCode = nativeNormalization(normalization, "normalization");
     this.#invokeStatus(
       "computeEmbeddedFarFields",
       () => compute(
@@ -1487,7 +1525,7 @@ export class WasmNecModel implements NecModel {
         grid.phiStartDeg,
         grid.phiCount,
         grid.phiStepDeg,
-        nativeNormalization,
+        normalizationCode,
       ),
     );
     return this.#readResult("computeEmbeddedFarFields", () => {
@@ -1506,17 +1544,14 @@ export class WasmNecModel implements NecModel {
         || phiCount !== grid.phiCount
         || portCount !== this.#ports.length
         || samplesPerPort !== grid.sampleCount
-        || returnedNormalization !== nativeNormalization
+        || returnedNormalization !== normalizationCode
       ) {
         throw new NecRuntimeError(
           "The native embedded far-field result has invalid metadata",
         );
       }
       const totalSamples = samplesPerPort * portCount;
-      const resultNormalization: EmbeddedFieldNormalization =
-        nativeNormalization === 0
-          ? Object.freeze({ kind: "unit-voltage", valueV: 1 })
-          : Object.freeze({ kind: "unit-current", valueA: 1 });
+      const resultNormalization = embeddedNormalization(normalizationCode);
       return {
         ...this.#evaluation(ring,available,grid,this.#ports.length),
         radiusM: this.#module._necpp_wasm_v1_embedded_radius_m(this.#handle),
@@ -1805,6 +1840,86 @@ export class WasmNecModel implements NecModel {
       throw new NecRuntimeError("The native point status is invalid");
     }
     return Object.freeze({ estimatedError, status });
+  }
+
+  /**
+   * @internal Periodic entry point: the Floquet amplitudes of every port's
+   * basis solve at the prepared scan state. Arguments arrive validated.
+   */
+  [floquetAmplitudesEntry](request: NativeFloquetRequest): FloquetAmplitudes {
+    this.#assertNotDisposed("computeScanImpedance");
+    const p = Int32Array.from(request.evanescentModes, (mode) => mode.p);
+    const q = Int32Array.from(request.evanescentModes, (mode) => mode.q);
+    const compute = (pPointer: number, qPointer: number): number =>
+      this.#module._necpp_wasm_v1_compute_floquet_amplitudes(
+        this.#handle,
+        request.normalization,
+        pPointer,
+        qPointer,
+        p.length,
+      );
+    this.#invokeStatus(
+      "computeScanImpedance",
+      () => p.length === 0 ? compute(0, 0) : this.#withInt32Pair(p, q, compute),
+    );
+    return this.#readResult("computeScanImpedance", () => {
+      const modeCount = this.#module._necpp_wasm_v1_floquet_mode_count(this.#handle);
+      const portCount = this.#module._necpp_wasm_v1_floquet_port_count(this.#handle);
+      if (
+        !Number.isSafeInteger(modeCount)
+        || modeCount < 0
+        || portCount !== this.#ports.length
+        || this.#module._necpp_wasm_v1_floquet_normalization(this.#handle) !== request.normalization
+      ) {
+        throw new NecRuntimeError("The native Floquet result has invalid metadata");
+      }
+      const modeP = this.#copyInt32Buffer(INT32_BUFFER.floquetP, modeCount);
+      const modeQ = this.#copyInt32Buffer(INT32_BUFFER.floquetQ, modeCount);
+      const side = this.#copyInt32Buffer(INT32_BUFFER.floquetSide, modeCount);
+      const propagating = this.#copyInt32Buffer(INT32_BUFFER.floquetPropagating, modeCount);
+      const ktX = this.#copyBuffer(BUFFER.floquetKtX, modeCount);
+      const ktY = this.#copyBuffer(BUFFER.floquetKtY, modeCount);
+      const kzReal = this.#copyBuffer(BUFFER.floquetKzReal, modeCount);
+      const kzImag = this.#copyBuffer(BUFFER.floquetKzImag, modeCount);
+      const amplitudeCount = modeCount * portCount;
+      const teReal = this.#copyBuffer(BUFFER.floquetTeReal, amplitudeCount);
+      const teImag = this.#copyBuffer(BUFFER.floquetTeImag, amplitudeCount);
+      const tmReal = this.#copyBuffer(BUFFER.floquetTmReal, amplitudeCount);
+      const tmImag = this.#copyBuffer(BUFFER.floquetTmImag, amplitudeCount);
+      const modePower = this.#copyBuffer(BUFFER.floquetModePowerW, amplitudeCount);
+      const inputW = this.#copyBuffer(BUFFER.floquetInputPowerW, portCount);
+      const propagatingW = this.#copyBuffer(BUFFER.floquetPropagatingPowerW, portCount);
+      const lossW = this.#copyBuffer(BUFFER.floquetLossW, portCount);
+      const perPort = (values: Float64Array, mode: number): Float64Array =>
+        values.slice(mode * portCount, (mode + 1) * portCount);
+      const modes: FloquetMode[] = [];
+      for (let mode = 0; mode < modeCount; mode += 1) {
+        modes.push(Object.freeze({
+          p: modeP[mode]!,
+          q: modeQ[mode]!,
+          side: side[mode] === 1 ? "below" : "above",
+          propagating: propagating[mode] === 1,
+          ktRadPerM: Object.freeze([ktX[mode]!, ktY[mode]!] as const),
+          kzRadPerM: Object.freeze([kzReal[mode]!, kzImag[mode]!] as const),
+          te: Object.freeze({ real: perPort(teReal, mode), imag: perPort(teImag, mode) }),
+          tm: Object.freeze({ real: perPort(tmReal, mode), imag: perPort(tmImag, mode) }),
+          powerW: perPort(modePower, mode),
+        }));
+      }
+      const powerBudget: FloquetPortPower[] = [];
+      for (let port = 0; port < portCount; port += 1) {
+        powerBudget.push(Object.freeze({
+          inputW: inputW[port]!,
+          propagatingW: propagatingW[port]!,
+          lossW: lossW[port]!,
+        }));
+      }
+      return Object.freeze({
+        normalization: embeddedNormalization(request.normalization),
+        modes: Object.freeze(modes),
+        powerBudget: Object.freeze(powerBudget),
+      });
+    });
   }
 
   #assertNotDisposed(operation: PeriodicOperation): void {

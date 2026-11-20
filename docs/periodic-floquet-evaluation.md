@@ -192,6 +192,28 @@ Stage 2 so far:
   before, 130 ms and 67 ms after. Scan changes, frequency, load, ground and
   lattice changes in sequence match a new model to 1e-12. Sweeps run on a
   pool of worker periodic models that replay the cell's configuration.
+- issue #29: Floquet-mode amplitudes. Per port basis solve, the radiation
+  vector `N(k_pq)` of the cell current (with the ground image over perfect
+  ground) comes from closed-form segment integrals of `1, sin ks, cos ks`
+  against `exp(j k_pq . r)` with complex `kz`, which also replace the 16-point
+  Gauss rule of the split-mode moments (issue #27). Amplitudes are TE
+  (phi-hat) and TM (theta-hat) components of `E_pq`, power-normalized
+  (`P = |a|^2 / 2` per cell, peak phasors) and referred to the origin, so the
+  (0,0) amplitude above the cell is the scan element pattern. With the
+  thin-wire eta of the matrix (376.73 ohm), port input power equals the
+  propagating Floquet power plus load loss to 3.5e-3, 9.5e-4, 2.4e-4 and
+  4.7e-5 at 11, 21, 41 and 81 segments (broadside half-wave dipole): the
+  moment method's own power error, second order in the segment length, the
+  same at oblique scan, with a grating lobe, with loads, over ground and for
+  two-port cells. Against finite arrays of 11 x 11 to 27 x 27 half-wave
+  dipoles (0.6 x 0.5 wavelengths, 30 degrees in the E- and H-planes), the
+  embedded pattern of the centre element alone ripples around the periodic
+  value by 1 to 6 %, the edge waves of the finite array; driven with the scan
+  phases under a Gaussian taper (sigma 1.6 m, 15 x 15), the weighted mean of
+  the inner elements' patterns matches to 0.04 % (E-plane) and 0.37 %
+  (H-plane). Terminated amplitudes (every port in `Zg`, one driven with 1 W
+  available) derived from the raw amplitudes and the scan impedance match a
+  fresh solve with `Zg` as port loads to 1e-9.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section

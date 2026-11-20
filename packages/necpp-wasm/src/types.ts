@@ -598,11 +598,36 @@ export type ScanState =
     readonly scanPhasesRad?: never;
   };
 
+/**
+ * A Floquet mode: transverse wavevector `kt = kt0 + p b1 + q b2`, with `b1`,
+ * `b2` the reciprocal vectors of the lattice vectors as given
+ * (`a_i . b_j = 2 pi delta_ij`) and `kt0` the scan state's.
+ */
+export interface FloquetModeIndex {
+  readonly p: number;
+  readonly q: number;
+}
+
+/** What a scan result carries besides the scan impedance. */
+export interface FloquetRequestOptions {
+  /**
+   * Port drive the Floquet amplitudes are normalized to, as for embedded
+   * fields: unit voltage with the other ports shorted (the default), or unit
+   * current with them open.
+   */
+  readonly normalization?: EmbeddedFieldNormalization;
+  /**
+   * Evanescent Floquet modes to report besides the propagating ones, which
+   * are always reported. Indices of propagating modes are ignored.
+   */
+  readonly evanescentModes?: readonly FloquetModeIndex[];
+}
+
 /** One scan state at one frequency. */
-export type ScanImpedanceRequest = { readonly frequencyMHz: number } & ScanState;
+export type ScanImpedanceRequest = { readonly frequencyMHz: number } & ScanState & FloquetRequestOptions;
 
 /** Many scan states at one frequency. */
-export interface ScanSweepRequest {
+export interface ScanSweepRequest extends FloquetRequestOptions {
   readonly frequencyMHz: number;
   readonly scanStates: readonly ScanState[];
 }
@@ -664,6 +689,60 @@ export interface PeriodicPointDiagnostics {
 }
 
 /**
+ * One Floquet mode radiated by the unit cell, with one amplitude per port.
+ *
+ * Above the cell the field is the sum over modes of
+ * `E exp(-j (kt . r + kz z))`, below it `E exp(-j (kt . r - kz z))`, with
+ * `r` the absolute position: the phase is referred to the origin, as in the
+ * far fields of a finite model. `te` and `tm` are the components along
+ * phi-hat and theta-hat of the mode direction `(kt, +-kz)` (phi = 0 when
+ * `kt = 0`), so for the (0, 0) mode above the cell they are `E_phi` and
+ * `E_theta` of the scan element pattern. They are power-normalized: a
+ * propagating mode carries `(|te|^2 + |tm|^2) / 2` watts per cell; for an
+ * evanescent mode the same expression is its reactive power.
+ */
+/** The side of the unit cell a Floquet mode radiates to. */
+export type FloquetSide = "above" | "below";
+
+export interface FloquetMode extends FloquetModeIndex {
+  readonly side: FloquetSide;
+  readonly propagating: boolean;
+  /** Transverse wavevector in radians per metre. */
+  readonly ktRadPerM: readonly [number, number];
+  /** `sqrt(k^2 - |kt|^2)` as `[real, imag]`, with `imag <= 0`, in radians per metre. */
+  readonly kzRadPerM: readonly [number, number];
+  /** Per port, in square-root watts. */
+  readonly te: ComplexVector;
+  /** Per port, in square-root watts. */
+  readonly tm: ComplexVector;
+  /** Per port: watts per cell, zero for an evanescent mode. */
+  readonly powerW: Float64Array;
+}
+
+/**
+ * Power per cell when one port is driven as the normalization says: the
+ * input power returns as the power of the propagating Floquet modes plus
+ * the loss in the loads, to the discretization error of the wires.
+ */
+export interface FloquetPortPower {
+  readonly inputW: number;
+  readonly propagatingW: number;
+  readonly lossW: number;
+}
+
+/** The Floquet modes a unit cell radiates at one scan state. */
+export interface FloquetAmplitudes {
+  readonly normalization: EmbeddedFieldNormalization;
+  /**
+   * Every propagating mode above the cell, then below it (free space only),
+   * then the evanescent modes asked for, above and then below.
+   */
+  readonly modes: readonly FloquetMode[];
+  /** Per port. */
+  readonly powerBudget: readonly FloquetPortPower[];
+}
+
+/**
  * P x P scan impedance and scan admittance of the unit-cell ports at one
  * scan state. They are not symmetric in general; reciprocity holds as
  * `Z(psi) = Z(-psi)^T`.
@@ -675,6 +754,38 @@ export interface ScanImpedanceResult {
   /** The scan phases solved for, also when the request gave a scan direction. */
   readonly scanPhasesRad: ScanPhasesRad;
   readonly diagnostics: PeriodicPointDiagnostics;
+  readonly floquet: FloquetAmplitudes;
+}
+
+/**
+ * Floquet amplitudes with every port terminated in a generator impedance and
+ * one port driven with 1 W of available power (`terminatedFloquetAmplitudes`).
+ */
+export interface TerminatedFloquetMode
+  extends Omit<FloquetMode, "te" | "tm" | "powerW"> {
+  /** Per driven port, in square-root watts. */
+  readonly te: ComplexVector;
+  /** Per driven port, in square-root watts. */
+  readonly tm: ComplexVector;
+  /**
+   * Per driven port: watts per cell, so the fraction of the available power
+   * that leaves in this mode; zero for an evanescent mode.
+   */
+  readonly powerW: Float64Array;
+}
+
+export interface TerminatedFloquetAmplitudes {
+  /** `[resistance, reactance]` in ohms. */
+  readonly generatorImpedanceOhm: readonly [number, number];
+  readonly modes: readonly TerminatedFloquetMode[];
+}
+
+export interface TerminatedFloquetOptions {
+  /**
+   * Source impedance of every port's generator, in ohms: a resistance, or
+   * `[resistance, reactance]`. The resistance must be greater than zero.
+   */
+  readonly generatorImpedanceOhm: number | readonly [number, number];
 }
 
 /**

@@ -398,3 +398,60 @@ TEST_CASE("The split kernel is finite exactly on cut-off and continuous through 
     CHECK(gradient_error(after.smooth(r), value, k) < 1e-3);
   }
 }
+
+namespace {
+// int {1, sin ks, cos ks} exp(j kvec . (centre + s u)) ds by composite
+// Simpson's rule, independent of the closed form under test.
+nec_periodic::floquet_moments simpson_mode_moments(const nec_periodic::source_segment& segment, vec2 kt,
+                                                   complex_d kz, double k) {
+  const int intervals = 20000;
+  const double half = segment.length / 2, step = segment.length / intervals;
+  nec_periodic::floquet_moments sum{};
+  for(int i = 0; i <= intervals; ++i) {
+    const double s = -half + i * step;
+    const double weight = (i == 0 || i == intervals) ? 1.0 : (i % 2 == 1 ? 4.0 : 2.0);
+    const complex_d phase = std::exp(j * (kt.x * (segment.centre[0] + s * segment.direction[0]) +
+                                          kt.y * (segment.centre[1] + s * segment.direction[1]) +
+                                          kz * (segment.centre[2] + s * segment.direction[2])));
+    sum.constant += weight * phase;
+    sum.sine += weight * std::sin(k * s) * phase;
+    sum.cosine += weight * std::cos(k * s) * phase;
+  }
+  const double scale = step / 3;
+  return {sum.constant * scale, sum.sine * scale, sum.cosine * scale};
+}
+
+double moments_error(const nec_periodic::floquet_moments& value, const nec_periodic::floquet_moments& reference) {
+  const double scale = std::max({std::abs(reference.constant), std::abs(reference.sine), std::abs(reference.cosine)});
+  return std::max({std::abs(value.constant - reference.constant), std::abs(value.sine - reference.sine),
+                   std::abs(value.cosine - reference.cosine)}) / scale;
+}
+}  // namespace
+
+TEST_CASE("Modal segment integrals of propagating and evanescent Floquet modes equal a direct quadrature", "[periodic_green]") {
+  const double k = 2 * pi;
+  // A tilted segment of 0.3 wavelengths, the longest the periodic tolerance allows.
+  const double norm = std::sqrt(0.36 + 0.16 + 0.48 * 0.48);
+  const nec_periodic::source_segment tilted{{0.13, -0.27, 0.41}, {0.6 / norm, -0.4 / norm, 0.48 / norm}, 0.3};
+  const nec_periodic::source_segment along_x{{0.05, 0.1, 0.2}, {1.0, 0.0, 0.0}, 0.1};
+  struct mode_case {
+    const char* name;
+    const nec_periodic::source_segment& segment;
+    vec2 kt;
+    complex_d kz;
+  };
+  const mode_case cases[] = {
+    {"propagating upward", tilted, {2.1, -3.4}, std::sqrt(complex_d(k * k - 2.1 * 2.1 - 3.4 * 3.4))},
+    {"propagating downward", tilted, {2.1, -3.4}, -std::sqrt(complex_d(k * k - 2.1 * 2.1 - 3.4 * 3.4))},
+    {"evanescent", tilted, {9.7, 4.2}, complex_d(0.0, -std::sqrt(9.7 * 9.7 + 4.2 * 4.2 - k * k))},
+    {"evanescent, image side", tilted, {9.7, 4.2}, complex_d(0.0, std::sqrt(9.7 * 9.7 + 4.2 * 4.2 - k * k))},
+    // The phase rate along the segment equals k: one exponential of the sine
+    // and cosine terms is constant along it.
+    {"grazing along the segment", along_x, {k, 0.0}, 0.0},
+  };
+  for(const mode_case& c : cases) {
+    INFO(c.name);
+    const nec_periodic::floquet_moments value = nec_periodic::segment_mode_moments(c.segment, c.kt, c.kz, k);
+    REQUIRE(moments_error(value, simpson_mode_moments(c.segment, c.kt, c.kz, k)) < 1e-12);
+  }
+}

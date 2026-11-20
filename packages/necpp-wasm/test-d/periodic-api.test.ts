@@ -5,7 +5,12 @@ import {
   rectangularLattice,
   scanPhasesForDirection,
   squareLattice,
+  terminatedFloquetAmplitudes,
   type ComplexMatrix,
+  type ComplexVector,
+  type FloquetAmplitudes,
+  type FloquetMode,
+  type FloquetPortPower,
   type NecPeriodicModel,
   type PeriodicGround,
   type PeriodicLattice,
@@ -17,6 +22,7 @@ import {
   type ScanState,
   type ScanSweepChunk,
   type ScanSweepPoint,
+  type TerminatedFloquetAmplitudes,
 } from "../src/index.js";
 import {
   createNecPeriodicWorkerModel,
@@ -132,6 +138,45 @@ export async function periodicModelTypes(): Promise<void> {
   cell.completeGeometry({ symmetry: { kind: "reflection", planes: ["x=0"], tagIncrement: 10 } });
 
   cell.dispose();
+}
+
+export function periodicFloquetTypes(cell: NecPeriodicModel): void {
+  const result = cell.computeScanImpedance({
+    frequencyMHz: 300,
+    scanPhasesRad: [0, 0],
+    normalization: { kind: "unit-current", valueA: 1 },
+    evanescentModes: [{ p: 1, q: 0 }],
+  });
+  const floquet: FloquetAmplitudes = result.floquet;
+  const mode: FloquetMode | undefined = floquet.modes[0];
+  const side: "above" | "below" | undefined = mode?.side;
+  const te: ComplexVector | undefined = mode?.te;
+  const kz: readonly [number, number] | undefined = mode?.kzRadPerM;
+  const budget: FloquetPortPower | undefined = floquet.powerBudget[0];
+  void side;
+  void te;
+  void kz;
+  void budget;
+  // @ts-expect-error amplitudes are read-only.
+  floquet.modes = [];
+  // @ts-expect-error a mode index is a pair of integers p, q.
+  cell.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: [0, 0], evanescentModes: [[1, 0]] });
+  // @ts-expect-error the normalization is the embedded-field one.
+  cell.computeScanImpedance({ frequencyMHz: 300, scanPhasesRad: [0, 0], normalization: "unit-current" });
+
+  const terminated: TerminatedFloquetAmplitudes = terminatedFloquetAmplitudes(result, {
+    generatorImpedanceOhm: [50, 20],
+  });
+  terminatedFloquetAmplitudes(result, { generatorImpedanceOhm: 50 });
+  const generator: readonly [number, number] = terminated.generatorImpedanceOhm;
+  void generator;
+  // @ts-expect-error the generator impedance is required.
+  terminatedFloquetAmplitudes(result, {});
+  cell.sweepScanImpedance({
+    frequencyMHz: 300,
+    scanStates: [{ scanPhasesRad: [0, 0] }],
+    normalization: { kind: "unit-voltage", valueV: 1 },
+  });
 }
 
 export async function periodicSweepTypes(cell: NecPeriodicModel): Promise<void> {

@@ -103,6 +103,8 @@ public:
                  double near_cutoff_ratio = near_cutoff);
   double splitting() const { return splitting_; }
   const lattice_2d& lattice() const { return lattice_; }
+  complex_d wavenumber() const { return k_; }
+  vec2 scan_wavevector() const { return kt0_; }
   // G_p minus the free-space term of the origin cell, exp(-jkR)/(4 pi R) with
   // R = |r|, and minus the singular parts of the split modes. Finite
   // everywhere except at other lattice points.
@@ -188,6 +190,12 @@ struct floquet_moments {
   complex_d constant, sine, cosine;
 };
 floquet_moments segment_floquet_moments(const source_segment& segment, vec2 kt, double k);
+// The same integrals against a full Floquet-mode phase:
+//   int {1, sin(ks), cos(ks)} exp(j (kt, kz) . (centre + s u)) ds,
+// with kz complex (imaginary for an evanescent mode). They give the mode
+// amplitudes a segment's current radiates. Closed form, so exact for any
+// phase rate.
+floquet_moments segment_mode_moments(const source_segment& segment, vec2 kt, complex_d kz, double k);
 
 // A Green's function kernel G(r), r = observation minus source point, with
 // G including the 1/(4 pi) of exp(-jkR)/(4 pi R).

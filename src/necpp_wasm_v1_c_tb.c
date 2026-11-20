@@ -189,11 +189,35 @@ int necpp_wasm_v1_run_c_periodic_contract_test(void)
     model, 1.0, 0.0, 1, 0.0, 0.0, 1, 0.0,
     NECPP_WASM_V1_UNIT_VOLTAGE) != NECPP_WASM_V1_OK);
 
+  /* Floquet-mode amplitudes: the propagating modes above and below. */
+  CHECK(necpp_wasm_v1_compute_floquet_amplitudes(NULL,
+    NECPP_WASM_V1_UNIT_VOLTAGE, NULL, NULL, 0) == NECPP_WASM_V1_RUNTIME_ERROR);
+  CHECK(necpp_wasm_v1_compute_floquet_amplitudes(model, 7, NULL, NULL, 0) ==
+    NECPP_WASM_V1_INPUT_ERROR);
+  CHECK(necpp_wasm_v1_compute_floquet_amplitudes(model,
+    NECPP_WASM_V1_UNIT_VOLTAGE, NULL, NULL, 1) == NECPP_WASM_V1_INPUT_ERROR);
+  CHECK(necpp_wasm_v1_compute_floquet_amplitudes(model,
+    NECPP_WASM_V1_UNIT_CURRENT, NULL, NULL, 0) == NECPP_WASM_V1_OK);
+  CHECK(necpp_wasm_v1_floquet_normalization(model) ==
+    NECPP_WASM_V1_UNIT_CURRENT);
+  CHECK(necpp_wasm_v1_floquet_port_count(model) == 1);
+  CHECK(necpp_wasm_v1_floquet_mode_count(model) == 2);
+  CHECK(necpp_wasm_v1_result_buffer_length(
+    model, NECPP_WASM_V1_FLOQUET_TE_REAL) == 2);
+  CHECK(necpp_wasm_v1_int32_result_buffer_length(
+    model, NECPP_WASM_V1_FLOQUET_SIDE) == 2);
+  CHECK(necpp_wasm_v1_result_buffer_length(
+    model, NECPP_WASM_V1_FLOQUET_LOSS_W) == 1);
+
   /* A scan change invalidates the factorization and its results. */
   CHECK(necpp_wasm_v1_set_scan_phases(model, 1.0, 0) == NECPP_WASM_V1_OK);
   CHECK(necpp_wasm_v1_model_state(model) ==
     NECPP_WASM_V1_STATE_GEOMETRY_COMPLETE);
   CHECK(necpp_wasm_v1_impedance_order(model) == 0);
+  CHECK(necpp_wasm_v1_floquet_mode_count(model) == 0);
+  CHECK(necpp_wasm_v1_floquet_normalization(model) == -1);
+  CHECK(necpp_wasm_v1_compute_floquet_amplitudes(model,
+    NECPP_WASM_V1_UNIT_VOLTAGE, NULL, NULL, 0) == NECPP_WASM_V1_STATE_ERROR);
   CHECK(necpp_wasm_v1_clear_lattice(model) == NECPP_WASM_V1_OK);
   CHECK(necpp_wasm_v1_set_scan_phases(model, 0.5, 0) ==
     NECPP_WASM_V1_STATE_ERROR);
