@@ -4,16 +4,17 @@ import { finitePair, validScanDirection } from "./periodic-lattice.js";
 import { embeddedNormalization, inputError, positiveNumber, requireRecord } from "./model.js";
 import type {
   FloquetRequestOptions,
+  LayeredStacks,
   LoadDefinition,
   NecPeriodicWorkerModel,
   PeriodicGround,
   PeriodicLattice,
   PortDefinition,
+  ScanState,
   ScanSweepChunk,
   ScanSweepOptions,
   ScanSweepPoint,
   ScanSweepRequest,
-  ScanState,
   WireDefinition,
 } from "./types.js";
 
@@ -28,7 +29,8 @@ export type PeriodicCellCall =
   | { readonly method: "addLoad"; readonly argument: LoadDefinition }
   | { readonly method: "clearLoads" }
   | { readonly method: "setGround"; readonly argument: PeriodicGround }
-  | { readonly method: "setLattice"; readonly argument: PeriodicLattice };
+  | { readonly method: "setLattice"; readonly argument: PeriodicLattice }
+  | { readonly method: "setLayeredStacks"; readonly argument: LayeredStacks };
 
 /**
  * A deep copy of a configuration call, so that a caller who reuses and
@@ -54,6 +56,8 @@ function replay(worker: NecPeriodicWorkerModel, call: PeriodicCellCall): Promise
     return worker.setGround(call.argument);
   case "setLattice":
     return worker.setLattice(call.argument);
+  case "setLayeredStacks":
+    return worker.setLayeredStacks(call.argument);
   default: {
     const unexpected: never = call;
     throw new NecInputError(`Unknown unit-cell call ${String(unexpected)}`);

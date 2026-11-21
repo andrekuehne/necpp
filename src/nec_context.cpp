@@ -407,6 +407,7 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
   // The fill works in wavelengths (k = 2 pi); scale the lattice the same way
   // as c_geometry::frequency_scale scales the wires.
   m_periodic_green.reset();
+  m_prepared_stack.reset();
   m_periodic_low_rank.reset();
   m_periodic_close_images.clear();
   m_periodic_estimated_error = 0;
@@ -453,6 +454,7 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
       throw nec_geometry_exception(reason);
     }
     m_periodic_green = green;
+    m_periodic_estimated_error += prepare_periodic_stack(lattice, scan_wavevector, per_metre);
 
     // Every translation under which an image comes within the largest reach
     // of any segment; add_periodic_correction picks per segment pair.
@@ -553,6 +555,7 @@ void nec_context::stateful_set_periodic(
     m_periodic_fill.reset();
   m_periodic = {true, a1x_m, a1y_m, a2x_m, a2y_m, psi1_rad, psi2_rad};
   m_periodic_green.reset();
+  m_prepared_stack.reset();
   m_periodic_low_rank.reset();
 }
 
@@ -599,6 +602,7 @@ void nec_context::stateful_clear_periodic()
   m_periodic = {};
   m_periodic_fill.reset();
   m_periodic_green.reset();
+  m_prepared_stack.reset();
   m_periodic_low_rank.reset();
 }
 
@@ -851,7 +855,7 @@ void nec_context::periodic_low_rank_fill()
 {
   m_periodic_low_rank.reset();
   const std::vector<nec_periodic::floquet_mode>& modes = m_periodic_green->split_modes();
-  if (modes.empty())
+  if (modes.empty() && !m_prepared_stack)
     return;
   const int64_t n = m_geometry->n_segments;
   const nec_float k = two_pi();
@@ -860,6 +864,9 @@ void nec_context::periodic_low_rank_fill()
   const bool perfect = ground.type_perfect();
   auto update = std::make_shared<nec_periodic::low_rank_update>();
   for (const nec_periodic::floquet_mode& mode : modes) {
+    // With a layered stack, whose terms nearly cancel these near cut-off, a
+    // mode exactly at cut-off is evaluated next to it (stack_cutoff_kz).
+    const nec_complex kz = m_prepared_stack ? nec_periodic::stack_cutoff_kz(mode.kz, k) : mode.kz;
     const nec_float transverse = std::hypot(mode.kt.x, mode.kt.y);
     const nec_float tx = mode.kt.x / transverse, ty = mode.kt.y / transverse;
     std::vector<nec_complex> phase(static_cast<size_t>(n));
@@ -906,16 +913,33 @@ void nec_context::periodic_low_rank_fill()
              m_geometry->cx[entry] * m.cosine);
       }
       if (p.low_rank) {
-        update->add(std::move(u), std::move(v), -2.0 * area * mode.kz / (eta * k));
+        // With a layered stack, the stack's reflection of this mode joins
+        // its singular part as one term (periodic_stack_split_factor), so
+        // that their near-cancellation is exact rather than left to the
+        // low-rank solve.
+        const nec_complex factor = m_prepared_stack
+          ? periodic_stack_split_factor(mode, &p == &polarizations[0], p.source_factor) : 1.0;
+        if (factor == nec_complex(0.0, 0.0))
+          continue;
+        if (std::abs(factor) * k / std::abs(kz) > periodic_stack_low_rank_threshold || !m_prepared_stack) {
+          update->add(std::move(u), std::move(v), -2.0 * area * kz / (eta * k) / factor);
+          continue;
+        }
+        const nec_complex combined = -eta * k / (2.0 * area * kz) * factor;
+        for (int64_t i = 0; i < n; ++i)
+          for (int64_t basis = 0; basis < n; ++basis)
+            cm[basis + i * neq] += combined * u[size_t(i)] * v[size_t(basis)];
         continue;
       }
       // cmset's transposed fill: basis function x, observation i.
-      const nec_complex coefficient = -eta * mode.kz / (2.0 * area * k);
+      const nec_complex coefficient = -eta * kz / (2.0 * area * k);
       for (int64_t i = 0; i < n; ++i)
         for (int64_t basis = 0; basis < n; ++basis)
           cm[basis + i * neq] += coefficient * u[size_t(i)] * v[size_t(basis)];
     }
   }
+  if (m_prepared_stack)
+    periodic_stack_fill(*update);
   if (!update->empty())
     m_periodic_low_rank = update;
 }
@@ -974,14 +998,14 @@ std::vector<nec_periodic::floquet_mode> nec_context::stateful_periodic_floquet_m
 }
 
 std::array<nec_complex, 3> nec_context::periodic_radiation_vector(
-  nec_periodic::vec2 kt, nec_complex kz) const
+  nec_periodic::vec2 kt, nec_complex kz, nec_float reference_z) const
 {
   const nec_float k = two_pi();
   const bool perfect = ground.type_perfect();
   std::array<nec_complex, 3> radiation{};
   for (int64_t i = 0; i < m_geometry->n_segments; ++i) {
     const nec_periodic::source_segment segment{
-      {m_geometry->x[i], m_geometry->y[i], m_geometry->z[i]},
+      {m_geometry->x[i], m_geometry->y[i], m_geometry->z[i] - reference_z},
       {m_geometry->cab[i], m_geometry->sab[i], m_geometry->salp[i]},
       m_geometry->segment_length[i]};
     const nec_complex a(air[i], aii[i]), b(bir[i], bii[i]), c(cir[i], cii[i]);
@@ -994,44 +1018,16 @@ std::array<nec_complex, 3> nec_context::periodic_radiation_vector(
     if (!perfect)
       continue;
     // The ground image: the segment mirrored in z = 0 with the opposite
-    // current, (-ux, -uy, uz) at (x, y, -z). Its phase kz (-z) is that of
-    // the segment itself under -kz.
-    const nec_complex image = current(nec_periodic::segment_mode_moments(segment, kt, -kz, k));
+    // current, (-ux, -uy, uz) at (x, y, -z). Its phase kz (-z - h) is that
+    // of the segment raised to z + h under -kz.
+    nec_periodic::source_segment raised = segment;
+    raised.centre[2] = m_geometry->z[i] + reference_z;
+    const nec_complex image = current(nec_periodic::segment_mode_moments(raised, kt, -kz, k));
     radiation[0] -= segment.direction[0] * image;
     radiation[1] -= segment.direction[1] * image;
     radiation[2] += segment.direction[2] * image;
   }
   return radiation;
-}
-
-std::pair<nec_complex, nec_complex> nec_context::stateful_periodic_floquet_amplitudes(
-  const nec_periodic::floquet_mode& mode, bool above) const
-{
-  // At cut-off the mode carries no power: its field stays finite (the
-  // low-rank update solves it) while the normalization goes to zero.
-  if (mode.kz == nec_complex(0.0, 0.0))
-    return {};
-  const nec_float k = two_pi();
-  const nec_complex kz = above ? mode.kz : -mode.kz;
-  const std::array<nec_complex, 3> radiation = periodic_radiation_vector(mode.kt, kz);
-  const nec_float transverse = std::hypot(mode.kt.x, mode.kt.y);
-  const nec_float phi = transverse == 0.0 ? 0.0 : std::atan2(mode.kt.y, mode.kt.x);
-  const nec_float cos_phi = std::cos(phi), sin_phi = std::sin(phi);
-  // theta-hat of the direction (kt, kz) / k, complex for an evanescent mode.
-  const nec_complex cos_theta = kz / k;
-  const nec_float sin_theta = transverse / k;
-  const nec_complex radiation_te = -sin_phi * radiation[0] + cos_phi * radiation[1];
-  const nec_complex radiation_tm =
-    cos_theta * (cos_phi * radiation[0] + sin_phi * radiation[1]) - sin_theta * radiation[2];
-  // E = -(eta k / (2 A kz)) N_t, with N_t the part of N transverse to the
-  // mode direction, and the power per cell A |E|^2 |kz| / (2 eta k) =
-  // |a|^2 / 2. In wavelength units with native currents, E keeps its value
-  // and the area carries the wavelength into the power.
-  const nec_float eta = nec_periodic::nec_segment_field_impedance;
-  const nec_float area = m_periodic_green->lattice().cell_area();
-  const nec_complex factor = -(_wavelength / 2.0) * std::sqrt(eta * k / area) *
-    std::sqrt(std::abs(mode.kz)) / mode.kz;
-  return {factor * radiation_te, factor * radiation_tm};
 }
 
 void nec_context::solve_regular(complex_array& in_cm, int_array& in_ip, complex_array& b)

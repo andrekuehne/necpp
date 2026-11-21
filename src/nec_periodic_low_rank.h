@@ -30,8 +30,8 @@ public:
   static constexpr double rank_threshold = 1e-11;
 
   // Adds the column pair (u, v) with coefficient c = 1 / inverse_coefficient
-  // (inverse_coefficient = 0 exactly on cut-off). All columns have the
-  // matrix size.
+  // (inverse_coefficient = 0 exactly on cut-off), scaled to unit columns; a
+  // zero column adds nothing. All columns have the matrix size.
   void add(vector u, vector v, std::complex<double> inverse_coefficient);
   bool empty() const { return columns_.empty(); }
   // Once Zr is factored: solve_regular(b) overwrites b with Zr^-1 b.

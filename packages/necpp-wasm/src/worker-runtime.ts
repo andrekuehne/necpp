@@ -18,9 +18,10 @@ import type {
   FarFieldResult,
   FieldBackendDiagnostics,
   GroundModel,
-  LoadDefinition,
   IsolatedElementCharacterization,
   IsolatedElementRequest,
+  LayeredStacks,
+  LoadDefinition,
   NecModel,
   NecModelState,
   NecPeriodicModel,
@@ -335,6 +336,7 @@ async function invokeModel(
   case "characterizeIsolatedElement":
     return model.characterizeIsolatedElement(args[0] as IsolatedElementRequest);
   case "setLattice":
+  case "setLayeredStacks":
   case "computeScanImpedance":
     throw new NecStateError(
       method,
@@ -379,6 +381,9 @@ function invokePeriodicModel(
     return undefined;
   case "setLattice":
     model.setLattice(args[0] as PeriodicLattice);
+    return undefined;
+  case "setLayeredStacks":
+    model.setLayeredStacks(args[0] as LayeredStacks);
     return undefined;
   case "computeScanImpedance":
     return model.computeScanImpedance(args[0] as ScanImpedanceRequest);

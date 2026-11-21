@@ -262,6 +262,84 @@ Stage 2 so far:
   1.16j), which points to slow edge convergence rather than an error of
   the pattern; no test covers this case.
 
+- issue #32: layered radome above the array. `setLayeredStacks({ above:
+  { bottomZM, layers } })` with lossy dielectric layers
+  (`eps = eps_r (1 - j tan delta)`). A transmission-line model per mode and
+  polarization (`nec_periodic_stack`; admittance `kz / k` for TE, impedance
+  `kz / (eps k)` for TM, so nothing is infinite at cut-off) gives the
+  voltage reflection, transmission and absorbed power; it is tested natively
+  against the Fresnel half-space, Brewster's angle, the half-wave window,
+  the thin-sheet susceptance `(eps_r - 1) k t` of WAIM theory, lossless
+  energy conservation (also for evanescent modes) and reciprocity of the
+  transmission. In the fill each mode adds `c R_eff a b^T` per
+  polarization, `c = -eta k / (2 A kz)`, with `b` the modal integrals of the
+  basis functions (with the ground image), `a` the down-going wave at the
+  observation points (with its ground reflection), phases referred to the
+  stack's lower face h, and `R_eff = R / (1 - rho R exp(-2j kz h))` the
+  reflections between stack and perfect ground (`rho = -1` TE, `+1` TM on
+  theta-hat amplitudes, on which TM reflects as minus the voltage
+  reflection). Modes are kept down to the decay `exp(-18)` over twice the
+  gap: measured truncation error at most `0.03 exp(-decay)` for decays of 6
+  to 26 (gaps 0.02 to 0.2 wavelengths, free space and ground, eps_r 4 and
+  10). Above 20,000 modes (a gap of about 0.01 wavelengths in a half-
+  wavelength cell) the stack is refused with the gap and mode count; a wire
+  reaching the stack is refused. Large terms (near cut-off, near a
+  guided-wave pole) go to the low-rank update, with columns now scaled to
+  unit size. Near cut-off the stack's TE and TM terms nearly cancel the
+  kernel's split singular parts (grazing incidence on any dielectric reflects
+  as -1 in TE and +1 in TM), so for a split mode the two are joined into one
+  term `c (1 + R_eff sigma / sf) u v^T` plus the finite rest
+  `c R_eff (a b^T - sigma u v^T)`; left as two nearly parallel low-rank
+  columns, the pseudo-inverse dropped their difference and the scan
+  impedance fell back to the bare array's value at cut-off (-1053j against
+  -75j). A mode exactly on cut-off is evaluated at `|kz| = sqrt(eps) k`, the
+  nearest representable state. Floquet modes above the cell are the
+  transmitted waves, referred to the origin; below it (free space) they
+  include the reflection; `dielectricLossW` sums the absorbed power over all
+  modes, evanescent ones included. Verified at the package seam:
+  - a layer of eps_r 1 changes nothing (to 1e-12; it reflects exactly 0);
+  - a layer of loss tangent 1e12 acts as a ground plane at its lower face:
+    the scan impedance matches the mirrored cell over perfect ground by the
+    image route to 1e-5, independently checking signs and polarizations;
+  - thinning a layer (1e-2, 1e-3, 1e-4 m) leaves a tenth of the change each
+    time;
+  - power closes to 6.6e-4 to 9.6e-4 at 21 segments, the moment method's own
+    error without a stack, with 10 to 34 % of the input lost in the stack,
+    over ground and in free space, including a sheet 0.05 wavelengths from
+    the wires that absorbs mostly from evanescent modes;
+  - the stack's change of the scan impedance is reciprocal to 1.3e-4;
+  - the transmitted wave carries the slab's own phase where the (0,0) mode
+    crosses without reflection: the bare array's amplitudes times
+    `T exp(j kz d)`, with `T = -1` through a half-wave window at broadside
+    (TE and TM) and `T = exp(-j kz1 d)` for TM at the Brewster angle, to
+    1e-5; the scan element pattern swept with a stack equals the
+    transmitted (0,0) amplitude at its samples;
+  - through a Wood anomaly, bisected to floating-point resolution, the scan
+    impedance is continuous (both sides within 1e-7 to 1.3e-6, as without a
+    stack);
+  - against CST Studio Suite 2024 (frequency-domain unit cell, Floquet port,
+    second-order tetrahedra; `test/fixtures/fem-issue32`): 48 x 2 mm strips
+    25 mm over ground on 60 x 50 mm at 2.998 GHz, a 3 mm sheet of eps_r 4,
+    tan delta 0.02 at 40 mm, eight scan states to 60 degrees. The
+    transmitted (0,0) TE and TM fractions and the sheet loss agree to 3.3e-4
+    (CST's own power balance closes to 3e-4), and the sheet's change of the
+    impedance to 3.0 to 4.3 % (21 segments, wire radius w / 4). The absolute
+    impedances differ by about 5 ohm in both cases, the feed models (a 1 mm
+    face port against a segment source). The thin-wire result moves with
+    the segmentation once segments get short: at H-plane 60 degrees 218,
+    243, 258 and 270 ohm resistance at 11, 21, 31 and 41 uniform segments
+    (CST 246). Holding the feed segment at 2.4 mm and refining only the arms
+    does not converge either: the bare broadside resistance goes 107, 127,
+    138, 145 and 156 ohm for 5 to 30 segments per arm (CST 120), and the
+    sheet's change matches CST best at 10 per arm (4 to 5 %, against 10 to
+    30 % elsewhere). The same happens in an isolated finite dipole of the
+    same wire in free space, with no periodic code involved (71, 85, 98, 106
+    and 119 ohm for 5, 10, 20, 30 and 60 segments per arm; with a 0.1 mm
+    wire 69 to 85 ohm, settling slowly). It is NEC's thin-wire kernel below
+    about 3 radii per segment and its source model next to much shorter
+    segments, so the comparison uses uniform segments of 4.6 radii (21);
+    a feed-gap-matched model would need tapered segmentation.
+
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
 says so. Terms follow [`GLOSSARY.md`](../GLOSSARY.md); the layered-stack route
@@ -502,7 +580,8 @@ term agrees to about 1e-5, the accuracy of NEC's own Romberg integral
 
 ### Layered stacks (stage 3b)
 
-Decided in [ADR 0001](adr/0001-layered-stacks-in-matrix-fill.md). The wires
+Decided in [ADR 0001](adr/0001-layered-stacks-in-matrix-fill.md); the stack
+above the wires is implemented as issue #32 (see the status entry). The wires
 live in an air region. Above and below it, layered stacks that are uniform in
 the lattice plane (radome, substrate below the wires, finite ground) act on
 each Floquet mode `(p, q)` only through a TE and a TM reflection coefficient
@@ -572,8 +651,8 @@ point is the P x P scan admittance of the P unit-cell ports.
 - Wires only; no surface patches.
 - No conductor may touch its own periodic image, checked by image distance
   (see connected arrays).
-- Free space or perfect ground only; layered stacks and finite ground follow
-  in stage 3b.
+- Free space or perfect ground only, with a layered stack above the wires
+  (issue #32); stacks below the wires and finite ground follow in issue #33.
 - Geometry symmetry reduction disabled.
 - Networks and transmission lines: untested in this mode; exclude until
   checked.
@@ -791,8 +870,12 @@ Stage 1 has no effect on existing behaviour and can be merged on its own.
   against the observed kinks in the scan impedance; finite values exactly on
   a circle.
 - **Layered stacks:** an `eps_r = 1` layer changes nothing; thin-layer limit;
-  power closure including dielectric loss; a published wide-angle impedance
-  matching (WAIM) sheet case (Magill and Wheeler, from memory **[verify]**).
+  power closure including dielectric loss; a wide-angle impedance matching
+  (WAIM) sheet case. Magill and Wheeler (IEEE Trans. AP-14(1):49-53, 1966)
+  turned out to model aperture windows flush with a metal face, not
+  dipoles, and no dipole case with every dimension given could be verified,
+  so the reference is a full-wave FEM unit-cell simulation run for issue #32
+  (see the status entry).
 - **Finite ground:** against NEC's existing reflection-coefficient ground in
   the large-spacing limit.
 

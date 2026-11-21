@@ -33,6 +33,7 @@ import type {
   IsolatedElementCharacterization,
   IsolatedElementRequest,
   LatticeVectorM,
+  LayeredStacks,
   LoadDefinition,
   NecCurrentDistribution,
   NecModel,
@@ -52,7 +53,7 @@ import type {
 import type { NecWasmModule } from "./wasm-internal.js";
 
 /** Operations of the periodic model that reach the native model directly. */
-type PeriodicOperation = "setLattice" | "setScanPhases" | "computeScanImpedance";
+type PeriodicOperation = "setLattice" | "setScanPhases" | "setLayeredStacks" | "computeScanImpedance";
 
 /**
  * @internal Keys of the periodic entry points on `WasmNecModel`. They are not
@@ -61,6 +62,7 @@ type PeriodicOperation = "setLattice" | "setScanPhases" | "computeScanImpedance"
  */
 export const setLatticeEntry: unique symbol = Symbol("necpp.setLattice");
 export const setScanPhasesEntry: unique symbol = Symbol("necpp.setScanPhases");
+export const setLayeredStacksEntry: unique symbol = Symbol("necpp.setLayeredStacks");
 export const periodicDiagnosticsEntry: unique symbol = Symbol("necpp.periodicDiagnostics");
 export const floquetAmplitudesEntry: unique symbol = Symbol("necpp.floquetAmplitudes");
 
@@ -171,6 +173,7 @@ const BUFFER = {
   floquetInputPowerW: 59,
   floquetPropagatingPowerW: 60,
   floquetLossW: 61,
+  floquetDielectricLossW: 62,
 } as const;
 
 export type FarFieldSnapshotCapability =
@@ -1828,6 +1831,32 @@ export class WasmNecModel implements NecModel {
     ));
   }
 
+  /** @internal Periodic entry point; see `setLatticeEntry`. Arguments arrive validated. */
+  [setLayeredStacksEntry](stacks: LayeredStacks): void {
+    this.#assertNotDisposed("setLayeredStacks");
+    const above = stacks.above;
+    const layers = Float64Array.from((above?.layers ?? []).flatMap((layer) =>
+      [layer.thicknessM, layer.relativePermittivity, layer.lossTangent ?? 0]));
+    this.#invokeStatus("setLayeredStacks", () => {
+      if (layers.length === 0) {
+        return this.#module._necpp_wasm_v1_set_layered_stack_above(this.#handle, 0, 0, 0);
+      }
+      let pointer = 0;
+      try {
+        pointer = this.#allocate(layers.byteLength);
+        this.#module.HEAPF64.set(layers, pointer / FLOAT64_BYTES);
+        return this.#module._necpp_wasm_v1_set_layered_stack_above(
+          this.#handle,
+          above!.bottomZM,
+          pointer,
+          layers.length / 3,
+        );
+      } finally {
+        this.#free(pointer);
+      }
+    });
+  }
+
   /** @internal Periodic entry point: the diagnostics of the latest impedance result. */
   [periodicDiagnosticsEntry](): PeriodicPointDiagnostics {
     const estimatedError =
@@ -1839,7 +1868,16 @@ export class WasmNecModel implements NecModel {
     if (status === undefined) {
       throw new NecRuntimeError("The native point status is invalid");
     }
-    return Object.freeze({ estimatedError, status });
+    // A stack always leaves a gap above the wires; without one the gap is 0.
+    const gapM = this.#module._necpp_wasm_v1_impedance_stack_gap_m(this.#handle);
+    if (gapM === 0) {
+      return Object.freeze({ estimatedError, status });
+    }
+    const modeCount = this.#module._necpp_wasm_v1_impedance_stack_mode_count(this.#handle);
+    if (!Number.isSafeInteger(modeCount) || modeCount < 0 || !Number.isFinite(gapM) || gapM < 0) {
+      throw new NecRuntimeError("The native layered-stack diagnostics are invalid");
+    }
+    return Object.freeze({ estimatedError, status, layeredStack: Object.freeze({ gapM, modeCount }) });
   }
 
   /**
@@ -1890,6 +1928,7 @@ export class WasmNecModel implements NecModel {
       const inputW = this.#copyBuffer(BUFFER.floquetInputPowerW, portCount);
       const propagatingW = this.#copyBuffer(BUFFER.floquetPropagatingPowerW, portCount);
       const lossW = this.#copyBuffer(BUFFER.floquetLossW, portCount);
+      const dielectricLossW = this.#copyBuffer(BUFFER.floquetDielectricLossW, portCount);
       const perPort = (values: Float64Array, mode: number): Float64Array =>
         values.slice(mode * portCount, (mode + 1) * portCount);
       const modes: FloquetMode[] = [];
@@ -1912,6 +1951,7 @@ export class WasmNecModel implements NecModel {
           inputW: inputW[port]!,
           propagatingW: propagatingW[port]!,
           lossW: lossW[port]!,
+          dielectricLossW: dielectricLossW[port]!,
         }));
       }
       return Object.freeze({

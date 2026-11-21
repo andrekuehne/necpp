@@ -1,6 +1,8 @@
 #include "nec_periodic_low_rank.h"
 
 #include <Eigen/Dense>
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <utility>
 
@@ -9,7 +11,20 @@ namespace nec_periodic {
 void low_rank_update::add(vector u, vector v, std::complex<double> inverse_coefficient) {
   if(u.size() != v.size() || (!columns_.empty() && u.size() != columns_.front().u.size()))
     throw std::invalid_argument("Low-rank columns must have the matrix size");
-  columns_.push_back({std::move(u), std::move(v), {}, inverse_coefficient});
+  // Columns scaled to a largest entry of 1, so that the capacitance matrix
+  // is not graded by the columns' units and its pseudo-inverse drops only
+  // directions that are dependent: c u v^T = (c |u| |v|) (u / |u|) (v / |v|)^T.
+  double u_scale = 0, v_scale = 0;
+  for(size_t i = 0; i < u.size(); ++i) {
+    u_scale = std::max(u_scale, std::abs(u[i]));
+    v_scale = std::max(v_scale, std::abs(v[i]));
+  }
+  if(u_scale == 0 || v_scale == 0) return;  // a zero term
+  for(size_t i = 0; i < u.size(); ++i) {
+    u[i] /= u_scale;
+    v[i] /= v_scale;
+  }
+  columns_.push_back({std::move(u), std::move(v), {}, inverse_coefficient / (u_scale * v_scale)});
   capacitance_inverse_.clear();
 }
 

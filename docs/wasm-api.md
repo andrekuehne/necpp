@@ -678,18 +678,19 @@ the caller's requested policy.
 
 `createNecPeriodicModel(options?)` returns a `NecPeriodicModel`: the unit cell
 of an infinite planar array in free space or above a perfect ground plane at
-z=0. It shares the loading options, error taxonomy and lifecycle states of
+z=0, optionally under a layered stack (a radome). It shares the loading options, error taxonomy and lifecycle states of
 `NecModel`, with these methods:
 
 | Method | Inputs and units | Output | Failures beyond illegal state |
 |---|---|---|---|
 | `addWire`, `definePorts`, `addLoad`, `clearLoads`, `dispose` | As for `NecModel` | As for `NecModel` | As for `NecModel` |
 | `completeGeometry()` | None; no symmetry and no ground connection | `void` | As for `NecModel` |
-| `setGround(ground)` | `{ kind: "free-space" }` (the default) or `{ kind: "perfect" }` | `void`; invalidates prepared data | `NecGeometryError` for finite ground (until layered stacks arrive) and, over perfect ground, when a conductor touches, nearly touches or crosses the ground plane (see clearance below); refused here while a lattice is set, otherwise by `setLattice` |
+| `setGround(ground)` | `{ kind: "free-space" }` (the default) or `{ kind: "perfect" }` | `void`; invalidates prepared data | `NecGeometryError` for finite ground (until it arrives as a stack below the wires) and, over perfect ground, when a conductor touches, nearly touches or crosses the ground plane (see clearance below); refused here while a lattice is set, otherwise by `setLattice` |
 | `setLattice({ a1M, a2M })` | Two finite, non-parallel `[x, y]` vectors in m, in the xy-plane | `void`; resets the scan phases, invalidates prepared data | `NecInputError` for malformed or parallel vectors; `NecGeometryError` when a conductor touches or nearly touches a periodic image, or over perfect ground the ground plane (see clearance below) |
+| `setLayeredStacks({ above? })` | `above`: `{ bottomZM, layers }`, the stack's lower face in m and at least one layer `{ thicknessM, relativePermittivity, lossTangent? }` from there up (thickness > 0, `relativePermittivity` >= 1, `lossTangent` >= 0, default 0), air above; `{}` removes it | `void`; invalidates prepared data but keeps the scan-independent fill | `NecInputError` for malformed layers or a key other than `above`; `NecGeometryError` when a wire, radius included, reaches the stack's lower face; a gap too small for the tolerance is refused when solving (below) |
 | `computeScanImpedance({ frequencyMHz, scanPhasesRad })` | Positive MHz; finite `[psi1, psi2]` in radians per cell along `a1M`, `a2M` | P x P scan impedance and admittance, frequency, the scan phases and `diagnostics: { estimatedError, status }`; the model is `prepared` afterwards | `NecStateError` before `setLattice`; refusals of the accuracy policy below; otherwise as `prepare` and `computeImpedanceMatrix` |
 | `computeScanImpedance({ frequencyMHz, scanDirection })` | Positive MHz; `{ thetaDeg, phiDeg }`, finite, `thetaDeg` 0 to 90 | As above; `scanPhasesRad` reports the phases the direction maps to | As above; `NecInputError` for a direction outside visible space or with both or neither of `scanPhasesRad` and `scanDirection` |
-| `computeScanImpedance` Floquet options | `normalization`: an `EmbeddedFieldNormalization` (default unit voltage); `evanescentModes`: an array of integer `{ p, q }` | `floquet: { normalization, modes, powerBudget }`: per mode its indices, `side` (`"above"`, `"below"`), `propagating`, `ktRadPerM`, `kzRadPerM` (`[real, imag]`, `imag <= 0`) and per port `te`, `tm` (square-root watts) and `powerW`; per port `{ inputW, propagatingW, lossW }` | `NecInputError` for a malformed normalization or mode index |
+| `computeScanImpedance` Floquet options | `normalization`: an `EmbeddedFieldNormalization` (default unit voltage); `evanescentModes`: an array of integer `{ p, q }` | `floquet: { normalization, modes, powerBudget }`: per mode its indices, `side` (`"above"`, `"below"`), `propagating`, `ktRadPerM`, `kzRadPerM` (`[real, imag]`, `imag <= 0`) and per port `te`, `tm` (square-root watts) and `powerW`; per port `{ inputW, propagatingW, lossW, dielectricLossW }`; with a stack, `diagnostics.layeredStack: { gapM, modeCount }` | `NecInputError` for a malformed normalization or mode index |
 | `sweepScanImpedance({ frequencyMHz, scanStates }, { signal?, workers? }?)` | Positive MHz; an array of scan states, each `{ scanPhasesRad }` or `{ scanDirection }` as above; `workers` 1 through 8 or `"auto"` (default); an `AbortSignal` | `AsyncIterable` of chunks `{ points: [{ index, result }], completed, total }`, each with the scan states solved since the previous chunk, in completion order; `result` as from `computeScanImpedance`. The model's own state is unchanged | Thrown on the call: `NecStateError` before `setLattice` or after `dispose`, `NecInputError` for a malformed request or options. On iteration: `NecCancellationError` (`details.reason === "aborted"`) after the signal aborts; the first scan state's failure, as `computeScanImpedance` would raise it |
 | `computeScanElementPattern({ frequencyMHz, normalization?, grid?, refinement? }, { signal?, workers?, onProgress? }?)` | Positive MHz; `normalization` as for Floquet amplitudes; `grid`: `"auto"` (default) or `{ spacingUV?, points? }`, `spacingUV` in (0, 0.5], `points` an array of `{ u, v }` with `u^2 + v^2 <= 1 - 1e-8`; `refinement`: `false` or `{ tolerance?, maxRounds?, maxSamples? }` (positive; 0 through 8; 1 through 50,000); sweep options as for `sweepScanImpedance`; `onProgress({ completed, total, round })` after every chunk | A `ScanElementPattern`: `frequencyMHz`, `normalization`, `lattice`, `portCount`, `sides`, `spacingUV`, `woodCircles` (`{ p, q, centreUV }`, the horizon first), `samples` (`{ u, v, round, scanPhasesRad, woodCircles, above, below, diagnostics }`, `above`/`below` the solved (0, 0) `te`, `tm` per port) and `evaluate(direction, side?)` | Rejects: `NecStateError` before `setLattice` or after `dispose`; `NecInputError` for a malformed request or options, or a grid of more than 50,000 samples; otherwise as `sweepScanImpedance` |
 | `pattern.evaluate(direction, side?)` | `{ u, v }` with `u^2 + v^2 <= 1`, or `{ thetaDeg, phiDeg }` with `thetaDeg` 0 to 90; `side` `"above"` (default) or `"below"` (free space only) | `{ te, tm, interpolationError, sampled }`: the (0, 0) amplitudes per port in that direction (exactly the solved ones at a sample, `sampled: true`) and per port an estimate of the interpolation error of `(te, tm)` | `NecInputError` for a direction outside visible space, an unknown side, or `"below"` over ground |
@@ -747,6 +748,24 @@ power and the loss in the loads (`powerBudget`); they close against the
 propagating power to the wire discretization (second order in the segment
 length). The amplitudes need no extra factorization: one back-substitution
 per port.
+
+Layered stacks: a stack above the wires acts on each Floquet mode only through
+a TE and a TM reflection from a transmission-line model of its layers
+(admittance `kz / k` for TE, impedance `kz / (eps k)` for TM, `eps = eps_r (1 -
+j tan delta)`), added to the interaction matrix as one rank-2 term per mode
+built from the same segment integrals as the amplitudes (ADR 0001). Over
+perfect ground the reflections between ground and stack are summed in closed
+form. The terms decay like `exp(-2 |kz| g)` over the gap g between the highest
+point of any wire axis and the stack; modes are kept down to `exp(-18)`, whose
+truncation error was measured at most 0.03 of that, and a gap that would need
+more than 20,000 modes (about 0.01 wavelengths for a half-wavelength cell) is
+refused. Terms large near cut-off or near a guided-wave pole of the stack go
+to the low-rank update; for a mode near cut-off the stack's reflection joins
+the kernel's singular part as one term, since the two nearly cancel there.
+With a stack, the modes above the cell are the waves it transmits (still
+referred to the origin, valid above the stack), the modes below include its
+reflection, and `dielectricLossW` is the power absorbed in it, from
+propagating and evanescent modes, so the power budget closes with it.
 
 Scan sweeps: `sweepScanImpedance` solves the scan states on a pool of worker
 periodic models. Each worker gets the unit cell by replaying the
@@ -865,6 +884,11 @@ estimate is the sum of
   the spectral sum carries a term of size `1 / kz` there, which the solution
   cancels. Modes nearer than `1e-3 k` are split out and solved without it,
   so this term is at most `eps / 1e-3`.
+- with a layered stack, its truncation, `exp(-18)` (at least 30 times the
+  error measured for gaps of 0.02 to 0.2 wavelengths), and the rounding of
+  its terms of size `k / kz` near cut-off, `eps / (|kz| / k)`, where a mode
+  exactly on cut-off is evaluated at the nearest representable state
+  `|kz| = sqrt(eps) k`, so at most `sqrt(eps)`, about `1.5e-8`.
 
 At a Wood anomaly the spectral sum is singular. The singular part of each
 Floquet mode within `|kz| < 1e-3 k` of cut-off is split out of the kernel
@@ -898,26 +922,33 @@ reason, never solved with a looser one:
 |---|---|---|
 | Unit cell above about 320 square wavelengths | `NecGeometryError` | A work bound: the kernel stays accurate by widening its spectral sum, which would need more than 10000 Floquet modes per evaluation; model the array as a finite array |
 | Segments longer than about 0.3 wavelengths | `NecGeometryError` | The Gauss rule of the periodic correction |
+| A layered stack whose gap to the wires would need more than 20,000 Floquet modes | `NecGeometryError` | The stack's reflection terms decay only like `exp(-2 |kz| g)`; the message gives the gap and the mode count |
 
 Unsupported configurations are refused with a reason through the same error
 types as the finite model. The periodic model has no patch, network or
 transmission-line methods, and its `setGround` takes free space or perfect
 ground; the native model refuses, as `NECPP_WASM_V1_GEOMETRY_ERROR`, finite
-ground (until layered stacks arrive), conductors on or through a perfect
+ground (until it arrives as a stack below the wires), a wire entering a layered
+stack or a gap too small for the tolerance, conductors on or through a perfect
 ground plane, surface patches, networks and transmission lines (untested in
 periodic mode) and symmetric geometry. NaN appears only for a genuine
 failure.
 
 The native C ABI adds `necpp_wasm_v1_set_lattice`,
 `necpp_wasm_v1_clear_lattice`, `necpp_wasm_v1_set_scan_phases`,
-`necpp_wasm_v1_impedance_estimated_error` and
+`necpp_wasm_v1_set_layered_stack_above` (the lower face in m, then the
+layers as triples of doubles: thickness in m, relative permittivity, loss
+tangent, and their count; 0 removes the stack),
+`necpp_wasm_v1_impedance_estimated_error`,
 `necpp_wasm_v1_impedance_point_status` (`NECPP_WASM_V1_POINT_STATUS_OK`),
+`necpp_wasm_v1_impedance_stack_gap_m` and
+`necpp_wasm_v1_impedance_stack_mode_count` (0 without a stack),
 and for the Floquet amplitudes `necpp_wasm_v1_compute_floquet_amplitudes`
 (normalization, then the evanescent indices as two `int32` arrays and their
 count), `necpp_wasm_v1_floquet_mode_count`, `necpp_wasm_v1_floquet_port_count`
 and `necpp_wasm_v1_floquet_normalization`, with the result buffers
 `NECPP_WASM_V1_FLOQUET_*` (doubles: kt, kz per mode, mode-major te, tm and
-mode power, per-port input, propagating and loss power; `int32`: p, q, side,
+mode power, per-port input, propagating, loss and dielectric loss power; `int32`: p, q, side,
 propagating). They are additive v1 symbols; `necpp_wasm_v1_set_lattice` returns the
 geometry status for a clearance refusal. While a lattice is set, the native
 model also refuses far fields, embedded far fields and isolated-element

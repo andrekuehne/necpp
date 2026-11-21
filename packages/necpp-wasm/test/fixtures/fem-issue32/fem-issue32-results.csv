@@ -1,0 +1,42 @@
+# tool: CST Studio Suite 2024 (2024.3, 2024-02-23), frequency domain solver, tetrahedral mesh, second-order elements, direct linear solver (double precision), discrete sample at 2.99792458 GHz only; unit cell boundaries (rectangular lattice 60 x 50 mm) with scan angle, PEC (electric) boundary at z = 0, Floquet port at z = 100 mm with 18 modes considered (TE/TM (0,0), (+-1,0), (0,+-1), (+-1,+-1)), sort +beta/pw
+# feed: discrete face port (CST DiscreteFacePort, type S-parameter, 50 ohm) on the 1 x 2 mm gap face between the two inner strip edges picked at x = -0.5 and x = +0.5 (each y = -1..+1, z = 25), directed +x (CST end points -0.5 0 25 -> 0.5 0 25); the FD tet solver excites and monitors on the whole port face; Z = 50 (1 + S11)/(1 - S11), equal to the ratio of CST's port voltage and current results to 1e-13 ohm
+# geometry: strip = zero-thickness PEC sheet (brick of zero height) x -24..-0.5 and 0.5..24, y -1..1, z = 25; sheet (case A) eps_r 4.0, tan d 0.02 (CST ConstSigma model fixed at f0, so eps = 4 (1 - j 0.02) at f0), z 40..43, spanning the cell; case B: same brick as vacuum
+# scan convention: CST SetPeriodicBoundaryAnglesDirection outward = phase of a wave travelling out toward (theta, phi), cell (m, n) at -k0 (m dx sin t cos p + n dy sin t sin p), as in the spec (only the discrete port is excited; the cell is mirror-symmetric in x and y, so Z and the (0,0) fractions do not depend on this sign, confirmed by the mirror states below)
+# frac_te00 / frac_tm00 = |S(Floquet TE(0,0) or TM(0,0), port)|^2 / (1 - |S11|^2); TE/TM as CST defines them (transverse electric / magnetic field with respect to the port plane z = const); mode 1 = TE(0,0), mode 2 = TM(0,0) by CST's mode names, an order fixed by the sorting angles theta 0 phi 0 and so the same in every scan state; frac_sheet_loss = CST volume loss in the sheet / CST power accepted by the port
+# mesh case A: final = adaptive pass 12 (34920 tetrahedra; last Delta S 0.00080 and 0.00056), previous = pass 11 (31479 tetrahedra; separate run stopped by MaxPasses 11, its pass history identical to the final run's passes 1-11); max |Z_final - Z_previous| = 0.171 ohm over the 8 states; a separate run adapted at theta 60 phi 90 (9 passes, 25150 tetrahedra) differs from final by at most 0.258 ohm
+# mesh case B: final = adaptive pass 9 (24669 tetrahedra; last Delta S 0.00100 and 0.00079), previous = pass 8 (21131 tetrahedra; separate run stopped by MaxPasses 8, its pass history identical to the final run's passes 1-8); max |Z_final - Z_previous| = 0.660 ohm over the 8 states; a separate run adapted at theta 60 phi 90 (8 passes, 21879 tetrahedra) differs from final by at most 0.861 ohm
+# checks: passivity max(|S11|^2 + |S_TE00|^2 + |S_TM00|^2) = 0.99993 (evanescent modes carry no real power; their |S|^2 at the port, at most 7.6e-03, is left out); case B (lossless) power balance = 1 within 1.9e-04; case A 1 - frac_te00 - frac_tm00 vs CST volume loss within 3.0e-04 (the same small deficit as in case B); mirror states (15,180) (30,270) (30,225) equal (15,0) (30,90) (30,45) to 2.1e-11 ohm; all (m,n) != (0,0) modes evanescent in every state
+# deviations: none in geometry or materials; the strip is a zero-thickness sheet and the feed a face port over the full 1 x 2 mm gap (necpp uses thin wires of radius 0.5 mm and its own gap model, so feed-model differences are expected, see case B)
+case,phi_deg,theta_deg,mesh_pass,R_ohm,X_ohm,frac_te00,frac_tm00,frac_sheet_loss
+A,0,0,final,90.734,6.820,0.00000,0.98503,0.01474
+A,0,0,previous,90.778,6.903,0.00000,0.98503,0.01474
+A,0,15,final,82.726,6.089,0.00000,0.98534,0.01442
+A,0,15,previous,82.765,6.174,0.00000,0.98534,0.01442
+A,0,30,final,66.321,8.411,0.00000,0.98629,0.01341
+A,0,30,previous,66.351,8.501,0.00000,0.98629,0.01341
+A,90,15,final,90.040,12.265,0.98442,0.00000,0.01535
+A,90,15,previous,90.086,12.351,0.98443,0.00000,0.01535
+A,90,30,final,89.035,26.825,0.98217,0.00000,0.01759
+A,90,30,previous,89.089,26.919,0.98218,0.00000,0.01759
+A,90,45,final,93.086,49.455,0.97611,0.00000,0.02366
+A,90,45,previous,93.154,49.562,0.97611,0.00000,0.02366
+A,90,60,final,119.311,92.640,0.95535,0.00000,0.04443
+A,90,60,previous,119.429,92.764,0.95535,0.00000,0.04443
+A,45,30,final,76.251,14.491,0.51567,0.46853,0.01554
+A,45,30,previous,76.290,14.582,0.51568,0.46852,0.01554
+B,0,0,final,120.302,-43.498,,,
+B,0,0,previous,120.317,-43.433,,,
+B,0,15,final,115.564,-34.124,,,
+B,0,15,previous,115.590,-34.053,,,
+B,0,30,final,98.676,-6.720,,,
+B,0,30,previous,98.728,-6.619,,,
+B,90,15,final,128.024,-36.721,,,
+B,90,15,previous,128.051,-36.667,,,
+B,90,30,final,151.824,-12.632,,,
+B,90,30,previous,151.901,-12.611,,,
+B,90,45,final,192.642,42.622,,,
+B,90,45,previous,192.871,42.604,,,
+B,90,60,final,245.579,163.414,,,
+B,90,60,previous,246.235,163.488,,,
+B,45,30,final,122.974,-10.846,,,
+B,45,30,previous,123.036,-10.777,,,

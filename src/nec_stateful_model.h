@@ -96,6 +96,25 @@ struct nec_lattice_definition {
   nec_float a2y_m = 0.0;
 };
 
+/*! One dielectric layer of a layered stack. */
+struct nec_dielectric_layer_definition {
+  nec_float thickness_m = 0.0;
+  nec_float relative_permittivity = 1.0;
+  nec_float loss_tangent = 0.0;
+};
+
+/*! A layered stack above the wires of a periodic unit cell (a radome): its
+ * lower face at bottom_z_m, layers from there up, air above them. */
+struct nec_layered_stack_definition {
+  nec_float bottom_z_m = 0.0;
+  std::vector<nec_dielectric_layer_definition> layers;
+};
+
+/*! The layered stacks of a periodic unit cell; none by default. */
+struct nec_layered_stacks_definition {
+  std::optional<nec_layered_stack_definition> above;
+};
+
 struct nec_far_field_grid {
   nec_float radius_m = 1.0;
   nec_float theta_start_deg = 0.0;
@@ -249,6 +268,11 @@ struct nec_periodic_diagnostics {
    * modelling error is not included. */
   nec_float estimated_error = 0.0;
   nec_periodic_point_status status = nec_periodic_point_status::ok;
+  /*! With a layered stack above the wires: the gap from the highest point of
+   * a wire axis to the stack, and the Floquet modes its reflection takes. */
+  bool layered_stack = false;
+  nec_float stack_gap_m = 0.0;
+  size_t stack_mode_count = 0;
 };
 
 /*! Which side of the unit cell a Floquet mode radiates to. */
@@ -290,11 +314,13 @@ struct nec_floquet_mode {
 };
 
 /*! Power per cell of one port's basis solve: the input power returns as the
- * power of the propagating modes plus the loss in the loads. */
+ * power of the propagating modes plus the loss in the loads and in the
+ * layered stacks. */
 struct nec_floquet_port_power {
   nec_float input_w = 0.0;
   nec_float propagating_w = 0.0;
   nec_float loss_w = 0.0;
+  nec_float dielectric_loss_w = 0.0;
 };
 
 /*! Floquet-mode amplitudes of every port's basis solve, normalized as the
@@ -390,6 +416,10 @@ public:
   /*! Phase advance in radians from one cell to the next along a1 and a2. */
   void set_scan_phases(nec_float psi1_rad, nec_float psi2_rad);
   bool periodic() const { return m_periodic; }
+  /*! Layered stacks for periodic mode, replacing the previous ones. A
+   * conductor that enters a stack is refused; a gap too small for the
+   * periodic tolerance is refused when preparing. */
+  void set_layered_stacks(const nec_layered_stacks_definition& stacks);
 
   void prepare(nec_float frequency_mhz);
 
@@ -551,6 +581,7 @@ private:
   nec_model_ground_connection m_ground_connection = nec_model_ground_connection::none;
   bool m_periodic = false;
   nec_lattice_definition m_lattice;
+  nec_layered_stacks_definition m_layered_stacks;
   nec_float m_scan_psi1_rad = 0.0;
   nec_float m_scan_psi2_rad = 0.0;
   nec_float m_frequency_mhz = 0.0;
