@@ -11,3 +11,16 @@ export const NEC_SPEED_OF_LIGHT_M_PER_S = 1 / Math.sqrt(
 export function necWavenumberPerM(frequencyMHz: number): number {
   return 2 * Math.PI * frequencyMHz * 1e6 / NEC_SPEED_OF_LIGHT_M_PER_S;
 }
+
+/** NEC's pi (math_util.h), 1.6e-11 relative above the exact value. */
+const NEC_PI = 3.1415926536;
+
+/**
+ * The wavenumber of the periodic kernel in rad/m: two of NEC's pi per
+ * wavelength. A Floquet mode is at cut-off where its transverse wavevector
+ * (from the scan phases with the exact pi) reaches it, so directions near
+ * the horizon or a Wood circle need this one rather than `necWavenumberPerM`.
+ */
+export function necPeriodicWavenumberPerM(frequencyMHz: number): number {
+  return 2 * NEC_PI * frequencyMHz * 1e6 / NEC_SPEED_OF_LIGHT_M_PER_S;
+}

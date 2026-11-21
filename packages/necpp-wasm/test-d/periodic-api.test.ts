@@ -17,6 +17,9 @@ import {
   type PeriodicPointDiagnostics,
   type PeriodicPointStatus,
   type ScanDirection,
+  type ScanElementPattern,
+  type ScanElementPatternSample,
+  type ScanElementPatternValue,
   type ScanImpedanceResult,
   type ScanPhasesRad,
   type ScanState,
@@ -238,4 +241,37 @@ export async function periodicWorkerTypes(): Promise<void> {
   );
   cell.terminate();
   await cell.dispose();
+}
+
+export async function scanElementPatternTypes(cell: NecPeriodicModel, worker: NecPeriodicWorkerModel): Promise<void> {
+  const pattern: ScanElementPattern = await cell.computeScanElementPattern(
+    {
+      frequencyMHz: 300,
+      normalization: { kind: "unit-current", valueA: 1 },
+      grid: { spacingUV: 0.05, points: [{ u: 0.1, v: 0.2 }] },
+      refinement: { tolerance: 0.005, maxRounds: 2, maxSamples: 10_000 },
+    },
+    { workers: 4, onProgress: ({ completed, total, round }) => void [completed, total, round] },
+  );
+  await cell.computeScanElementPattern({ frequencyMHz: 300, grid: "auto", refinement: false });
+  const value: ScanElementPatternValue = pattern.evaluate({ u: 0.3, v: -0.2 });
+  const below: ScanElementPatternValue = pattern.evaluate({ thetaDeg: 30, phiDeg: 90 }, "below");
+  const te: ComplexVector = value.te;
+  const error: Float64Array = below.interpolationError;
+  const sample: ScanElementPatternSample | undefined = pattern.samples[0];
+  const round: number | undefined = sample?.round;
+  const centre: readonly [number, number] | undefined = pattern.woodCircles[0]?.centreUV;
+  void [te, error, round, centre];
+  // @ts-expect-error a direction is (u, v) or angles, not a pair.
+  pattern.evaluate([0.3, -0.2]);
+  // @ts-expect-error the side is "above" or "below".
+  pattern.evaluate({ u: 0, v: 0 }, "upper");
+  // @ts-expect-error samples are read-only.
+  pattern.samples = [];
+  // @ts-expect-error a grid is "auto" or { spacingUV?, points? }.
+  void cell.computeScanElementPattern({ frequencyMHz: 300, grid: "fine" });
+  // @ts-expect-error refinement is off with false, not true.
+  void cell.computeScanElementPattern({ frequencyMHz: 300, refinement: true });
+  const fromWorker: Promise<ScanElementPattern> = worker.computeScanElementPattern({ frequencyMHz: 300 });
+  void fromWorker;
 }

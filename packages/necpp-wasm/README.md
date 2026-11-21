@@ -948,6 +948,56 @@ cell.dispose();
   without a new solve; `powerW` is then the fraction of the available power
   in each mode.
 
+### Scan element pattern
+
+The **scan element pattern** of a port is its far field inside the infinite
+array: in each direction, the (0, 0) Floquet amplitude at the scan state
+pointing that way. `computeScanElementPattern` samples it with a scan sweep
+over visible space and returns an object you can evaluate in any direction,
+in `(u, v) = sin(theta) (cos(phi), sin(phi))` or in angles:
+
+```ts
+import { createNecPeriodicModel, rectangularLattice } from "@necpp-engine/wasm";
+
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 11, start: [-0.24, 0, 0.25], end: [0.24, 0, 0.25], radiusM: 0.001 });
+cell.completeGeometry();
+cell.definePorts([{ tag: 1, segment: 6 }]);
+cell.setGround({ kind: "perfect" });
+cell.setLattice(rectangularLattice({ spacingXM: 0.7, spacingYM: 0.6 }));
+
+const pattern = await cell.computeScanElementPattern(
+  { frequencyMHz: 300, grid: { spacingUV: 0.2 } },
+  { onProgress: ({ completed, total, round }) => console.log(round, completed, total) },
+);
+const value = pattern.evaluate({ thetaDeg: 30, phiDeg: 0 });
+console.log(value.te.real[0], value.tm.real[0], value.interpolationError[0]);
+console.log(pattern.samples.length, pattern.woodCircles.map(({ p, q }) => [p, q]));
+cell.dispose();
+```
+
+- At a sweep point (`pattern.samples`), `evaluate` returns the solved
+  amplitudes exactly (`sampled: true`). Elsewhere it interpolates, never
+  across a **Wood circle** (where a grating lobe appears), so the pattern
+  stays sharp at Wood anomalies and scan-blindness notches, and states an
+  `interpolationError` per port. That is an estimate: in tests it covered
+  99.5 % of directions, falling short by up to about 3 times only where two
+  Wood circles, or one and the horizon, are both close.
+- The grid: a square grid of `spacingUV` (by default a tenth of the distance
+  to the nearest grating-lobe circle centre, at most 0.1, widened to keep the
+  grid at 8,000 samples) or your own `points`, plus rows along both sides of
+  every Wood circle, graded towards it.
+- Adaptive refinement (on by default) then adds samples wherever the
+  interpolation error exceeds 1 % of the pattern's peak: up to 4 rounds and
+  four times the grid's samples (`refinement: { tolerance, maxRounds,
+  maxSamples }`, or `false`). Next to a Wood anomaly a dipole array's
+  pattern can drop to a null within `|kz| / k ~ 0.01`, which only refinement
+  resolves.
+- The sweeps run on the same workers as `sweepScanImpedance` and take
+  `workers` and `signal`. Building the interpolant also costs about 1 ms of
+  main-thread time per sample.
+- In free space `side` may be `"below"` for the pattern below the cell.
+
 ### Conventions and limits
 
 - Scan impedance is not the active impedance of any finite array: it belongs

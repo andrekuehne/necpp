@@ -362,6 +362,44 @@ test("the periodic model in a worker returns the direct model's scan impedance",
   );
 });
 
+test("the periodic model in a worker computes the direct model's scan element pattern", {
+  skip: !hasWasm && "WASM artifacts have not been built",
+}, async () => {
+  const worker = await createNecPeriodicWorkerModel();
+  const direct = await createNecPeriodicModel();
+  try {
+    await assert.rejects(worker.computeScanElementPattern({ frequencyMHz: 299.792458 }), NecStateError);
+    await buildPeriodicCell(worker);
+    await buildPeriodicCell(direct);
+    // Without refinement: its choices could differ where the two models'
+    // solves, equal to rounding, straddle the tolerance.
+    const request = { frequencyMHz: 299.792458, grid: { spacingUV: 0.4 }, refinement: false };
+    const [expected, actual] = await Promise.all([
+      direct.computeScanElementPattern(request),
+      worker.computeScanElementPattern(request),
+    ]);
+    assert.equal(actual.samples.length, expected.samples.length);
+    assert.deepEqual(actual.woodCircles, expected.woodCircles);
+    for (const [index, sample] of actual.samples.entries()) {
+      assert.equal(sample.u, expected.samples[index].u);
+      assert.equal(sample.v, expected.samples[index].v);
+      assert.equal(sample.round, expected.samples[index].round);
+    }
+    const [first, second] = [actual.evaluate({ thetaDeg: 35, phiDeg: 20 }), expected.evaluate({ thetaDeg: 35, phiDeg: 20 })];
+    for (const component of ["te", "tm"]) {
+      for (const part of ["real", "imag"]) {
+        first[component][part].forEach((value, port) => {
+          assert.ok(Math.abs(value - second[component][part][port]) <= 1e-9 * (1 + Math.abs(value)));
+        });
+      }
+    }
+  } finally {
+    await worker.dispose();
+    direct.dispose();
+  }
+  await assert.rejects(worker.computeScanElementPattern({ frequencyMHz: 299.792458 }), NecStateError);
+});
+
 test("periodic refusals in a worker arrive as the direct model's error types", {
   skip: !hasWasm && "WASM artifacts have not been built",
 }, async () => {

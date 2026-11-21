@@ -33,6 +33,9 @@ import type {
   PrepareOptions,
   PreparedQuadratureRequest,
   PreparedTransferHandle,
+  ScanElementPattern,
+  ScanElementPatternOptions,
+  ScanElementPatternRequest,
   ScanImpedanceRequest,
   ScanImpedanceResult,
   ScanSweepChunk,
@@ -48,6 +51,7 @@ import {
   type PeriodicCellCall,
   type ValidSweep,
 } from "./periodic-sweep.js";
+import { computeScanElementPattern, validPatternRequest } from "./scan-element-pattern.js";
 import {
   cloneFloat64,
   isNodeRuntime,
@@ -685,6 +689,38 @@ class WorkerNecPeriodicModel implements NecPeriodicWorkerModel {
     const assets = this.#assets;
     this.#sweepPool ??= new ScanSweepPool(() => createNecPeriodicWorkerModel(assets));
     yield* this.#sweepPool.sweep(calls, sweep);
+  }
+
+  async computeScanElementPattern(
+    request: ScanElementPatternRequest,
+    options?: ScanElementPatternOptions,
+  ): Promise<ScanElementPattern> {
+    if (this.state === "disposed") {
+      throw new NecStateError("computeScanElementPattern", "disposed");
+    }
+    const valid = validPatternRequest(request, options);
+    // The cell as of this call, as for a sweep.
+    const settled = this.#settled;
+    const issued = this.#issued.slice();
+    await settled;
+    let lattice: PeriodicLattice | undefined;
+    for (const { call, succeeded } of issued) {
+      if (succeeded && call.method === "setLattice") lattice = call.argument;
+    }
+    if (lattice === undefined) {
+      throw new NecStateError(
+        "computeScanElementPattern",
+        this.state,
+        "computeScanElementPattern requires a lattice; call setLattice first",
+      );
+    }
+    return computeScanElementPattern(
+      lattice,
+      (sweepRequest, sweepOptions) =>
+        this.#sweepAfterCalls(validSweep(sweepRequest, sweepOptions), Promise.resolve(), issued),
+      valid,
+      options,
+    );
   }
 
   dispose(): Promise<void> {
