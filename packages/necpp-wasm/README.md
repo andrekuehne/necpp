@@ -998,6 +998,90 @@ cell.dispose();
   main-thread time per sample.
 - In free space `side` may be `"below"` for the pattern below the cell.
 
+### Windowed arrays
+
+A **windowed array** is a finite block of driven cells inside the infinite
+array, every other cell still present and terminated. Its pattern is exactly
+the array factor times the scan element pattern, so one pattern serves any
+window, taper and steering direction without a further solve:
+
+```ts
+import {
+  createNecPeriodicModel,
+  rectangularLattice,
+  windowedArray,
+  type WindowedArrayCell,
+} from "@necpp-engine/wasm";
+
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 11, start: [-0.24, 0, 0], end: [0.24, 0, 0], radiusM: 0.001 });
+cell.completeGeometry();
+cell.definePorts([{ tag: 1, segment: 6 }]);
+cell.setLattice(rectangularLattice({ spacingXM: 0.6, spacingYM: 0.5 }));
+
+const pattern = await cell.computeScanElementPattern({ frequencyMHz: 300 });
+const steering = cell.computeScanImpedance({
+  frequencyMHz: 300,
+  scanDirection: { thetaDeg: 30, phiDeg: 0 },
+});
+
+// A 16 x 16 window under a cosine taper, steered to 30 degrees.
+const cells: WindowedArrayCell[] = [];
+const taper: number[] = [];
+for (let m = 0; m < 16; m += 1) {
+  for (let n = 0; n < 16; n += 1) {
+    cells.push([m, n]);
+    taper.push(Math.cos((Math.PI * (m - 7.5)) / 16) * Math.cos((Math.PI * (n - 7.5)) / 16));
+  }
+}
+const array = windowedArray(pattern, {
+  steering,
+  cells,
+  excitation: { real: Float64Array.from(taper), imag: new Float64Array(taper.length) },
+});
+const field = array.computeFarField({
+  theta: { startDeg: -90, count: 181, stepDeg: 1 },
+  phi: { startDeg: 0, count: 1, stepDeg: 0 },
+});
+console.log(field.eThetaReal[120], array.activeImpedances.real[0], array.activeImpedances.approximate);
+cell.dispose();
+```
+
+- `cells` are lattice indices `[m, n]`, the cell at `m a1 + n a2`.
+  `excitation` (cell-major, `cell * portCount + port`, volts or amperes as
+  the pattern's normalization; 1 on every port by default) is the taper; the
+  steering result's scan phases are applied on top, and `drive` holds the
+  result: a finite array driven with `drive` is the same block without the
+  surrounding cells.
+- `computeFarField` takes the theta-phi grid of a finite model's
+  `computeFarField` and returns the same `FarFieldResult`, `E` in V/m with
+  `exp(-j k R) / R`. Below the horizon it uses the pattern below the cell in
+  free space and is zero over ground.
+- `activeImpedances` is an **approximation**, flagged `approximate: true`:
+  every driven element is taken to see the scan impedance of the steering
+  state (applied to its own port drives). Deep inside a large window that is
+  close (0.7 % at the centre of a uniform 32 x 32 array in tests); towards
+  the edges it is not. For the per-element active impedances of an array of
+  moderate size, solve the finite array (`createNecArraySolver`).
+- What the windowed model leaves out: the edges. A finite array has no cells
+  outside the block, and its pattern differs by the edge effects: against
+  direct finite solves of half-wave dipoles (three segments each, on a 0.6 x
+  0.5 wavelength lattice) steered to 30 degrees, the main
+  beam and near sidelobes differ by 7.8, 4.8 and 2.2 % of the peak at 8 x 8,
+  16 x 16 and 32 x 32, and by 1 % or less under a cosine taper at 16 x 16.
+  Strongly coupled elements (vertical dipoles, for example) converge far
+  more slowly.
+- The infinite model overstates scan blindness: a guided wave needs many
+  cells to build up, so a real array shows a shallower, wider and shifted
+  dip. The notch also appears in every steered pattern, because the scan
+  element pattern multiplies them all.
+- The windowed model is exact only when the passive cells are terminated in
+  the generators' internal impedance: shorted with ideal voltage drive (the
+  default unit-voltage normalization), open with ideal current drive
+  (`{ kind: "unit-current", valueA: 1 }`). For a common generator impedance,
+  load every port of the cell with it (`addLoad`) and drive the window
+  through it; the active impedances then include the load.
+
 ### Conventions and limits
 
 - Scan impedance is not the active impedance of any finite array: it belongs

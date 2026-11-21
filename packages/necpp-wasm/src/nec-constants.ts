@@ -24,3 +24,10 @@ const NEC_PI = 3.1415926536;
 export function necPeriodicWavenumberPerM(frequencyMHz: number): number {
   return 2 * NEC_PI * frequencyMHz * 1e6 / NEC_SPEED_OF_LIGHT_M_PER_S;
 }
+
+/**
+ * The free-space field impedance of NEC's thin-wire kernel in ohms: its
+ * prefactor j 4.771341189 is j eta / (8 pi^2). The Floquet amplitudes are
+ * normalized to power with it.
+ */
+export const NEC_FIELD_IMPEDANCE_OHM = 4.771341189 * 8 * Math.PI * Math.PI;

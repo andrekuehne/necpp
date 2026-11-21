@@ -6,8 +6,11 @@ import {
   scanPhasesForDirection,
   squareLattice,
   terminatedFloquetAmplitudes,
+  windowedArray,
+  type ApproximateActiveImpedance,
   type ComplexMatrix,
   type ComplexVector,
+  type FarFieldResult,
   type FloquetAmplitudes,
   type FloquetMode,
   type FloquetPortPower,
@@ -26,6 +29,8 @@ import {
   type ScanSweepChunk,
   type ScanSweepPoint,
   type TerminatedFloquetAmplitudes,
+  type WindowedArray,
+  type WindowedArrayCell,
 } from "../src/index.js";
 import {
   createNecPeriodicWorkerModel,
@@ -274,4 +279,30 @@ export async function scanElementPatternTypes(cell: NecPeriodicModel, worker: Ne
   void cell.computeScanElementPattern({ frequencyMHz: 300, refinement: true });
   const fromWorker: Promise<ScanElementPattern> = worker.computeScanElementPattern({ frequencyMHz: 300 });
   void fromWorker;
+}
+
+export function windowedArrayTypes(pattern: ScanElementPattern, steering: ScanImpedanceResult): void {
+  const lattice: PeriodicLattice = pattern.lattice;
+  const cells: WindowedArrayCell[] = [[0, 0], [1, 0], [0, 1]];
+  const array: WindowedArray = windowedArray(pattern, {
+    steering,
+    cells,
+    excitation: { real: new Float64Array(3), imag: new Float64Array(3) },
+  });
+  windowedArray(pattern, { steering, cells });
+  const field: FarFieldResult = array.computeFarField({
+    radiusM: 10,
+    theta: { startDeg: -90, count: 181, stepDeg: 1 },
+    phi: { startDeg: 0, count: 1, stepDeg: 0 },
+  });
+  const impedances: ApproximateActiveImpedance = array.activeImpedances;
+  const approximate: true = impedances.approximate;
+  const drive: ComplexVector = array.drive;
+  void [lattice, field, approximate, drive];
+  // @ts-expect-error the steering state is a scan result, not a direction.
+  windowedArray(pattern, { steering: { thetaDeg: 30, phiDeg: 0 }, cells });
+  // @ts-expect-error a cell is a pair of lattice indices.
+  windowedArray(pattern, { steering, cells: [{ m: 0, n: 0 }] });
+  // @ts-expect-error the windowed array has no ring or other field evaluator.
+  array.computeFarField({ evaluator: "ring", theta: { startDeg: 0, count: 1, stepDeg: 0 }, phi: { startDeg: 0, count: 1, stepDeg: 0 } });
 }

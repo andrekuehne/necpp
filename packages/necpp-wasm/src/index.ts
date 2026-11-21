@@ -40,6 +40,7 @@ export {
   squareLattice,
 } from "./periodic-lattice.js";
 export { terminatedFloquetAmplitudes } from "./periodic-floquet.js";
+export { windowedArray } from "./windowed-array.js";
 
 export type {
   NecCancellationReason,
@@ -49,6 +50,7 @@ export type {
 
 export type {
   AngleSweep,
+  ApproximateActiveImpedance,
   ArrayBuildPlan,
   ArrayElementId,
   ArrayElementMapping,
@@ -171,6 +173,10 @@ export type {
   TerminatedFloquetAmplitudes,
   TerminatedFloquetMode,
   TerminatedFloquetOptions,
+  WindowedArray,
+  WindowedArrayCell,
+  WindowedArrayFarFieldRequest,
+  WindowedArrayOptions,
   WireDefinition,
 } from "./types.js";
 

@@ -909,6 +909,8 @@ export interface ScanElementWoodCircle extends FloquetModeIndex {
 export interface ScanElementPattern {
   readonly frequencyMHz: number;
   readonly normalization: EmbeddedFieldNormalization;
+  /** The lattice of the cell the pattern belongs to. */
+  readonly lattice: PeriodicLattice;
   readonly portCount: number;
   /** `["above", "below"]` in free space, `["above"]` over ground. */
   readonly sides: readonly FloquetSide[];
@@ -922,6 +924,70 @@ export interface ScanElementPattern {
    * on the same side of every Wood circle.
    */
   evaluate(direction: ScanElementPatternDirection, side?: FloquetSide): ScanElementPatternValue;
+}
+
+/** A cell of a windowed array: its indices `[m, n]` on the lattice, at `m a1 + n a2`. */
+export type WindowedArrayCell = readonly [number, number];
+
+export interface WindowedArrayOptions {
+  /**
+   * The scan result at the steering state, from the same cell and frequency
+   * as the pattern (only the frequency and port count can be checked) (`computeScanImpedance` with a `scanDirection` or scan
+   * phases). Its scan phases steer the beam and its scan impedance stands in
+   * for every element's active impedance.
+   */
+  readonly steering: ScanImpedanceResult;
+  /** The driven cells, by lattice indices. Every other cell of the infinite array stays present and terminated. */
+  readonly cells: readonly WindowedArrayCell[];
+  /**
+   * The taper: per cell and port (cell-major, `cell * portCount + port`), in
+   * volts or amperes as the pattern's normalization; the steering phases are
+   * applied on top. Defaults to 1 on every port.
+   */
+  readonly excitation?: ComplexVector;
+}
+
+/** A far-field request on a windowed array: a theta-phi grid at a range. */
+export type WindowedArrayFarFieldRequest = Pick<FarFieldRequest, "radiusM" | "theta" | "phi">;
+
+/**
+ * Active impedances that every driven element is taken to see: the scan
+ * impedance of the steering state applied to each cell's port drives. An
+ * approximation that leaves out the window's edges; the finite-array solve
+ * gives exact per-element active impedances.
+ */
+export interface ApproximateActiveImpedance extends ComplexVector {
+  readonly approximate: true;
+}
+
+/**
+ * A windowed array: a finite block of driven cells inside the infinite array,
+ * whose other elements stay present and terminated. Its pattern is exactly
+ * the array factor times the scan element pattern; a finite array of the
+ * same cells differs from it by its edge effects.
+ */
+export interface WindowedArray {
+  readonly frequencyMHz: number;
+  readonly normalization: EmbeddedFieldNormalization;
+  readonly lattice: PeriodicLattice;
+  readonly cells: readonly WindowedArrayCell[];
+  readonly portCount: number;
+  readonly scanPhasesRad: ScanPhasesRad;
+  /**
+   * The port drives, cell-major: the excitation times the steering phases
+   * `exp(j (m psi1 + n psi2))`. A finite array driven with these (voltages
+   * or currents as the normalization) is the same array without the
+   * surrounding cells.
+   */
+  readonly drive: ComplexVector;
+  /** Cell-major like `drive`; `NaN` where a port's current is exactly zero. */
+  readonly activeImpedances: ApproximateActiveImpedance;
+  /**
+   * The far field like a finite model's: `E` in V/m with `exp(-j k R) / R`,
+   * sample index `phiIndex * thetaDeg.length + thetaIndex`. Over ground the
+   * field below the horizon is zero.
+   */
+  computeFarField(request: WindowedArrayFarFieldRequest): FarFieldResult;
 }
 
 /**
