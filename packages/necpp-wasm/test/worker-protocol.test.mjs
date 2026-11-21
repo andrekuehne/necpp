@@ -359,7 +359,7 @@ function floquetAmplitudes() {
       tm: { real: Float64Array.of(0.3), imag: Float64Array.of(0.4) },
       powerW: Float64Array.of(0.15),
     }],
-    powerBudget: [{ inputW: 0.15, propagatingW: 0.15, lossW: 0 }],
+    powerBudget: [{ inputW: 0.15, propagatingW: 0.14, lossW: 0, dielectricLossW: 0.01 }],
   };
 }
 
@@ -401,6 +401,7 @@ test("worker scan-impedance results validate the Floquet amplitudes and freeze t
     malformed((value) => { value.modes = {}; }),
     malformed((value) => { value.powerBudget = []; }),
     malformed((value) => { value.powerBudget[0].lossW = Number.NaN; }),
+    malformed((value) => { delete value.powerBudget[0].dielectricLossW; }),
     malformed((value) => { value.modes[0].side = "left"; }),
     malformed((value) => { value.modes[0].p = 0.5; }),
     malformed((value) => { value.modes[0].propagating = 1; }),
@@ -425,9 +426,17 @@ test("worker scan-impedance results validate the diagnostics and freeze them", (
   assert.equal(Object.isFrozen(revived.scanPhasesRad), true);
   assert.equal(revived.impedance.real[0], 70);
 
+  const covered = reviveScanImpedanceResult(scanImpedanceResult({
+    estimatedError: 3e-7, status: "ok", layeredStack: { gapM: 0.14, modeCount: 240 },
+  }));
+  assert.deepEqual(covered.diagnostics.layeredStack, { gapM: 0.14, modeCount: 240 });
+  assert.equal(Object.isFrozen(covered.diagnostics.layeredStack), true);
+
   for (const diagnostics of [
     { estimatedError: Number.NaN, status: "ok" },
     { estimatedError: 1e-7, status: "refused" },
+    { estimatedError: 1e-7, status: "ok", layeredStack: { gapM: 0, modeCount: 3 } },
+    { estimatedError: 1e-7, status: "ok", layeredStack: { gapM: 0.1, modeCount: 1.5 } },
     undefined,
   ]) {
     assert.throws(() => reviveScanImpedanceResult(scanImpedanceResult(diagnostics)), NecRuntimeError);

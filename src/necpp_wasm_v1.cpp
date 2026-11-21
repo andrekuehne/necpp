@@ -73,6 +73,8 @@ struct impedance_buffers {
   uint64_t factorization_generation = 0;
   double estimated_error = 0.0;
   int32_t point_status = NECPP_WASM_V1_POINT_STATUS_OK;
+  double stack_gap_m = 0.0;
+  double stack_mode_count = 0.0;
   bool available = false;
 
   void clear()
@@ -85,6 +87,8 @@ struct impedance_buffers {
     factorization_generation = 0;
     estimated_error = 0.0;
     point_status = NECPP_WASM_V1_POINT_STATUS_OK;
+    stack_gap_m = 0.0;
+    stack_mode_count = 0.0;
     available = false;
   }
 };
@@ -179,6 +183,7 @@ struct floquet_buffers {
   std::vector<double> input_power_w;
   std::vector<double> propagating_power_w;
   std::vector<double> loss_w;
+  std::vector<double> dielectric_loss_w;
   size_t port_count = 0;
   int32_t normalization = NECPP_WASM_V1_UNIT_VOLTAGE;
   bool available = false;
@@ -469,6 +474,10 @@ void sync_impedance(
   if (result.periodic) {
     next.estimated_error = result.periodic->estimated_error;
     next.point_status = static_cast<int32_t>(result.periodic->status);
+    if (result.periodic->layered_stack) {
+      next.stack_gap_m = result.periodic->stack_gap_m;
+      next.stack_mode_count = static_cast<double>(result.periodic->stack_mode_count);
+    }
   }
   next.available = true;
   model.impedance = std::move(next);
@@ -1002,6 +1011,8 @@ const std::vector<double>* result_buffer(
     return &model->floquet.propagating_power_w;
   case NECPP_WASM_V1_FLOQUET_LOSS_W:
     return &model->floquet.loss_w;
+  case NECPP_WASM_V1_FLOQUET_DIELECTRIC_LOSS_W:
+    return &model->floquet.dielectric_loss_w;
   default:
     return nullptr;
   }
@@ -1133,6 +1144,7 @@ void sync_floquet(necpp_wasm_v1_model& model, const nec_floquet_result& result)
     next.input_power_w.push_back(power.input_w);
     next.propagating_power_w.push_back(power.propagating_w);
     next.loss_w.push_back(power.loss_w);
+    next.dielectric_loss_w.push_back(power.dielectric_loss_w);
   }
   next.available = true;
   model.floquet = std::move(next);
@@ -1452,6 +1464,35 @@ int32_t necpp_wasm_v1_set_scan_phases(
       "Scan phases must be finite");
   return invoke(model, NECPP_WASM_V1_INPUT_ERROR, [&] {
     model->native.set_scan_phases(psi1_rad, psi2_rad);
+    clear_calculated_results(*model);
+  });
+}
+
+int32_t necpp_wasm_v1_set_layered_stack_above(
+  necpp_wasm_v1_model* model,
+  double bottom_z_m, const double* layers, size_t layer_count)
+{
+  if (model == nullptr)
+    return NECPP_WASM_V1_RUNTIME_ERROR;
+  if (!is_configurable(model))
+    return fail(model, NECPP_WASM_V1_STATE_ERROR,
+      "setLayeredStacks requires completed geometry");
+  if ((layer_count > 0 && layers == nullptr) ||
+      layer_count > static_cast<size_t>(std::numeric_limits<int32_t>::max()))
+    return fail(model, NECPP_WASM_V1_INPUT_ERROR, "Invalid layer array");
+
+  // Invalid layers arrive as input errors, a conductor entering the stack as
+  // a geometry error.
+  return invoke(model, NECPP_WASM_V1_INPUT_ERROR, [&] {
+    nec_layered_stacks_definition stacks;
+    if (layer_count > 0) {
+      nec_layered_stack_definition above;
+      above.bottom_z_m = bottom_z_m;
+      for (size_t index = 0; index < layer_count; ++index)
+        above.layers.push_back({layers[3 * index], layers[3 * index + 1], layers[3 * index + 2]});
+      stacks.above = std::move(above);
+    }
+    model->native.set_layered_stacks(stacks);
     clear_calculated_results(*model);
   });
 }
@@ -2159,6 +2200,20 @@ int32_t necpp_wasm_v1_impedance_point_status(
 {
   return model != nullptr && model->impedance.available
     ? model->impedance.point_status : NECPP_WASM_V1_POINT_STATUS_OK;
+}
+
+double necpp_wasm_v1_impedance_stack_gap_m(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->impedance.available
+    ? model->impedance.stack_gap_m : 0.0;
+}
+
+double necpp_wasm_v1_impedance_stack_mode_count(
+  const necpp_wasm_v1_model* model)
+{
+  return model != nullptr && model->impedance.available
+    ? model->impedance.stack_mode_count : 0.0;
 }
 
 double necpp_wasm_v1_impedance_factorization_generation(

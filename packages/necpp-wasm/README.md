@@ -1082,6 +1082,43 @@ cell.dispose();
   load every port of the cell with it (`addLoad`) and drive the window
   through it; the active impedances then include the load.
 
+### Layered stacks (radomes)
+
+A **layered stack** above the wires, such as a radome or a wide-angle impedance
+matching (WAIM) sheet, is made of dielectric layers that are uniform in the
+lattice plane, with air above them:
+
+```ts
+cell.setLayeredStacks({
+  above: {
+    bottomZM: 0.04, // lower face, above every wire
+    layers: [{ thicknessM: 0.003, relativePermittivity: 4, lossTangent: 0.02 }],
+  },
+});
+const result = cell.computeScanImpedance({ frequencyMHz, scanDirection: { thetaDeg: 45, phiDeg: 90 } });
+result.diagnostics.layeredStack;            // { gapM, modeCount }
+result.floquet.powerBudget[0].dielectricLossW; // watts per cell absorbed in the stack
+cell.setLayeredStacks({}); // removes it
+```
+
+- Each Floquet mode sees the stack through a TE and a TM reflection, from a
+  transmission-line model of its layers. Their effect enters the scan
+  impedance directly, also over perfect ground, where the reflections between
+  ground and stack are included.
+- The Floquet modes above the cell are the waves **transmitted** through the
+  stack, so the scan element pattern is what an observer outside sees. The
+  power budget closes with `dielectricLossW`, which includes the power that
+  evanescent modes leave in a lossy layer close to the wires.
+- The wires must stay in the air below the stack: a wire that reaches it is
+  refused. The reflection terms decay like `exp(-2 |kz| gap)`, so a small gap
+  needs many modes. Above 20,000 modes (a gap of about 0.01 wavelengths in a
+  half-wavelength cell) the stack is refused with the gap and the mode count.
+- Against a full-wave FEM unit cell (CST) of strip dipoles over ground with a
+  spaced lossy sheet, the transmitted power fractions and the sheet loss
+  agree to 3e-4, and the sheet's change of the scan impedance to 3 to 4 %.
+- Permittivity is constant over frequency: `relativePermittivity` at least 1,
+  `lossTangent` at least 0, and `mu_r = 1`.
+
 ### Conventions and limits
 
 - Scan impedance is not the active impedance of any finite array: it belongs
@@ -1093,8 +1130,9 @@ cell.dispose();
   a ground plane at z=0 under every cell. Every conductor must stay above it;
   one that touches, nearly touches or crosses the plane is refused with a
   `NecGeometryError` (ground connections, such as monopoles on the plane,
-  are not supported). Finite ground waits for layered stacks. No geometry
-  symmetry.
+  are not supported). A layered stack can sit above the wires (see above);
+  stacks below the wires and finite ground are not supported yet. No
+  geometry symmetry.
 - Accuracy: one fixed internal tolerance, `1e-5` relative to the largest
   scan-impedance entry, and no numerical parameters. Each result carries
   `diagnostics.estimatedError` (the solver's numerical error: periodic

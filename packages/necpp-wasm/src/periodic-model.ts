@@ -1,6 +1,7 @@
 import { NecStateError } from "./errors.js";
 import { instantiateNecModule } from "./loader.js";
 import { validFloquetRequest } from "./periodic-floquet.js";
+import { validLayeredStacks } from "./periodic-stack.js";
 import { ScanSweepPool, recordedCall, validSweep, type PeriodicCellCall } from "./periodic-sweep.js";
 import { computeScanElementPattern, validPatternRequest } from "./scan-element-pattern.js";
 import { copyAssetOptions, createNecPeriodicWorkerModel } from "./worker-client.js";
@@ -19,9 +20,11 @@ import {
   positiveNumber,
   requireRecord,
   setLatticeEntry,
+  setLayeredStacksEntry,
   setScanPhasesEntry,
 } from "./model.js";
 import type {
+  LayeredStacks,
   LoadDefinition,
   NecModelState,
   NecPeriodicModel,
@@ -99,6 +102,12 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
     this.#cell[setLatticeEntry](valid.a1M, valid.a2M);
     this.#lattice = valid;
     this.#calls.push(recordedCall({ method: "setLattice", argument: valid }));
+  }
+
+  setLayeredStacks(stacks: LayeredStacks): void {
+    const valid = validLayeredStacks(stacks, "stacks");
+    this.#cell[setLayeredStacksEntry](valid);
+    this.#calls.push(recordedCall({ method: "setLayeredStacks", argument: valid }));
   }
 
   #requireLattice(

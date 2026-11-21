@@ -10,10 +10,14 @@ import {
   type ApproximateActiveImpedance,
   type ComplexMatrix,
   type ComplexVector,
+  type DielectricLayer,
   type FarFieldResult,
   type FloquetAmplitudes,
   type FloquetMode,
   type FloquetPortPower,
+  type LayeredStack,
+  type LayeredStackDiagnostics,
+  type LayeredStacks,
   type NecPeriodicModel,
   type PeriodicGround,
   type PeriodicLattice,
@@ -305,4 +309,24 @@ export function windowedArrayTypes(pattern: ScanElementPattern, steering: ScanIm
   windowedArray(pattern, { steering, cells: [{ m: 0, n: 0 }] });
   // @ts-expect-error the windowed array has no ring or other field evaluator.
   array.computeFarField({ evaluator: "ring", theta: { startDeg: 0, count: 1, stepDeg: 0 }, phi: { startDeg: 0, count: 1, stepDeg: 0 } });
+}
+
+export async function layeredStackTypes(
+  cell: NecPeriodicModel,
+  worker: NecPeriodicWorkerModel,
+  result: ScanImpedanceResult,
+): Promise<void> {
+  const layer: DielectricLayer = { thicknessM: 0.003, relativePermittivity: 4, lossTangent: 0.02 };
+  const above: LayeredStack = { bottomZM: 0.04, layers: [layer, { thicknessM: 0.01, relativePermittivity: 2.2 }] };
+  const stacks: LayeredStacks = { above };
+  cell.setLayeredStacks(stacks);
+  cell.setLayeredStacks({});
+  await worker.setLayeredStacks(stacks);
+  const diagnostics: LayeredStackDiagnostics | undefined = result.diagnostics.layeredStack;
+  const loss: number = result.floquet.powerBudget[0]!.dielectricLossW;
+  void [diagnostics, loss];
+  // @ts-expect-error only a stack above the wires is supported.
+  cell.setLayeredStacks({ below: above });
+  // @ts-expect-error a layer needs its thickness.
+  cell.setLayeredStacks({ above: { bottomZM: 0.04, layers: [{ relativePermittivity: 4 }] } });
 }

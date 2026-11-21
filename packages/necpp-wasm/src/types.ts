@@ -663,6 +663,52 @@ export interface ScanSweepChunk {
   readonly total: number;
 }
 
+/** One layer of a layered stack: a dielectric uniform in the lattice plane. */
+export interface DielectricLayer {
+  /** Greater than zero. */
+  readonly thicknessM: number;
+  /** At least 1; mu_r is 1. */
+  readonly relativePermittivity: number;
+  /**
+   * Zero or more (defaults to 0): the permittivity is
+   * `relativePermittivity (1 - j lossTangent)`, constant over frequency.
+   */
+  readonly lossTangent?: number;
+}
+
+/**
+ * A layered stack above the wires of a unit cell (a radome or a wide-angle
+ * impedance matching sheet): layers uniform in the lattice plane, with air
+ * above the last. Each Floquet mode sees it through a TE and a TM reflection,
+ * so it changes the scan impedance, and the Floquet modes above the cell are
+ * the waves it transmits.
+ */
+export interface LayeredStack {
+  /**
+   * Height of the stack's lower face, in metres. Every wire, radius
+   * included, must stay below it.
+   */
+  readonly bottomZM: number;
+  /** From the lower face up; at least one. */
+  readonly layers: readonly DielectricLayer[];
+}
+
+/** The layered stacks of a unit cell; none by default. */
+export interface LayeredStacks {
+  readonly above?: LayeredStack;
+}
+
+/**
+ * The prepared layered stack of a periodic result. Its reflection terms
+ * decay like `exp(-2 |kz| gapM)`, so the gap sets how many Floquet modes
+ * they need; a gap that would need too many is refused.
+ */
+export interface LayeredStackDiagnostics {
+  /** From the highest point of any wire axis to the stack's lower face. */
+  readonly gapM: number;
+  readonly modeCount: number;
+}
+
 /**
  * How a periodic result relates to the tolerance; every returned result is
  * within it. `"near-cutoff"`: on or near a Wood anomaly, where a Floquet mode
@@ -686,6 +732,8 @@ export interface PeriodicPointDiagnostics {
    */
   readonly estimatedError: number;
   readonly status: PeriodicPointStatus;
+  /** Present with a layered stack. */
+  readonly layeredStack?: LayeredStackDiagnostics;
 }
 
 /**
@@ -722,12 +770,16 @@ export interface FloquetMode extends FloquetModeIndex {
 /**
  * Power per cell when one port is driven as the normalization says: the
  * input power returns as the power of the propagating Floquet modes plus
- * the loss in the loads, to the discretization error of the wires.
+ * the loss in the loads and in the layered stacks, to the discretization
+ * error of the wires.
  */
 export interface FloquetPortPower {
   readonly inputW: number;
   readonly propagatingW: number;
+  /** In the loads and the wires' conductivity. */
   readonly lossW: number;
+  /** In the layered stacks; zero without one. */
+  readonly dielectricLossW: number;
 }
 
 /** The Floquet modes a unit cell radiates at one scan state. */
@@ -1013,6 +1065,12 @@ export interface NecPeriodicModel {
   setGround(ground: PeriodicGround): void;
   setLattice(lattice: PeriodicLattice): void;
   /**
+   * Replace the layered stacks; `{}` removes them. A wire that enters a
+   * stack is refused here; a gap too small for the periodic tolerance is
+   * refused when solving, with the gap and the mode count it would need.
+   */
+  setLayeredStacks(stacks: LayeredStacks): void;
+  /**
    * Fill, factor and return the scan impedance for one scan state. A scan
    * change at the previous frequency fills only the scan-dependent part of
    * the interaction matrix and is about twice as fast as a new frequency.
@@ -1059,6 +1117,7 @@ export type NecWorkerOperation =
   | "prepareCurrentQuadrature"
   | "characterizeIsolatedElement"
   | "setLattice"
+  | "setLayeredStacks"
   | "computeScanImpedance"
   | "dispose";
 
@@ -1157,6 +1216,7 @@ export interface NecPeriodicWorkerModel {
   clearLoads(): Promise<void>;
   setGround(ground: PeriodicGround): Promise<void>;
   setLattice(lattice: PeriodicLattice): Promise<void>;
+  setLayeredStacks(stacks: LayeredStacks): Promise<void>;
   computeScanImpedance(request: ScanImpedanceRequest): Promise<ScanImpedanceResult>;
   /** As `NecPeriodicModel.sweepScanImpedance`; starts after the calls before it. */
   sweepScanImpedance(

@@ -178,7 +178,8 @@ enum necpp_wasm_v1_result_buffer_kind {
   /* Periodic Floquet amplitudes (necpp_wasm_v1_compute_floquet_amplitudes).
    * Per mode: kt and kz in radians per metre. Mode-major, index
    * mode * port_count + port: te, tm (square-root watts) and the mode power
-   * (watts per cell). Per port: input, propagating and loss power. */
+   * (watts per cell). Per port: input, propagating, load loss and
+   * dielectric (layered-stack) loss power. */
   NECPP_WASM_V1_FLOQUET_KT_X = 50,
   NECPP_WASM_V1_FLOQUET_KT_Y = 51,
   NECPP_WASM_V1_FLOQUET_KZ_REAL = 52,
@@ -190,7 +191,8 @@ enum necpp_wasm_v1_result_buffer_kind {
   NECPP_WASM_V1_FLOQUET_MODE_POWER_W = 58,
   NECPP_WASM_V1_FLOQUET_INPUT_POWER_W = 59,
   NECPP_WASM_V1_FLOQUET_PROPAGATING_POWER_W = 60,
-  NECPP_WASM_V1_FLOQUET_LOSS_W = 61
+  NECPP_WASM_V1_FLOQUET_LOSS_W = 61,
+  NECPP_WASM_V1_FLOQUET_DIELECTRIC_LOSS_W = 62
 };
 
 enum necpp_wasm_v1_current_mode {
@@ -293,6 +295,19 @@ int32_t necpp_wasm_v1_set_lattice(
 int32_t necpp_wasm_v1_clear_lattice(necpp_wasm_v1_model* model);
 int32_t necpp_wasm_v1_set_scan_phases(
   necpp_wasm_v1_model* model, double psi1_rad, double psi2_rad);
+/*
+ * Layered stack above the wires of a periodic unit cell (a radome), additive
+ * ABI v1 symbol: its lower face at bottom_z_m and layer_count layers from
+ * there up, each three doubles in `layers` (thickness in metres, relative
+ * permittivity of at least 1, loss tangent), with air above them;
+ * layer_count 0 removes the stack. Invalidates the factorization. Returns
+ * NECPP_WASM_V1_GEOMETRY_ERROR when a conductor enters the stack; prepare
+ * returns NECPP_WASM_V1_GEOMETRY_ERROR for a gap too small for the periodic
+ * tolerance, with the gap and mode count in the message.
+ */
+int32_t necpp_wasm_v1_set_layered_stack_above(
+  necpp_wasm_v1_model* model,
+  double bottom_z_m, const double* layers, size_t layer_count);
 int32_t necpp_wasm_v1_prepare(
   necpp_wasm_v1_model* model, double frequency_mhz);
 int32_t necpp_wasm_v1_compute_impedance(necpp_wasm_v1_model* model);
@@ -413,6 +428,13 @@ double necpp_wasm_v1_impedance_condition_estimate(
 double necpp_wasm_v1_impedance_estimated_error(
   const necpp_wasm_v1_model* model);
 int32_t necpp_wasm_v1_impedance_point_status(
+  const necpp_wasm_v1_model* model);
+/* Periodic mode with a layered stack above the wires (0 otherwise): the gap
+ * from the highest point of a wire axis to the stack in metres, and the
+ * number of Floquet modes its reflection terms take. */
+double necpp_wasm_v1_impedance_stack_gap_m(
+  const necpp_wasm_v1_model* model);
+double necpp_wasm_v1_impedance_stack_mode_count(
   const necpp_wasm_v1_model* model);
 /* Periodic mode only: the Floquet-mode amplitudes of every port's basis
  * solve, normalized as embedded fields (necpp_wasm_v1_embedded_normalization):

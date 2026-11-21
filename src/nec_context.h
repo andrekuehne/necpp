@@ -35,12 +35,14 @@
 #include "nec_ground.h"
 #include "nec_power_budget.h"
 #include "c_plot_card.h"
+#include "nec_periodic_stack.h"
 
 class c_geometry;
 class nec_stateful_model;
 struct nec_far_field_evaluation_input;
 namespace nec_periodic {
 class periodic_green; struct wire_segment; class low_rank_update; struct floquet_mode; struct vec2;
+class lattice_2d;
 }
 
 enum excitation_return {
@@ -170,6 +172,30 @@ public:
    * (|te|^2 + |tm|^2) / 2 watts per cell. Phase referred to the origin. */
   std::pair<nec_complex, nec_complex> stateful_periodic_floquet_amplitudes(
     const nec_periodic::floquet_mode& mode, bool above) const;
+
+  /*! Periodic mode: a layered stack above the wires (a radome), in metres,
+   * layers from its lower face up, with air above it. Each Floquet mode sees
+   * it through a TE and a TM reflection added to the interaction matrix, and
+   * the modes above it are the waves it transmits. Applied from the next
+   * stateful_prepare_frequency(); the scan-independent fill is kept. */
+  struct periodic_stack_definition {
+    nec_float bottom_z_m = 0;
+    std::vector<nec_periodic::dielectric_layer> layers;  // thickness in metres
+  };
+  void stateful_set_periodic_stack(std::optional<periodic_stack_definition> stack);
+  /*! Refuse a stack that a conductor enters or touches
+   * (nec_geometry_exception). Changes nothing. */
+  void stateful_check_periodic_stack_entry(const periodic_stack_definition& stack) const;
+  /*! The prepared stack: the gap between the highest point of any wire axis
+   * and the stack, and the Floquet modes its reflection terms take. */
+  struct periodic_stack_diagnostics {
+    nec_float gap_m = 0;
+    size_t mode_count = 0;
+  };
+  std::optional<periodic_stack_diagnostics> stateful_periodic_stack_diagnostics() const;
+  /*! Periodic mode: the power the latest solve loses in the stack, in watts
+   * per cell; zero without one. */
+  nec_float stateful_periodic_dielectric_loss() const;
 
   /*! Result ownership helpers for the stateful layer. */
   void stateful_clear_results()  { m_results.clear(); }
@@ -1029,9 +1055,15 @@ private:
   // unit-cell current of the latest solve, with its ground image over
   // perfect ground, in wavelength units and native current coefficients
   // (amperes per wavelength).
-  std::array<nec_complex, 3> periodic_radiation_vector(nec_periodic::vec2 kt, nec_complex kz) const;
+  // With reference_z h, the direct current is weighed against
+  // exp(j (kt . rho + kz (z - h))) and its image against
+  // exp(j (kt . rho - kz (z + h))), so N comes out times exp(-j kz h).
+  std::array<nec_complex, 3> periodic_radiation_vector(
+    nec_periodic::vec2 kt, nec_complex kz, nec_float reference_z = 0) const;
   // The singular parts of the Floquet modes split out of m_periodic_green
-  // (near cut-off), solved by a low-rank update; null when none is split.
+  // (near cut-off), and the layered stack's terms that are large (near
+  // cut-off or a guided-wave pole), solved by a low-rank update; null when
+  // there are none.
   std::shared_ptr<nec_periodic::low_rank_update> m_periodic_low_rank;
   // Lattice translations, in wavelengths, under which some periodic image
   // comes close to the unit cell. For each observation point and source
@@ -1072,6 +1104,53 @@ private:
   // splits a Floquet mode out of the kernel into the low-rank update; set
   // only by the periodic model test.
   std::optional<nec_float> m_periodic_near_cutoff;
+
+  // The layered stack above the wires, as set (metres), and as prepared for
+  // the frequency and scan state: in wavelengths, with the Floquet modes its
+  // reflection terms take and each mode's TE and TM response.
+  std::optional<periodic_stack_definition> m_periodic_stack;
+  struct prepared_stack_mode {
+    nec_float kt_x = 0, kt_y = 0;
+    nec_complex kz;
+    // Split out of the kernel near cut-off (and then with the kernel's kt, kz).
+    bool split = false;
+    nec_periodic::stack_response te, tm;
+  };
+  struct prepared_periodic_stack {
+    nec_float bottom_z = 0;
+    nec_float top_z = 0;
+    nec_float gap_m = 0;
+    std::vector<nec_periodic::dielectric_layer> layers;
+    std::vector<prepared_stack_mode> modes;
+  };
+  std::optional<prepared_periodic_stack> m_prepared_stack;
+  // Builds m_prepared_stack at stateful_prepare_frequency, or refuses a gap
+  // that would need too many modes; returns the stack's estimated error.
+  nec_float prepare_periodic_stack(const nec_periodic::lattice_2d& lattice,
+    nec_periodic::vec2 scan_wavevector, nec_float per_metre);
+  // Adds the stack's reflection terms to cm, or to update where they are
+  // large (near cut-off or a guided-wave pole of the stack).
+  void periodic_stack_fill(nec_periodic::low_rank_update& update);
+  // The response of the prepared stack to the TE or TM part of a mode, in the
+  // field convention of the Floquet amplitudes, and the factor
+  // 1 / (1 - rho R exp(-2j kz h)) of the reflections between the stack and
+  // a perfect ground (rho = -1 TE, +1 TM).
+  struct stack_mode_response {
+    nec_complex reflection, transmission, multiple_reflections;
+    nec_float absorbed = 0;
+  };
+  stack_mode_response periodic_stack_mode_response(
+    const nec_periodic::stack_response& response, nec_complex kz, bool te) const;
+  // For a mode split out of the kernel near cut-off: the factor by which the
+  // stack scales the kernel's singular TE or TM part c u v^T (v with the
+  // ground image's source factor), 1 + R_eff sigma / source_factor with
+  // sigma the limit of a b^T over u v^T at cut-off; periodic_stack_fill adds
+  // the rest, c R_eff (a b^T - sigma u v^T), which is finite there.
+  nec_complex periodic_stack_split_factor(const nec_periodic::floquet_mode& mode,
+    bool te, nec_float source_factor) const;
+  // A term whose coefficient, relative to a propagating mode's, exceeds this
+  // goes to the low-rank update.
+  static constexpr nec_float periodic_stack_low_rank_threshold = 1e3;
   std::vector<nec_periodic::wire_segment> periodic_wire_segments_m() const;
   void periodic_fill();
   void fill_part_matrix(fill_part part, complex_array& matrix);

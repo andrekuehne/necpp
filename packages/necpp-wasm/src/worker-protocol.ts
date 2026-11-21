@@ -16,14 +16,15 @@ import type {
   CreateNecModelOptions,
   CreateNecWorkerModelOptions,
   EmbeddedFarFieldResult,
-  FieldBackendDiagnostics,
   FarFieldResult,
+  FieldBackendDiagnostics,
   FloquetAmplitudes,
   FloquetMode,
   GeometryCompletionResult,
   ImpedanceResult,
   IsolatedElementCharacterization,
   IsolatedElementHandoff,
+  LayeredStackDiagnostics,
   NecCurrentDistribution,
   NecModelState,
   NecWorkerOperation,
@@ -590,12 +591,24 @@ function reviveFloquetAmplitudes(value: unknown, ports: number): FloquetAmplitud
     inputW: finiteWorkerNumber(power?.inputW, `floquet.powerBudget[${index}].inputW`),
     propagatingW: finiteWorkerNumber(power?.propagatingW, `floquet.powerBudget[${index}].propagatingW`),
     lossW: finiteWorkerNumber(power?.lossW, `floquet.powerBudget[${index}].lossW`),
+    dielectricLossW: finiteWorkerNumber(power?.dielectricLossW, `floquet.powerBudget[${index}].dielectricLossW`),
   }));
   return Object.freeze({
     normalization: embeddedNormalization(kind === "unit-voltage" ? 0 : 1),
     modes: Object.freeze(modes),
     powerBudget: Object.freeze(powerBudget),
   });
+}
+
+function reviveLayeredStackDiagnostics(value: unknown): { layeredStack?: LayeredStackDiagnostics } {
+  if (value === undefined) return {};
+  const record = value as LayeredStackDiagnostics;
+  const gapM = finiteWorkerNumber(record?.gapM, "diagnostics.layeredStack.gapM");
+  const modeCount = record.modeCount;
+  if (!(gapM > 0) || !Number.isSafeInteger(modeCount) || modeCount < 0) {
+    throw new NecRuntimeError("Worker result diagnostics.layeredStack is invalid");
+  }
+  return { layeredStack: Object.freeze({ gapM, modeCount }) };
 }
 
 /** Validate and copy a structured-cloned scan-impedance result. */
@@ -618,7 +631,11 @@ export function reviveScanImpedanceResult(value: unknown): ScanImpedanceResult {
     admittance: matrices.admittance,
     frequencyMHz: finiteWorkerNumber(record.frequencyMHz, "frequencyMHz"),
     scanPhasesRad: workerPair(record.scanPhasesRad, "scanPhasesRad"),
-    diagnostics: Object.freeze({ estimatedError, status: status as PeriodicPointStatus }),
+    diagnostics: Object.freeze({
+      estimatedError,
+      status: status as PeriodicPointStatus,
+      ...reviveLayeredStackDiagnostics(record.diagnostics?.layeredStack),
+    }),
     floquet: reviveFloquetAmplitudes(record.floquet, matrices.impedance.rows),
   };
 }

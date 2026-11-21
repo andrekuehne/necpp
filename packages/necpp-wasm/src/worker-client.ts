@@ -20,6 +20,7 @@ import type {
   IsolatedElementHandoff,
   IsolatedElementHandoffOptions,
   IsolatedElementRequest,
+  LayeredStacks,
   LoadDefinition,
   NecCurrentDistribution,
   NecModelState,
@@ -650,6 +651,10 @@ class WorkerNecPeriodicModel implements NecPeriodicWorkerModel {
 
   setLattice(lattice: PeriodicLattice): Promise<void> {
     return this.#configure({ method: "setLattice", argument: lattice }, [lattice]);
+  }
+
+  setLayeredStacks(stacks: LayeredStacks): Promise<void> {
+    return this.#configure({ method: "setLayeredStacks", argument: stacks }, [stacks]);
   }
 
   async computeScanImpedance(request: ScanImpedanceRequest): Promise<ScanImpedanceResult> {

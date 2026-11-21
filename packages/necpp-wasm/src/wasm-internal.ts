@@ -76,6 +76,12 @@ export interface NecWasmModule {
     psi1Rad: number,
     psi2Rad: number,
   ): number;
+  _necpp_wasm_v1_set_layered_stack_above(
+    model: number,
+    bottomZM: number,
+    layers: number,
+    layerCount: number,
+  ): number;
   _necpp_wasm_v1_prepare(model: number, frequencyMHz: number): number;
   _necpp_wasm_v1_compute_impedance(model: number): number;
   _necpp_wasm_v1_solve_voltages(
@@ -161,6 +167,8 @@ export interface NecWasmModule {
   _necpp_wasm_v1_impedance_condition_estimate(model: number): number;
   _necpp_wasm_v1_impedance_estimated_error(model: number): number;
   _necpp_wasm_v1_impedance_point_status(model: number): number;
+  _necpp_wasm_v1_impedance_stack_gap_m(model: number): number;
+  _necpp_wasm_v1_impedance_stack_mode_count(model: number): number;
   _necpp_wasm_v1_compute_floquet_amplitudes(
     model: number,
     normalization: number,

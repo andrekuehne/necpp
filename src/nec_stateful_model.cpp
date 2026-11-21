@@ -616,6 +616,39 @@ void nec_stateful_model::set_lattice(const nec_lattice_definition& lattice)
   invalidate_factorization();
 }
 
+void nec_stateful_model::set_layered_stacks(const nec_layered_stacks_definition& stacks)
+{
+  const char* operation = "SET LAYERED STACKS";
+  require_configurable(operation);
+  std::optional<nec_context::periodic_stack_definition> above;
+  if (stacks.above) {
+    const nec_layered_stack_definition& stack = *stacks.above;
+    if (!finite_value(stack.bottom_z_m))
+      fail(operation, "THE STACK'S LOWER FACE MUST BE FINITE");
+    if (stack.layers.empty())
+      fail(operation, "A LAYERED STACK NEEDS AT LEAST ONE LAYER");
+    nec_context::periodic_stack_definition definition;
+    definition.bottom_z_m = stack.bottom_z_m;
+    for (const nec_dielectric_layer_definition& layer : stack.layers) {
+      if (!finite_value(layer.thickness_m) || !(layer.thickness_m > 0.0))
+        fail(operation, "LAYER THICKNESS MUST BE POSITIVE AND FINITE");
+      if (!finite_value(layer.relative_permittivity) || !(layer.relative_permittivity >= 1.0))
+        fail(operation, "LAYER RELATIVE PERMITTIVITY MUST BE FINITE AND AT LEAST 1");
+      if (!finite_value(layer.loss_tangent) || !(layer.loss_tangent >= 0.0))
+        fail(operation, "LAYER LOSS TANGENT MUST BE FINITE AND NOT NEGATIVE");
+      // exp(+jwt): eps = eps_r (1 - j tan_delta).
+      definition.layers.push_back({layer.thickness_m,
+        nec_complex(layer.relative_permittivity, -layer.relative_permittivity * layer.loss_tangent)});
+    }
+    m_context->stateful_check_periodic_stack_entry(definition);
+    above = std::move(definition);
+  }
+  m_context->stateful_set_periodic_stack(std::move(above));
+  m_layered_stacks = stacks;
+  // The stack enters only the scan-dependent part of the fill.
+  invalidate_for_scan_change();
+}
+
 void nec_stateful_model::clear_lattice()
 {
   require_configurable("CLEAR LATTICE");
@@ -917,6 +950,11 @@ const nec_impedance_result& nec_stateful_model::compute_impedance_matrix()
     diagnostics.estimated_error = m_context->stateful_periodic_estimated_error();
     if (m_context->stateful_periodic_near_cutoff())
       diagnostics.status = nec_periodic_point_status::near_cutoff;
+    if (const auto stack = m_context->stateful_periodic_stack_diagnostics()) {
+      diagnostics.layered_stack = true;
+      diagnostics.stack_gap_m = stack->gap_m;
+      diagnostics.stack_mode_count = stack->mode_count;
+    }
     result.periodic = diagnostics;
   }
   m_impedance_result = std::move(result);
@@ -1000,6 +1038,7 @@ const nec_floquet_result& nec_stateful_model::compute_floquet_amplitudes(
       for (size_t index = 0; index < port_count; ++index)
         power.input_w += 0.5 * std::real(achieved_voltages[index] * std::conj(achieved_currents[index]));
       power.loss_w = m_context->stateful_power_budget().structure_loss_w;
+      power.dielectric_loss_w = m_context->stateful_periodic_dielectric_loss();
       for (size_t index = 0; index < radiated.size(); ++index) {
         nec_floquet_mode& output = result.modes[index];
         std::tie(output.te[port], output.tm[port]) =

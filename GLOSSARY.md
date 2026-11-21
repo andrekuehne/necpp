@@ -112,3 +112,7 @@ _Avoid_: finite array (that has no elements outside the block)
 
 **Layered stack**:
 A region above or below the wires made of layers that are uniform in the lattice plane (radome, substrate, finite ground). It acts on each Floquet mode only through a TE and a TM reflection coefficient.
+
+**Gap**:
+The distance from the highest point of any wire axis to a layered stack. The stack's reflection terms decay like `exp(-2 |kz| g)` across it, so the gap sets how many Floquet modes they need; too small a gap is refused.
+_Avoid_: clearance (that is between conductors and their periodic images), spacing
