@@ -154,13 +154,14 @@ TEST_CASE("Transmission is the same through the reversed stack", "[periodic_stac
 TEST_CASE("At cut-off in air the stack response is finite", "[periodic_stack]") {
   // kz = 0 exactly: TE sees a short (reflection -1), TM an open (+1), as at
   // grazing incidence on any dielectric; nothing is transmitted or absorbed.
+  // To rounding: complex division is not exact on every platform.
   const std::vector<dielectric_layer> stack{{0.05, complex_d(4.0, -0.08)}};
   const stack_response te = stack_response_of(stack, k, 0.0, polarization::te);
   const stack_response tm = stack_response_of(stack, k, 0.0, polarization::tm);
-  CHECK(te.reflection == complex_d(-1.0, 0.0));
-  CHECK(tm.reflection == complex_d(1.0, 0.0));
-  CHECK(te.transmission == complex_d(0.0, 0.0));
-  CHECK(tm.transmission == complex_d(0.0, 0.0));
+  CHECK(std::abs(te.reflection + 1.0) < 1e-15);
+  CHECK(std::abs(tm.reflection - 1.0) < 1e-15);
+  CHECK(std::abs(te.transmission) < 1e-15);
+  CHECK(std::abs(tm.transmission) < 1e-15);
   CHECK(te.absorbed == 0.0);
   CHECK(tm.absorbed == 0.0);
 }

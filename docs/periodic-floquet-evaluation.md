@@ -325,10 +325,20 @@ Stage 2 so far:
     (CST's own power balance closes to 3e-4), and the sheet's change of the
     impedance to 3.0 to 4.3 % (21 segments, wire radius w / 4). The absolute
     impedances differ by about 5 ohm in both cases, the feed models (a 1 mm
-    face port against a segment source). The bare thin-wire result still
-    moves with the segmentation where the segments get short: at H-plane 60
-    degrees 218, 243, 258 and 270 ohm resistance at 11, 21, 31 and 41
-    segments (CST 246), the last two with segments of 2 to 3 wire radii.
+    face port against a segment source). The thin-wire result moves with
+    the segmentation once segments get short: at H-plane 60 degrees 218,
+    243, 258 and 270 ohm resistance at 11, 21, 31 and 41 uniform segments
+    (CST 246). Holding the feed segment at 2.4 mm and refining only the arms
+    does not converge either: the bare broadside resistance goes 107, 127,
+    138, 145 and 156 ohm for 5 to 30 segments per arm (CST 120), and the
+    sheet's change matches CST best at 10 per arm (4 to 5 %, against 10 to
+    30 % elsewhere). The same happens in an isolated finite dipole of the
+    same wire in free space, with no periodic code involved (71, 85, 98, 106
+    and 119 ohm for 5, 10, 20, 30 and 60 segments per arm; with a 0.1 mm
+    wire 69 to 85 ohm, settling slowly). It is NEC's thin-wire kernel below
+    about 3 radii per segment and its source model next to much shorter
+    segments, so the comparison uses uniform segments of 4.6 radii (21);
+    a feed-gap-matched model would need tapered segmentation.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
