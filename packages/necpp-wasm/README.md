@@ -1089,16 +1089,33 @@ matching (WAIM) sheet, is made of dielectric layers that are uniform in the
 lattice plane, with air above them:
 
 ```ts
+import { createNecPeriodicModel, rectangularLattice } from "@necpp-engine/wasm";
+
+// Strip dipoles (as wires of radius width / 4) 25 mm over ground at 3 GHz.
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 21, start: [-0.024, 0, 0.025], end: [0.024, 0, 0.025], radiusM: 0.0005 });
+cell.completeGeometry();
+cell.definePorts([{ tag: 1, segment: 11 }]);
+cell.setGround({ kind: "perfect" });
+cell.setLattice(rectangularLattice({ spacingXM: 0.06, spacingYM: 0.05 }));
+
+// A 3 mm sheet of eps_r 4 whose lower face is 15 mm above the dipoles.
 cell.setLayeredStacks({
   above: {
-    bottomZM: 0.04, // lower face, above every wire
+    bottomZM: 0.04,
     layers: [{ thicknessM: 0.003, relativePermittivity: 4, lossTangent: 0.02 }],
   },
 });
-const result = cell.computeScanImpedance({ frequencyMHz, scanDirection: { thetaDeg: 45, phiDeg: 90 } });
-result.diagnostics.layeredStack;            // { gapM, modeCount }
-result.floquet.powerBudget[0].dielectricLossW; // watts per cell absorbed in the stack
-cell.setLayeredStacks({}); // removes it
+const result = cell.computeScanImpedance({
+  frequencyMHz: 2997.92458,
+  scanDirection: { thetaDeg: 45, phiDeg: 90 },
+});
+const [power] = result.floquet.powerBudget;
+// The gap and the modes the stack's terms took; the share of the input power
+// absorbed in the sheet.
+console.log(result.diagnostics.layeredStack, power && power.dielectricLossW / power.inputW);
+cell.setLayeredStacks({}); // removes the stack
+cell.dispose();
 ```
 
 - Each Floquet mode sees the stack through a TE and a TM reflection, from a
