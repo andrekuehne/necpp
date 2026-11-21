@@ -90,6 +90,7 @@ export type {
   FreeSpaceGround,
   LatticeVectorM,
   LayeredStack,
+  LayeredStackBelow,
   LayeredStackDiagnostics,
   LayeredStacks,
   FullArrayDescription,

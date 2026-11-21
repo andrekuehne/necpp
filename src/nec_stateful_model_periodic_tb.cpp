@@ -147,6 +147,32 @@ TEST_CASE("The lattice changes the port impedance until it is cleared", "[period
   REQUIRE(port_impedance(model) == isolated);
 }
 
+TEST_CASE("Finite ground returns to NEC's own ground when the lattice is cleared", "[periodic_model]")
+{
+  // In periodic mode finite ground reaches each Floquet mode as a half-space
+  // and NEC's own ground is free space; clearing the lattice restores it.
+  nec_stateful_model model;
+  model.add_wire({1, 11, 0.0, 0.0, 0.3, 0.0, 0.0, 0.78, 0.001});
+  model.complete_geometry();
+  model.define_ports({{1, 6}});
+  nec_ground_definition finite;
+  finite.kind = nec_ground_kind::finite_reflection_coefficient;
+  finite.relative_permittivity = 13.0;
+  finite.conductivity_s_per_m = 0.005;
+  model.set_ground(finite);
+  const nec_complex isolated = port_impedance(model);
+
+  model.set_lattice(square_lattice(0.7));
+  const nec_complex periodic = port_impedance(model);
+  REQUIRE(std::isfinite(periodic.real()));
+  REQUIRE(std::abs(periodic - isolated) > 1.0);
+
+  model.clear_lattice();
+  REQUIRE(port_impedance(model) == isolated);
+  model.set_lattice(square_lattice(0.7));
+  REQUIRE(port_impedance(model) == periodic);
+}
+
 TEST_CASE("A lattice under which a conductor touches its image is refused without effect", "[periodic_model]")
 {
   nec_stateful_model model;
@@ -161,7 +187,7 @@ TEST_CASE("A lattice under which a conductor touches its image is refused withou
   REQUIRE(port_impedance(model) == before);
 }
 
-TEST_CASE("Periodic mode refuses symmetry and finite ground", "[periodic_model]")
+TEST_CASE("Periodic mode refuses symmetry, and conductors reaching finite ground", "[periodic_model]")
 {
   SECTION("symmetric geometry")
   {
@@ -176,8 +202,10 @@ TEST_CASE("Periodic mode refuses symmetry and finite ground", "[periodic_model]"
     REQUIRE_FALSE(model.periodic());
   }
 
-  SECTION("finite ground")
+  SECTION("a dipole lying on finite ground")
   {
+    // Finite ground is supported (as a layered stack), but wires must stay
+    // in the air above it.
     nec_stateful_model model;
     build_dipole_cell(model);
     nec_ground_definition finite;
@@ -186,12 +214,12 @@ TEST_CASE("Periodic mode refuses symmetry and finite ground", "[periodic_model]"
     finite.conductivity_s_per_m = 0.005;
     model.set_ground(finite);
     REQUIRE(mentions(refusal<nec_geometry_exception>(
-      [&] { model.set_lattice(square_lattice(0.7)); }), "FINITE GROUND"));
+      [&] { model.set_lattice(square_lattice(0.7)); }), "CONDUCTOR ENTERS THE FINITE GROUND"));
 
     model.set_ground(nec_ground_definition{});
     model.set_lattice(square_lattice(0.7));
     REQUIRE(mentions(refusal<nec_geometry_exception>(
-      [&] { model.set_ground(finite); }), "FINITE GROUND"));
+      [&] { model.set_ground(finite); }), "CONDUCTOR ENTERS THE FINITE GROUND"));
   }
 }
 

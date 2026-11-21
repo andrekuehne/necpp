@@ -144,7 +144,7 @@ test("scan impedance over perfect ground is reciprocal as Z(psi) = Z(-psi)^T", {
   assert.ok(asymmetry > 0.1, `Z(psi) should not be symmetric: ${asymmetry}`);
 });
 
-test("finite ground and conductors on the ground plane are refused with the reason", { skip }, async () => {
+test("conductors on the ground plane or finite ground are refused with the reason", { skip }, async () => {
   const lattice = { a1M: [0.6, 0], a2M: [0, 0.5] };
   const cell = await wireCell([horizontalDipole([0, 0, 0])]);
   try {
@@ -156,7 +156,7 @@ test("finite ground and conductors on the ground plane are refused with the reas
       method: "reflection-coefficient",
       relativePermittivity: 13,
       conductivitySPerM: 0.005,
-    }), (error) => error instanceof NecGeometryError && /FINITE GROUND/.test(error.message));
+    }), (error) => error instanceof NecGeometryError && /CONDUCTOR ENTERS THE FINITE GROUND/.test(error.message));
     // Both refusals left the cell in free space.
     const result = cell.computeScanImpedance({ frequencyMHz: FREQUENCY_MHZ, scanPhasesRad: [0, 0] });
     assert.ok(Number.isFinite(result.impedance.real[0]));

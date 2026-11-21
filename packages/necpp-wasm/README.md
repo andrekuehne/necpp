@@ -779,7 +779,8 @@ additional native solves.
 ## Infinite periodic arrays
 
 `createNecPeriodicModel()` models one **unit cell** of an infinite planar
-array in free space or above a perfect ground plane. Wires, ports and loads
+array in free space, above a perfect ground plane or above finite ground.
+Wires, ports and loads
 use the same definitions as `NecModel`; the lattice is two vectors in the
 xy-plane, in metres. For each **scan state** it returns the P x P **scan
 impedance** and **scan admittance** of the unit-cell ports: the port matrices
@@ -941,7 +942,7 @@ cell.dispose();
   as propagating Floquet power plus the loss in the loads, to the
   discretization error of the wires (about 1e-3 at 21 segments per
   half-wave, falling with the square of the segment length).
-- Over perfect ground only modes above the cell exist.
+- Over perfect or finite ground only modes above the cell exist.
 - `terminatedFloquetAmplitudes(result, { generatorImpedanceOhm })` terminates
   every port in the same generator impedance (ohms, or `[resistance,
   reactance]`) and drives one port at a time with 1 W of available power,
@@ -1082,7 +1083,7 @@ cell.dispose();
   load every port of the cell with it (`addLoad`) and drive the window
   through it; the active impedances then include the load.
 
-### Layered stacks (radomes)
+### Layered stacks (radomes, substrates) and finite ground
 
 A **layered stack** above the wires, such as a radome or a wide-angle impedance
 matching (WAIM) sheet, is made of dielectric layers that are uniform in the
@@ -1136,6 +1137,46 @@ cell.dispose();
 - Permittivity is constant over frequency: `relativePermittivity` at least 1,
   `lossTangent` at least 0, and `mu_r = 1`.
 
+A stack **below** the wires, such as a substrate, is placed by its upper face
+and lists its layers from there down. Below it is the ground: perfect or
+finite, with air between the stack and z=0 unless it rests there, or in free
+space air, through which the stack transmits the modes below the cell.
+**Finite ground** (soil of finite conductivity) is a reflection of the same
+kind, with no layers:
+
+```ts
+import { createNecPeriodicModel, rectangularLattice } from "@necpp-engine/wasm";
+
+// Half-wave dipoles 0.25 m over a 0.1 m substrate on soil, at 300 MHz.
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 21, start: [-0.24, 0, 0.25], end: [0.24, 0, 0.25], radiusM: 0.001 });
+cell.completeGeometry();
+cell.definePorts([{ tag: 1, segment: 11 }]);
+cell.setGround({ kind: "finite", method: "sommerfeld-norton", relativePermittivity: 13, conductivitySPerM: 0.005 });
+cell.setLattice(rectangularLattice({ spacingXM: 0.6, spacingYM: 0.5 }));
+cell.setLayeredStacks({
+  below: { topZM: 0.1, layers: [{ thicknessM: 0.1, relativePermittivity: 3, lossTangent: 0.01 }] },
+});
+const result = cell.computeScanImpedance({ frequencyMHz: 299.792458, scanPhasesRad: [0, 0] });
+const [power] = result.floquet.powerBudget;
+// The share of the input power taken by the substrate and the soil.
+console.log(power && power.dielectricLossW / power.inputW);
+cell.dispose();
+```
+
+- Each Floquet mode sees finite ground through its exact Fresnel reflection,
+  whichever `method` is set: no Sommerfeld integrals and no
+  reflection-coefficient approximation. Against the centre of a tapered
+  finite array over NEC's Sommerfeld-Norton ground the scan impedance agrees
+  to the finite array's edge error (1.9 % at 21 x 21).
+- Stacks above and below can be combined, over any ground; the reflections
+  between them are included. `dielectricLossW` then counts the loss in both
+  stacks and all the power that enters the soil.
+- Wires must stay in the air above the stack below and above finite ground;
+  over ground, the stack below must not reach below z=0. The gap reported in
+  `diagnostics.layeredStack` is the smallest one, to either stack or to
+  finite ground, and it sets the mode count as above.
+
 ### Conventions and limits
 
 - Scan impedance is not the active impedance of any finite array: it belongs
@@ -1143,13 +1184,13 @@ cell.dispose();
   `Z(psi) = Z(-psi)^T`.
 - A single cell of an infinite array has no far field of its own, so the
   periodic model has no far-field, embedded-field or isolated-element methods.
-- Free space, or perfect ground with `cell.setGround({ kind: "perfect" })`:
-  a ground plane at z=0 under every cell. Every conductor must stay above it;
-  one that touches, nearly touches or crosses the plane is refused with a
+- Free space, perfect ground with `cell.setGround({ kind: "perfect" })` (a
+  ground plane at z=0 under every cell) or finite ground (see above). Every
+  conductor must stay above the ground; one that touches, nearly touches or
+  crosses a perfect ground plane, or reaches finite ground, is refused with a
   `NecGeometryError` (ground connections, such as monopoles on the plane,
-  are not supported). A layered stack can sit above the wires (see above);
-  stacks below the wires and finite ground are not supported yet. No
-  geometry symmetry.
+  are not supported). Layered stacks can sit above and below the wires (see
+  above). No geometry symmetry.
 - Accuracy: one fixed internal tolerance, `1e-5` relative to the largest
   scan-impedance entry, and no numerical parameters. Each result carries
   `diagnostics.estimatedError` (the solver's numerical error: periodic

@@ -1472,26 +1472,38 @@ int32_t necpp_wasm_v1_set_layered_stack_above(
   necpp_wasm_v1_model* model,
   double bottom_z_m, const double* layers, size_t layer_count)
 {
+  return necpp_wasm_v1_set_layered_stacks(model, bottom_z_m, layers, layer_count, 0.0, nullptr, 0);
+}
+
+int32_t necpp_wasm_v1_set_layered_stacks(
+  necpp_wasm_v1_model* model,
+  double above_bottom_z_m, const double* above_layers, size_t above_count,
+  double below_top_z_m, const double* below_layers, size_t below_count)
+{
   if (model == nullptr)
     return NECPP_WASM_V1_RUNTIME_ERROR;
   if (!is_configurable(model))
     return fail(model, NECPP_WASM_V1_STATE_ERROR,
       "setLayeredStacks requires completed geometry");
-  if ((layer_count > 0 && layers == nullptr) ||
-      layer_count > static_cast<size_t>(std::numeric_limits<int32_t>::max()))
+  const size_t limit = static_cast<size_t>(std::numeric_limits<int32_t>::max());
+  if ((above_count > 0 && above_layers == nullptr) || above_count > limit ||
+      (below_count > 0 && below_layers == nullptr) || below_count > limit)
     return fail(model, NECPP_WASM_V1_INPUT_ERROR, "Invalid layer array");
 
-  // Invalid layers arrive as input errors, a conductor entering the stack as
-  // a geometry error.
+  // Invalid layers arrive as input errors, a conductor entering a stack as a
+  // geometry error.
   return invoke(model, NECPP_WASM_V1_INPUT_ERROR, [&] {
+    const auto layers_of = [](const double* layers, size_t count) {
+      std::vector<nec_dielectric_layer_definition> result;
+      for (size_t index = 0; index < count; ++index)
+        result.push_back({layers[3 * index], layers[3 * index + 1], layers[3 * index + 2]});
+      return result;
+    };
     nec_layered_stacks_definition stacks;
-    if (layer_count > 0) {
-      nec_layered_stack_definition above;
-      above.bottom_z_m = bottom_z_m;
-      for (size_t index = 0; index < layer_count; ++index)
-        above.layers.push_back({layers[3 * index], layers[3 * index + 1], layers[3 * index + 2]});
-      stacks.above = std::move(above);
-    }
+    if (above_count > 0)
+      stacks.above = nec_layered_stack_definition{above_bottom_z_m, layers_of(above_layers, above_count)};
+    if (below_count > 0)
+      stacks.below = nec_layered_stack_below_definition{below_top_z_m, layers_of(below_layers, below_count)};
     model->native.set_layered_stacks(stacks);
     clear_calculated_results(*model);
   });

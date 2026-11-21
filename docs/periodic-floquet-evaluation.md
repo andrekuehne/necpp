@@ -339,6 +339,68 @@ Stage 2 so far:
     about 3 radii per segment and its source model next to much shorter
     segments, so the comparison uses uniform segments of 4.6 radii (21);
     a feed-gap-matched model would need tapered segmentation.
+- issue #33: stacks below the wires and finite ground.
+  `setLayeredStacks({ below: { topZM, layers } })` lists its layers from the
+  upper face down; below them is the ground (perfect or finite, with air
+  between the stack and z = 0 unless it rests there) or, in free space, air.
+  Finite ground (`setGround({ kind: "finite", ... })`, either method) leaves
+  NEC's own ground in free space and reaches each Floquet mode as a
+  half-space of `eps_r - j sigma / (w eps0)`, so its Fresnel reflection is
+  exact and no Sommerfeld integrals are needed. The layer model takes what
+  lies beyond the last layer (air, a half-space or a perfect conductor); it
+  is tested natively against the Fresnel half-space and the shorted line of
+  a slab on a conductor. In the fill the wires sit between an upper
+  reflection `G_a` at `z_a` and a lower one `G_b` at `z_b`; summing the
+  reflections between them, each mode and polarization adds
+  `c (G_a / D) a b^T + c (G_b - K) a_up s_d^T`, with
+  `a = a_down + G_b W a_up`, `b = s_u + G_b W s_d`, `W = exp(-j kz (z_a -
+  z_b))` and `D = 1 - G_a G_b W^2`. Perfect ground stays on the image route:
+  `K = rho exp(-2j kz z_b)` is the part of `G_b` its image already holds, so
+  that without a stack below the second term vanishes and the first is the
+  term of issue #32. Near a pole of the lower stack the first term's vectors
+  carry the large `G_b W`, so their size enters the routing to the low-rank
+  update; at cut-off both terms join the kernel's split singular part, with
+  `sigma` `(1 + G_b)^2 kappa` and `kappa` (`kappa` 1 for TE, `(kt / k)^2` for
+  TM). The gap is now the smallest: to the stack above from the highest
+  wire point, to the stack below or to finite ground from the lowest. Modes
+  below the cell exist only without a ground; `dielectricLossW` includes the
+  power the ground takes. Verified at the package seam:
+  - finite ground of 1e8 S/m matches perfect ground by the image route to
+    1.2e-5 to 4.8e-5, falling as `1 / sqrt(sigma)`;
+  - against NEC's finite ground: very large lattice spacing approaches the
+    isolated element over reflection-coefficient ground (24 %, 3.7 %,
+    0.45 % at spacings of sqrt(7), sqrt(47) and sqrt(311) wavelengths;
+    the ground damps the coupling along it, which in free space still leaves
+    6.3 % at the largest). That limit cannot separate reflection-coefficient
+    from Sommerfeld-Norton ground (1.3 % apart for this dipole), but the
+    centre of a tapered finite array can: off broadside at a quarter-wave
+    height, over Sommerfeld-Norton ground it differs by 2.7 % at 15 x 15 and
+    1.9 % at 21 x 21 (the edge error, as over perfect ground), over
+    reflection-coefficient ground by 2.9 % and 3.0 % (that approximation);
+  - power closes to 5.9e-4 to 9.6e-4 at 21 segments with 13 to 49 % of the
+    input lost below: a slab resting on perfect ground or with air under it,
+    a stack in free space (its transmitted waves below), soil alone and
+    under a slab, and stacks above and below together;
+  - a layer of loss tangent 1e12 below acts as perfect ground at its upper
+    face (2.0e-6 alone, 1.6e-6 under the radome); capped by such a layer at
+    `z = H`, a stack below is the stack above the mirrored cell over perfect
+    ground (8.1e-7 to 2.7e-6, losses within 3e-6): the two-sided reflection
+    against the image route of issue #32;
+  - a layer of eps_r 1 below changes nothing (exactly in free space, 2e-14
+    over perfect ground, 7e-11 over soil, where the reflection is then
+    referred to the stack's face);
+  - through a half-wave window below, the modes below are the bare ones
+    times `T exp(j kz d)`, to 1e-5;
+  - the lower stack's change of the scan impedance is reciprocal to 2.6e-4
+    (free space), 1.3e-3 (perfect ground) and 5.9e-4 (soil) at 21 segments,
+    about three times more at 11: NEC's point matching across the slab's
+    0.02 m gap to the nearest wire;
+  - refusals as above: a wire entering the stack below or the soil, a lower
+    stack reaching into the ground, and a gap needing more than 20,000
+    modes (for finite ground named as such);
+  - continuity through a Wood anomaly with soil, soil under both stacks, a
+    grounded slab and a stack in free space; sweep workers replay stacks and
+    ground.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -574,14 +636,15 @@ term agrees to about 1e-5, the accuracy of NEC's own Romberg integral
   source (free-space image term from existing code, plus a smooth correction
   for the image lattice).
 - **Finite ground** (soil of infinite extent, `GroundModel` `kind: "finite"`):
-  not in stage 2. It arrives in stage 3b as one case of a layered stack: in
-  the spectral domain each Floquet mode sees an exact Fresnel coefficient, so
-  no Sommerfeld integrals are needed.
+  not in stage 2. It arrived in stage 3b (issue #33) as one case of a
+  layered stack: in the spectral domain each Floquet mode sees an exact
+  Fresnel coefficient, so no Sommerfeld integrals are needed.
 
 ### Layered stacks (stage 3b)
 
 Decided in [ADR 0001](adr/0001-layered-stacks-in-matrix-fill.md); the stack
-above the wires is implemented as issue #32 (see the status entry). The wires
+above the wires is implemented as issue #32, the stack below and finite
+ground as issue #33 (see the status entries). The wires
 live in an air region. Above and below it, layered stacks that are uniform in
 the lattice plane (radome, substrate below the wires, finite ground) act on
 each Floquet mode `(p, q)` only through a TE and a TM reflection coefficient
@@ -651,8 +714,8 @@ point is the P x P scan admittance of the P unit-cell ports.
 - Wires only; no surface patches.
 - No conductor may touch its own periodic image, checked by image distance
   (see connected arrays).
-- Free space or perfect ground only, with a layered stack above the wires
-  (issue #32); stacks below the wires and finite ground follow in issue #33.
+- Free space, perfect ground or finite ground, with layered stacks above
+  (issue #32) and below the wires (issue #33).
 - Geometry symmetry reduction disabled.
 - Networks and transmission lines: untested in this mode; exclude until
   checked.
@@ -877,7 +940,8 @@ Stage 1 has no effect on existing behaviour and can be merged on its own.
   so the reference is a full-wave FEM unit-cell simulation run for issue #32
   (see the status entry).
 - **Finite ground:** against NEC's existing reflection-coefficient ground in
-  the large-spacing limit.
+  the large-spacing limit, and against the centre of a tapered finite array
+  over Sommerfeld-Norton ground (issue #33, see the status entry).
 
 ## Decisions
 

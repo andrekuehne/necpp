@@ -16,6 +16,7 @@ import {
   type FloquetMode,
   type FloquetPortPower,
   type LayeredStack,
+  type LayeredStackBelow,
   type LayeredStackDiagnostics,
   type LayeredStacks,
   type NecPeriodicModel,
@@ -138,13 +139,14 @@ export async function periodicModelTypes(): Promise<void> {
   void cell.computeEmbeddedFarFields;
   // @ts-expect-error no isolated-element (ring-field) characterization on the periodic model.
   void cell.characterizeIsolatedElement;
-  // Free space or perfect ground; finite ground needs layered stacks.
+  // Free space, perfect ground or finite ground (seen as a layered stack).
   const ground: PeriodicGround = { kind: "perfect" };
   cell.setGround(ground);
   cell.setGround({ kind: "free-space" });
+  cell.setGround({ kind: "finite", method: "reflection-coefficient", relativePermittivity: 13, conductivitySPerM: 0.005 });
   cell.setGround(
-    // @ts-expect-error no finite ground on the periodic model.
-    { kind: "finite", method: "reflection-coefficient", relativePermittivity: 13, conductivitySPerM: 0.005 },
+    // @ts-expect-error finite ground needs its soil.
+    { kind: "finite", method: "sommerfeld-norton" },
   );
   // @ts-expect-error unit cells take no symmetry options.
   cell.completeGeometry({ symmetry: { kind: "reflection", planes: ["x=0"], tagIncrement: 10 } });
@@ -244,10 +246,7 @@ export async function periodicWorkerTypes(): Promise<void> {
   void cell.characterizeIsolatedElement;
   // @ts-expect-error no prepare step: the scan request names the frequency.
   void cell.prepare;
-  cell.setGround(
-    // @ts-expect-error no finite ground on the periodic worker model.
-    { kind: "finite", method: "reflection-coefficient", relativePermittivity: 13, conductivitySPerM: 0.005 },
-  );
+  await cell.setGround({ kind: "finite", method: "sommerfeld-norton", relativePermittivity: 13, conductivitySPerM: 0.005 });
   cell.terminate();
   await cell.dispose();
 }
@@ -318,14 +317,16 @@ export async function layeredStackTypes(
 ): Promise<void> {
   const layer: DielectricLayer = { thicknessM: 0.003, relativePermittivity: 4, lossTangent: 0.02 };
   const above: LayeredStack = { bottomZM: 0.04, layers: [layer, { thicknessM: 0.01, relativePermittivity: 2.2 }] };
-  const stacks: LayeredStacks = { above };
+  const below: LayeredStackBelow = { topZM: 0.01, layers: [layer] };
+  const stacks: LayeredStacks = { above, below };
   cell.setLayeredStacks(stacks);
+  cell.setLayeredStacks({ below });
   cell.setLayeredStacks({});
   await worker.setLayeredStacks(stacks);
   const diagnostics: LayeredStackDiagnostics | undefined = result.diagnostics.layeredStack;
   const loss: number = result.floquet.powerBudget[0]!.dielectricLossW;
   void [diagnostics, loss];
-  // @ts-expect-error only a stack above the wires is supported.
+  // @ts-expect-error a stack below the wires is placed by its upper face.
   cell.setLayeredStacks({ below: above });
   // @ts-expect-error a layer needs its thickness.
   cell.setLayeredStacks({ above: { bottomZM: 0.04, layers: [{ relativePermittivity: 4 }] } });

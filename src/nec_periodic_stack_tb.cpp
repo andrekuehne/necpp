@@ -151,6 +151,80 @@ TEST_CASE("Transmission is the same through the reversed stack", "[periodic_stac
     }
 }
 
+TEST_CASE("A half-space beyond the face reflects as Fresnel and absorbs the rest", "[periodic_stack]") {
+  // Finite ground: no layers, soil of eps = 13 - 5.4j (13, 0.005 S/m at 16.6 MHz).
+  // The power entering the half-space never returns, so it counts as absorbed.
+  const complex_d eps(13.0, -5.4);
+  const nec_periodic::stack_termination soil{eps};
+  for (const double s : {0.0, std::sin(35 * pi / 180), 0.95}) {
+    const double c = std::sqrt(1 - s * s);
+    const complex_d root = std::sqrt(eps - s * s);
+    const complex_d r_s = (c - root) / (c + root);
+    const complex_d r_p = (eps * c - root) / (eps * c + root);
+    const stack_response te = stack_response_of({}, k, air_kz(s), polarization::te, soil);
+    const stack_response tm = stack_response_of({}, k, air_kz(s), polarization::tm, soil);
+    CHECK(std::abs(te.reflection - r_s) < 1e-13);
+    CHECK(std::abs(tm.reflection + r_p) < 1e-13);
+    for (const stack_response& r : {te, tm}) {
+      CHECK(r.transmission == complex_d(0.0, 0.0));
+      CHECK(std::abs(r.absorbed - (1 - std::norm(r.reflection))) < 1e-13);
+    }
+  }
+}
+
+TEST_CASE("A slab on a perfect conductor reflects as a shorted line", "[periodic_stack]") {
+  // The conductor shorts the tangential field: the slab's input admittance is
+  // -j y1 cot(kz1 d) (TE), its input impedance j z1 tan(kz1 d) (TM), with
+  // y = kz / k and z = kz / (eps k).
+  const nec_periodic::stack_termination conductor{1.0, true};
+  for (const polarization mode : both)
+    CHECK(std::abs(stack_response_of({}, k, air_kz(0.3), mode, conductor).reflection + 1.0) < 1e-15);
+  const double eps = 4.4, thickness = 0.07;
+  for (const double s : {0.0, 0.6, 1.3, 2.5}) {
+    const complex_d kz0 = air_kz(s), kz1 = k * std::sqrt(complex_d(eps - s * s));
+    const complex_d line = std::tan(kz1 * thickness);
+    const complex_d y_in = -j * (kz1 / k) / line, y0 = kz0 / k;
+    const complex_d z_in = j * (kz1 / (eps * k)) * line, z0 = kz0 / k;
+    const stack_response te = stack_response_of({{thickness, eps}}, k, kz0, polarization::te, conductor);
+    const stack_response tm = stack_response_of({{thickness, eps}}, k, kz0, polarization::tm, conductor);
+    CHECK(std::abs(te.reflection - (y0 - y_in) / (y0 + y_in)) < 1e-13);
+    CHECK(std::abs(tm.reflection - (z_in - z0) / (z_in + z0)) < 1e-13);
+    for (const stack_response& r : {te, tm}) {
+      CHECK(r.transmission == complex_d(0.0, 0.0));
+      CHECK(std::abs(r.absorbed) < 1e-13);
+    }
+  }
+  // With loss, all that is not reflected is absorbed.
+  for (const polarization mode : both) {
+    const stack_response r =
+      stack_response_of({{thickness, complex_d(eps, -0.4)}}, k, air_kz(0.5), mode, conductor);
+    CHECK(r.absorbed > 1e-2);
+    CHECK(std::abs(r.absorbed - (1 - std::norm(r.reflection))) < 1e-13);
+  }
+}
+
+TEST_CASE("Air in front of the termination only delays its reflection", "[periodic_stack]") {
+  // The air between a stack below the wires and the ground: an eps = 1 layer
+  // of thickness d before soil or a conductor shifts its reflection by the
+  // round trip exp(-2j kz d), for propagating and evanescent modes; a layer of
+  // the soil's own permittivity just moves the soil's face.
+  const complex_d eps(13.0, -5.4);
+  const double d = 0.13;
+  for (const nec_periodic::stack_termination beyond :
+       {nec_periodic::stack_termination{eps}, nec_periodic::stack_termination{1.0, true}})
+    for (const polarization mode : both)
+      for (const double s : {0.0, 0.6, 1.4}) {
+        const complex_d bare = stack_response_of({}, k, air_kz(s), mode, beyond).reflection;
+        const complex_d spaced = stack_response_of({{d, 1.0}}, k, air_kz(s), mode, beyond).reflection;
+        CHECK(std::abs(spaced - bare * std::exp(-2.0 * j * air_kz(s) * d)) < 1e-13);
+      }
+  const nec_periodic::stack_termination soil{eps};
+  for (const polarization mode : both)
+    for (const double s : {0.0, 0.6, 1.4})
+      CHECK(std::abs(stack_response_of({{d, eps}}, k, air_kz(s), mode, soil).reflection -
+                     stack_response_of({}, k, air_kz(s), mode, soil).reflection) < 1e-13);
+}
+
 TEST_CASE("At cut-off in air the stack response is finite", "[periodic_stack]") {
   // kz = 0 exactly: TE sees a short (reflection -1), TM an open (+1), as at
   // grazing incidence on any dielectric; nothing is transmitted or absorbed.

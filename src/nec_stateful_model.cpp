@@ -523,34 +523,89 @@ void nec_stateful_model::validate_symmetric_load_orbits() const
   }
 }
 
-/*! The reason periodic mode refuses a ground model, or null for free space
- * and perfect ground. */
-static const char* periodic_ground_refusal(const nec_ground_definition& ground)
+static bool finite_ground_kind(nec_ground_kind kind)
 {
-  switch (ground.kind) {
-  case nec_ground_kind::free_space:
-  case nec_ground_kind::perfect:
-    return nullptr;
-  default:
-    return "FINITE GROUND IS NOT SUPPORTED IN PERIODIC MODE UNTIL LAYERED STACKS ARRIVE";
+  return kind == nec_ground_kind::finite_reflection_coefficient ||
+         kind == nec_ground_kind::finite_sommerfeld_norton;
+}
+
+/*! The context's layered stacks, each layer validated, in metres with
+ * eps = eps_r (1 - j tan_delta) (exp(+jwt)). */
+static nec_context::periodic_stacks_definition context_stacks(
+  const nec_layered_stacks_definition& stacks, const char* operation)
+{
+  const auto layers_of = [operation](const std::vector<nec_dielectric_layer_definition>& layers) {
+    if (layers.empty())
+      fail(operation, "A LAYERED STACK NEEDS AT LEAST ONE LAYER");
+    std::vector<nec_periodic::dielectric_layer> converted;
+    for (const nec_dielectric_layer_definition& layer : layers) {
+      if (!finite_value(layer.thickness_m) || !(layer.thickness_m > 0.0))
+        fail(operation, "LAYER THICKNESS MUST BE POSITIVE AND FINITE");
+      if (!finite_value(layer.relative_permittivity) || !(layer.relative_permittivity >= 1.0))
+        fail(operation, "LAYER RELATIVE PERMITTIVITY MUST BE FINITE AND AT LEAST 1");
+      if (!finite_value(layer.loss_tangent) || !(layer.loss_tangent >= 0.0))
+        fail(operation, "LAYER LOSS TANGENT MUST BE FINITE AND NOT NEGATIVE");
+      converted.push_back({layer.thickness_m,
+        nec_complex(layer.relative_permittivity, -layer.relative_permittivity * layer.loss_tangent)});
+    }
+    return converted;
+  };
+  nec_context::periodic_stacks_definition result;
+  if (stacks.above) {
+    if (!finite_value(stacks.above->bottom_z_m))
+      fail(operation, "THE STACK'S LOWER FACE MUST BE FINITE");
+    result.above = nec_context::periodic_stack_definition{
+      stacks.above->bottom_z_m, layers_of(stacks.above->layers)};
   }
+  if (stacks.below) {
+    if (!finite_value(stacks.below->top_z_m))
+      fail(operation, "THE STACK'S UPPER FACE MUST BE FINITE");
+    result.below = nec_context::periodic_stack_definition{
+      stacks.below->top_z_m, layers_of(stacks.below->layers)};
+  }
+  return result;
+}
+
+void nec_stateful_model::check_periodic_boundaries(const nec_layered_stacks_definition& stacks,
+  const nec_ground_definition& ground, const char* operation) const
+{
+  m_context->stateful_check_periodic_boundaries(context_stacks(stacks, operation),
+    ground.kind != nec_ground_kind::free_space, finite_ground_kind(ground.kind));
 }
 
 void nec_stateful_model::set_ground(const nec_ground_definition& ground)
 {
   require_configurable("SET GROUND");
   validate_symmetry_ground(ground, "SET GROUND");
-  if (m_periodic) {
-    if (const char* refusal = periodic_ground_refusal(ground))
-      fail_geometry("SET GROUND", refusal);
-    if (ground.kind == nec_ground_kind::perfect)
-      m_context->stateful_check_periodic_ground_clearance();
-  }
-
-  int ground_type = -1;
   switch (ground.kind) {
   case nec_ground_kind::free_space:
+  case nec_ground_kind::perfect:
     break;
+  case nec_ground_kind::finite_reflection_coefficient:
+  case nec_ground_kind::finite_sommerfeld_norton:
+    if (!finite_value(ground.relative_permittivity) ||
+        !finite_value(ground.conductivity_s_per_m) ||
+        !(ground.relative_permittivity > 0.0) ||
+        !(ground.conductivity_s_per_m > 0.0))
+      fail("SET GROUND", "FINITE GROUND PARAMETERS MUST BE POSITIVE AND FINITE");
+    break;
+  default:
+    fail("SET GROUND", "UNKNOWN GROUND KIND");
+  }
+  if (m_periodic) {
+    if (ground.kind == nec_ground_kind::perfect)
+      m_context->stateful_check_periodic_ground_clearance();
+    check_periodic_boundaries(m_layered_stacks, ground, "SET GROUND");
+  }
+  m_ground = ground;
+  apply_context_ground();
+  invalidate_factorization();
+}
+
+void nec_stateful_model::apply_context_ground()
+{
+  int ground_type = -1;
+  switch (m_ground.kind) {
   case nec_ground_kind::perfect:
     ground_type = 1;
     break;
@@ -561,23 +616,20 @@ void nec_stateful_model::set_ground(const nec_ground_definition& ground)
     ground_type = 2;
     break;
   default:
-    fail("SET GROUND", "UNKNOWN GROUND KIND");
+    break;
   }
-
-  if (ground_type == 0 || ground_type == 2) {
-    if (!finite_value(ground.relative_permittivity) ||
-        !finite_value(ground.conductivity_s_per_m) ||
-        !(ground.relative_permittivity > 0.0) ||
-        !(ground.conductivity_s_per_m > 0.0))
-      fail("SET GROUND", "FINITE GROUND PARAMETERS MUST BE POSITIVE AND FINITE");
-  }
-
+  // In periodic mode each Floquet mode sees the exact Fresnel reflection of
+  // finite ground, whichever method was asked for; NEC's own ground would
+  // add its approximate image to the fill.
+  const bool periodic_finite = m_periodic && finite_ground_kind(m_ground.kind);
   m_context->gn_card(
-    ground_type, 0,
-    ground.relative_permittivity, ground.conductivity_s_per_m,
+    periodic_finite ? -1 : ground_type, 0,
+    m_ground.relative_permittivity, m_ground.conductivity_s_per_m,
     0.0, 0.0, 0.0, 0.0);
-  m_ground = ground;
-  invalidate_factorization();
+  m_context->stateful_set_periodic_finite_ground(periodic_finite
+    ? std::optional<nec_context::periodic_finite_ground>(
+        {m_ground.relative_permittivity, m_ground.conductivity_s_per_m})
+    : std::nullopt);
 }
 
 void nec_stateful_model::refuse_periodic(const char* operation) const
@@ -598,8 +650,6 @@ void nec_stateful_model::set_lattice(const nec_lattice_definition& lattice)
   require_configurable("SET LATTICE");
   if (m_geometry_completion.symmetry.kind != nec_geometry_symmetry_kind::none)
     fail_geometry("SET LATTICE", "GEOMETRY SYMMETRY IS NOT SUPPORTED IN PERIODIC MODE");
-  if (const char* refusal = periodic_ground_refusal(m_ground))
-    fail_geometry("SET LATTICE", refusal);
 
   // The context validates the vectors and the clearance of every conductor
   // from its periodic images (and ground images) before anything changes.
@@ -607,9 +657,12 @@ void nec_stateful_model::set_lattice(const nec_lattice_definition& lattice)
     lattice.a1x_m, lattice.a1y_m, lattice.a2x_m, lattice.a2y_m);
   if (m_ground.kind == nec_ground_kind::perfect)
     m_context->stateful_check_periodic_ground_clearance();
+  check_periodic_boundaries(m_layered_stacks, m_ground, "SET LATTICE");
   m_context->stateful_set_periodic(
     lattice.a1x_m, lattice.a1y_m, lattice.a2x_m, lattice.a2y_m, 0.0, 0.0);
   m_periodic = true;
+  if (finite_ground_kind(m_ground.kind))
+    apply_context_ground();
   m_lattice = lattice;
   m_scan_psi1_rad = 0.0;
   m_scan_psi2_rad = 0.0;
@@ -620,32 +673,12 @@ void nec_stateful_model::set_layered_stacks(const nec_layered_stacks_definition&
 {
   const char* operation = "SET LAYERED STACKS";
   require_configurable(operation);
-  std::optional<nec_context::periodic_stack_definition> above;
-  if (stacks.above) {
-    const nec_layered_stack_definition& stack = *stacks.above;
-    if (!finite_value(stack.bottom_z_m))
-      fail(operation, "THE STACK'S LOWER FACE MUST BE FINITE");
-    if (stack.layers.empty())
-      fail(operation, "A LAYERED STACK NEEDS AT LEAST ONE LAYER");
-    nec_context::periodic_stack_definition definition;
-    definition.bottom_z_m = stack.bottom_z_m;
-    for (const nec_dielectric_layer_definition& layer : stack.layers) {
-      if (!finite_value(layer.thickness_m) || !(layer.thickness_m > 0.0))
-        fail(operation, "LAYER THICKNESS MUST BE POSITIVE AND FINITE");
-      if (!finite_value(layer.relative_permittivity) || !(layer.relative_permittivity >= 1.0))
-        fail(operation, "LAYER RELATIVE PERMITTIVITY MUST BE FINITE AND AT LEAST 1");
-      if (!finite_value(layer.loss_tangent) || !(layer.loss_tangent >= 0.0))
-        fail(operation, "LAYER LOSS TANGENT MUST BE FINITE AND NOT NEGATIVE");
-      // exp(+jwt): eps = eps_r (1 - j tan_delta).
-      definition.layers.push_back({layer.thickness_m,
-        nec_complex(layer.relative_permittivity, -layer.relative_permittivity * layer.loss_tangent)});
-    }
-    m_context->stateful_check_periodic_stack_entry(definition);
-    above = std::move(definition);
-  }
-  m_context->stateful_set_periodic_stack(std::move(above));
+  nec_context::periodic_stacks_definition definition = context_stacks(stacks, operation);
+  m_context->stateful_check_periodic_boundaries(definition,
+    m_ground.kind != nec_ground_kind::free_space, false);
+  m_context->stateful_set_periodic_stacks(std::move(definition));
   m_layered_stacks = stacks;
-  // The stack enters only the scan-dependent part of the fill.
+  // The stacks enter only the scan-dependent part of the fill.
   invalidate_for_scan_change();
 }
 
@@ -654,6 +687,8 @@ void nec_stateful_model::clear_lattice()
   require_configurable("CLEAR LATTICE");
   m_context->stateful_clear_periodic();
   m_periodic = false;
+  if (finite_ground_kind(m_ground.kind))
+    apply_context_ground();
   m_lattice = {};
   m_scan_psi1_rad = 0.0;
   m_scan_psi2_rad = 0.0;
@@ -985,7 +1020,7 @@ const nec_floquet_result& nec_stateful_model::compute_floquet_amplitudes(
 
   const nec_float wavelength_m = em::get_wavelength(m_frequency_mhz * 1.0e6);
   const size_t port_count = m_ports.size();
-  const bool perfect = m_ground.kind == nec_ground_kind::perfect;
+  const bool grounded = m_ground.kind != nec_ground_kind::free_space;
   // The propagating modes on each side (below only in free space), then the
   // evanescent ones.
   struct radiated_mode {
@@ -995,7 +1030,7 @@ const nec_floquet_result& nec_stateful_model::compute_floquet_amplitudes(
   std::vector<radiated_mode> radiated;
   for (const bool propagating : {true, false})
     for (const bool above : {true, false}) {
-      if (!above && perfect)
+      if (!above && grounded)
         continue;
       for (const nec_periodic::floquet_mode& mode : modes)
         if ((mode.kz.imag() == 0.0) == propagating)

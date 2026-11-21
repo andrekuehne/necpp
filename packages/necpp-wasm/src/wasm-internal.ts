@@ -76,11 +76,14 @@ export interface NecWasmModule {
     psi1Rad: number,
     psi2Rad: number,
   ): number;
-  _necpp_wasm_v1_set_layered_stack_above(
+  _necpp_wasm_v1_set_layered_stacks(
     model: number,
-    bottomZM: number,
-    layers: number,
-    layerCount: number,
+    aboveBottomZM: number,
+    aboveLayers: number,
+    aboveCount: number,
+    belowTopZM: number,
+    belowLayers: number,
+    belowCount: number,
   ): number;
   _necpp_wasm_v1_prepare(model: number, frequencyMHz: number): number;
   _necpp_wasm_v1_compute_impedance(model: number): number;
