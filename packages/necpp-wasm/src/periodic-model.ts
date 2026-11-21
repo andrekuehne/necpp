@@ -2,6 +2,7 @@ import { NecStateError } from "./errors.js";
 import { instantiateNecModule } from "./loader.js";
 import { validFloquetRequest } from "./periodic-floquet.js";
 import { ScanSweepPool, recordedCall, validSweep, type PeriodicCellCall } from "./periodic-sweep.js";
+import { computeScanElementPattern, validPatternRequest } from "./scan-element-pattern.js";
 import { copyAssetOptions, createNecPeriodicWorkerModel } from "./worker-client.js";
 import {
   finitePair,
@@ -27,6 +28,9 @@ import type {
   PeriodicGround,
   PeriodicLattice,
   PortDefinition,
+  ScanElementPattern,
+  ScanElementPatternOptions,
+  ScanElementPatternRequest,
   ScanImpedanceRequest,
   ScanImpedanceResult,
   ScanPhasesRad,
@@ -97,7 +101,9 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
     this.#calls.push(recordedCall({ method: "setLattice", argument: valid }));
   }
 
-  #requireLattice(operation: "computeScanImpedance" | "sweepScanImpedance"): PeriodicLattice {
+  #requireLattice(
+    operation: "computeScanImpedance" | "sweepScanImpedance" | "computeScanElementPattern",
+  ): PeriodicLattice {
     const lattice = this.#lattice;
     if (this.state === "disposed" || lattice === undefined) {
       throw new NecStateError(
@@ -140,6 +146,25 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
     const assets = this.#assets;
     this.#sweepPool ??= new ScanSweepPool(() => createNecPeriodicWorkerModel(assets));
     return this.#sweepPool.sweep(this.#calls.slice(), sweep);
+  }
+
+  async computeScanElementPattern(
+    request: ScanElementPatternRequest,
+    options?: ScanElementPatternOptions,
+  ): Promise<ScanElementPattern> {
+    const lattice = this.#requireLattice("computeScanElementPattern");
+    const valid = validPatternRequest(request, options);
+    // Every round sweeps the cell as of this call, whatever changes meanwhile.
+    const calls = this.#calls.slice();
+    const assets = this.#assets;
+    this.#sweepPool ??= new ScanSweepPool(() => createNecPeriodicWorkerModel(assets));
+    const pool = this.#sweepPool;
+    return computeScanElementPattern(
+      lattice,
+      (sweepRequest, sweepOptions) => pool.sweep(calls, validSweep(sweepRequest, sweepOptions)),
+      valid,
+      options,
+    );
   }
 
   dispose(): void {

@@ -214,6 +214,34 @@ Stage 2 so far:
   (H-plane). Terminated amplitudes (every port in `Zg`, one driven with 1 W
   available) derived from the raw amplitudes and the scan impedance match a
   fresh solve with `Zg` as port loads to 1e-9.
+- issue #30: scan element pattern object. Near the Wood circle of mode c the
+  (0,0) amplitude is analytic in u, v and `kappa_c = |kz_c| / k`, but not only
+  a square-root kink: through the low-rank update its solve carries
+  `(kappa_c D + S)^-1`, and with S small the pattern changes within
+  `kappa_c ~ 0.01`. A half-wave dipole array in free space (0.7 x 0.6
+  wavelengths) drops to a null on the circle of its (1, 0) grating lobe
+  (`|a| = 0.003` against 0.11 nearby, Z near `-j 918` ohm), whose width varies
+  along the circle within 0.1 rad; the unit-current amplitude is smoother
+  but has its own transition within 1e-3. The pattern is therefore sampled on
+  rows graded geometrically from `kappa = 1e-3` on both sides of every circle
+  and interpolated in a lift of kappa that spaces them evenly, never across a
+  circle. At the horizon the amplitude goes like `sqrt(cos theta)` with a
+  finite limit of `a / sqrt(cos theta)` (to 1e-4 between `cos theta` = 1e-3
+  and 1e-4, free space and ground); below 1e-4 NEC's pi, 1.6e-11 above the
+  exact value, shifts the engine's cut-off, so directions near the horizon use
+  the kernel's wavenumber. Adaptive refinement (1 % of the peak) resolves the
+  null: at spacing 0.2 with refinement to 4596 samples the error next to it
+  is at most 1.2e-3 (1 % of the peak), against 20 to 350 % of the local value
+  on the fixed grid of spacing 0.1. Contrary to an argument that a guided wave
+  along a wire array cannot be phase-matched in visible space (its (0,0)
+  harmonic would radiate), x-dipoles 0.25 wavelengths over ground with three
+  layers of shorter parasitic dipoles (half-length 0.22 at 0.4, 0.55 and 0.7
+  wavelengths, rows 0.65 apart) show a true scan-blindness notch in the
+  H-plane at v = 0.452, 0.086 before the (0, -1) onset, down to 0.1 to 0.4 %
+  of the peak (11 and 5 segments per wire): at blindness the (0,0) harmonic
+  of the guided wave has zero amplitude. The stated interpolation error
+  covered 397 of 399 random directions; the two misses, by up to 3 times, lie
+  where two Wood circles, or one and the horizon, are both close.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section

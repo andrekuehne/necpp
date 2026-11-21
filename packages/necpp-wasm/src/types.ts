@@ -789,6 +789,142 @@ export interface TerminatedFloquetOptions {
 }
 
 /**
+ * A direction as a point of the u-v plane:
+ * `(u, v) = sin(theta) (cos(phi), sin(phi))`, inside the unit circle.
+ */
+export interface DirectionUV {
+  readonly u: number;
+  readonly v: number;
+}
+
+/** A direction of the scan element pattern, in u-v or as angles. */
+export type ScanElementPatternDirection = DirectionUV | ScanDirection;
+
+/** The sampling grid of a scan element pattern; rows along every Wood circle are always added. */
+export interface ScanElementPatternGrid {
+  /**
+   * Spacing in u-v of the square grid and of the points along each Wood
+   * circle. Defaults to the automatic spacing: a tenth of the distance to the
+   * nearest Wood-circle centre, at most 0.1.
+   */
+  readonly spacingUV?: number;
+  /**
+   * Directions to sample instead of the square grid, kept as given; each
+   * inside the horizon (`u^2 + v^2 <= 1 - 1e-8`).
+   */
+  readonly points?: readonly DirectionUV[];
+}
+
+/**
+ * Adaptive refinement after the sweep on the grid. Each round adds, around
+ * every sample whose leave-one-out error (three times it, as for the stated
+ * error) exceeds `tolerance` times the pattern's largest amplitude, the
+ * midpoints to its nearest samples, and solves them. Refinement stops after
+ * `maxRounds` rounds, when no sample exceeds the tolerance, or at
+ * `maxSamples`.
+ */
+export interface ScanElementPatternRefinement {
+  /** Fraction of the pattern's largest amplitude; defaults to 0.01. */
+  readonly tolerance?: number;
+  /** Rounds, each halving the local spacing; 0 through 8, defaults to 4. */
+  readonly maxRounds?: number;
+  /** Samples in all, the grid's included; defaults to four times the grid's, at most 50,000. */
+  readonly maxSamples?: number;
+}
+
+export interface ScanElementPatternRequest {
+  readonly frequencyMHz: number;
+  /** Port drive of the amplitudes, as for embedded fields; unit voltage by default. */
+  readonly normalization?: EmbeddedFieldNormalization;
+  /** `"auto"` (the default) or a manual grid. */
+  readonly grid?: "auto" | ScanElementPatternGrid;
+  /** Adaptive refinement (on by default with its defaults); `false` keeps the grid as it is. */
+  readonly refinement?: false | ScanElementPatternRefinement;
+}
+
+/** Progress of the sweeps behind a scan element pattern. */
+export interface ScanElementPatternProgress {
+  /** Samples solved so far. */
+  readonly completed: number;
+  /** Samples so far: the grid and the refinement rounds started. */
+  readonly total: number;
+  /** 0 for the grid, then the refinement round. */
+  readonly round: number;
+}
+
+export interface ScanElementPatternOptions extends ScanSweepOptions {
+  /** Called after each chunk of the sweeps behind the pattern. */
+  readonly onProgress?: (progress: ScanElementPatternProgress) => void;
+}
+
+/** TE and TM amplitudes of the (0, 0) Floquet mode, per port. */
+export interface ScanElementAmplitudes {
+  /** Per port, in square-root watts: `E_phi` of the scan element pattern. */
+  readonly te: ComplexVector;
+  /** Per port, in square-root watts: `E_theta` of the scan element pattern. */
+  readonly tm: ComplexVector;
+}
+
+/** The scan element pattern in one direction. */
+export interface ScanElementPatternValue extends ScanElementAmplitudes {
+  /**
+   * Per port: an estimate of the interpolation error of the vector
+   * `(te, tm)`, in square-root watts, zero at a sweep point. The solver's
+   * own estimated error (`PeriodicPointDiagnostics`) comes on top. On the
+   * tested arrays it covered 99.5 % of directions; it can fall short, by up
+   * to about 3 times, where two Wood circles, or one and the horizon, are
+   * both close.
+   */
+  readonly interpolationError: Float64Array;
+  /** The direction is a sweep point, and the amplitudes are the solved ones. */
+  readonly sampled: boolean;
+}
+
+/** One sweep point behind a scan element pattern. */
+export interface ScanElementPatternSample extends DirectionUV {
+  /** 0 for the grid, otherwise the refinement round that added it. */
+  readonly round: number;
+  readonly scanPhasesRad: ScanPhasesRad;
+  /** The Wood circles the sample lies on. */
+  readonly woodCircles: readonly FloquetModeIndex[];
+  readonly above: ScanElementAmplitudes;
+  /** In free space only. */
+  readonly below: ScanElementAmplitudes | undefined;
+  readonly diagnostics: PeriodicPointDiagnostics;
+}
+
+/** The Wood circle of one Floquet mode in the u-v plane. */
+export interface ScanElementWoodCircle extends FloquetModeIndex {
+  /** The mode propagates inside the unit circle around this centre. (0, 0) is the horizon. */
+  readonly centreUV: readonly [number, number];
+}
+
+/**
+ * The scan element pattern of every port of a unit cell at one frequency: in
+ * each direction, the (0, 0) Floquet amplitudes at the scan state pointing
+ * that way. It interpolates a scan sweep over visible space and never
+ * interpolates across a Wood circle, so Wood anomalies and scan-blindness
+ * notches stay sharp.
+ */
+export interface ScanElementPattern {
+  readonly frequencyMHz: number;
+  readonly normalization: EmbeddedFieldNormalization;
+  readonly portCount: number;
+  /** `["above", "below"]` in free space, `["above"]` over ground. */
+  readonly sides: readonly FloquetSide[];
+  /** The grid spacing in u-v. */
+  readonly spacingUV: number;
+  readonly woodCircles: readonly ScanElementWoodCircle[];
+  readonly samples: readonly ScanElementPatternSample[];
+  /**
+   * The pattern in a direction of visible space (`side` defaults to
+   * `"above"`; `"below"` in free space only), interpolated from the samples
+   * on the same side of every Wood circle.
+   */
+  evaluate(direction: ScanElementPatternDirection, side?: FloquetSide): ScanElementPatternValue;
+}
+
+/**
  * The unit cell of an infinite periodic array in free space or above a perfect
  * ground plane. Wires, ports and loads use the same definitions as
  * `NecModel`. A single cell of an infinite array has no far field of its own,
@@ -826,6 +962,14 @@ export interface NecPeriodicModel {
     request: ScanSweepRequest,
     options?: ScanSweepOptions,
   ): AsyncIterable<ScanSweepChunk>;
+  /**
+   * The scan element pattern at one frequency, from a scan sweep on the
+   * pattern's grid (on the same workers as `sweepScanImpedance`).
+   */
+  computeScanElementPattern(
+    request: ScanElementPatternRequest,
+    options?: ScanElementPatternOptions,
+  ): Promise<ScanElementPattern>;
   /** Idempotent. After disposal, every operation except `state` and `dispose` fails. */
   dispose(): void;
 }
@@ -953,6 +1097,11 @@ export interface NecPeriodicWorkerModel {
     request: ScanSweepRequest,
     options?: ScanSweepOptions,
   ): AsyncIterable<ScanSweepChunk>;
+  /** As `NecPeriodicModel.computeScanElementPattern`; starts after the calls before it. */
+  computeScanElementPattern(
+    request: ScanElementPatternRequest,
+    options?: ScanElementPatternOptions,
+  ): Promise<ScanElementPattern>;
   /** Idempotent. Disposes the native model and the sweep workers, then releases the worker thread. */
   dispose(): Promise<void>;
   /**

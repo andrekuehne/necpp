@@ -99,6 +99,10 @@ The Wood anomalies of one Floquet mode at one frequency, seen in the plane of th
 The far-field pattern of one unit-cell port inside the infinite array, with the other ports shorted or open. In each direction it equals the (0,0) Floquet-mode amplitude at the scan state pointing that way.
 _Avoid_: embedded pattern (reserved for finite models), active element pattern
 
+**Interpolation error**:
+What a scan element pattern states for a direction between its sweep points: an estimate from leave-one-out errors and the spread of alternative interpolants, not a bound. Adaptive refinement adds sweep points where it exceeds a tolerance.
+_Avoid_: estimated error (that is the solver's, of one periodic result)
+
 **Scan blindness**:
 A scan state at which the scan element pattern drops to (nearly) zero because a guided wave along the array or its layered stacks is phase-matched to a Floquet mode.
 

@@ -691,6 +691,8 @@ z=0. It shares the loading options, error taxonomy and lifecycle states of
 | `computeScanImpedance({ frequencyMHz, scanDirection })` | Positive MHz; `{ thetaDeg, phiDeg }`, finite, `thetaDeg` 0 to 90 | As above; `scanPhasesRad` reports the phases the direction maps to | As above; `NecInputError` for a direction outside visible space or with both or neither of `scanPhasesRad` and `scanDirection` |
 | `computeScanImpedance` Floquet options | `normalization`: an `EmbeddedFieldNormalization` (default unit voltage); `evanescentModes`: an array of integer `{ p, q }` | `floquet: { normalization, modes, powerBudget }`: per mode its indices, `side` (`"above"`, `"below"`), `propagating`, `ktRadPerM`, `kzRadPerM` (`[real, imag]`, `imag <= 0`) and per port `te`, `tm` (square-root watts) and `powerW`; per port `{ inputW, propagatingW, lossW }` | `NecInputError` for a malformed normalization or mode index |
 | `sweepScanImpedance({ frequencyMHz, scanStates }, { signal?, workers? }?)` | Positive MHz; an array of scan states, each `{ scanPhasesRad }` or `{ scanDirection }` as above; `workers` 1 through 8 or `"auto"` (default); an `AbortSignal` | `AsyncIterable` of chunks `{ points: [{ index, result }], completed, total }`, each with the scan states solved since the previous chunk, in completion order; `result` as from `computeScanImpedance`. The model's own state is unchanged | Thrown on the call: `NecStateError` before `setLattice` or after `dispose`, `NecInputError` for a malformed request or options. On iteration: `NecCancellationError` (`details.reason === "aborted"`) after the signal aborts; the first scan state's failure, as `computeScanImpedance` would raise it |
+| `computeScanElementPattern({ frequencyMHz, normalization?, grid?, refinement? }, { signal?, workers?, onProgress? }?)` | Positive MHz; `normalization` as for Floquet amplitudes; `grid`: `"auto"` (default) or `{ spacingUV?, points? }`, `spacingUV` in (0, 0.5], `points` an array of `{ u, v }` with `u^2 + v^2 <= 1 - 1e-8`; `refinement`: `false` or `{ tolerance?, maxRounds?, maxSamples? }` (positive; 0 through 8; 1 through 50,000); sweep options as for `sweepScanImpedance`; `onProgress({ completed, total, round })` after every chunk | A `ScanElementPattern`: `frequencyMHz`, `normalization`, `portCount`, `sides`, `spacingUV`, `woodCircles` (`{ p, q, centreUV }`, the horizon first), `samples` (`{ u, v, round, scanPhasesRad, woodCircles, above, below, diagnostics }`, `above`/`below` the solved (0, 0) `te`, `tm` per port) and `evaluate(direction, side?)` | Rejects: `NecStateError` before `setLattice` or after `dispose`; `NecInputError` for a malformed request or options, or a grid of more than 50,000 samples; otherwise as `sweepScanImpedance` |
+| `pattern.evaluate(direction, side?)` | `{ u, v }` with `u^2 + v^2 <= 1`, or `{ thetaDeg, phiDeg }` with `thetaDeg` 0 to 90; `side` `"above"` (default) or `"below"` (free space only) | `{ te, tm, interpolationError, sampled }`: the (0, 0) amplitudes per port in that direction (exactly the solved ones at a sample, `sampled: true`) and per port an estimate of the interpolation error of `(te, tm)` | `NecInputError` for a direction outside visible space, an unknown side, or `"below"` over ground |
 
 Pure helpers, without a model:
 
@@ -755,6 +757,28 @@ free again. The pool starts on the first sweep and is terminated by
 `dispose()` (and by `terminate()` on the worker model). Leaving the
 iteration early (`break`) stops dispatch the same way.
 
+Scan element pattern: `computeScanElementPattern` sweeps the (0, 0) amplitudes
+over visible space, `(u, v) = kt0 / k` with the kernel's k (NEC's pi), and
+interpolates them in every direction. The grid is a square grid (or the given
+points) plus, along both sides of every Wood circle (unit circles around the
+centres `-(p b1 + q b2) / k`, the horizon among them), rows that run from
+`|kz| / k = 1e-3` geometrically to the spacing and uniformly to 0.5; the
+horizon's row sits at `cos(theta) = 1e-4`. A point is interpolated only from
+samples on its side of every circle (samples on a circle serve both), by local
+polyharmonic splines in the coordinates u, v and a lift of the `|kz| / k` of
+each circle near it, under which those rows are evenly spaced, with `|kz| / k`
+also in the polynomial tail: across a circle the pattern has a square-root
+kink and, through the low-rank update of the mode at cut-off, can change
+within `|kz| / k ~ 0.01`. The interpolated quantity is
+`(te phi-hat + tm theta-hat) / sqrt(cos(theta))` in Cartesian components,
+smooth through broadside and finite at the horizon. Per value the result is
+the median of three such interpolants, and the interpolation error three times
+the largest of their leave-one-out errors (Rippa's formula) and their
+differences from the median. Refinement adds, around each sample whose
+leave-one-out error exceeds the tolerance times the largest amplitude, the
+midpoints to its nearest samples (along a circle or row when both lie on it),
+solves them on the same workers and repeats.
+
 `createNecPeriodicWorkerModel(options?)` from `@necpp-engine/wasm/worker` runs
 the periodic model in a dedicated worker. It takes the loading options plus
 `onProgress` and a creation-only `signal`, like `createNecWorkerModel`; its
@@ -762,7 +786,8 @@ methods are those above, asynchronous and serialized, plus `terminate()` and
 `subscribeProgress()`. A sweep solves the cell as of the call to
 `sweepScanImpedance`: it waits for the calls issued before it to settle and
 replays those that succeeded, so its missing-lattice `NecStateError` arrives
-on iteration rather than on the call.
+on iteration rather than on the call. `computeScanElementPattern` likewise
+uses the cell as of its call; the interpolation runs on the calling thread.
 The worker protocol adds `setLattice` and `computeScanImpedance`
 (`NecWorkerOperation`) and a periodic `create` option; a finite worker refuses
 the periodic calls and a periodic worker the finite-only ones with a
