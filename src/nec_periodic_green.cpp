@@ -434,24 +434,33 @@ std::array<complex_d, 3> axial(const point& direction, complex_d scale) {
 }
 }
 
+namespace {
+// sin(x) / x, by its series where the quotient loses accuracy.
+complex_d sinc(complex_d x) {
+  if(std::abs(x) < 1e-3) {
+    const complex_d x2 = x * x;
+    return 1.0 - x2 / 6.0 + x2 * x2 / 120.0;
+  }
+  return std::sin(x) / x;
+}
+}  // namespace
+
 floquet_moments segment_floquet_moments(const source_segment& segment, vec2 kt, double k) {
-  // The integrand is entire with phase rates up to |kt| + k (about 2k near
-  // cut-off); 16 points integrate it to rounding over segments up to the
-  // 0.3 wavelengths the periodic tolerance allows.
-  const gauss_rule& rule = gauss_legendre(16);
+  return segment_mode_moments(segment, kt, 0.0, k);
+}
+
+floquet_moments segment_mode_moments(const source_segment& segment, vec2 kt, complex_d kz, double k) {
+  const point& c = segment.centre;
   const point& u = segment.direction;
   const double half = segment.length / 2;
-  const double centre_phase = kt.x * segment.centre[0] + kt.y * segment.centre[1];
-  const double phase_rate = kt.x * u[0] + kt.y * u[1];
-  floquet_moments moments{};
-  for(size_t i = 0; i < rule.node.size(); ++i) {
-    const double s = half * rule.node[i], w = half * rule.weight[i];
-    const complex_d phase = w * std::exp(j * (centre_phase + phase_rate * s));
-    moments.constant += phase;
-    moments.sine += std::sin(k * s) * phase;
-    moments.cosine += std::cos(k * s) * phase;
-  }
-  return moments;
+  const complex_d centre_phase = std::exp(j * (kt.x * c[0] + kt.y * c[1] + kz * c[2]));
+  const complex_d rate = kt.x * u[0] + kt.y * u[1] + kz * u[2];
+  // int exp(j g s) ds over [-half, half] = 2 half sinc(g half); sin and cos
+  // split into exp(+-j k s).
+  const auto integral = [&](complex_d g) { return segment.length * sinc(g * half); };
+  const complex_d plus = integral(rate + k), minus = integral(rate - k);
+  return {centre_phase * integral(rate), centre_phase * (plus - minus) / (2.0 * j),
+          centre_phase * (plus + minus) / 2.0};
 }
 
 segment_field segment_field_of_kernel(const kernel_function& kernel, const source_segment& segment,

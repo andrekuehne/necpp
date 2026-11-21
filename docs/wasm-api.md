@@ -689,6 +689,7 @@ z=0. It shares the loading options, error taxonomy and lifecycle states of
 | `setLattice({ a1M, a2M })` | Two finite, non-parallel `[x, y]` vectors in m, in the xy-plane | `void`; resets the scan phases, invalidates prepared data | `NecInputError` for malformed or parallel vectors; `NecGeometryError` when a conductor touches or nearly touches a periodic image, or over perfect ground the ground plane (see clearance below) |
 | `computeScanImpedance({ frequencyMHz, scanPhasesRad })` | Positive MHz; finite `[psi1, psi2]` in radians per cell along `a1M`, `a2M` | P x P scan impedance and admittance, frequency, the scan phases and `diagnostics: { estimatedError, status }`; the model is `prepared` afterwards | `NecStateError` before `setLattice`; refusals of the accuracy policy below; otherwise as `prepare` and `computeImpedanceMatrix` |
 | `computeScanImpedance({ frequencyMHz, scanDirection })` | Positive MHz; `{ thetaDeg, phiDeg }`, finite, `thetaDeg` 0 to 90 | As above; `scanPhasesRad` reports the phases the direction maps to | As above; `NecInputError` for a direction outside visible space or with both or neither of `scanPhasesRad` and `scanDirection` |
+| `computeScanImpedance` Floquet options | `normalization`: an `EmbeddedFieldNormalization` (default unit voltage); `evanescentModes`: an array of integer `{ p, q }` | `floquet: { normalization, modes, powerBudget }`: per mode its indices, `side` (`"above"`, `"below"`), `propagating`, `ktRadPerM`, `kzRadPerM` (`[real, imag]`, `imag <= 0`) and per port `te`, `tm` (square-root watts) and `powerW`; per port `{ inputW, propagatingW, lossW }` | `NecInputError` for a malformed normalization or mode index |
 | `sweepScanImpedance({ frequencyMHz, scanStates }, { signal?, workers? }?)` | Positive MHz; an array of scan states, each `{ scanPhasesRad }` or `{ scanDirection }` as above; `workers` 1 through 8 or `"auto"` (default); an `AbortSignal` | `AsyncIterable` of chunks `{ points: [{ index, result }], completed, total }`, each with the scan states solved since the previous chunk, in completion order; `result` as from `computeScanImpedance`. The model's own state is unchanged | Thrown on the call: `NecStateError` before `setLattice` or after `dispose`, `NecInputError` for a malformed request or options. On iteration: `NecCancellationError` (`details.reason === "aborted"`) after the signal aborts; the first scan state's failure, as `computeScanImpedance` would raise it |
 
 Pure helpers, without a model:
@@ -700,6 +701,7 @@ Pure helpers, without a model:
 | `centeredRectangularLattice({ spacingXM, spacingYM })` | Rows along x: `{ a1M: [dx, 0], a2M: [dx / 2, dy] }` | As above |
 | `hexagonalLattice({ spacingM, rowsAlong? })` | `rowsAlong: "x"` (default): `{ a1M: [d, 0], a2M: [d / 2, d sqrt(3) / 2] }`; `"y"`: `{ a1M: [0, d], a2M: [d sqrt(3) / 2, d / 2] }` | As above; `rowsAlong` must be `"x"` or `"y"` |
 | `scanPhasesForDirection({ lattice, frequencyMHz, thetaDeg, phiDeg })` | `[psi1, psi2]` with `psi_i = -kt0 . a_i`, `kt0 = k sin(theta) [cos(phi), sin(phi)]`, k from NEC's speed of light | `NecInputError` for malformed input or `thetaDeg` outside 0 to 90 |
+| `terminatedFloquetAmplitudes(result, { generatorImpedanceOhm })` | The Floquet modes of `result` with every port terminated in `Zg` (ohms, or `[resistance, reactance]`) and one port driven with 1 W available power (EMF `sqrt(8 Re Zg)`): `A (Z + Zg)^-1 sqrt(8 Re Zg)` with `A` the unit-current amplitudes (`A_V Z` from unit-voltage ones); per mode `te`, `tm`, `powerW` per driven port | `NecInputError` unless `Re Zg > 0` and finite; `NecConditioningError` if `Z + Zg` is singular |
 
 Presets exist only in TypeScript; the engine and the ABI take any two
 lattice vectors. An oblique lattice needs no preset: the engine reduces a
@@ -725,6 +727,23 @@ the prepared frequency, so a scan change at the same frequency fills only the
 spectral sum and adds the phase-weighted image matrices, about half the work
 of a new frequency; any change other than the scan phases drops them. Above
 256 MiB for the image matrices it fills them again for each scan state.
+
+Floquet amplitudes: above the cell the field is the sum of
+`E exp(-j (kt . r + kz z))` over the modes, below it `E exp(-j (kt . r - kz z))`,
+with `kt = kt0 + p b1 + q b2` and `r` the absolute position. `te` and `tm` are
+the phi-hat and theta-hat components of the mode direction (phi = 0 when
+`kt = 0`), power-normalized so that a propagating mode carries
+`(|te|^2 + |tm|^2) / 2` watts per cell (`|kz|` in place of `kz` for an
+evanescent one). They come from the radiation vector of the unit-cell current,
+`E = -(eta k / (2 A kz)) N_t`, through closed-form segment integrals of NEC's
+three current terms against the complex mode phase, with the ground image
+over perfect ground; the eta of NEC's thin-wire field (376.73 ohm) keeps the
+power consistent with the matrix. A mode exactly on cut-off carries no power
+and reports zero amplitudes. Each port's basis solve also gives its input
+power and the loss in the loads (`powerBudget`); they close against the
+propagating power to the wire discretization (second order in the segment
+length). The amplitudes need no extra factorization: one back-substitution
+per port.
 
 Scan sweeps: `sweepScanImpedance` solves the scan states on a pool of worker
 periodic models. Each worker gets the unit cell by replaying the
@@ -856,8 +875,14 @@ failure.
 The native C ABI adds `necpp_wasm_v1_set_lattice`,
 `necpp_wasm_v1_clear_lattice`, `necpp_wasm_v1_set_scan_phases`,
 `necpp_wasm_v1_impedance_estimated_error` and
-`necpp_wasm_v1_impedance_point_status` (`NECPP_WASM_V1_POINT_STATUS_OK`).
-They are additive v1 symbols; `necpp_wasm_v1_set_lattice` returns the
+`necpp_wasm_v1_impedance_point_status` (`NECPP_WASM_V1_POINT_STATUS_OK`),
+and for the Floquet amplitudes `necpp_wasm_v1_compute_floquet_amplitudes`
+(normalization, then the evanescent indices as two `int32` arrays and their
+count), `necpp_wasm_v1_floquet_mode_count`, `necpp_wasm_v1_floquet_port_count`
+and `necpp_wasm_v1_floquet_normalization`, with the result buffers
+`NECPP_WASM_V1_FLOQUET_*` (doubles: kt, kz per mode, mode-major te, tm and
+mode power, per-port input, propagating and loss power; `int32`: p, q, side,
+propagating). They are additive v1 symbols; `necpp_wasm_v1_set_lattice` returns the
 geometry status for a clearance refusal. While a lattice is set, the native
 model also refuses far fields, embedded far fields and isolated-element
 characterization. The interaction matrix is

@@ -174,7 +174,23 @@ enum necpp_wasm_v1_result_buffer_kind {
   NECPP_WASM_V1_CURRENT_B_REAL = 46,
   NECPP_WASM_V1_CURRENT_B_IMAG = 47,
   NECPP_WASM_V1_CURRENT_C_REAL = 48,
-  NECPP_WASM_V1_CURRENT_C_IMAG = 49
+  NECPP_WASM_V1_CURRENT_C_IMAG = 49,
+  /* Periodic Floquet amplitudes (necpp_wasm_v1_compute_floquet_amplitudes).
+   * Per mode: kt and kz in radians per metre. Mode-major, index
+   * mode * port_count + port: te, tm (square-root watts) and the mode power
+   * (watts per cell). Per port: input, propagating and loss power. */
+  NECPP_WASM_V1_FLOQUET_KT_X = 50,
+  NECPP_WASM_V1_FLOQUET_KT_Y = 51,
+  NECPP_WASM_V1_FLOQUET_KZ_REAL = 52,
+  NECPP_WASM_V1_FLOQUET_KZ_IMAG = 53,
+  NECPP_WASM_V1_FLOQUET_TE_REAL = 54,
+  NECPP_WASM_V1_FLOQUET_TE_IMAG = 55,
+  NECPP_WASM_V1_FLOQUET_TM_REAL = 56,
+  NECPP_WASM_V1_FLOQUET_TM_IMAG = 57,
+  NECPP_WASM_V1_FLOQUET_MODE_POWER_W = 58,
+  NECPP_WASM_V1_FLOQUET_INPUT_POWER_W = 59,
+  NECPP_WASM_V1_FLOQUET_PROPAGATING_POWER_W = 60,
+  NECPP_WASM_V1_FLOQUET_LOSS_W = 61
 };
 
 enum necpp_wasm_v1_current_mode {
@@ -203,7 +219,19 @@ enum necpp_wasm_v1_int32_result_buffer_kind {
   NECPP_WASM_V1_CURRENT_END_KIND = 7,
   NECPP_WASM_V1_CURRENT_END_TAG = 8,
   NECPP_WASM_V1_CURRENT_END_SEGMENT = 9,
-  NECPP_WASM_V1_CURRENT_END_END = 10
+  NECPP_WASM_V1_CURRENT_END_END = 10,
+  /* Per Floquet mode: the indices p, q along the reciprocal vectors of the
+   * given lattice vectors, the side (NECPP_WASM_V1_FLOQUET_ABOVE or
+   * NECPP_WASM_V1_FLOQUET_BELOW) and 1 for a propagating mode, else 0. */
+  NECPP_WASM_V1_FLOQUET_P = 11,
+  NECPP_WASM_V1_FLOQUET_Q = 12,
+  NECPP_WASM_V1_FLOQUET_SIDE = 13,
+  NECPP_WASM_V1_FLOQUET_PROPAGATING = 14
+};
+
+enum necpp_wasm_v1_floquet_side {
+  NECPP_WASM_V1_FLOQUET_ABOVE = 0,
+  NECPP_WASM_V1_FLOQUET_BELOW = 1
 };
 
 uint32_t necpp_wasm_v1_abi_version(void);
@@ -385,6 +413,24 @@ double necpp_wasm_v1_impedance_condition_estimate(
 double necpp_wasm_v1_impedance_estimated_error(
   const necpp_wasm_v1_model* model);
 int32_t necpp_wasm_v1_impedance_point_status(
+  const necpp_wasm_v1_model* model);
+/* Periodic mode only: the Floquet-mode amplitudes of every port's basis
+ * solve, normalized as embedded fields (necpp_wasm_v1_embedded_normalization):
+ * every propagating mode on each side (below the cell only in free space),
+ * then the evanescent modes (p, q) asked for. A propagating mode carries
+ * (|te|^2 + |tm|^2) / 2 watts per cell; te and tm are the phi-hat and
+ * theta-hat components of the mode direction, phase referred to the origin.
+ * evanescent_p and evanescent_q may be NULL when evanescent_count is 0.
+ * Preserves a prior solution. Returns NECPP_WASM_V1_STATE_ERROR unless the
+ * model is prepared with a lattice. */
+int32_t necpp_wasm_v1_compute_floquet_amplitudes(
+  necpp_wasm_v1_model* model, int32_t normalization,
+  const int32_t* evanescent_p, const int32_t* evanescent_q,
+  size_t evanescent_count);
+/* 0 without a Floquet result; the normalization is -1 then. */
+size_t necpp_wasm_v1_floquet_mode_count(const necpp_wasm_v1_model* model);
+size_t necpp_wasm_v1_floquet_port_count(const necpp_wasm_v1_model* model);
+int32_t necpp_wasm_v1_floquet_normalization(
   const necpp_wasm_v1_model* model);
 double necpp_wasm_v1_impedance_factorization_generation(
   const necpp_wasm_v1_model* model);

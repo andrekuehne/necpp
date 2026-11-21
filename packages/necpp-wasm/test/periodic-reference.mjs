@@ -139,3 +139,85 @@ export async function finiteArrayCentreImpedance({
     await solver.dispose();
   }
 }
+
+/**
+ * The embedded pattern of the centre element of a finite array in one
+ * direction, voltage-normalized: port `portIndex` driven by 1 V, every other
+ * port shorted.
+ *
+ * Cells sit at m * a1M + n * a2M for |m|, |n| <= `cells`. Without `sigmaM`
+ * only the centre element is driven. With it, every cell's port `portIndex`
+ * is driven by exp(-|rho|^2 / (2 sigmaM^2)) exp(j (m psi1 + n psi2)) volts
+ * and the far field is divided by the sum of the weights: in the direction
+ * of the scan state `psi` the element phases cancel, so this is the
+ * weighted mean of the inner elements' embedded patterns, without most of
+ * the edge waves that make a single element's pattern ripple with the array
+ * size. Returns `{ eTheta, ePhi }` as `[real, imag]` times `R exp(j k R)`,
+ * so without the propagation factor.
+ */
+export async function finiteArrayCentreFarField({
+  frequencyMHz,
+  a1M,
+  a2M,
+  cells,
+  wires,
+  ports,
+  portIndex = 0,
+  thetaDeg,
+  phiDeg,
+  sigmaM,
+  psi = [0, 0],
+  ground = { kind: "free-space" },
+}) {
+  const elements = [];
+  const drives = [];
+  for (let m = -cells; m <= cells; m += 1) {
+    for (let n = -cells; n <= cells; n += 1) {
+      const x = m * a1M[0] + n * a2M[0];
+      const y = m * a1M[1] + n * a2M[1];
+      elements.push({ id: `cell_${m}_${n}`, positionM: [x, y], patternId: "cell" });
+      const weight = sigmaM === undefined
+        ? (m === 0 && n === 0 ? 1 : 0)
+        : Math.exp(-(x * x + y * y) / (2 * sigmaM * sigmaM));
+      drives.push({ weight, phase: m * psi[0] + n * psi[1] });
+    }
+  }
+  const solver = await createNecArraySolver({
+    elements,
+    patterns: [{ id: "cell", kind: "straight-wire-pattern", wires, ports }],
+    ground,
+  }, { symmetry: "auto", symmetrizer: { positionEpsilonM: 1e-9 } });
+  try {
+    await solver.prepare({ frequencyMHz });
+    const voltages = {
+      real: new Float64Array(elements.length * ports.length),
+      imag: new Float64Array(elements.length * ports.length),
+    };
+    let weights = 0;
+    drives.forEach(({ weight, phase }, cell) => {
+      voltages.real[cell * ports.length + portIndex] = weight * Math.cos(phase);
+      voltages.imag[cell * ports.length + portIndex] = weight * Math.sin(phase);
+      weights += weight;
+    });
+    await solver.solveVoltages(voltages);
+    const radiusM = 1;
+    const field = await solver.computeFarField({
+      radiusM,
+      theta: { startDeg: thetaDeg, count: 1, stepDeg: 0 },
+      phi: { startDeg: phiDeg, count: 1, stepDeg: 0 },
+    });
+    // Remove exp(-j k R) / R and the sum of the weights.
+    const phase = WAVENUMBER_PER_M * radiusM;
+    const scale = radiusM / weights;
+    const unpropagated = (real, imag) => [
+      scale * (real * Math.cos(phase) - imag * Math.sin(phase)),
+      scale * (real * Math.sin(phase) + imag * Math.cos(phase)),
+    ];
+    return {
+      eTheta: unpropagated(field.eThetaReal[0], field.eThetaImag[0]),
+      ePhi: unpropagated(field.ePhiReal[0], field.ePhiImag[0]),
+    };
+  } finally {
+    await solver.dispose();
+  }
+}

@@ -39,6 +39,7 @@ export {
   scanPhasesForDirection,
   squareLattice,
 } from "./periodic-lattice.js";
+export { terminatedFloquetAmplitudes } from "./periodic-floquet.js";
 
 export type {
   NecCancellationReason,
@@ -77,6 +78,12 @@ export type {
   FieldWorkerSelection,
   FarFieldResult,
   FiniteGround,
+  FloquetAmplitudes,
+  FloquetMode,
+  FloquetModeIndex,
+  FloquetPortPower,
+  FloquetRequestOptions,
+  FloquetSide,
   FreeSpaceGround,
   FullArrayDescription,
   GeometryCompletionResult,
@@ -149,6 +156,9 @@ export type {
   SymmetrizerDiagnostics,
   SymmetrizerOptions,
   SymmetryCandidateDiagnostics,
+  TerminatedFloquetAmplitudes,
+  TerminatedFloquetMode,
+  TerminatedFloquetOptions,
   WireDefinition,
 } from "./types.js";
 

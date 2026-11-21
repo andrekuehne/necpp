@@ -1,5 +1,6 @@
 import { NecStateError } from "./errors.js";
 import { instantiateNecModule } from "./loader.js";
+import { validFloquetRequest } from "./periodic-floquet.js";
 import { ScanSweepPool, recordedCall, validSweep, type PeriodicCellCall } from "./periodic-sweep.js";
 import { copyAssetOptions, createNecPeriodicWorkerModel } from "./worker-client.js";
 import {
@@ -11,6 +12,7 @@ import {
 import {
   WasmNecModel,
   createModelFromModule,
+  floquetAmplitudesEntry,
   inputError,
   periodicDiagnosticsEntry,
   positiveNumber,
@@ -114,6 +116,7 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
     const record = requireRecord(request, "request");
     const frequencyMHz = positiveNumber(record.frequencyMHz, "request.frequencyMHz");
     const scanPhasesRad = requestedScanPhases(record, lattice, frequencyMHz);
+    const floquetRequest = validFloquetRequest(record, "request");
 
     this.#cell[setScanPhasesEntry](scanPhasesRad);
     this.#cell.prepare({ frequencyMHz });
@@ -124,6 +127,7 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
       frequencyMHz: result.frequencyMHz,
       scanPhasesRad,
       diagnostics: this.#cell[periodicDiagnosticsEntry](),
+      floquet: this.#cell[floquetAmplitudesEntry](floquetRequest),
     };
   }
 

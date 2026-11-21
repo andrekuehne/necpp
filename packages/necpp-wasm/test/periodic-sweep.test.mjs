@@ -123,10 +123,18 @@ test("a worker model's sweep returns the results of its single solves", { skip }
     await assert.rejects(cell.setLattice({ a1M: [0.001, 0], a2M: [0, 0.5] }));
     await cell.setLattice(LATTICE);
     const states = SCAN_STATES.slice(0, 4);
+    // The Floquet options apply to every scan state of the sweep.
+    const floquet = { normalization: { kind: "unit-current", valueA: 1 }, evanescentModes: [{ p: 1, q: 0 }] };
     const singles = [];
-    for (const state of states) singles.push(await cell.computeScanImpedance({ frequencyMHz: FREQUENCY_MHZ, ...state }));
+    for (const state of states) {
+      singles.push(await cell.computeScanImpedance({ frequencyMHz: FREQUENCY_MHZ, ...state, ...floquet }));
+    }
+    assert.equal(singles[0].floquet.normalization.kind, "unit-current");
     // The sweep solves the cell as it is when sweepScanImpedance is called.
-    const sweep = cell.sweepScanImpedance({ frequencyMHz: FREQUENCY_MHZ, scanStates: states }, { workers: 2 });
+    const sweep = cell.sweepScanImpedance(
+      { frequencyMHz: FREQUENCY_MHZ, scanStates: states, ...floquet },
+      { workers: 2 },
+    );
     await cell.setLattice({ a1M: [0.7, 0], a2M: [0, 0.6] });
     assertSameAsSingleSolves(await collect(sweep), singles);
   } finally {

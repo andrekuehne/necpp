@@ -1,7 +1,9 @@
 import { NecCancellationError, NecInputError } from "./errors.js";
+import { validFloquetRequest } from "./periodic-floquet.js";
 import { finitePair, validScanDirection } from "./periodic-lattice.js";
-import { inputError, positiveNumber, requireRecord } from "./model.js";
+import { embeddedNormalization, inputError, positiveNumber, requireRecord } from "./model.js";
 import type {
+  FloquetRequestOptions,
   LoadDefinition,
   NecPeriodicWorkerModel,
   PeriodicGround,
@@ -62,6 +64,8 @@ function replay(worker: NecPeriodicWorkerModel, call: PeriodicCellCall): Promise
 export interface ValidSweep {
   readonly frequencyMHz: number;
   readonly scanStates: readonly ScanState[];
+  /** The Floquet options of every scan state, validated. */
+  readonly floquet: FloquetRequestOptions;
   readonly workers: "auto" | number;
   readonly signal: AbortSignal | undefined;
 }
@@ -88,6 +92,11 @@ export function validSweep(request: ScanSweepRequest, options: ScanSweepOptions 
     (record.scanStates as readonly unknown[]).map((state, index) =>
       validScanState(state, `request.scanStates[${index}]`)),
   );
+  const floquetRequest = validFloquetRequest(record, "request");
+  const floquet: FloquetRequestOptions = Object.freeze({
+    normalization: embeddedNormalization(floquetRequest.normalization),
+    evanescentModes: floquetRequest.evanescentModes,
+  });
   const workers = options?.workers ?? "auto";
   if (workers !== "auto" && (!Number.isInteger(workers) || workers < 1 || workers > 8)) {
     inputError("options.workers must be \"auto\" or an integer from 1 through 8", {
@@ -103,7 +112,7 @@ export function validSweep(request: ScanSweepRequest, options: ScanSweepOptions 
         || typeof signal.removeEventListener !== "function")) {
     inputError("options.signal must be an AbortSignal", { name: "options.signal" });
   }
-  return { frequencyMHz, scanStates, workers, signal };
+  return { frequencyMHz, scanStates, floquet, workers, signal };
 }
 
 function logicalCores(): number {
@@ -181,7 +190,7 @@ export class ScanSweepPool {
 
   /** Solve the scan states of a valid sweep on cells configured by `calls`. */
   async *sweep(calls: readonly PeriodicCellCall[], sweep: ValidSweep): AsyncGenerator<ScanSweepChunk> {
-    const { frequencyMHz, scanStates, signal } = sweep;
+    const { frequencyMHz, scanStates, floquet, signal } = sweep;
     const total = scanStates.length;
     const cancelled = (): NecCancellationError =>
       new NecCancellationError("aborted", "The scan sweep was aborted");
@@ -221,7 +230,11 @@ export class ScanSweepPool {
           const index = next;
           next += 1;
           try {
-            const result = await worker.model.computeScanImpedance({ frequencyMHz, ...scanStates[index]! });
+            const result = await worker.model.computeScanImpedance({
+              frequencyMHz,
+              ...scanStates[index]!,
+              ...floquet,
+            });
             if (stopped) return;
             finished.push({ index, result });
           } catch (error) {

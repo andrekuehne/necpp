@@ -161,6 +161,16 @@ export interface NecWasmModule {
   _necpp_wasm_v1_impedance_condition_estimate(model: number): number;
   _necpp_wasm_v1_impedance_estimated_error(model: number): number;
   _necpp_wasm_v1_impedance_point_status(model: number): number;
+  _necpp_wasm_v1_compute_floquet_amplitudes(
+    model: number,
+    normalization: number,
+    evanescentP: number,
+    evanescentQ: number,
+    evanescentCount: number,
+  ): number;
+  _necpp_wasm_v1_floquet_mode_count(model: number): number;
+  _necpp_wasm_v1_floquet_port_count(model: number): number;
+  _necpp_wasm_v1_floquet_normalization(model: number): number;
   _necpp_wasm_v1_impedance_factorization_generation(model: number): number;
 
   _necpp_wasm_v1_solution_count(model: number): number;

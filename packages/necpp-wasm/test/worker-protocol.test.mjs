@@ -345,7 +345,25 @@ test("characterization handles transfer to a MessagePort without cloning large b
   );
 });
 
-function scanImpedanceResult(diagnostics) {
+function floquetAmplitudes() {
+  return {
+    normalization: { kind: "unit-current", valueA: 1 },
+    modes: [{
+      p: 0,
+      q: 0,
+      side: "above",
+      propagating: true,
+      ktRadPerM: [1.5, 0],
+      kzRadPerM: [6, 0],
+      te: { real: Float64Array.of(0.1), imag: Float64Array.of(-0.2) },
+      tm: { real: Float64Array.of(0.3), imag: Float64Array.of(0.4) },
+      powerW: Float64Array.of(0.15),
+    }],
+    powerBudget: [{ inputW: 0.15, propagatingW: 0.15, lossW: 0 }],
+  };
+}
+
+function scanImpedanceResult(diagnostics, floquet = floquetAmplitudes()) {
   const matrix = (value) => ({
     rows: 1,
     columns: 1,
@@ -359,8 +377,43 @@ function scanImpedanceResult(diagnostics) {
     frequencyMHz: 300,
     scanPhasesRad: [0.5, -0.25],
     diagnostics,
+    floquet,
   };
 }
+
+test("worker scan-impedance results validate the Floquet amplitudes and freeze them", () => {
+  const revived = reviveScanImpedanceResult(scanImpedanceResult({ estimatedError: 1e-7, status: "ok" })).floquet;
+  assert.deepEqual(revived, floquetAmplitudes());
+  assert.equal(Object.isFrozen(revived), true);
+  assert.equal(Object.isFrozen(revived.modes), true);
+  assert.equal(Object.isFrozen(revived.modes[0]), true);
+  assert.equal(Object.isFrozen(revived.modes[0].te), true);
+  assert.equal(Object.isFrozen(revived.powerBudget[0]), true);
+
+  const malformed = (change) => {
+    const floquet = floquetAmplitudes();
+    change(floquet);
+    return floquet;
+  };
+  for (const floquet of [
+    null,
+    malformed((value) => { value.normalization = { kind: "unit-power" }; }),
+    malformed((value) => { value.modes = {}; }),
+    malformed((value) => { value.powerBudget = []; }),
+    malformed((value) => { value.powerBudget[0].lossW = Number.NaN; }),
+    malformed((value) => { value.modes[0].side = "left"; }),
+    malformed((value) => { value.modes[0].p = 0.5; }),
+    malformed((value) => { value.modes[0].propagating = 1; }),
+    malformed((value) => { value.modes[0].kzRadPerM = [6]; }),
+    malformed((value) => { value.modes[0].te.real = [0.1]; }),
+    malformed((value) => { value.modes[0].tm.imag = Float64Array.of(0.4, 0.5); }),
+  ]) {
+    assert.throws(
+      () => reviveScanImpedanceResult(scanImpedanceResult({ estimatedError: 1e-7, status: "ok" }, floquet)),
+      NecRuntimeError,
+    );
+  }
+});
 
 test("worker scan-impedance results validate the diagnostics and freeze them", () => {
   const revived = reviveScanImpedanceResult(

@@ -1,4 +1,5 @@
 import { selectEvaluator, reviveEvaluation } from "./field-selection.js";
+import { embeddedNormalization } from "./model.js";
 import {
   NecConditioningError,
   NecError,
@@ -17,6 +18,8 @@ import type {
   EmbeddedFarFieldResult,
   FieldBackendDiagnostics,
   FarFieldResult,
+  FloquetAmplitudes,
+  FloquetMode,
   GeometryCompletionResult,
   ImpedanceResult,
   IsolatedElementCharacterization,
@@ -526,6 +529,75 @@ export function reviveImpedanceResult(value: unknown): ImpedanceResult {
 
 const POINT_STATUSES: readonly PeriodicPointStatus[] = ["ok", "near-cutoff"];
 
+function workerPair(value: unknown, name: string): readonly [number, number] {
+  if (!Array.isArray(value) || value.length !== 2) {
+    throw new NecRuntimeError(`Worker result ${name} is not a pair`);
+  }
+  return Object.freeze([
+    finiteWorkerNumber(value[0], `${name}[0]`),
+    finiteWorkerNumber(value[1], `${name}[1]`),
+  ] as const);
+}
+
+function portValues(value: unknown, name: string, ports: number): Float64Array {
+  const values = copyFloat64(value, name);
+  if (values.length !== ports) {
+    throw new NecRuntimeError(`Worker result ${name} does not have one entry per port`);
+  }
+  return values;
+}
+
+/** Validate a structured-cloned Floquet result of a cell with `ports` ports. */
+function reviveFloquetAmplitudes(value: unknown, ports: number): FloquetAmplitudes {
+  if (typeof value !== "object" || value === null) {
+    throw new NecRuntimeError("Worker result floquet is not an object");
+  }
+  const record = value as FloquetAmplitudes;
+  const kind = record.normalization?.kind as unknown;
+  if (kind !== "unit-voltage" && kind !== "unit-current") {
+    throw new NecRuntimeError("Worker result floquet.normalization is invalid");
+  }
+  if (!Array.isArray(record.modes) || !Array.isArray(record.powerBudget)
+      || record.powerBudget.length !== ports) {
+    throw new NecRuntimeError("Worker result floquet is malformed");
+  }
+  const modes = record.modes.map((mode: FloquetMode, index): FloquetMode => {
+    const name = `floquet.modes[${index}]`;
+    if (!Number.isInteger(mode?.p) || !Number.isInteger(mode?.q)
+        || (mode.side !== "above" && mode.side !== "below")
+        || typeof mode.propagating !== "boolean") {
+      throw new NecRuntimeError(`Worker result ${name} is malformed`);
+    }
+    return Object.freeze({
+      p: mode.p,
+      q: mode.q,
+      side: mode.side,
+      propagating: mode.propagating,
+      ktRadPerM: workerPair(mode.ktRadPerM, `${name}.ktRadPerM`),
+      kzRadPerM: workerPair(mode.kzRadPerM, `${name}.kzRadPerM`),
+      te: Object.freeze({
+        real: portValues(mode.te?.real, `${name}.te.real`, ports),
+        imag: portValues(mode.te?.imag, `${name}.te.imag`, ports),
+      }),
+      tm: Object.freeze({
+        real: portValues(mode.tm?.real, `${name}.tm.real`, ports),
+        imag: portValues(mode.tm?.imag, `${name}.tm.imag`, ports),
+      }),
+      powerW: portValues(mode.powerW, `${name}.powerW`, ports),
+    });
+  });
+  const powerBudget = record.powerBudget.map((power, index) => Object.freeze({
+    inputW: finiteWorkerNumber(power?.inputW, `floquet.powerBudget[${index}].inputW`),
+    propagatingW: finiteWorkerNumber(power?.propagatingW, `floquet.powerBudget[${index}].propagatingW`),
+    lossW: finiteWorkerNumber(power?.lossW, `floquet.powerBudget[${index}].lossW`),
+  }));
+  return Object.freeze({
+    normalization: embeddedNormalization(kind === "unit-voltage" ? 0 : 1),
+    modes: Object.freeze(modes),
+    powerBudget: Object.freeze(powerBudget),
+  });
+}
+
 /** Validate and copy a structured-cloned scan-impedance result. */
 export function reviveScanImpedanceResult(value: unknown): ScanImpedanceResult {
   if (typeof value !== "object" || value === null) {
@@ -533,10 +605,6 @@ export function reviveScanImpedanceResult(value: unknown): ScanImpedanceResult {
   }
   const record = value as ScanImpedanceResult;
   const matrices = reviveImpedanceResult({ ...record, factorizationGeneration: 0 });
-  const phases = record.scanPhasesRad;
-  if (!Array.isArray(phases) || phases.length !== 2) {
-    throw new NecRuntimeError("Worker result scanPhasesRad is not a pair");
-  }
   const estimatedError = finiteWorkerNumber(
     record.diagnostics?.estimatedError,
     "diagnostics.estimatedError",
@@ -549,11 +617,9 @@ export function reviveScanImpedanceResult(value: unknown): ScanImpedanceResult {
     impedance: matrices.impedance,
     admittance: matrices.admittance,
     frequencyMHz: finiteWorkerNumber(record.frequencyMHz, "frequencyMHz"),
-    scanPhasesRad: Object.freeze([
-      finiteWorkerNumber(phases[0], "scanPhasesRad[0]"),
-      finiteWorkerNumber(phases[1], "scanPhasesRad[1]"),
-    ] as const),
+    scanPhasesRad: workerPair(record.scanPhasesRad, "scanPhasesRad"),
     diagnostics: Object.freeze({ estimatedError, status: status as PeriodicPointStatus }),
+    floquet: reviveFloquetAmplitudes(record.floquet, matrices.impedance.rows),
   };
 }
 

@@ -13,6 +13,7 @@
 #include "nec_context.h"
 #include "nec_exception.h"
 #include "nec_far_field.h"
+#include "nec_periodic_green.h"
 #include "nec_port_matrix.h"
 #include "nec_prepared_current_quadrature.h"
 #include "nec_results.h"
@@ -921,6 +922,109 @@ const nec_impedance_result& nec_stateful_model::compute_impedance_matrix()
   m_impedance_result = std::move(result);
   m_has_impedance_result = true;
   return m_impedance_result;
+}
+
+const nec_floquet_result& nec_stateful_model::compute_floquet_amplitudes(
+  nec_embedded_field_normalization normalization,
+  const std::vector<nec_floquet_mode_index>& evanescent)
+{
+  const char* operation = "COMPUTE FLOQUET AMPLITUDES";
+  if (!m_periodic)
+    fail(operation, "NEEDS A PERIODIC UNIT CELL; SET A LATTICE FIRST");
+  if (m_state != nec_model_state::prepared && m_state != nec_model_state::solved)
+    fail(operation, "MODEL IS NOT PREPARED");
+  if (normalization != nec_embedded_field_normalization::unit_voltage &&
+      normalization != nec_embedded_field_normalization::unit_current)
+    fail(operation, "UNKNOWN NORMALIZATION");
+
+  const nec_complex_matrix impedance = compute_impedance_matrix().impedance;
+  std::vector<std::pair<long, long>> requested;
+  requested.reserve(evanescent.size());
+  for (const nec_floquet_mode_index& index : evanescent)
+    requested.emplace_back(index.p, index.q);
+  const std::vector<nec_periodic::floquet_mode> modes =
+    m_context->stateful_periodic_floquet_modes(requested);
+
+  const nec_float wavelength_m = em::get_wavelength(m_frequency_mhz * 1.0e6);
+  const size_t port_count = m_ports.size();
+  const bool perfect = m_ground.kind == nec_ground_kind::perfect;
+  // The propagating modes on each side (below only in free space), then the
+  // evanescent ones.
+  struct radiated_mode {
+    const nec_periodic::floquet_mode* mode;
+    bool above;
+  };
+  std::vector<radiated_mode> radiated;
+  for (const bool propagating : {true, false})
+    for (const bool above : {true, false}) {
+      if (!above && perfect)
+        continue;
+      for (const nec_periodic::floquet_mode& mode : modes)
+        if ((mode.kz.imag() == 0.0) == propagating)
+          radiated.push_back({&mode, above});
+    }
+  nec_floquet_result result;
+  result.normalization = normalization;
+  for (const radiated_mode& entry : radiated) {
+    const nec_periodic::floquet_mode& mode = *entry.mode;
+    nec_floquet_mode output;
+    output.p = int(mode.p);
+    output.q = int(mode.q);
+    output.side = entry.above ? nec_floquet_side::above : nec_floquet_side::below;
+    output.propagating = mode.kz.imag() == 0.0;
+    output.kt_x_rad_per_m = mode.kt.x / wavelength_m;
+    output.kt_y_rad_per_m = mode.kt.y / wavelength_m;
+    output.kz_rad_per_m = mode.kz / wavelength_m;
+    output.te.assign(port_count, nec_complex(0.0, 0.0));
+    output.tm.assign(port_count, nec_complex(0.0, 0.0));
+    output.power_w.assign(port_count, 0.0);
+    result.modes.push_back(std::move(output));
+  }
+  result.power.resize(port_count);
+
+  const bool had_solution = m_has_port_solution;
+  const nec_port_solution saved_solution = m_last_port_solution;
+  try {
+    std::vector<nec_complex> voltages(port_count, nec_complex(0.0, 0.0));
+    std::vector<nec_complex> achieved_voltages;
+    std::vector<nec_complex> achieved_currents;
+    for (size_t port = 0; port < port_count; ++port) {
+      if (normalization == nec_embedded_field_normalization::unit_current) {
+        apply_unit_current_basis(port, impedance, achieved_voltages, achieved_currents);
+      } else {
+        std::fill(voltages.begin(), voltages.end(), nec_complex(0.0, 0.0));
+        voltages[port] = nec_complex(1.0, 0.0);
+        execute_voltage_solve(voltages, achieved_voltages, achieved_currents);
+      }
+      nec_floquet_port_power& power = result.power[port];
+      for (size_t index = 0; index < port_count; ++index)
+        power.input_w += 0.5 * std::real(achieved_voltages[index] * std::conj(achieved_currents[index]));
+      power.loss_w = m_context->stateful_power_budget().structure_loss_w;
+      for (size_t index = 0; index < radiated.size(); ++index) {
+        nec_floquet_mode& output = result.modes[index];
+        std::tie(output.te[port], output.tm[port]) =
+          m_context->stateful_periodic_floquet_amplitudes(*radiated[index].mode, radiated[index].above);
+        if (!finite_value(output.te[port].real()) || !finite_value(output.te[port].imag()) ||
+            !finite_value(output.tm[port].real()) || !finite_value(output.tm[port].imag()))
+          fail(operation, "ENGINE RETURNED A NONFINITE FLOQUET AMPLITUDE");
+        if (output.propagating) {
+          output.power_w[port] = 0.5 * (std::norm(output.te[port]) + std::norm(output.tm[port]));
+          power.propagating_w += output.power_w[port];
+        }
+      }
+    }
+  } catch (...) {
+    const std::exception_ptr failure = std::current_exception();
+    try {
+      restore_after_internal_solves(had_solution, saved_solution);
+    } catch (...) {
+    }
+    std::rethrow_exception(failure);
+  }
+  restore_after_internal_solves(had_solution, saved_solution);
+
+  m_floquet_result = std::move(result);
+  return m_floquet_result;
 }
 
 const nec_port_solution& nec_stateful_model::solve_port_currents(

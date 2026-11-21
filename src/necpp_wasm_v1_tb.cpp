@@ -77,6 +77,114 @@ void require_complex_buffer_matches(
 
 } // namespace
 
+namespace {
+
+// Two tilted, unequal wires over perfect ground, the same through the stateful
+// model and through the ABI.
+void build_floquet_cell(nec_stateful_model& model)
+{
+  model.add_wire({1, 21, -0.2, -0.05, 0.12, 0.2, 0.05, 0.36, 0.001});
+  model.add_wire({2, 17, 0.1, 0.15, 0.3, 0.3, 0.35, 0.15, 0.001});
+  model.complete_geometry();
+  model.define_ports({{1, 11}, {2, 9}});
+  model.set_ground({nec_ground_kind::perfect});
+  model.set_lattice({0.8, 0.0, 0.1, 0.7});
+  model.set_scan_phases(1.1, -0.4);
+  model.prepare(299.792458);
+}
+
+void build_floquet_cell(necpp_wasm_v1_model* model)
+{
+  static const int32_t tags[] = {1, 2};
+  static const int32_t segments[] = {11, 9};
+  REQUIRE(necpp_wasm_v1_add_wire(model, 1, 21, -0.2, -0.05, 0.12, 0.2, 0.05, 0.36, 0.001) ==
+          NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_add_wire(model, 2, 17, 0.1, 0.15, 0.3, 0.3, 0.35, 0.15, 0.001) ==
+          NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_complete_geometry(model, NECPP_WASM_V1_GROUND_CONNECTION_NONE) ==
+          NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_define_ports(model, tags, segments, 2) == NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_set_ground(model, NECPP_WASM_V1_GROUND_PERFECT, 0, 0) == NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_set_lattice(model, 0.8, 0.0, 0.1, 0.7) == NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_set_scan_phases(model, 1.1, -0.4) == NECPP_WASM_V1_OK);
+  REQUIRE(necpp_wasm_v1_prepare(model, 299.792458) == NECPP_WASM_V1_OK);
+}
+
+} // namespace
+
+TEST_CASE("Floquet-amplitude ABI buffers reproduce the stateful model", "[periodic_floquet][wasm_abi]")
+{
+  nec_stateful_model native;
+  build_floquet_cell(native);
+  const nec_floquet_result expected = native.compute_floquet_amplitudes(
+    nec_embedded_field_normalization::unit_current, {{1, 0}, {-1, 1}});
+
+  std::unique_ptr<necpp_wasm_v1_model, decltype(&necpp_wasm_v1_model_delete)> owner(
+    necpp_wasm_v1_model_create(), necpp_wasm_v1_model_delete);
+  necpp_wasm_v1_model* model = owner.get();
+  build_floquet_cell(model);
+  const int32_t evanescent_p[] = {1, -1};
+  const int32_t evanescent_q[] = {0, 1};
+  REQUIRE(necpp_wasm_v1_compute_floquet_amplitudes(
+    model, NECPP_WASM_V1_UNIT_CURRENT, evanescent_p, evanescent_q, 2) == NECPP_WASM_V1_OK);
+
+  const size_t modes = expected.modes.size();
+  const size_t ports = 2;
+  REQUIRE(modes > 2);
+  REQUIRE(necpp_wasm_v1_floquet_mode_count(model) == modes);
+  REQUIRE(necpp_wasm_v1_floquet_port_count(model) == ports);
+  REQUIRE(necpp_wasm_v1_floquet_normalization(model) == NECPP_WASM_V1_UNIT_CURRENT);
+  const int32_t* p = necpp_wasm_v1_int32_result_buffer(model, NECPP_WASM_V1_FLOQUET_P);
+  const int32_t* q = necpp_wasm_v1_int32_result_buffer(model, NECPP_WASM_V1_FLOQUET_Q);
+  const int32_t* side = necpp_wasm_v1_int32_result_buffer(model, NECPP_WASM_V1_FLOQUET_SIDE);
+  const int32_t* propagating =
+    necpp_wasm_v1_int32_result_buffer(model, NECPP_WASM_V1_FLOQUET_PROPAGATING);
+  const double* kt_x = necpp_wasm_v1_result_buffer(model, NECPP_WASM_V1_FLOQUET_KT_X);
+  const double* kt_y = necpp_wasm_v1_result_buffer(model, NECPP_WASM_V1_FLOQUET_KT_Y);
+  REQUIRE(p != nullptr);
+  REQUIRE(q != nullptr);
+  REQUIRE(side != nullptr);
+  REQUIRE(propagating != nullptr);
+  REQUIRE(kt_x != nullptr);
+  REQUIRE(kt_y != nullptr);
+  std::vector<nec_complex> kz, te, tm;
+  std::vector<double> power;
+  for (size_t mode = 0; mode < modes; ++mode) {
+    const nec_floquet_mode& m = expected.modes[mode];
+    REQUIRE(p[mode] == m.p);
+    REQUIRE(q[mode] == m.q);
+    REQUIRE(side[mode] == static_cast<int32_t>(m.side));
+    REQUIRE(propagating[mode] == (m.propagating ? 1 : 0));
+    REQUIRE(kt_x[mode] == m.kt_x_rad_per_m);
+    REQUIRE(kt_y[mode] == m.kt_y_rad_per_m);
+    kz.push_back(m.kz_rad_per_m);
+    for (size_t port = 0; port < ports; ++port) {
+      te.push_back(m.te[port]);
+      tm.push_back(m.tm[port]);
+      power.push_back(m.power_w[port]);
+    }
+  }
+  // Amplitude buffers are mode-major: mode * ports + port.
+  require_complex_buffer_matches(model, NECPP_WASM_V1_FLOQUET_KZ_REAL, NECPP_WASM_V1_FLOQUET_KZ_IMAG, kz);
+  require_complex_buffer_matches(model, NECPP_WASM_V1_FLOQUET_TE_REAL, NECPP_WASM_V1_FLOQUET_TE_IMAG, te);
+  require_complex_buffer_matches(model, NECPP_WASM_V1_FLOQUET_TM_REAL, NECPP_WASM_V1_FLOQUET_TM_IMAG, tm);
+  const double* mode_power = necpp_wasm_v1_result_buffer(model, NECPP_WASM_V1_FLOQUET_MODE_POWER_W);
+  REQUIRE(necpp_wasm_v1_result_buffer_length(model, NECPP_WASM_V1_FLOQUET_MODE_POWER_W) == power.size());
+  for (size_t index = 0; index < power.size(); ++index)
+    REQUIRE(mode_power[index] == power[index]);
+  const double* input = necpp_wasm_v1_result_buffer(model, NECPP_WASM_V1_FLOQUET_INPUT_POWER_W);
+  const double* propagating_power = necpp_wasm_v1_result_buffer(model, NECPP_WASM_V1_FLOQUET_PROPAGATING_POWER_W);
+  const double* loss = necpp_wasm_v1_result_buffer(model, NECPP_WASM_V1_FLOQUET_LOSS_W);
+  REQUIRE(input != nullptr);
+  REQUIRE(propagating_power != nullptr);
+  REQUIRE(loss != nullptr);
+  for (size_t port = 0; port < ports; ++port) {
+    REQUIRE(input[port] == expected.power[port].input_w);
+    REQUIRE(propagating_power[port] == expected.power[port].propagating_w);
+    REQUIRE(loss[port] == expected.power[port].loss_w);
+  }
+}
+
 TEST_CASE("WP-S3 ABI completion metadata matches the stateful model",
           "[wp_s3][wasm_abi][symmetry]")
 {

@@ -81,6 +81,13 @@ _Avoid_: grating lobe (that is only a propagating Floquet mode other than (0,0))
 **Floquet port**:
 A plane parallel to the lattice, clear of all conductors, on which Floquet-mode amplitudes are defined.
 
+**Floquet-mode amplitude**:
+The TE and TM amplitude of one Floquet mode radiated by the unit cell when one port is driven at unit voltage (others shorted) or unit current (others open), power-normalized so that a propagating mode carries half its squared magnitude in watts per cell.
+
+**Terminated amplitude**:
+A Floquet-mode amplitude with every port terminated in a generator impedance and one port driven with 1 W of available power, derived from the raw amplitudes and the scan impedance.
+_Avoid_: realized amplitude
+
 **Wood anomaly**:
 A scan state and frequency at which one Floquet mode grazes the lattice plane (`kz = 0`): the boundary where a grating lobe appears or disappears.
 _Avoid_: Rayleigh anomaly, grating-lobe onset (as a noun for the singular point)
