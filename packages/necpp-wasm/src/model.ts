@@ -286,7 +286,7 @@ function isFloat64Array(value: unknown): value is Float64Array {
   return Object.prototype.toString.call(value) === "[object Float64Array]";
 }
 
-function validateComplexVector(
+export function validateComplexVector(
   vector: unknown,
   expectedLength: number,
   name: string,

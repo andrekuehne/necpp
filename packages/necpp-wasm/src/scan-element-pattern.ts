@@ -150,8 +150,12 @@ export function validPatternRequest(request: unknown, options: unknown): ValidPa
   };
 }
 
-/** phi-hat and theta-hat of the direction (u, v) above or below the cell, and cos(theta) above. */
-function frame(u: number, v: number, side: FloquetSide): {
+/**
+ * @internal phi-hat and theta-hat of the direction (u, v) above or below the
+ * cell, along which te and tm lie (phi = 0 at broadside), and `kappa` =
+ * |cos(theta)|.
+ */
+export function frame(u: number, v: number, side: FloquetSide): {
   readonly phi: readonly [number, number, number];
   readonly theta: readonly [number, number, number];
   readonly kappa: number;
@@ -188,6 +192,7 @@ function zeroOrder(result: ScanImpedanceResult, side: FloquetSide): ScanElementA
 class ComputedScanElementPattern implements ScanElementPattern {
   readonly frequencyMHz: number;
   readonly normalization: EmbeddedFieldNormalization;
+  readonly lattice: PeriodicLattice;
   readonly portCount: number;
   readonly sides: readonly FloquetSide[];
   readonly spacingUV: number;
@@ -196,6 +201,7 @@ class ComputedScanElementPattern implements ScanElementPattern {
   readonly #interpolant: LiftedInterpolant;
 
   constructor(
+    lattice: PeriodicLattice,
     request: ValidPatternRequest,
     spacing: number,
     circles: readonly WoodCircle[],
@@ -204,6 +210,7 @@ class ComputedScanElementPattern implements ScanElementPattern {
   ) {
     this.frequencyMHz = request.frequencyMHz;
     this.normalization = request.normalization;
+    this.lattice = lattice;
     this.portCount = samples[0]!.above.te.real.length;
     this.sides = Object.freeze(samples[0]!.below === undefined ? ["above"] : ["above", "below"]);
     this.spacingUV = spacing;
@@ -488,5 +495,5 @@ export async function computeScanElementPattern(
       interpolant.add(points, samples.slice(first).map((sample) => interpolatedValues(sample, sides, ports)));
     }
   }
-  return new ComputedScanElementPattern(request, spacing, circles, interpolant, Object.freeze(samples));
+  return new ComputedScanElementPattern(lattice, request, spacing, circles, interpolant, Object.freeze(samples));
 }

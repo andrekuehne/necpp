@@ -242,6 +242,25 @@ Stage 2 so far:
   of the guided wave has zero amplitude. The stated interpolation error
   covered 397 of 399 random directions; the two misses, by up to 3 times, lie
   where two Wood circles, or one and the horizon, are both close.
+- issue #31: windowed arrays. `windowedArray(pattern, { steering, cells,
+  excitation? })` forms the array factor over the given lattice cells, with
+  the excitation times the steering phases of a scan result, and multiplies it
+  by the scan element pattern; it offers the steering state's scan impedance
+  as every driven element's active impedance, flagged `approximate`. Against
+  direct finite solves of x-dipoles (three segments, 0.6 x 0.5 wavelengths)
+  driven with the same port voltages and steered to 30 degrees in the E-plane,
+  the largest difference in the main beam and near sidelobes (four null
+  widths either side, above and below the array) is 7.8, 4.8 and 2.2 % of the
+  peak at 8 x 8, 16 x 16 and 32 x 32; under a cosine taper at 16 x 16, 0.5 %
+  (H-plane, 30 degrees) and 1.0 % (theta 40, phi 45 degrees). The centre
+  element of the uniform 32 x 32 array sees the offered active impedance to
+  0.7 %. Vertical dipoles on the same lattice, coupled strongly in every
+  direction of the plane, converge much more slowly (110, 47 and 19 %).
+  Gaussian-tapered finite arrays of them (15, 21 and 29 cells a side) move
+  steadily towards the scan element pattern at the steering direction
+  (E_theta -0.58 + 1.12j, -0.73 + 1.21j, -0.83 + 1.22j against -0.95 +
+  1.16j), which points to slow edge convergence rather than an error of
+  the pattern; no test covers this case.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -667,7 +686,10 @@ state. Only truncation (edge effects) is left out; a direct finite solve with
   `1/k`. Interpolation never crosses a circle.
 - **API:** the package exposes the result as a scan element pattern object
   that can be evaluated at any `(u, v)`, so any consumer field grid and
-  display frame works. The array factor stays with the consumer.
+  display frame works. `windowedArray(pattern, { steering, cells, excitation? })`
+  forms the array factor from a scan result at the steering state (scan
+  phases and scan impedance) and the cells' lattice indices, and returns the
+  far field in the finite models' `FarFieldResult` form.
 - **Termination consistency:** the windowed model is exactly periodic only if
   the passive elements' termination equals the generators' internal impedance
   (short with ideal voltage drive, open with ideal current drive, or a common
@@ -823,7 +845,9 @@ Taken 2026-11-18. Terms as in [`GLOSSARY.md`](../GLOSSARY.md).
 14. Version 1 is the windowed array: array factor times scan element pattern,
     with the steering-direction scan impedance for every element flagged as an
     approximation. Per-element windowed active impedance follows the
-    Brillouin-zone work.
+    Brillouin-zone work. The package forms it with a free function over a
+    computed pattern and the steering state's scan result (issue #31), so
+    one sweep serves every window, taper and steering direction.
 15. The scan element pattern comes from an `auto` u-v sweep (with `manual`
     override) refined along the Wood circles, exposed as an object
     evaluable at any `(u, v)`.
