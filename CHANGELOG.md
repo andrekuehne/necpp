@@ -1,3 +1,41 @@
+## 0.11.0 - 2026-11-22
+
+### Added
+
+* **Infinite periodic arrays (#19).** `createNecPeriodicModel` (and
+  `createNecPeriodicWorkerModel` from `@necpp-engine/wasm/worker`) solve one
+  unit cell of an infinite 2D array with Floquet boundary conditions. See
+  "Infinite periodic arrays" in the package README.
+  * Any planar lattice via `setLattice`, with `squareLattice`,
+    `rectangularLattice`, `centeredRectangularLattice` and `hexagonalLattice`
+    presets. Unit cells can hold several elements and ports (#22, #23).
+  * `computeScanImpedance` returns the P × P scan impedance and admittance for
+    a scan state given as phase steps or, via `scanPhasesForDirection`, as a
+    beam direction. Conductors close to their periodic images stay accurate
+    (#24).
+  * Each result reports an estimated error and a status. Configurations that
+    cannot reach the internal tolerance are refused with a reason. There are
+    no truncation or Ewald parameters to set (#25).
+  * Perfect ground under the array (#26). Results stay finite and smooth on
+    Wood anomalies, which are flagged (#27).
+  * `sweepScanImpedance` runs scan sweeps on the worker pool, streaming chunks
+    with progress and cancellation. Scan-only changes reuse the
+    scan-independent work (#28).
+  * Floquet-mode amplitudes, propagating mode powers and a per-cell power
+    budget (port power = Floquet power + loss);
+    `terminatedFloquetAmplitudes` applies a generator impedance without a new
+    solve (#29).
+  * `computeScanElementPattern` returns a scan element pattern object to
+    evaluate in any (u, v) direction, sampled on a grid refined along the Wood
+    anomaly circles (#30). `windowedArray` forms the pattern of a finite driven
+    block as array factor × scan element pattern (#31).
+  * `setLayeredStacks` places lossy layered dielectric stacks above the wires
+    (a radome, #32) and below them (a substrate, #33). `setGround` now accepts
+    finite ground (soil) on the periodic model, through the exact per-mode
+    Fresnel reflection (#33). Dielectric and soil loss enter the power budget.
+* C ABI additions under `necpp_wasm_v1` (additive only; `abiVersion` stays 1).
+  The finite model's results are unchanged.
+
 ## 0.10.1 - 2026-10-22
 
 ### Bug Fixes
