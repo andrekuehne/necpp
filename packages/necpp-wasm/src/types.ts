@@ -225,8 +225,14 @@ export interface FiniteGround {
 
 export type GroundModel = FreeSpaceGround | PerfectGround | FiniteGround;
 
-/** Ground models of a periodic unit cell: free space or a perfect ground plane at z=0. */
-export type PeriodicGround = FreeSpaceGround | PerfectGround;
+/**
+ * Ground models of a periodic unit cell: free space, a perfect ground plane
+ * at z=0 (solved by images), or finite ground below z=0. Each Floquet mode
+ * sees finite ground through its exact Fresnel reflection, as a layered
+ * stack, so `method` does not matter; every wire, radius included, must stay
+ * above z=0.
+ */
+export type PeriodicGround = FreeSpaceGround | PerfectGround | FiniteGround;
 
 export interface PrepareOptions {
   /** Frequency in megahertz; must be finite and greater than zero. */
@@ -693,18 +699,42 @@ export interface LayeredStack {
   readonly layers: readonly DielectricLayer[];
 }
 
+/**
+ * A layered stack below the wires of a unit cell (a substrate): layers
+ * uniform in the lattice plane, from its upper face down. Below the last
+ * layer is the ground set with `setGround` (perfect or finite, with air
+ * between the stack and z = 0 unless the stack rests on it) or, in free
+ * space, air; then the Floquet modes below the cell are the waves it
+ * transmits.
+ */
+export interface LayeredStackBelow {
+  /**
+   * Height of the stack's upper face, in metres. Every wire, radius
+   * included, must stay above it; over ground, the stack must not reach
+   * below z = 0.
+   */
+  readonly topZM: number;
+  /** From the upper face down; at least one. */
+  readonly layers: readonly DielectricLayer[];
+}
+
 /** The layered stacks of a unit cell; none by default. */
 export interface LayeredStacks {
   readonly above?: LayeredStack;
+  readonly below?: LayeredStackBelow;
 }
 
 /**
- * The prepared layered stack of a periodic result. Its reflection terms
- * decay like `exp(-2 |kz| gapM)`, so the gap sets how many Floquet modes
- * they need; a gap that would need too many is refused.
+ * The prepared layered stacks of a periodic result, finite ground included.
+ * Their reflection terms decay like `exp(-2 |kz| gapM)`, so the gap sets how
+ * many Floquet modes they need; a gap that would need too many is refused.
  */
 export interface LayeredStackDiagnostics {
-  /** From the highest point of any wire axis to the stack's lower face. */
+  /**
+   * The smallest gap: from the highest point of any wire axis to the stack
+   * above, or from the lowest point to the stack below or to finite ground
+   * (z = 0).
+   */
   readonly gapM: number;
   readonly modeCount: number;
 }
@@ -732,7 +762,7 @@ export interface PeriodicPointDiagnostics {
    */
   readonly estimatedError: number;
   readonly status: PeriodicPointStatus;
-  /** Present with a layered stack. */
+  /** Present with a layered stack or finite ground. */
   readonly layeredStack?: LayeredStackDiagnostics;
 }
 
@@ -778,7 +808,10 @@ export interface FloquetPortPower {
   readonly propagatingW: number;
   /** In the loads and the wires' conductivity. */
   readonly lossW: number;
-  /** In the layered stacks; zero without one. */
+  /**
+   * In the layered stacks and the finite ground (all the power that enters
+   * the ground); zero without them.
+   */
   readonly dielectricLossW: number;
 }
 
@@ -786,7 +819,8 @@ export interface FloquetPortPower {
 export interface FloquetAmplitudes {
   readonly normalization: EmbeddedFieldNormalization;
   /**
-   * Every propagating mode above the cell, then below it (free space only),
+   * Every propagating mode above the cell, then below it (only without a
+   * ground: through the stack below, if any),
    * then the evanescent modes asked for, above and then below.
    */
   readonly modes: readonly FloquetMode[];

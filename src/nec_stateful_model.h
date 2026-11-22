@@ -110,9 +110,19 @@ struct nec_layered_stack_definition {
   std::vector<nec_dielectric_layer_definition> layers;
 };
 
+/*! A layered stack below the wires of a periodic unit cell (a substrate):
+ * its upper face at top_z_m, layers from there down. Below them is the
+ * ground, with air between the stack and z = 0 (none when the stack rests
+ * on it), or air in free space. */
+struct nec_layered_stack_below_definition {
+  nec_float top_z_m = 0.0;
+  std::vector<nec_dielectric_layer_definition> layers;
+};
+
 /*! The layered stacks of a periodic unit cell; none by default. */
 struct nec_layered_stacks_definition {
   std::optional<nec_layered_stack_definition> above;
+  std::optional<nec_layered_stack_below_definition> below;
 };
 
 struct nec_far_field_grid {
@@ -522,6 +532,13 @@ private:
   void validate_symmetric_load_orbits() const;
   void refuse_periodic(const char* operation) const;
   void apply_periodic_state();
+  // The context's ground for m_ground: in periodic mode finite ground leaves
+  // the context in free space and reaches each Floquet mode as a half-space.
+  void apply_context_ground();
+  // Refuse stacks or a ground that conductors enter, or a lower stack that
+  // reaches into the ground; changes nothing.
+  void check_periodic_boundaries(const nec_layered_stacks_definition& stacks,
+    const nec_ground_definition& ground, const char* operation) const;
   void validate_symmetry_ground(
     const nec_ground_definition& ground, const char* operation) const;
   void clear_matrix_cache();

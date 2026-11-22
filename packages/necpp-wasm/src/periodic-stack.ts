@@ -1,5 +1,5 @@
 import { finiteNumber, inputError, positiveNumber, requireRecord } from "./model.js";
-import type { DielectricLayer, LayeredStack, LayeredStacks } from "./types.js";
+import type { DielectricLayer, LayeredStack, LayeredStackBelow, LayeredStacks } from "./types.js";
 
 function validLayer(value: unknown, name: string): DielectricLayer {
   const record = requireRecord(value, name);
@@ -20,26 +20,36 @@ function validLayer(value: unknown, name: string): DielectricLayer {
   return Object.freeze({ thicknessM, relativePermittivity, lossTangent });
 }
 
-function validStack(value: unknown, name: string): LayeredStack {
-  const record = requireRecord(value, name);
-  const bottomZM = finiteNumber(record.bottomZM, `${name}.bottomZM`);
+function validLayers(record: Record<string, unknown>, name: string): readonly DielectricLayer[] {
   if (!Array.isArray(record.layers) || record.layers.length === 0) {
     inputError(`${name}.layers must be a non-empty array of layers`, { name: `${name}.layers` });
   }
-  const layers = (record.layers as readonly unknown[]).map((layer, index) =>
-    validLayer(layer, `${name}.layers[${index}]`));
-  return Object.freeze({ bottomZM, layers: Object.freeze(layers) });
+  return Object.freeze((record.layers as readonly unknown[]).map((layer, index) =>
+    validLayer(layer, `${name}.layers[${index}]`)));
+}
+
+function validStackAbove(value: unknown, name: string): LayeredStack {
+  const record = requireRecord(value, name);
+  const bottomZM = finiteNumber(record.bottomZM, `${name}.bottomZM`);
+  return Object.freeze({ bottomZM, layers: validLayers(record, name) });
+}
+
+function validStackBelow(value: unknown, name: string): LayeredStackBelow {
+  const record = requireRecord(value, name);
+  const topZM = finiteNumber(record.topZM, `${name}.topZM`);
+  return Object.freeze({ topZM, layers: validLayers(record, name) });
 }
 
 /** @internal Layered stacks, validated and copied. */
 export function validLayeredStacks(value: unknown, name: string): LayeredStacks {
   const record = requireRecord(value, name);
   for (const key of Object.keys(record)) {
-    if (key !== "above") {
-      inputError(`${name}.${key} is not a layered stack; only "above" is supported`, { name: `${name}.${key}` });
+    if (key !== "above" && key !== "below") {
+      inputError(`${name}.${key} is not a layered stack; use "above" or "below"`, { name: `${name}.${key}` });
     }
   }
-  return record.above === undefined
-    ? Object.freeze({})
-    : Object.freeze({ above: validStack(record.above, `${name}.above`) });
+  return Object.freeze({
+    ...(record.above === undefined ? {} : { above: validStackAbove(record.above, `${name}.above`) }),
+    ...(record.below === undefined ? {} : { below: validStackBelow(record.below, `${name}.below`) }),
+  });
 }

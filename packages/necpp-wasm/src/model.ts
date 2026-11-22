@@ -1834,25 +1834,29 @@ export class WasmNecModel implements NecModel {
   /** @internal Periodic entry point; see `setLatticeEntry`. Arguments arrive validated. */
   [setLayeredStacksEntry](stacks: LayeredStacks): void {
     this.#assertNotDisposed("setLayeredStacks");
-    const above = stacks.above;
-    const layers = Float64Array.from((above?.layers ?? []).flatMap((layer) =>
+    // Both sides' layers, three doubles each: above first, then below.
+    const above = stacks.above?.layers ?? [];
+    const below = stacks.below?.layers ?? [];
+    const layers = Float64Array.from([...above, ...below].flatMap((layer) =>
       [layer.thicknessM, layer.relativePermittivity, layer.lossTangent ?? 0]));
     this.#invokeStatus("setLayeredStacks", () => {
-      if (layers.length === 0) {
-        return this.#module._necpp_wasm_v1_set_layered_stack_above(this.#handle, 0, 0, 0);
-      }
       let pointer = 0;
       try {
-        pointer = this.#allocate(layers.byteLength);
-        this.#module.HEAPF64.set(layers, pointer / FLOAT64_BYTES);
-        return this.#module._necpp_wasm_v1_set_layered_stack_above(
+        if (layers.length > 0) {
+          pointer = this.#allocate(layers.byteLength);
+          this.#module.HEAPF64.set(layers, pointer / FLOAT64_BYTES);
+        }
+        return this.#module._necpp_wasm_v1_set_layered_stacks(
           this.#handle,
-          above!.bottomZM,
-          pointer,
-          layers.length / 3,
+          stacks.above?.bottomZM ?? 0,
+          above.length > 0 ? pointer : 0,
+          above.length,
+          stacks.below?.topZM ?? 0,
+          below.length > 0 ? pointer + above.length * 3 * FLOAT64_BYTES : 0,
+          below.length,
         );
       } finally {
-        this.#free(pointer);
+        if (pointer !== 0) this.#free(pointer);
       }
     });
   }
@@ -1868,7 +1872,8 @@ export class WasmNecModel implements NecModel {
     if (status === undefined) {
       throw new NecRuntimeError("The native point status is invalid");
     }
-    // A stack always leaves a gap above the wires; without one the gap is 0.
+    // A stack or finite ground always leaves a gap to the wires; without one
+    // the gap is 0.
     const gapM = this.#module._necpp_wasm_v1_impedance_stack_gap_m(this.#handle);
     if (gapM === 0) {
       return Object.freeze({ estimatedError, status });

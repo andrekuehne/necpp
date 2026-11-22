@@ -345,9 +345,12 @@ void nec_context::refuse_unsupported_periodic_configuration() const
     throw nec_geometry_exception(ntyp[0] == 1
       ? "NETWORKS ARE NOT SUPPORTED IN PERIODIC MODE (UNTESTED)"
       : "TRANSMISSION LINES ARE NOT SUPPORTED IN PERIODIC MODE (UNTESTED)");
+  // Finite ground reaches the periodic fill as a half-space seen by each
+  // Floquet mode (stateful_set_periodic_finite_ground), never as NEC's
+  // approximate ground image.
   if (ground.present() && !ground.type_perfect())
     throw nec_geometry_exception(
-      "FINITE GROUND IS NOT SUPPORTED IN PERIODIC MODE UNTIL LAYERED STACKS ARRIVE");
+      "FINITE GROUND IN PERIODIC MODE MUST BE SET AS A HALF-SPACE, NOT AS NEC'S GROUND");
   if (ground.type_perfect())
     stateful_check_periodic_ground_clearance();
   if (nop != 1)
@@ -998,10 +1001,10 @@ std::vector<nec_periodic::floquet_mode> nec_context::stateful_periodic_floquet_m
 }
 
 std::array<nec_complex, 3> nec_context::periodic_radiation_vector(
-  nec_periodic::vec2 kt, nec_complex kz, nec_float reference_z) const
+  nec_periodic::vec2 kt, nec_complex kz, nec_float reference_z, bool ground_image) const
 {
   const nec_float k = two_pi();
-  const bool perfect = ground.type_perfect();
+  const bool perfect = ground_image && ground.type_perfect();
   std::array<nec_complex, 3> radiation{};
   for (int64_t i = 0; i < m_geometry->n_segments; ++i) {
     const nec_periodic::source_segment segment{

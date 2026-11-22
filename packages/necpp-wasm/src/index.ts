@@ -102,6 +102,7 @@ export type {
   IsolatedElementRequest,
   LatticeVectorM,
   LayeredStack,
+  LayeredStackBelow,
   LayeredStackDiagnostics,
   LayeredStacks,
   LoadDefinition,

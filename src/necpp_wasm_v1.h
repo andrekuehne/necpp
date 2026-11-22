@@ -308,6 +308,20 @@ int32_t necpp_wasm_v1_set_scan_phases(
 int32_t necpp_wasm_v1_set_layered_stack_above(
   necpp_wasm_v1_model* model,
   double bottom_z_m, const double* layers, size_t layer_count);
+/*
+ * Layered stacks above and below the wires of a periodic unit cell, additive
+ * ABI v1 symbol; replaces both. Above as necpp_wasm_v1_set_layered_stack_above.
+ * Below (a substrate): its upper face at below_top_z_m and below_count layers
+ * from there down, each three doubles as above; below them the ground, with
+ * air between the stack and z = 0, or air in free space. A count of 0
+ * leaves that side without a stack. Returns NECPP_WASM_V1_GEOMETRY_ERROR when
+ * a conductor enters a stack or the lower stack reaches below z = 0 over
+ * ground.
+ */
+int32_t necpp_wasm_v1_set_layered_stacks(
+  necpp_wasm_v1_model* model,
+  double above_bottom_z_m, const double* above_layers, size_t above_count,
+  double below_top_z_m, const double* below_layers, size_t below_count);
 int32_t necpp_wasm_v1_prepare(
   necpp_wasm_v1_model* model, double frequency_mhz);
 int32_t necpp_wasm_v1_compute_impedance(necpp_wasm_v1_model* model);

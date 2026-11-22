@@ -114,6 +114,7 @@ for (const entry of [
   "_necpp_wasm_v1_clear_lattice",
   "_necpp_wasm_v1_set_scan_phases",
   "_necpp_wasm_v1_set_layered_stack_above",
+  "_necpp_wasm_v1_set_layered_stacks",
   "_necpp_wasm_v1_impedance_estimated_error",
   "_necpp_wasm_v1_impedance_point_status",
   "_necpp_wasm_v1_impedance_stack_gap_m",

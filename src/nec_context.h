@@ -173,28 +173,47 @@ public:
   std::pair<nec_complex, nec_complex> stateful_periodic_floquet_amplitudes(
     const nec_periodic::floquet_mode& mode, bool above) const;
 
-  /*! Periodic mode: a layered stack above the wires (a radome), in metres,
-   * layers from its lower face up, with air above it. Each Floquet mode sees
-   * it through a TE and a TM reflection added to the interaction matrix, and
-   * the modes above it are the waves it transmits. Applied from the next
-   * stateful_prepare_frequency(); the scan-independent fill is kept. */
+  /*! Periodic mode: layered stacks above the wires (a radome) and below them
+   * (a substrate), in metres, each with its face next to the wires at
+   * face_z_m and its layers from there outward. Above the upper stack is
+   * air; below the lower one is the ground, if any (perfect, or the finite
+   * ground of stateful_set_periodic_finite_ground), with air between the
+   * stack and z = 0, and otherwise air. Each Floquet mode sees a stack
+   * through a TE and a TM reflection added to the interaction matrix; the
+   * modes above (below, in free space) are the waves it transmits. Applied
+   * from the next stateful_prepare_frequency(); the scan-independent fill is
+   * kept. */
   struct periodic_stack_definition {
-    nec_float bottom_z_m = 0;
+    nec_float face_z_m = 0;
     std::vector<nec_periodic::dielectric_layer> layers;  // thickness in metres
   };
-  void stateful_set_periodic_stack(std::optional<periodic_stack_definition> stack);
-  /*! Refuse a stack that a conductor enters or touches
-   * (nec_geometry_exception). Changes nothing. */
-  void stateful_check_periodic_stack_entry(const periodic_stack_definition& stack) const;
-  /*! The prepared stack: the gap between the highest point of any wire axis
-   * and the stack, and the Floquet modes its reflection terms take. */
+  struct periodic_stacks_definition {
+    std::optional<periodic_stack_definition> above, below;
+  };
+  void stateful_set_periodic_stacks(periodic_stacks_definition stacks);
+  /*! Periodic mode: finite ground under the array, the half-space z < 0,
+   * seen by each Floquet mode through its exact Fresnel reflection as a
+   * layered stack is (the context's own ground is then free space). */
+  struct periodic_finite_ground {
+    nec_float relative_permittivity = 1;
+    nec_float conductivity_s_per_m = 0;
+  };
+  void stateful_set_periodic_finite_ground(std::optional<periodic_finite_ground> ground);
+  /*! Refuse stacks that a conductor enters or touches, a lower stack that
+   * reaches below z = 0 over ground, and with finite ground a conductor that
+   * reaches z = 0 (nec_geometry_exception). Changes nothing. */
+  void stateful_check_periodic_boundaries(const periodic_stacks_definition& stacks,
+    bool ground_below, bool finite_ground) const;
+  /*! The prepared stacks and finite ground: the smallest gap between a wire
+   * axis and one of them, and the Floquet modes their reflection terms
+   * take. */
   struct periodic_stack_diagnostics {
     nec_float gap_m = 0;
     size_t mode_count = 0;
   };
   std::optional<periodic_stack_diagnostics> stateful_periodic_stack_diagnostics() const;
-  /*! Periodic mode: the power the latest solve loses in the stack, in watts
-   * per cell; zero without one. */
+  /*! Periodic mode: the power the latest solve loses in the stacks and the
+   * finite ground, in watts per cell; zero without them. */
   nec_float stateful_periodic_dielectric_loss() const;
 
   /*! Result ownership helpers for the stateful layer. */
@@ -1058,8 +1077,9 @@ private:
   // With reference_z h, the direct current is weighed against
   // exp(j (kt . rho + kz (z - h))) and its image against
   // exp(j (kt . rho - kz (z + h))), so N comes out times exp(-j kz h).
+  // Without ground_image, the direct current alone.
   std::array<nec_complex, 3> periodic_radiation_vector(
-    nec_periodic::vec2 kt, nec_complex kz, nec_float reference_z = 0) const;
+    nec_periodic::vec2 kt, nec_complex kz, nec_float reference_z = 0, bool ground_image = true) const;
   // The singular parts of the Floquet modes split out of m_periodic_green
   // (near cut-off), and the layered stack's terms that are large (near
   // cut-off or a guided-wave pole), solved by a low-rank update; null when
@@ -1105,47 +1125,67 @@ private:
   // only by the periodic model test.
   std::optional<nec_float> m_periodic_near_cutoff;
 
-  // The layered stack above the wires, as set (metres), and as prepared for
-  // the frequency and scan state: in wavelengths, with the Floquet modes its
-  // reflection terms take and each mode's TE and TM response.
-  std::optional<periodic_stack_definition> m_periodic_stack;
+  // The layered stacks and the finite ground, as set (metres), and as
+  // prepared for the frequency and scan state: in wavelengths, with the
+  // Floquet modes their reflection terms take and each mode's TE and TM
+  // response.
+  periodic_stacks_definition m_periodic_stacks;
+  std::optional<periodic_finite_ground> m_periodic_finite_ground;
+  // One reflecting side of the air region the wires live in.
+  struct prepared_stack_side {
+    nec_float face_z = 0;  // next to the wires
+    nec_float far_z = 0;   // the outer face, where a wave leaves into air
+    std::vector<nec_periodic::dielectric_layer> layers;  // from the face outward
+    nec_periodic::stack_termination beyond;
+  };
   struct prepared_stack_mode {
     nec_float kt_x = 0, kt_y = 0;
     nec_complex kz;
     // Split out of the kernel near cut-off (and then with the kernel's kt, kz).
     bool split = false;
-    nec_periodic::stack_response te, tm;
+    // TE, TM; zero on a side without a stack.
+    nec_periodic::stack_response above[2], below[2];
   };
   struct prepared_periodic_stack {
-    nec_float bottom_z = 0;
-    nec_float top_z = 0;
-    nec_float gap_m = 0;
-    std::vector<nec_periodic::dielectric_layer> layers;
+    std::optional<prepared_stack_side> above, below;
+    nec_float gap_m = 0;  // the smaller of the two gaps
     std::vector<prepared_stack_mode> modes;
   };
   std::optional<prepared_periodic_stack> m_prepared_stack;
   // Builds m_prepared_stack at stateful_prepare_frequency, or refuses a gap
-  // that would need too many modes; returns the stack's estimated error.
+  // that would need too many modes; returns the stacks' estimated error.
   nec_float prepare_periodic_stack(const nec_periodic::lattice_2d& lattice,
     nec_periodic::vec2 scan_wavevector, nec_float per_metre);
-  // Adds the stack's reflection terms to cm, or to update where they are
-  // large (near cut-off or a guided-wave pole of the stack).
+  // Adds the stacks' reflection terms to cm, or to update where they are
+  // large (near cut-off or a guided-wave pole of a stack).
   void periodic_stack_fill(nec_periodic::low_rank_update& update);
-  // The response of the prepared stack to the TE or TM part of a mode, in the
-  // field convention of the Floquet amplitudes, and the factor
-  // 1 / (1 - rho R exp(-2j kz h)) of the reflections between the stack and
-  // a perfect ground (rho = -1 TE, +1 TM).
+  // The prepared stacks' response to the TE or TM part of a mode, in the
+  // field convention of the Floquet amplitudes: the upper reflection G_a at
+  // upper_z (zero without a stack above) and the lower one G_b at lower_z
+  // (perfect ground on the image route: rho = -1 TE, +1 TM at z = 0; zero
+  // in free space), of which the kernel's ground image already holds
+  // lower_in_kernel, the transit W = exp(-j kz (upper_z - lower_z)) between
+  // them and the factor 1 / (1 - G_a G_b W^2) of their multiple reflections.
   struct stack_mode_response {
-    nec_complex reflection, transmission, multiple_reflections;
-    nec_float absorbed = 0;
+    nec_complex upper, lower, lower_in_kernel, transit, multiple_reflections;
+    nec_float upper_z = 0, lower_z = 0;
+    // Into the air beyond the outer face at upper_far_z (lower_far_z): 1
+    // without a stack on that side, 0 over ground.
+    nec_complex upper_transmission = 1.0, lower_transmission = 1.0;
+    nec_float upper_far_z = 0, lower_far_z = 0;
+    nec_float upper_absorbed = 0, lower_absorbed = 0;
   };
-  stack_mode_response periodic_stack_mode_response(
-    const nec_periodic::stack_response& response, nec_complex kz, bool te) const;
+  stack_mode_response periodic_stack_mode_response(const nec_periodic::stack_response& above,
+    const nec_periodic::stack_response& below, nec_complex kz, bool te) const;
+  // The responses of both prepared sides to a mode, TE or TM.
+  std::pair<nec_periodic::stack_response, nec_periodic::stack_response>
+  periodic_stack_side_responses(nec_complex kz, bool te) const;
   // For a mode split out of the kernel near cut-off: the factor by which the
-  // stack scales the kernel's singular TE or TM part c u v^T (v with the
-  // ground image's source factor), 1 + R_eff sigma / source_factor with
-  // sigma the limit of a b^T over u v^T at cut-off; periodic_stack_fill adds
-  // the rest, c R_eff (a b^T - sigma u v^T), which is finite there.
+  // stacks scale the kernel's singular TE or TM part c u v^T (v with the
+  // ground image's source factor), 1 + J / source_factor with J the sum
+  // over the reflection terms of their coefficient times sigma, the limit of
+  // their a b^T over u v^T at cut-off; periodic_stack_fill adds the rest,
+  // c G (a b^T - sigma u v^T), which is finite there.
   nec_complex periodic_stack_split_factor(const nec_periodic::floquet_mode& mode,
     bool te, nec_float source_factor) const;
   // A term whose coefficient, relative to a propagating mode's, exceeds this
