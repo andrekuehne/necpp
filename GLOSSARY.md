@@ -40,7 +40,7 @@ A periodic image of a source segment near enough to an observation point that it
 _Avoid_: near image, image ring
 
 **Estimated error**:
-The numerical error a periodic result carries in its diagnostics, relative to the largest scan-impedance entry: periodic Green's function, quadrature and rounding near a Wood anomaly. Thin-wire modelling error is not included.
+The numerical error a periodic result carries in its diagnostics, relative to the largest scan-impedance entry: periodic Green's function (with the interpolation of its tables), quadrature and rounding near a Wood anomaly. Thin-wire modelling error is not included.
 _Avoid_: accuracy, error bound
 
 **Periodic tolerance**:

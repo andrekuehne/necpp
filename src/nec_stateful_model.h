@@ -579,6 +579,8 @@ private:
   std::unique_ptr<nec_context> m_context;
   // Defined only in the periodic model test (see nec_context).
   friend struct nec_periodic_split_access;
+  // Defined only in the periodic fill test.
+  friend struct nec_periodic_fill_access;
   nec_model_state m_state = nec_model_state::empty;
   nec_geometry_completion_result m_geometry_completion;
   std::vector<nec_port_definition> m_ports;

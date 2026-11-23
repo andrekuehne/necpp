@@ -401,6 +401,64 @@ Stage 2 so far:
   - continuity through a Wood anomaly with soil, soil under both stacks, a
     grounded slab and a stack in free space; sweep workers replay stacks and
     ground.
+- issue #52: fast scan changes. Nearly all of a scan change was the
+  spectral Ewald sum, evaluated per kernel sample (8 per pair, twice over
+  ground) with two complex error functions per Floquet mode. A mode's term
+  at `r = (x, y, dz)` is `exp(-j kt . rho_obs) exp(j kt . rho_src) F(dz)`,
+  its gradient from F and `G(dz)`, so the error functions sit in two
+  functions of the height difference alone (`spectral_factor`). The fill
+  (`nec_periodic_spectral_fill`) now evaluates them per mode once per scan
+  state, on a uniform table in dz read with centred 8-point Lagrange
+  stencils (spacing `0.1 / max(k, 4E)`), or exactly at the few distinct dz
+  of a planar cell; split modes tabulate their remainder the same way. The
+  stencils of every kernel sample are kept per frequency. The table compares
+  the midpoints of its intervals with direct values at every scan state and
+  adds the largest kernel error (about `1e-13` to `1e-11` relative to one
+  propagating mode's term) to the estimated error; a table beyond `2^20`
+  nodes times modes, or one that misses the kernel's `1e-10`, is not used,
+  and every kernel sample is evaluated directly. The fields are formed for
+  8 MiB of source segments at a time. The spatial
+  term of a lattice point is a function of the distance alone: its smooth
+  numerators `c`, `d` of `c / (8 pi R)` and `d / (8 pi R^3)`, and the term
+  minus the free-space term (the origin and the close images), are
+  tabulated once per frequency in R (`nec_periodic_spatial_table`, spacing
+  `0.03 / max(k, 4E)`: near the lattice point the numerators reach
+  `exp((k/2E)^2)` times the free-space term, which the spectral sum
+  cancels, so their error counts at that size). With cheap spatial terms
+  the splitting is chosen for the scan change: among `k / 2E` from the
+  automatic value to 3 in quarters, the least work of the modes times the
+  kernel samples (weighted 10) plus the lattice points times the matrix
+  size, within the 256 MiB cache. Beyond 3 the cancellation between the
+  sums, `exp((k/2E)^2)` times the rounding, approaches the kernel's
+  accuracy. The size refusal and the kernel's error estimate keep the
+  automatic splitting. Against the previous fill (automatic splitting,
+  every kernel sample direct) scan impedance and admittance, Floquet
+  amplitudes, mode powers and the power budget agree within `1.5e-11` over
+  free space, perfect and finite ground, stacks above and below, planar,
+  tilted, two-wire, helix (84 segments) and close-image cells, square,
+  hexagonal, rectangular and oblique lattices, broadside, oblique,
+  invisible-space and grating-lobe scans, and 1e-3 and 1e-8 from and on a
+  Wood circle (`nec_stateful_model_periodic_fill_tb.cpp`). Benchmarks in
+  WASM (Node 24, one thread; the crossed dipole 2 x 11 segments a quarter
+  wavelength over perfect ground on a 0.5 wavelength square lattice, the
+  helix 84 segments in 7 turns over perfect ground on 0.8):
+
+  | | Crossed dipole, before | after | Helix, before | after |
+  |---|---|---|---|---|
+  | k / 2E | 0.89 | 2.75 | 1.42 | 3 |
+  | Call at a new frequency | 286 ms | 213 ms | 3.52 s | 1.21 s |
+  | Scan change | 143 ms | 1.96 ms | 2.06 s | 30.5 ms |
+  | Per-frequency cache (lattice points) | 0.43 MiB (57) | 3.8 MiB (489) | 5.0 MiB (45) | 32 MiB (221) |
+  | Default scan element pattern, 8 workers | 93.8 s | 3.7 s | about 75 min (estimated) | 162 s |
+
+  The patterns take 4616 and 17456 scan states (the helix's 0.8 wavelength
+  lattice puts Wood circles in visible space, which the refinement
+  follows). The helix pattern before was not run; the estimate is its scan
+  states times the scan change over 8 workers. On a warm pool a helix scan
+  state takes 30 ms on one worker and 44 ms per worker on eight; the rest
+  of the 162 s is the pool's start (one fill per worker) and the pattern's
+  refinement rounds. Natively (g++ -O3) the scan change goes from 109 ms to
+  0.91 ms and from 1.63 s to 16.9 ms.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
