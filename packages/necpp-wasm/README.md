@@ -850,8 +850,10 @@ all ports of the cell.
 ### Scan sweeps and workers
 
 A scan change at the frequency of the previous call keeps the
-scan-independent part of the fill (the free-space matrix and the sum over
-lattice points) and costs about half of a call at a new frequency. To map the
+scan-independent part of the fill (the free-space matrix, the sum over
+lattice points and the kernel's tables) and costs a few percent of a call
+at a new frequency: in WASM about 2 ms for a 22-segment cell and 30 ms for
+an 84-segment helix, against 0.2 s and 1.2 s at a new frequency. To map the
 scan impedance over many scan states, sweep them on a pool of workers:
 
 ```ts
@@ -1194,7 +1196,8 @@ cell.dispose();
 - Accuracy: one fixed internal tolerance, `1e-5` relative to the largest
   scan-impedance entry, and no numerical parameters. Each result carries
   `diagnostics.estimatedError` (the solver's numerical error: periodic
-  Green's function, quadrature, rounding near a Wood anomaly; about `2e-10`
+  Green's function and the interpolation of its tables, quadrature, rounding
+  near a Wood anomaly; about `2e-10`
   for typical cells) and `diagnostics.status`. Thin-wire modelling error is
   not included. Configurations that cannot reach the tolerance are refused
   with a reason: unit cells above about 320 square wavelengths and segments

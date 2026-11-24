@@ -756,9 +756,9 @@ export type PeriodicPointStatus = "ok" | "near-cutoff";
 export interface PeriodicPointDiagnostics {
   /**
    * The solver's numerical error relative to the largest scan-impedance
-   * entry: the periodic Green's function, the quadrature over each segment
-   * and the rounding near a Wood anomaly. Thin-wire modelling error is not
-   * included.
+   * entry: the periodic Green's function (with the interpolation of its
+   * tables), the quadrature over each segment and the rounding near a Wood
+   * anomaly. Thin-wire modelling error is not included.
    */
   readonly estimatedError: number;
   readonly status: PeriodicPointStatus;

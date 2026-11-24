@@ -24,6 +24,8 @@ set(NECPP_LIB_SRCS
     nec_field_evaluator_wasm.cpp
     nec_ring_field.cpp
     nec_periodic_green.cpp
+    nec_periodic_spectral_fill.cpp
+    nec_periodic_spatial_table.cpp
     nec_periodic_low_rank.cpp
     nec_periodic_clearance.cpp
     nec_periodic_stack.cpp

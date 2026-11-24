@@ -414,6 +414,7 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
   m_periodic_low_rank.reset();
   m_periodic_close_images.clear();
   m_periodic_estimated_error = 0;
+  m_periodic_table_error = 0;
   if (m_periodic.active) {
     const nec_float per_metre = (1.0e6 * freq_mhz) / em::speed_of_light();
     const nec_periodic::lattice_2d lattice(
@@ -456,6 +457,12 @@ void nec_context::stateful_prepare_frequency(nec_float frequency_mhz)
         longest);
       throw nec_geometry_exception(reason);
     }
+    // The size refusal and the error estimate above keep the automatic
+    // splitting; the fill uses the one chosen for scan changes.
+    const nec_float splitting = periodic_scan_splitting(*green);
+    if (splitting != green->splitting())
+      green = std::make_shared<const nec_periodic::periodic_green>(
+        lattice, two_pi(), scan_wavevector, splitting, near_cutoff_ratio);
     m_periodic_green = green;
     m_periodic_estimated_error += prepare_periodic_stack(lattice, scan_wavevector, per_metre);
 
@@ -652,11 +659,27 @@ void nec_context::fill_part_matrix(fill_part part, complex_array& matrix)
 /*! The periodic interaction matrix in cm: the free-space fill, the sum over
  * lattice points rho of exp(-j kt0 . rho) times the image's contribution, and
  * the spectral sum. The first two are kept per frequency
- * (m_periodic_fill), so a scan change at the same frequency fills only the
- * spectral sum.
+ * (m_periodic_fill), with the kernel tables (periodic_fill_tables), so a
+ * scan change at the same frequency evaluates only the spectral sum, per
+ * Floquet mode from its tables in dz (nec_periodic::spectral_fill), and adds
+ * the phase-weighted matrices of the lattice points.
  */
 void nec_context::periodic_fill()
 {
+  // The state of the fill in progress goes with it, also when it throws.
+  struct fill_state_reset {
+    nec_context& context;
+    ~fill_state_reset()
+    {
+      context.m_fill_point = nullptr;
+      context.m_fill_tables = nullptr;
+      context.m_spectral_evaluation.reset();
+      context.m_periodic_spectral_fields.clear();
+      context.m_periodic_spectral_fields.shrink_to_fit();
+      context.m_spectral_block_first = context.m_spectral_block_last = 0;
+    }
+  } reset{*this};
+
   const int64_t size = cm.size();
   if (!m_periodic_fill || m_periodic_fill->frequency_mhz != freq_mhz) {
     m_periodic_fill.reset();
@@ -665,20 +688,34 @@ void nec_context::periodic_fill()
     fill->free_space.resize(size);
     fill_part_matrix(fill_part::free_space, fill->free_space);
     fill->points = periodic_fill_points();
+    periodic_fill_tables(*fill);
     if (double(fill->points.size()) * double(size) * sizeof(nec_complex) <= periodic_fill_cache_bytes) {
       fill->point_matrices.resize(fill->points.size());
+      m_fill_tables = fill.get();
       for (size_t index = 0; index < fill->points.size(); ++index) {
         m_fill_point = &fill->points[index];
         fill->point_matrices[index].resize(size);
         fill_part_matrix(fill_part::periodic_point, fill->point_matrices[index]);
       }
       m_fill_point = nullptr;
+      m_fill_tables = nullptr;
     }
     m_periodic_fill = std::move(fill);
   }
   const periodic_scan_independent_fill& fill = *m_periodic_fill;
 
+  // A table that misses the kernel's accuracy at this scan state is not
+  // used: every kernel sample is evaluated directly instead.
+  m_spectral_evaluation.emplace(fill.spectral->begin(*m_periodic_green));
+  if (m_spectral_evaluation->interpolation_error() > nec_periodic::kernel_error)
+    m_spectral_evaluation.emplace(fill.spectral->begin(*m_periodic_green, true));
+  m_periodic_table_error = (fill.spatial ? fill.spatial->interpolation_error() : 0.0) +
+    m_spectral_evaluation->interpolation_error();
+  m_spectral_block_first = m_spectral_block_last = 0;
   fill_part_matrix(fill_part::periodic_spectral, cm);
+  m_spectral_evaluation.reset();
+  m_periodic_spectral_fields.clear();
+  m_periodic_spectral_fields.shrink_to_fit();
   for (int64_t entry = 0; entry < size; ++entry)
     cm[entry] += fill.free_space[entry];
   const nec_periodic::vec2 scan_wavevector = m_periodic_green->lattice().scan_wavevector(
@@ -692,14 +729,137 @@ void nec_context::periodic_fill()
     if (fill.point_matrices.empty()) {
       image_matrix.resize(size);
       m_fill_point = &image;
+      m_fill_tables = &fill;
       fill_part_matrix(fill_part::periodic_point, image_matrix);
       m_fill_point = nullptr;
+      m_fill_tables = nullptr;
     } else {
       matrix = &fill.point_matrices[index];
     }
     for (int64_t entry = 0; entry < size; ++entry)
       cm[entry] += phase * (*matrix)[entry];
   }
+}
+
+/*! The kernel tables of the per-frequency fill: the spatial terms in the
+ * distance, up to the farthest a kernel sample can be from a lattice point
+ * the fill evaluates (the spatial radius plus a segment, and for the origin
+ * and the close images, the cell with its ground images and the close
+ * reach), and the spectral sum's kernel samples and tables in dz. The
+ * reference fill evaluates the spatial terms directly and every kernel
+ * sample of the spectral sum.
+ */
+void nec_context::periodic_fill_tables(periodic_scan_independent_fill& fill) const
+{
+  const nec_periodic::periodic_green& green = *m_periodic_green;
+  const bool perfect = ground.type_perfect();
+  const int64_t n = m_geometry->n_segments;
+  nec_periodic::spectral_fill::geometry cell;
+  cell.ground_image = perfect;
+  nec_float longest = 0, close_reach = 0;
+  nec_float low[3], high[3];
+  for (int axis = 0; axis < 3; ++axis) {
+    low[axis] = std::numeric_limits<nec_float>::infinity();
+    high[axis] = -low[axis];
+  }
+  const auto extend = [&](nec_float x, nec_float y, nec_float z) {
+    const nec_float p[3] = {x, y, z};
+    for (int axis = 0; axis < 3; ++axis) {
+      low[axis] = std::min(low[axis], p[axis]);
+      high[axis] = std::max(high[axis], p[axis]);
+    }
+  };
+  for (int64_t i = 0; i < n; ++i) {
+    const nec_float length = m_geometry->segment_length[i];
+    const nec_periodic::point centre = {m_geometry->x[i], m_geometry->y[i], m_geometry->z[i]};
+    const nec_periodic::point direction = {m_geometry->cab[i], m_geometry->sab[i], m_geometry->salp[i]};
+    cell.observations.push_back(centre);
+    cell.sources.push_back({centre, direction, length});
+    longest = std::max(longest, length);
+    close_reach = std::max(close_reach, std::min(
+      periodic_close_image_reach(length, m_geometry->segment_radius[i]), 0.5 * rkh));
+    for (const nec_float end : {-0.5, 0.5})
+      for (const nec_float mirror : {1.0, -1.0}) {
+        if (mirror < 0 && !perfect)
+          continue;
+        extend(centre[0] + end * length * direction[0], centre[1] + end * length * direction[1],
+          mirror * (centre[2] + end * length * direction[2]));
+      }
+  }
+  const nec_float cell_diagonal = n > 0
+    ? std::hypot(high[0] - low[0], high[1] - low[1], high[2] - low[2]) : 0.0;
+
+  const size_t table_bound = m_periodic_reference_fill ? 0 : m_periodic_max_table_size.value_or(
+    nec_periodic::spectral_fill::default_max_table_entries);
+  if (!m_periodic_reference_fill)
+    for (const nec_periodic::source_segment& source : cell.sources)
+      fill.quadratures.push_back(nec_periodic::segment_quadrature_of(source.length, two_pi()));
+  fill.spectral = std::make_unique<nec_periodic::spectral_fill>(green, std::move(cell), table_bound);
+  if (!m_periodic_reference_fill) {
+    fill.spatial = std::make_unique<nec_periodic::spatial_table>(green,
+      green.spatial_radius() + longest, std::max(cell_diagonal, close_reach + longest),
+      m_periodic_max_table_size.value_or(nec_periodic::spatial_table::default_max_nodes));
+    // Tables that miss the kernel's accuracy are not used.
+    if (fill.spatial->interpolation_error() > nec_periodic::kernel_error)
+      fill.spatial.reset();
+  }
+}
+
+/*! The splitting parameter E of the periodic kernel. A scan change evaluates
+ * the spectral sum at every kernel sample of the fill (work: its Floquet
+ * modes times the samples) and adds the matrix of every lattice point the
+ * spatial sum reaches (work: their number times the matrix size); the
+ * spatial terms are kept per frequency. A smaller E means fewer modes and
+ * more lattice points. Among k / 2E from the kernel's automatic choice up to
+ * periodic_max_scan_kappa, in steps of a quarter, this takes the E of the
+ * least work whose lattice-point matrices fit periodic_fill_cache_bytes; it
+ * depends on the cell, lattice and frequency only, so single calls and
+ * sweeps share it.
+ */
+nec_float nec_context::periodic_scan_splitting(const nec_periodic::periodic_green& automatic) const
+{
+  if (m_periodic_reference_fill)
+    return automatic.splitting();
+  const nec_float k = automatic.wavenumber().real();
+  const int64_t n = m_geometry->n_segments;
+  const nec_float images = ground.type_perfect() ? 2.0 : 1.0;
+  const nec_float samples = nec_float(n) * nec_float(n) * images *
+    (nec_periodic::default_segment_gauss_order + 2);
+  const nec_float entries = nec_float(cm.size());
+  // Every lattice point the spatial sum can reach from a pair lies within its
+  // radius plus the cell's extent in the plane and a segment of the origin.
+  nec_float low_x = 0, high_x = 0, low_y = 0, high_y = 0, longest = 0;
+  for (int64_t i = 0; i < n; ++i) {
+    low_x = i ? std::min(low_x, m_geometry->x[i]) : m_geometry->x[i];
+    high_x = i ? std::max(high_x, m_geometry->x[i]) : m_geometry->x[i];
+    low_y = i ? std::min(low_y, m_geometry->y[i]) : m_geometry->y[i];
+    high_y = i ? std::max(high_y, m_geometry->y[i]) : m_geometry->y[i];
+    longest = std::max(longest, m_geometry->segment_length[i]);
+  }
+  const nec_float extent = std::hypot(high_x - low_x, high_y - low_y) + longest;
+
+  std::vector<nec_float> kappas = {k / (2 * automatic.splitting())};
+  for (nec_float kappa = 0.25; kappa <= periodic_max_scan_kappa; kappa += 0.25)
+    if (kappa > kappas.front())
+      kappas.push_back(kappa);
+  nec_float best = automatic.splitting();
+  nec_float least = std::numeric_limits<nec_float>::infinity();
+  for (const nec_float kappa : kappas) {
+    const nec_float splitting = k / (2 * kappa);
+    const nec_periodic::periodic_green candidate(automatic.lattice(), automatic.wavenumber(),
+      automatic.scan_wavevector(), splitting);
+    const nec_float points = nec_float(candidate.lattice_points_within(
+      {0.0, 0.0}, candidate.spatial_radius() + extent).size());
+    if (points * entries * sizeof(nec_complex) > periodic_fill_cache_bytes)
+      continue;
+    const nec_float work = periodic_mode_sample_work * candidate.spectral_mode_count() * samples +
+      points * entries;
+    if (work < least) {
+      least = work;
+      best = splitting;
+    }
+  }
+  return best;
 }
 
 /*! The lattice points whose spatial Ewald term reaches some pair of
@@ -723,6 +883,25 @@ std::vector<nec_context::periodic_fill_point> nec_context::periodic_fill_points(
     indices.insert(index_of(image.x, image.y));
   const bool perfect = ground.type_perfect();
   const int64_t n = m_geometry->n_segments;
+  // The points of green.lattice_points_within for every pair, marked on a
+  // grid of the reduced lattice's indices: the pairs' centres differ by at
+  // most the cell's extent in the plane, so every point lies within that
+  // extent plus the reach of the origin.
+  const nec_periodic::vec2 ra1 = lattice.reduced_a1(), ra2 = lattice.reduced_a2();
+  const nec_periodic::vec2 rb1 = lattice.reduced_b1(), rb2 = lattice.reduced_b2();
+  nec_float low_x = 0, high_x = 0, low_y = 0, high_y = 0, longest = 0;
+  for (int64_t i = 0; i < n; ++i) {
+    low_x = i ? std::min(low_x, m_geometry->x[i]) : m_geometry->x[i];
+    high_x = i ? std::max(high_x, m_geometry->x[i]) : m_geometry->x[i];
+    low_y = i ? std::min(low_y, m_geometry->y[i]) : m_geometry->y[i];
+    high_y = i ? std::max(high_y, m_geometry->y[i]) : m_geometry->y[i];
+    longest = std::max(longest, m_geometry->segment_length[i]);
+  }
+  const nec_float limit = std::hypot(high_x - low_x, high_y - low_y) + green.spatial_radius() + 0.5 * longest;
+  const long m_bound = long(std::ceil(limit * std::hypot(rb1.x, rb1.y) / two_pi())) + 1;
+  const long n_bound = long(std::ceil(limit * std::hypot(rb2.x, rb2.y) / two_pi())) + 1;
+  const size_t columns = size_t(2 * n_bound + 1);
+  std::vector<char> marked(size_t(2 * m_bound + 1) * columns, 0);
   for (int64_t i = 0; i < n; ++i)
     for (int64_t j = 0; j < n; ++j)
       for (const nec_float mirror : {1.0, -1.0}) {
@@ -732,11 +911,27 @@ std::vector<nec_context::periodic_fill_point> nec_context::periodic_fill_points(
         const nec_float dz = m_geometry->z[i] - mirror * m_geometry->z[j];
         if (std::abs(dz) > reach)
           continue;
-        for (const nec_periodic::vec2& rho : green.lattice_points_within(
-               {m_geometry->x[i] - m_geometry->x[j], m_geometry->y[i] - m_geometry->y[j]},
-               std::sqrt(reach * reach - dz * dz)))
-          indices.insert(index_of(rho.x, rho.y));
+        const nec_float cx = m_geometry->x[i] - m_geometry->x[j], cy = m_geometry->y[i] - m_geometry->y[j];
+        const nec_float radius = std::sqrt(reach * reach - dz * dz);
+        const nec_float m_centre = (cx * rb1.x + cy * rb1.y) / two_pi();
+        const nec_float n_centre = (cx * rb2.x + cy * rb2.y) / two_pi();
+        const nec_float m_half = radius * std::hypot(rb1.x, rb1.y) / two_pi();
+        const nec_float n_half = radius * std::hypot(rb2.x, rb2.y) / two_pi();
+        const long m_first = std::max(long(std::ceil(m_centre - m_half)), -m_bound);
+        const long m_last = std::min(long(std::floor(m_centre + m_half)), m_bound);
+        const long n_first = std::max(long(std::ceil(n_centre - n_half)), -n_bound);
+        const long n_last = std::min(long(std::floor(n_centre + n_half)), n_bound);
+        for (long m = m_first; m <= m_last; ++m)
+          for (long n_index = n_first; n_index <= n_last; ++n_index) {
+            const nec_float x = m * ra1.x + n_index * ra2.x, y = m * ra1.y + n_index * ra2.y;
+            if (std::hypot(x - cx, y - cy) <= radius)
+              marked[size_t(m + m_bound) * columns + size_t(n_index + n_bound)] = 1;
+          }
       }
+  for (long m = -m_bound; m <= m_bound; ++m)
+    for (long n_index = -n_bound; n_index <= n_bound; ++n_index)
+      if (marked[size_t(m + m_bound) * columns + size_t(n_index + n_bound)])
+        indices.insert(index_of(m * ra1.x + n_index * ra2.x, m * ra1.y + n_index * ra2.y));
   std::vector<periodic_fill_point> images;
   images.reserve(indices.size());
   for (const auto& [m, n_index] : indices) {
@@ -762,7 +957,7 @@ std::vector<nec_context::periodic_fill_point> nec_context::periodic_fill_points(
  * minus the free-space field, which efld adds.
  */
 void nec_context::add_periodic_point(
-  nec_float xi, nec_float yi, nec_float zi, nec_float ai)
+  nec_float xi, nec_float yi, nec_float zi, nec_float ai, int64_t source)
 {
   const periodic_fill_point& image = *m_fill_point;
   const nec_periodic::periodic_green& green = *m_periodic_green;
@@ -791,9 +986,21 @@ void nec_context::add_periodic_point(
       continue;
 
     const nec_periodic::vec2 rho{image.x, image.y};
-    const nec_periodic::source_segment segment{
-      {xj, yj, source_z}, {cabj, sabj, source_salp}, m_s};
-    const nec_periodic::segment_field field = nec_periodic::segment_field_of_kernel(
+    const nec_periodic::point direction = {cabj, sabj, source_salp};
+    nec_periodic::segment_field field;
+    if (m_fill_tables && m_fill_tables->spatial) {
+      // The rule of segment_field_of_kernel, kept per source segment, and the
+      // spatial term from its tables.
+      const nec_periodic::segment_quadrature& quadrature = m_fill_tables->quadratures[size_t(source)];
+      std::array<nec_periodic::green_value, nec_periodic::default_segment_gauss_order + 2> samples;
+      for (size_t q = 0; q < quadrature.offset.size(); ++q) {
+        const nec_float s = quadrature.offset[q];
+        samples[q] = m_fill_tables->spatial->term(rho,
+          {xi - (xj + s * direction[0]), yi - (yj + s * direction[1]), zi - (source_z + s * direction[2])},
+          origin || close);
+      }
+      field = nec_periodic::segment_field_of_samples(quadrature, direction, samples.data(), two_pi());
+    } else field = nec_periodic::segment_field_of_kernel(
       [&green, rho, close](const nec_periodic::point& r) {
         nec_periodic::green_value value = green.spatial_term(rho, r, true);
         if (close) {
@@ -805,7 +1012,7 @@ void nec_context::add_periodic_point(
         }
         return value;
       },
-      segment, {xi, yi, zi}, two_pi());
+      {{xj, yj, source_z}, direction, m_s}, {xi, yi, zi}, two_pi());
     if (close) {
       std::array<nec_complex, 9> image_field;
       // The image source sits at (xj + x, yj + y, source_z).
@@ -816,24 +1023,26 @@ void nec_context::add_periodic_point(
   }
 }
 
-/*! Add the field of the spectral Ewald sum of the current source segment
- * (and over perfect ground of its ground image, as add_periodic_point) to the
- * nine field components.
+/*! Add the field of the spectral Ewald sum of a source segment (and over
+ * perfect ground of its ground image, as add_periodic_point) at an
+ * observation point to the nine field components, from the fields
+ * periodic_fill evaluated for the scan state (m_periodic_spectral_fields).
  */
-void nec_context::add_periodic_spectral(nec_float xi, nec_float yi, nec_float zi)
+void nec_context::add_periodic_spectral(int64_t observation, int64_t source)
 {
-  const nec_periodic::periodic_green& green = *m_periodic_green;
-  for (const bool ground_image : {false, true}) {
-    if (ground_image && !ground.type_perfect())
-      continue;
-    const nec_float source_z = ground_image ? -zj : zj;
-    const nec_float source_salp = ground_image ? -salpj : salpj;
-    const nec_float sign = ground_image ? -1.0 : 1.0;
-    const nec_periodic::segment_field field = nec_periodic::segment_field_of_kernel(
-      [&green](const nec_periodic::point& r) { return green.spectral(r); },
-      {{xj, yj, source_z}, {cabj, sabj, source_salp}, m_s}, {xi, yi, zi}, two_pi());
-    add_segment_field(sign, components(field));
+  // The fields of a block of sources at a time (cmset runs through the
+  // sources in order), within periodic_spectral_block_bytes.
+  if (source < m_spectral_block_first || source >= m_spectral_block_last) {
+    const int64_t n = m_geometry->n_segments;
+    const int64_t block = std::max<int64_t>(1, int64_t(periodic_spectral_block_bytes /
+      (double(n) * sizeof(nec_periodic::segment_field_components))));
+    m_spectral_block_first = source;
+    m_spectral_block_last = std::min(n, source + block);
+    m_spectral_evaluation->fields(size_t(m_spectral_block_first), size_t(m_spectral_block_last),
+      m_periodic_spectral_fields);
   }
+  add_segment_field(1.0, m_periodic_spectral_fields[size_t(observation) *
+    size_t(m_spectral_block_last - m_spectral_block_first) + size_t(source - m_spectral_block_first)]);
 }
 
 /*! Fill the singular parts of the Floquet modes split out of the periodic
@@ -3431,9 +3640,9 @@ void nec_context::cmww( int j, int i1, int i2, complex_array& in_cm,
     } else {
       exk = eyk = ezk = exs = eys = ezs = exc = eyc = ezc = cplx_00();
       if (m_fill_part == fill_part::periodic_point)
-        add_periodic_point(xi, yi, zi, ai);
+        add_periodic_point(xi, yi, zi, ai, j);
       else
-        add_periodic_spectral(xi, yi, zi);
+        add_periodic_spectral(i, j);
     }
 
     etk= exk* cabi+ eyk* sabi+ ezk* salpi;

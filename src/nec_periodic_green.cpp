@@ -201,37 +201,51 @@ void periodic_green::add_spatial(const point& r, bool subtract_origin_free_term,
     }
 }
 
+spatial_radial periodic_green::spatial_numerators(double distance) const {
+  const double e = splitting_;
+  const complex_d two_over_root_pi = 2 / std::sqrt(pi);
+  const complex_d gauss = std::exp(-distance * distance * e * e + kappa_ * kappa_);
+  const complex_d outgoing = exp_erfc(-j * k_ * distance, distance * e - j * kappa_);
+  const complex_d incoming = exp_erfc(j * k_ * distance, distance * e + j * kappa_);
+  const complex_d c = outgoing + incoming;
+  const complex_d c_prime = j * k_ * (incoming - outgoing) - 2.0 * e * two_over_root_pi * gauss;
+  return {c, c_prime * distance - c};
+}
+
+spatial_radial periodic_green::smooth_spatial_radial(double distance) const {
+  const double e = splitting_;
+  if(distance * (e + std::abs(k_)) < origin_series_limit) {
+    // T = (1/4pi) sum_n c_n R^(n-1), T'/R = (1/4pi) sum_n c_n (n-1) R^(n-3),
+    // n odd, c_n = f^(n)(0) / n!.
+    const double distance2 = distance * distance;
+    complex_d value = 0, derivative = 0;
+    for(int slot = origin_series_terms - 1; slot >= 0; --slot) {
+      value = value * distance2 + origin_series_[slot];
+      if(slot > 0) derivative = derivative * distance2 + double(2 * slot) * origin_series_[slot];
+    }
+    return {value / (4 * pi), derivative / (4 * pi)};
+  }
+  // (f(R) - f(-R)) / (8 pi R): the spatial origin term minus exp(-jkR)/(4 pi R).
+  const complex_d two_over_root_pi = 2 / std::sqrt(pi);
+  const complex_d gauss = std::exp(-distance * distance * e * e + kappa_ * kappa_);
+  const complex_d f_plus = exp_erfc(j * k_ * distance, distance * e + j * kappa_);
+  const complex_d f_minus = exp_erfc(-j * k_ * distance, -distance * e + j * kappa_);
+  const radial_term term = over_eight_pi_r(
+    f_plus - f_minus, j * k_ * (f_plus + f_minus) - 2.0 * e * two_over_root_pi * gauss, distance);
+  return {term.value, term.derivative_over_distance};
+}
+
 green_value periodic_green::spatial_term(vec2 rho, const point& r, bool subtract_origin_free_term) const {
   const bool origin = rho.x == 0 && rho.y == 0;
   const point d = {r[0] - rho.x, r[1] - rho.y, r[2]};
   const double distance = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-  const double e = splitting_;
-  const complex_d two_over_root_pi = 2 / std::sqrt(pi);
-  const complex_d gauss = std::exp(-distance * distance * e * e + kappa_ * kappa_);
-  radial_term term;
+  spatial_radial term;
   if(origin && subtract_origin_free_term) {
-    if(distance * (e + std::abs(k_)) < origin_series_limit) {
-      // T = (1/4pi) sum_n c_n R^(n-1), T'/R = (1/4pi) sum_n c_n (n-1) R^(n-3),
-      // n odd, c_n = f^(n)(0) / n!.
-      const double distance2 = distance * distance;
-      complex_d value = 0, derivative = 0;
-      for(int slot = origin_series_terms - 1; slot >= 0; --slot) {
-        value = value * distance2 + origin_series_[slot];
-        if(slot > 0) derivative = derivative * distance2 + double(2 * slot) * origin_series_[slot];
-      }
-      term = {value / (4 * pi), derivative / (4 * pi)};
-    } else {
-      // (f(R) - f(-R)) / (8 pi R): the spatial origin term minus exp(-jkR)/(4 pi R).
-      const complex_d f_plus = exp_erfc(j * k_ * distance, distance * e + j * kappa_);
-      const complex_d f_minus = exp_erfc(-j * k_ * distance, -distance * e + j * kappa_);
-      term = over_eight_pi_r(f_plus - f_minus, j * k_ * (f_plus + f_minus) - 2.0 * e * two_over_root_pi * gauss,
-                             distance);
-    }
+    term = smooth_spatial_radial(distance);
   } else {
-    const complex_d outgoing = exp_erfc(-j * k_ * distance, distance * e - j * kappa_);
-    const complex_d incoming = exp_erfc(j * k_ * distance, distance * e + j * kappa_);
-    term = over_eight_pi_r(outgoing + incoming, j * k_ * (incoming - outgoing) - 2.0 * e * two_over_root_pi * gauss,
-                           distance);
+    const spatial_radial numerators = spatial_numerators(distance);
+    term = {numerators.value / (8 * pi * distance),
+            numerators.derivative_over_distance / (8 * pi * distance * distance * distance)};
   }
   return {term.value, {term.derivative_over_distance * d[0], term.derivative_over_distance * d[1],
                        term.derivative_over_distance * d[2]}};
@@ -347,22 +361,38 @@ green_value periodic_green::singular_part(const floquet_mode& mode, const point&
   return {value, {-j * mode.kt.x * value, -j * mode.kt.y * value, 0.0}};
 }
 
-void periodic_green::add_spectral(const point& r, green_value& sum) const {
-  const double e = splitting_, dz = r[2];
+spectral_factor periodic_green::spectral_mode_factor(const floquet_mode& mode, double dz) const {
+  const double e = splitting_;
+  const complex_d kz = mode.kz;
   const complex_d scale = 1.0 / (4.0 * j * lattice_.cell_area());
+  const complex_d alpha = j * kz / (2 * e);
+  const complex_d below = exp_erfc(-j * kz * dz, alpha - dz * e);
+  const complex_d above = exp_erfc(j * kz * dz, alpha + dz * e);
+  // A split mode leaves out its singular part 2 scale / kz. The Gaussian parts
+  // of d/dz cancel between the two terms.
+  return {is_split(kz) ? scale * spectral_remainder(kz, dz, e, below, above) : scale * (below + above) / kz,
+          scale * j * (above - below)};
+}
+
+std::vector<floquet_mode> periodic_green::spectral_modes() const {
+  std::vector<floquet_mode> modes;
   for_each_mode(spectral_radius_, [&](vec2 kt, complex_d kz) {
-    const complex_d alpha = j * kz / (2 * e);
-    const complex_d below = exp_erfc(-j * kz * dz, alpha - dz * e);
-    const complex_d above = exp_erfc(j * kz * dz, alpha + dz * e);
-    const complex_d mode = scale * std::exp(-j * (kt.x * r[0] + kt.y * r[1]));
-    // A split mode leaves out its singular part 2 mode / kz.
-    const complex_d value =
-      is_split(kz) ? mode * spectral_remainder(kz, dz, e, below, above) : mode * (below + above) / kz;
+    const vec2 step = kt - kt0_;
+    modes.push_back(
+      {std::lround(dot(step, lattice_.a1()) / (2 * pi)), std::lround(dot(step, lattice_.a2()) / (2 * pi)), kt, kz});
+  });
+  return modes;
+}
+
+void periodic_green::add_spectral(const point& r, green_value& sum) const {
+  for_each_mode(spectral_radius_, [&](vec2 kt, complex_d kz) {
+    const spectral_factor factor = spectral_mode_factor({0, 0, kt, kz}, r[2]);
+    const complex_d phase = std::exp(-j * (kt.x * r[0] + kt.y * r[1]));
+    const complex_d value = phase * factor.value;
     sum.value += value;
     sum.gradient[0] += -j * kt.x * value;
     sum.gradient[1] += -j * kt.y * value;
-    // The Gaussian parts of d/dz cancel between the two terms.
-    sum.gradient[2] += mode * j * (above - below);
+    sum.gradient[2] += phase * factor.z_derivative;
   });
 }
 
@@ -463,25 +493,32 @@ floquet_moments segment_mode_moments(const source_segment& segment, vec2 kt, com
           centre_phase * (plus + minus) / 2.0};
 }
 
-segment_field segment_field_of_kernel(const kernel_function& kernel, const source_segment& segment,
-                                      const point& observation, double k, int gauss_order) {
+namespace {
+// A segment rule over arrays the caller owns: weight, sine and cosine of the
+// Gauss nodes.
+struct quadrature_view {
+  const double *weight, *sine, *cosine;
+  size_t nodes;
+  double sine_end, cosine_end;
+};
+
+void check_gauss_order(int gauss_order) {
   if(gauss_order < 1 || gauss_order > max_segment_gauss_order)
     throw std::invalid_argument("Gauss order must be between 1 and " + std::to_string(max_segment_gauss_order));
-  const gauss_rule& rule = gauss_legendre(gauss_order);
-  const point& u = segment.direction;
-  const double half = segment.length / 2;
-  const auto kernel_at = [&](double s) {
-    return kernel({observation[0] - (segment.centre[0] + s * u[0]), observation[1] - (segment.centre[1] + s * u[1]),
-                   observation[2] - (segment.centre[2] + s * u[2])});
-  };
+}
+
+segment_field field_of_samples(const quadrature_view& quadrature, const point& direction, const green_value* samples,
+                               double k) {
+  const point& u = direction;
+  const size_t nodes = quadrature.nodes;
   // int I G ds' for I = 1, sin, cos, and int I' grad G ds' for sin (I' = k cos)
   // and cos (I' = -k sin).
   complex_d potential_constant = 0, potential_sine = 0, potential_cosine = 0;
   std::array<complex_d, 3> charge_sine{}, charge_cosine{};
-  for(size_t i = 0; i < rule.node.size(); ++i) {
-    const double s = half * rule.node[i], w = half * rule.weight[i];
-    const green_value g = kernel_at(s);
-    const double sin_ks = std::sin(k * s), cos_ks = std::cos(k * s);
+  for(size_t i = 0; i < nodes; ++i) {
+    const double w = quadrature.weight[i];
+    const green_value& g = samples[i];
+    const double sin_ks = quadrature.sine[i], cos_ks = quadrature.cosine[i];
     potential_constant += w * g.value;
     potential_sine += w * sin_ks * g.value;
     potential_cosine += w * cos_ks * g.value;
@@ -490,8 +527,9 @@ segment_field segment_field_of_kernel(const kernel_function& kernel, const sourc
       charge_cosine[c] -= w * k * sin_ks * g.gradient[c];
     }
   }
-  const green_value plus_end = kernel_at(half), minus_end = kernel_at(-half);
-  const double sin_end = std::sin(k * half), cos_end = std::cos(k * half);
+  const green_value& plus_end = samples[nodes];
+  const green_value& minus_end = samples[nodes + 1];
+  const double sin_end = quadrature.sine_end, cos_end = quadrature.cosine_end;
   const complex_d prefactor = -j * nec_segment_field_impedance / k;
   // (-j eta / k) [ k^2 s_hat potential + charge - (I(+h) grad G(+h) - I(-h) grad G(-h)) ]
   const auto field = [&](complex_d potential, const std::array<complex_d, 3>& charge, double i_plus, double i_minus) {
@@ -506,6 +544,61 @@ segment_field segment_field_of_kernel(const kernel_function& kernel, const sourc
   result.sine = field(potential_sine, charge_sine, sin_end, -sin_end);
   result.cosine = field(potential_cosine, charge_cosine, cos_end, cos_end);
   return result;
+}
+}
+
+segment_quadrature segment_quadrature_of(double length, double k, int gauss_order) {
+  check_gauss_order(gauss_order);
+  const gauss_rule& rule = gauss_legendre(gauss_order);
+  const double half = length / 2;
+  segment_quadrature quadrature;
+  for(size_t i = 0; i < rule.node.size(); ++i) {
+    const double s = half * rule.node[i];
+    quadrature.offset.push_back(s);
+    quadrature.weight.push_back(half * rule.weight[i]);
+    quadrature.sine.push_back(std::sin(k * s));
+    quadrature.cosine.push_back(std::cos(k * s));
+  }
+  quadrature.offset.push_back(half);
+  quadrature.offset.push_back(-half);
+  quadrature.sine_end = std::sin(k * half);
+  quadrature.cosine_end = std::cos(k * half);
+  return quadrature;
+}
+
+segment_field segment_field_of_samples(const segment_quadrature& quadrature, const point& direction,
+                                       const green_value* samples, double k) {
+  return field_of_samples({quadrature.weight.data(), quadrature.sine.data(), quadrature.cosine.data(),
+                           quadrature.weight.size(), quadrature.sine_end, quadrature.cosine_end},
+                          direction, samples, k);
+}
+
+segment_field segment_field_of_kernel(const kernel_function& kernel, const source_segment& segment,
+                                      const point& observation, double k, int gauss_order) {
+  // The rule of segment_quadrature_of, on the stack: this runs for every
+  // pair and lattice point of the per-frequency fill.
+  check_gauss_order(gauss_order);
+  const gauss_rule& rule = gauss_legendre(gauss_order);
+  const size_t nodes = rule.node.size();
+  const double half = segment.length / 2;
+  const point& u = segment.direction;
+  std::array<double, max_segment_gauss_order> weight, sine, cosine;
+  std::array<green_value, max_segment_gauss_order + 2> samples;
+  const auto sample = [&](double s) {
+    return kernel({observation[0] - (segment.centre[0] + s * u[0]), observation[1] - (segment.centre[1] + s * u[1]),
+                   observation[2] - (segment.centre[2] + s * u[2])});
+  };
+  for(size_t i = 0; i < nodes; ++i) {
+    const double s = half * rule.node[i];
+    weight[i] = half * rule.weight[i];
+    sine[i] = std::sin(k * s);
+    cosine[i] = std::cos(k * s);
+    samples[i] = sample(s);
+  }
+  samples[nodes] = sample(half);
+  samples[nodes + 1] = sample(-half);
+  return field_of_samples({weight.data(), sine.data(), cosine.data(), nodes, std::sin(k * half), std::cos(k * half)},
+                          u, samples.data(), k);
 }
 }
 

@@ -152,7 +152,7 @@ test("aborting a sweep rejects it at once and frees the workers for the next swe
     });
 
     const controller = new AbortController();
-    const states = Array.from({ length: 24 }, (_, index) => ({ scanPhasesRad: [0.1 * index, -0.05 * index] }));
+    const states = Array.from({ length: 400 }, (_, index) => ({ scanPhasesRad: [0.005 * index, -0.0025 * index] }));
     const sweep = cell.sweepScanImpedance({ frequencyMHz: FREQUENCY_MHZ, scanStates: states }, {
       workers: 2,
       signal: controller.signal,
@@ -163,8 +163,9 @@ test("aborting a sweep rejects it at once and frees the workers for the next swe
     await assert.rejects(sweep.next(), (error) => error instanceof NecCancellationError);
 
     // Each worker finishes at most the one scan state it was solving; the
-    // other twenty-odd are never dispatched, which would take about eleven
-    // single solves per worker.
+    // other ~400 are never dispatched, which would take about 200 single
+    // solves per worker. The bound is a quarter of that: far above the
+    // messaging of a two-state sweep, which a scan change no longer dwarfs.
     const started = performance.now();
     const chunks = await collect(cell.sweepScanImpedance(
       { frequencyMHz: FREQUENCY_MHZ, scanStates: states.slice(0, 2) },
@@ -172,7 +173,7 @@ test("aborting a sweep rejects it at once and frees the workers for the next swe
     ));
     const elapsed = performance.now() - started;
     assert.equal(chunks.at(-1).completed, 2);
-    assert.ok(elapsed < 6 * single, `next sweep ${elapsed.toFixed(0)} ms, single solve ${single.toFixed(0)} ms`);
+    assert.ok(elapsed < 50 * single,`next sweep ${elapsed.toFixed(0)} ms, single solve ${single.toFixed(0)} ms`);
   } finally {
     cell.dispose();
   }

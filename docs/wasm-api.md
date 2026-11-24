@@ -728,10 +728,16 @@ factorization, then fills, factors and extracts Z and Y. The fill is split
 into the free-space matrix, one matrix per lattice point rho (its share of the
 spatial Ewald sum, which depends on the scan state only through the phase
 `exp(-j kt0 . rho)`) and the spectral sum. The engine keeps the first two at
-the prepared frequency, so a scan change at the same frequency fills only the
-spectral sum and adds the phase-weighted image matrices, about half the work
-of a new frequency; any change other than the scan phases drops them. Above
-256 MiB for the image matrices it fills them again for each scan state.
+the prepared frequency, with the kernel's tables (the spatial terms in the
+distance, and the kernel samples of the spectral sum), so a scan change at the
+same frequency evaluates only the spectral sum, per Floquet mode from a table
+in the height difference, and adds the phase-weighted image matrices: a few
+percent of the work of a new frequency (2 ms against 0.2 s for a 22-segment
+cell in WASM, 30 ms against 1.2 s for an 84-segment helix). The Ewald
+splitting is chosen for that, from the cell, lattice and frequency only, so
+single calls and sweeps give the same results. Any change other than the scan
+phases drops the kept parts. Above 256 MiB for the image matrices it fills
+them again for each scan state.
 
 Floquet amplitudes: above the cell the field is the sum of
 `E exp(-j (kt . r + kz z))` over the modes, below it `E exp(-j (kt . r - kz z))`,
@@ -885,6 +891,10 @@ estimate is the sum of
 
 - the Ewald kernel's error, `1e-10` (kernel tests against direct lattice
   sums and the spectral series);
+- the interpolation of the kernel's tables (the spatial terms in the
+  distance, per frequency; each Floquet mode's factors in the height
+  difference, per scan state), measured at the midpoints of their intervals
+  whenever they are built: about `1e-12` to `3e-11`;
 - the Gauss rule over the longest segment, `1e-10` up to a tenth of a
   wavelength and growing like the tenth power of the length beyond, at least
   four times the error measured on lattices of 0.5, 1 and 3 wavelengths;

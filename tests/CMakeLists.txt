@@ -44,6 +44,8 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/nec_ring_field_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_green_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_segment_field_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_periodic_spectral_fill_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_periodic_spatial_table_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_stack_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_wp2_tb.cpp
@@ -51,6 +53,7 @@ set(NECPP_TEST_SRCS
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_symmetry_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_conductivity_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_periodic_tb.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_periodic_fill_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_stateful_model_floquet_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp0_tb.cpp
     ${CMAKE_SOURCE_DIR}/src/current_quadrature_wp1_tb.cpp
@@ -87,6 +90,8 @@ add_executable(nec2++_tests
     ${CMAKE_SOURCE_DIR}/src/nec_field_evaluator_wasm.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_ring_field.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_green.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_periodic_spectral_fill.cpp
+    ${CMAKE_SOURCE_DIR}/src/nec_periodic_spatial_table.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_low_rank.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_clearance.cpp
     ${CMAKE_SOURCE_DIR}/src/nec_periodic_stack.cpp

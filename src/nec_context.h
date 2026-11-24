@@ -36,6 +36,8 @@
 #include "nec_power_budget.h"
 #include "c_plot_card.h"
 #include "nec_periodic_stack.h"
+#include "nec_periodic_spatial_table.h"
+#include "nec_periodic_spectral_fill.h"
 
 class c_geometry;
 class nec_stateful_model;
@@ -152,11 +154,12 @@ public:
   void stateful_check_periodic_ground_clearance() const;
   /*! Periodic mode: the estimated numerical error of the prepared periodic
    * correction relative to the largest scan-impedance entry (kernel and
-   * Gauss rule, and the rounding near the nearest Floquet mode to cut-off
-   * that is not split out).
+   * Gauss rule, the rounding near the nearest Floquet mode to cut-off that
+   * is not split out, and the kernel tables' interpolation as measured by the
+   * latest fill).
    */
   nec_float stateful_periodic_estimated_error() const
-  { return m_periodic_estimated_error; }
+  { return m_periodic_estimated_error + m_periodic_table_error; }
   /*! Periodic mode: whether the prepared scan state is on or near a Wood
    * anomaly, a Floquet mode split out of the kernel (|kz| < 1e-3 k). */
   bool stateful_periodic_near_cutoff() const;
@@ -1116,14 +1119,51 @@ private:
     // One matrix per image, or empty when they would take more than
     // periodic_fill_cache_bytes; then each scan state fills them again.
     std::vector<complex_array> point_matrices;
+    // The spatial terms from tables in the distance (null on the reference
+    // fill), and the spectral sum's geometry: its kernel samples and their
+    // tables in dz.
+    std::unique_ptr<nec_periodic::spatial_table> spatial;
+    std::unique_ptr<nec_periodic::spectral_fill> spectral;
+    // The segment rule of each source segment, with the spatial tables.
+    std::vector<nec_periodic::segment_quadrature> quadratures;
   };
   std::unique_ptr<periodic_scan_independent_fill> m_periodic_fill;
   static constexpr double periodic_fill_cache_bytes = 256.0 * 1024 * 1024;
+  // The tables of the fill being built or refilled
+  // (fill_part::periodic_point); null, or a fill without spatial tables,
+  // evaluates the spatial terms directly.
+  const periodic_scan_independent_fill* m_fill_tables = nullptr;
+  // The spectral sum of the scan state being filled
+  // (fill_part::periodic_spectral), and its segment fields for the sources
+  // m_spectral_block_first .. m_spectral_block_last - 1 at every observation
+  // point.
+  std::optional<nec_periodic::spectral_fill::scan_evaluation> m_spectral_evaluation;
+  std::vector<nec_periodic::segment_field_components> m_periodic_spectral_fields;
+  int64_t m_spectral_block_first = 0, m_spectral_block_last = 0;
+  static constexpr double periodic_spectral_block_bytes = 8.0 * 1024 * 1024;
   nec_float m_periodic_estimated_error = 0;
+  // The kernel tables' interpolation error measured by the latest fill.
+  nec_float m_periodic_table_error = 0;
   // Replaces nec_periodic::near_cutoff, the fraction of k below which |kz|
   // splits a Floquet mode out of the kernel into the low-rank update; set
   // only by the periodic model test.
   std::optional<nec_float> m_periodic_near_cutoff;
+  // Set only by the periodic fill test. The reference fill is the fill
+  // before the kernel tables: the automatic splitting and every kernel
+  // sample evaluated directly. The table bound replaces the default bounds
+  // on the size of the spectral and spatial tables.
+  bool m_periodic_reference_fill = false;
+  std::optional<size_t> m_periodic_max_table_size;
+  // The splitting parameter of the periodic kernel for the prepared
+  // frequency; automatic is the kernel's own choice.
+  nec_float periodic_scan_splitting(const nec_periodic::periodic_green& automatic) const;
+  // The largest k / 2E the scan splitting takes: the spatial and spectral
+  // sums cancel to about exp((k/2E)^2) times their rounding, 2e-12 at 3.
+  static constexpr nec_float periodic_max_scan_kappa = 3.0;
+  // The work of one kernel sample and Floquet mode in a scan change's
+  // spectral fill, in units of one matrix entry of one lattice point in the
+  // phase-weighted sum.
+  static constexpr nec_float periodic_mode_sample_work = 10.0;
 
   // The layered stacks and the finite ground, as set (metres), and as
   // prepared for the frequency and scan state: in wavelengths, with the
@@ -1195,8 +1235,9 @@ private:
   void periodic_fill();
   void fill_part_matrix(fill_part part, complex_array& matrix);
   std::vector<periodic_fill_point> periodic_fill_points() const;
-  void add_periodic_point(nec_float xi, nec_float yi, nec_float zi, nec_float ai);
-  void add_periodic_spectral(nec_float xi, nec_float yi, nec_float zi);
+  void periodic_fill_tables(periodic_scan_independent_fill& fill) const;
+  void add_periodic_point(nec_float xi, nec_float yi, nec_float zi, nec_float ai, int64_t source);
+  void add_periodic_spectral(int64_t observation, int64_t source);
   // Add sign times the nine segment field components exk..ezc of field.
   void add_segment_field(nec_float sign, const std::array<nec_complex, 9>& field);
   void refuse_unsupported_periodic_configuration() const;
@@ -1213,6 +1254,9 @@ private:
   // Defined only in the periodic model test, which widens the split of
   // Floquet modes near cut-off (m_periodic_near_cutoff).
   friend struct nec_periodic_split_access;
+  // Defined only in the periodic fill test, which compares the fill with the
+  // reference fill (m_periodic_reference_fill).
+  friend struct nec_periodic_fill_access;
 
   /*! Return a read-only view for raw ordinary far-field evaluation. */
   nec_far_field_evaluation_input far_field_evaluation_input(

@@ -79,6 +79,21 @@ struct floquet_mode {
   complex_d kz;
 };
 
+// One Floquet mode's term of the spectral sum at r = (x, y, dz), without its
+// transverse phase exp(-j kt . (x, y)): the term is that phase times value,
+// its gradient that phase times (-j kt_x value, -j kt_y value, z_derivative).
+// Both depend on dz alone. For a split mode, value is the remainder after its
+// singular part.
+struct spectral_factor {
+  complex_d value, z_derivative;
+};
+
+// The spatial Ewald term of one lattice point as a function of the distance R
+// from it (periodic_green::spatial_numerators, smooth_spatial_radial).
+struct spatial_radial {
+  complex_d value, derivative_over_distance;
+};
+
 // Floquet modes with |kz| below this fraction of |k| are split out of the
 // spectral sum (periodic_green::split_modes): the results that need them are
 // on or near a Wood anomaly.
@@ -124,10 +139,20 @@ public:
   // kernel's accuracy) for |r - rho| beyond spatial_radius().
   green_value spatial_term(vec2 rho, const point& r, bool subtract_origin_free_term) const;
   double spatial_radius() const { return spatial_radius_; }
+  // The spatial term at distance R as c / (8 pi R), its derivative over R as
+  // d / (8 pi R^3): returns c and d, which are smooth in R and finite at 0.
+  spatial_radial spatial_numerators(double distance) const;
+  // The spatial term minus the free-space term exp(-jkR)/(4 pi R), and its
+  // derivative over R: smooth and even in R (the origin's term of smooth()).
+  spatial_radial smooth_spatial_radial(double distance) const;
   // The lattice points within radius of centre (in the lattice plane).
   std::vector<vec2> lattice_points_within(vec2 centre, double radius) const;
   // The spectral sum alone, without the singular parts of the split modes.
   green_value spectral(const point& r) const;
+  // The Floquet modes of the spectral sum, in the order spectral() adds them,
+  // and the term of one of them (split or not, as split_modes() says).
+  std::vector<floquet_mode> spectral_modes() const;
+  spectral_factor spectral_mode_factor(const floquet_mode& mode, double dz) const;
   // The modes with |kz| < near_cutoff_ratio |k|, whose singular parts smooth()
   // and full() leave out.
   const std::vector<floquet_mode>& split_modes() const { return split_modes_; }
@@ -205,6 +230,20 @@ using kernel_function = std::function<green_value(const point&)>;
 // tenth of a wavelength, below the Ewald kernel's own accuracy (1e-10).
 constexpr int default_segment_gauss_order = 6;
 constexpr int max_segment_gauss_order = 64;
+
+// The rule of segment_field_of_kernel over one segment: the kernel is sampled
+// at the offsets s from the centre along the segment, the Gauss nodes first,
+// then the ends +length/2 and -length/2; weight, sine and cosine (sin ks,
+// cos ks) belong to the Gauss nodes.
+struct segment_quadrature {
+  std::vector<double> offset, weight, sine, cosine;
+  double sine_end = 0, cosine_end = 0;
+};
+segment_quadrature segment_quadrature_of(double length, double k, int gauss_order = default_segment_gauss_order);
+// The field of a segment of the given direction from the kernel samples
+// G(observation - (centre + s u)) at the rule's offsets, in their order.
+segment_field segment_field_of_samples(const segment_quadrature& quadrature, const point& direction,
+                                       const green_value* samples, double k);
 
 // Field of a segment under a smooth kernel:
 //   E = (-j eta / k) [ k^2 s_hat int I G ds' + int I' grad G ds' - (I grad G) at the ends ],
