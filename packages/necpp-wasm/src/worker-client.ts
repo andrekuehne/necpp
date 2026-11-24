@@ -27,6 +27,7 @@ import type {
   NecPeriodicWorkerModel,
   NecWorkerModel,
   NecWorkerProgressListener,
+  PeriodicGeometryOptions,
   PeriodicGround,
   PeriodicLattice,
   PortDefinition,
@@ -53,6 +54,7 @@ import {
   type ValidSweep,
 } from "./periodic-sweep.js";
 import { computeScanElementPattern, validPatternRequest } from "./scan-element-pattern.js";
+import { validPeriodicGeometryOptions } from "./periodic-lattice.js";
 import {
   cloneFloat64,
   isNodeRuntime,
@@ -629,8 +631,9 @@ class WorkerNecPeriodicModel implements NecPeriodicWorkerModel {
     return this.#configure({ method: "addWire", argument: wire }, [wire]);
   }
 
-  completeGeometry(): Promise<void> {
-    return this.#configure({ method: "completeGeometry" }, []);
+  completeGeometry(options?: PeriodicGeometryOptions): Promise<void> {
+    const valid = validPeriodicGeometryOptions(options);
+    return this.#configure({ method: "completeGeometry", argument: valid }, [valid]);
   }
 
   definePorts(ports: readonly PortDefinition[]): Promise<void> {

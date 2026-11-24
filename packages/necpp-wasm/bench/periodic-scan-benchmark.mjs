@@ -1,9 +1,14 @@
-// Periodic scan benchmark (issue #52): the time of a call at a new frequency,
-// of a scan change at the same frequency, and of a default scan element
-// pattern, for the cells of issue #28 (a 22-segment crossed dipole and an
-// 84-segment helix, both over perfect ground). Timing only, not a gate.
+// Periodic scan benchmark (issues #52 and #47): the time of a call at a new
+// frequency, of a scan change at the same frequency, and of a default scan
+// element pattern, for the cells of issue #28 (a 22-segment crossed dipole
+// and an 84-segment helix, both over perfect ground) and for grounded cells
+// fed at the plane (a 6-segment monopole and the helix rising from the
+// plane). Timing only, not a gate.
 //
-//   node bench/periodic-scan-benchmark.mjs [package directory] [--no-pattern] [--cells=dipole,helix]
+//   node bench/periodic-scan-benchmark.mjs [package directory] [--no-pattern]
+//     [--cells=dipole,helix,monopole,grounded-helix]
+//
+// Without --cells, the cells of issue #28.
 //
 // The package directory (default: this package) must hold a built dist/.
 import { availableParallelism } from "node:os";
@@ -30,21 +35,36 @@ function crossedDipole(cell) {
   cell.setLattice({ a1M: [0.5, 0], a2M: [0, 0.5] });
 }
 
-function helix(cell) {
-  // Axial mode, circumference one wavelength, 7 turns of 12 segments.
-  const at = (i) => {
-    const angle = 2 * Math.PI * i / 12;
-    return [0.159 * Math.cos(angle), 0.159 * Math.sin(angle), 0.05 + 0.23 * i / 12];
+function helixStartingAt(z0, groundConnection) {
+  return (cell) => {
+    // Axial mode, circumference one wavelength, 7 turns of 12 segments.
+    const at = (i) => {
+      const angle = 2 * Math.PI * i / 12;
+      return [0.159 * Math.cos(angle), 0.159 * Math.sin(angle), z0 + 0.23 * i / 12];
+    };
+    for (let i = 0; i < 84; i += 1)
+      cell.addWire({ tag: i + 1, segments: 1, start: at(i), end: at(i + 1), radiusM: 0.002 });
+    cell.completeGeometry({ groundConnection });
+    cell.definePorts([{ tag: 1, segment: 1 }]);
+    cell.setGround({ kind: "perfect" });
+    cell.setLattice({ a1M: [0.8, 0], a2M: [0, 0.8] });
   };
-  for (let i = 0; i < 84; i += 1)
-    cell.addWire({ tag: i + 1, segments: 1, start: at(i), end: at(i + 1), radiusM: 0.002 });
-  cell.completeGeometry();
-  cell.definePorts([{ tag: 1, segment: 1 }]);
-  cell.setGround({ kind: "perfect" });
-  cell.setLattice({ a1M: [0.8, 0], a2M: [0, 0.8] });
 }
 
-const cells = { dipole: ["crossed dipole, 22 segments, square 0.5", crossedDipole], helix: ["helix, 84 segments, square 0.8", helix] };
+function monopole(cell) {
+  cell.addWire({ tag: 1, segments: 6, start: [0, 0, 0], end: [0, 0, 0.24], radiusM: 0.001 });
+  cell.completeGeometry({ groundConnection: "interpolate" });
+  cell.definePorts([{ tag: 1, segment: 1 }]);
+  cell.setGround({ kind: "perfect" });
+  cell.setLattice({ a1M: [0.5, 0], a2M: [0, 0.5] });
+}
+
+const cells = {
+  dipole: ["crossed dipole, 22 segments, square 0.5", crossedDipole],
+  helix: ["helix, 84 segments, square 0.8", helixStartingAt(0.05, "none")],
+  monopole: ["grounded monopole, 6 segments, square 0.5", monopole],
+  "grounded-helix": ["grounded helix fed at the plane, 84 segments, square 0.8", helixStartingAt(0, "interpolate")],
+};
 for (const key of selected) {
   if (!Object.hasOwn(cells, key)) throw new Error(`unknown cell "${key}"; expected ${Object.keys(cells).join(", ")}`);
 }

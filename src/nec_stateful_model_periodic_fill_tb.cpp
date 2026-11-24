@@ -73,6 +73,7 @@ struct cell_definition {
   nec_lattice_definition lattice;
   nec_ground_definition ground;
   nec_layered_stacks_definition stacks;
+  nec_model_ground_connection connection = nec_model_ground_connection::none;
 };
 
 struct scan_state {
@@ -96,13 +97,14 @@ nec_wire_definition dipole_along_x(int tag, nec_float x, nec_float y, nec_float 
   return {tag, segments, x - 0.24, y, z, x + 0.24, y, z, 0.001};
 }
 
-std::vector<nec_wire_definition> helix_wires(int tag, int segments)
+std::vector<nec_wire_definition> helix_wires(int tag, int segments, nec_float z0 = 0.05)
 {
-  // An axial-mode helix of circumference one wavelength, 12 segments a turn.
+  // An axial-mode helix of circumference one wavelength, 12 segments a turn,
+  // starting at height z0.
   std::vector<nec_wire_definition> wires;
-  const auto at = [](int i) {
+  const auto at = [z0](int i) {
     const nec_float angle = 2 * exact_pi * i / 12;
-    return std::array<nec_float, 3>{0.159 * std::cos(angle), 0.159 * std::sin(angle), 0.05 + 0.23 * i / 12.0};
+    return std::array<nec_float, 3>{0.159 * std::cos(angle), 0.159 * std::sin(angle), z0 + 0.23 * i / 12.0};
   };
   for (int i = 0; i < segments; ++i) {
     const auto a = at(i), b = at(i + 1);
@@ -125,7 +127,7 @@ void build(nec_stateful_model& model, const cell_definition& cell)
 {
   for (const nec_wire_definition& wire : cell.wires)
     model.add_wire(wire);
-  model.complete_geometry();
+  model.complete_geometry(cell.connection);
   model.define_ports(cell.ports);
   if (cell.ground.kind != nec_ground_kind::free_space)
     model.set_ground(cell.ground);
@@ -244,6 +246,15 @@ std::vector<cell_definition> cells()
   // Dipoles nearly touching their neighbours: close images.
   list.push_back({"dipoles with close images, rectangular 0.5 x 0.3", {dipole_along_x(1, 0, 0, 0, 13)}, {{1, 7}},
                   {0.5, 0, 0, 0.3}, {}, {}});
+  // Wires ending on perfect ground (#47): height differences down to zero
+  // between a kernel sample and the ground image of its own segment.
+  list.push_back({"grounded monopole, square 0.5", {{1, 6, 0, 0, 0, 0, 0, 0.24, 0.001}}, {{1, 1}},
+                  {0.5, 0, 0, 0.5}, perfect_ground(), {}, nec_model_ground_connection::interpolate});
+  list.push_back({"two grounded inverted-L elements, oblique",
+                  {{1, 4, 0.05, 0, 0, 0.05, 0, 0.12, 0.001}, {2, 5, 0.05, 0, 0.12, 0.2, 0, 0.12, 0.001},
+                   {3, 4, 0, 0.05, 0, 0, 0.05, 0.12, 0.001}, {4, 5, 0, 0.05, 0.12, 0, 0.2, 0.12, 0.001}},
+                  {{1, 1}, {3, 1}}, {0.55, 0.0, 0.1, 0.5}, perfect_ground(), {},
+                  nec_model_ground_connection::interpolate});
   return list;
 }
 
@@ -293,6 +304,10 @@ TEST_CASE("A helix-sized cell's tabulated fill agrees with the reference fill", 
   cell_definition helix{"84-segment helix over perfect ground, square 0.8", helix_wires(1, 84), {{1, 1}},
                         {0.8, 0, 0, 0.8}, perfect_ground(), {}};
   check_agreement(helix, {direction("oblique", helix.lattice, 30, 20), direction("grating lobe", helix.lattice, 60, 45)});
+  // Fed on the segment that rises from the plane (#47).
+  cell_definition grounded{"84-segment helix on perfect ground, square 0.8", helix_wires(1, 84, 0.0), {{1, 1}},
+                           {0.8, 0, 0, 0.8}, perfect_ground(), {}, nec_model_ground_connection::interpolate};
+  check_agreement(grounded, {direction("oblique", grounded.lattice, 30, 20)});
 }
 
 TEST_CASE("The tabulated fill agrees with the reference fill next to and on a Wood anomaly", "[periodic_fill]")

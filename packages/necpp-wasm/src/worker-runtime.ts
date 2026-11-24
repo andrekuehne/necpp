@@ -26,6 +26,7 @@ import type {
   NecModelState,
   NecPeriodicModel,
   NecWorkerProgressEvent,
+  PeriodicGeometryOptions,
   PeriodicGround,
   PeriodicLattice,
   PortDefinition,
@@ -365,7 +366,7 @@ function invokePeriodicModel(
     model.addWire(args[0] as WireDefinition);
     return undefined;
   case "completeGeometry":
-    model.completeGeometry();
+    model.completeGeometry(args[0] as PeriodicGeometryOptions | undefined);
     return undefined;
   case "definePorts":
     model.definePorts(args[0] as readonly PortDefinition[]);

@@ -121,6 +121,15 @@ export type SymmetryFailureClassification =
       readonly representationEligibilityFailure: true;
     };
 
+/**
+ * Geometry options of a periodic unit cell. `"zero-current"` connections are
+ * not supported in periodic mode.
+ */
+export interface PeriodicGeometryOptions {
+  /** Defaults to `"none"`. `"interpolate"` needs perfect ground. */
+  readonly groundConnection?: Exclude<GroundConnection, "zero-current">;
+}
+
 export interface CompleteGeometryOptions {
   /** Defaults to `"none"`. A non-none value declares a ground plane at z=0. */
   readonly groundConnection?: GroundConnection;
@@ -1086,15 +1095,21 @@ export interface NecPeriodicModel {
   readonly state: NecModelState;
 
   addWire(wire: WireDefinition): void;
-  /** Completes the unit-cell geometry. Symmetry and ground connections are not supported. */
-  completeGeometry(): void;
+  /**
+   * Completes the unit-cell geometry. Symmetry is not supported. With
+   * `groundConnection: "interpolate"`, wire ends on the plane z=0 are
+   * connected to their ground images, as for `NecModel`; perfect ground is
+   * then required.
+   */
+  completeGeometry(options?: PeriodicGeometryOptions): void;
   definePorts(ports: readonly PortDefinition[]): void;
   addLoad(load: LoadDefinition): void;
   clearLoads(): void;
   /**
    * Defaults to free space. Over perfect ground every conductor must stay
-   * clear of the plane at z=0: one that touches, nearly touches or crosses
-   * it is refused, since ground connections are not supported.
+   * clear of the plane at z=0, except the ends of wires that a ground
+   * connection joins to it: one that touches, nearly touches or crosses it
+   * otherwise is refused. A ground connection is refused over finite ground.
    */
   setGround(ground: PeriodicGround): void;
   setLattice(lattice: PeriodicLattice): void;
@@ -1244,7 +1259,7 @@ export interface NecPeriodicWorkerModel {
   readonly state: NecModelState;
 
   addWire(wire: WireDefinition): Promise<void>;
-  completeGeometry(): Promise<void>;
+  completeGeometry(options?: PeriodicGeometryOptions): Promise<void>;
   definePorts(ports: readonly PortDefinition[]): Promise<void>;
   addLoad(load: LoadDefinition): Promise<void>;
   clearLoads(): Promise<void>;

@@ -7,6 +7,7 @@ import type {
   LayeredStacks,
   LoadDefinition,
   NecPeriodicWorkerModel,
+  PeriodicGeometryOptions,
   PeriodicGround,
   PeriodicLattice,
   PortDefinition,
@@ -24,7 +25,7 @@ import type {
  */
 export type PeriodicCellCall =
   | { readonly method: "addWire"; readonly argument: WireDefinition }
-  | { readonly method: "completeGeometry" }
+  | { readonly method: "completeGeometry"; readonly argument?: PeriodicGeometryOptions }
   | { readonly method: "definePorts"; readonly argument: readonly PortDefinition[] }
   | { readonly method: "addLoad"; readonly argument: LoadDefinition }
   | { readonly method: "clearLoads" }
@@ -45,7 +46,7 @@ function replay(worker: NecPeriodicWorkerModel, call: PeriodicCellCall): Promise
   case "addWire":
     return worker.addWire(call.argument);
   case "completeGeometry":
-    return worker.completeGeometry();
+    return worker.completeGeometry(call.argument);
   case "definePorts":
     return worker.definePorts(call.argument);
   case "addLoad":

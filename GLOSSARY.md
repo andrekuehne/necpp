@@ -8,6 +8,10 @@ A method-of-moments wire antenna engine (NEC-2 lineage) with a stateful multi-po
 A ground half-space below `z = 0` with finite conductivity and permittivity. Infinite in extent, like perfect ground.
 _Avoid_: lossy ground, real ground; never use for a ground plate of finite size
 
+**Ground connection**:
+How a wire end on the ground plane z=0 is treated (NEC's `GE` card). `"none"` (the default, `GE 0`) treats no end specially. `"interpolate"` (`GE 1`) joins it to its ground image, so the current continues into the image: the grounded monopole. `"zero-current"` (`GE -1`) leaves the end free with zero current. The periodic model supports `"none"` and `"interpolate"`, the latter over perfect ground.
+_Avoid_: ground stake (a conductor through finite ground, which NEC cannot model accurately)
+
 ## Ports and drives
 
 **Active impedance**:

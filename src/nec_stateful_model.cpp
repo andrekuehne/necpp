@@ -573,6 +573,22 @@ void nec_stateful_model::check_periodic_boundaries(const nec_layered_stacks_defi
     ground.kind != nec_ground_kind::free_space, finite_ground_kind(ground.kind));
 }
 
+void nec_stateful_model::check_periodic_ground_connection(
+  const nec_ground_definition& ground, const char* operation) const
+{
+  // Free space is refused at PREPARE, as for the finite model, so that the
+  // ground may follow the lattice.
+  if (m_ground_connection == nec_model_ground_connection::zero_current)
+    fail_geometry(operation,
+      "ZERO-CURRENT GROUND CONNECTIONS ARE NOT SUPPORTED IN PERIODIC MODE;"
+      " USE THE INTERPOLATED GROUND CONNECTION");
+  if (m_ground_connection != nec_model_ground_connection::none &&
+      finite_ground_kind(ground.kind))
+    fail_geometry(operation,
+      "A GROUND CONNECTION IN PERIODIC MODE NEEDS PERFECT GROUND;"
+      " OVER FINITE GROUND WIRES MUST STAY IN THE AIR ABOVE Z = 0");
+}
+
 void nec_stateful_model::set_ground(const nec_ground_definition& ground)
 {
   require_configurable("SET GROUND");
@@ -593,6 +609,7 @@ void nec_stateful_model::set_ground(const nec_ground_definition& ground)
     fail("SET GROUND", "UNKNOWN GROUND KIND");
   }
   if (m_periodic) {
+    check_periodic_ground_connection(ground, "SET GROUND");
     if (ground.kind == nec_ground_kind::perfect)
       m_context->stateful_check_periodic_ground_clearance();
     check_periodic_boundaries(m_layered_stacks, ground, "SET GROUND");
@@ -651,6 +668,7 @@ void nec_stateful_model::set_lattice(const nec_lattice_definition& lattice)
   if (m_geometry_completion.symmetry.kind != nec_geometry_symmetry_kind::none)
     fail_geometry("SET LATTICE", "GEOMETRY SYMMETRY IS NOT SUPPORTED IN PERIODIC MODE");
 
+  check_periodic_ground_connection(m_ground, "SET LATTICE");
   // The context validates the vectors and the clearance of every conductor
   // from its periodic images (and ground images) before anything changes.
   m_context->stateful_check_periodic_clearance(

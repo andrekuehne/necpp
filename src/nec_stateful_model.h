@@ -539,6 +539,11 @@ private:
   // reaches into the ground; changes nothing.
   void check_periodic_boundaries(const nec_layered_stacks_definition& stacks,
     const nec_ground_definition& ground, const char* operation) const;
+  // Refuse a ground connection the periodic model does not support with
+  // `ground`: zero current at the plane, or any connection over finite
+  // ground; changes nothing.
+  void check_periodic_ground_connection(
+    const nec_ground_definition& ground, const char* operation) const;
   void validate_symmetry_ground(
     const nec_ground_definition& ground, const char* operation) const;
   void clear_matrix_cache();

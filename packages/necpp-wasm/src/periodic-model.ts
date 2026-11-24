@@ -9,6 +9,7 @@ import {
   finitePair,
   scanPhasesForDirection,
   validLattice,
+  validPeriodicGeometryOptions,
   validScanDirection,
 } from "./periodic-lattice.js";
 import {
@@ -28,6 +29,7 @@ import type {
   LoadDefinition,
   NecModelState,
   NecPeriodicModel,
+  PeriodicGeometryOptions,
   PeriodicGround,
   PeriodicLattice,
   PortDefinition,
@@ -72,9 +74,10 @@ export class WasmNecPeriodicModel implements NecPeriodicModel {
     this.#calls.push(recordedCall({ method: "addWire", argument: wire }));
   }
 
-  completeGeometry(): void {
-    this.#cell.completeGeometry();
-    this.#calls.push({ method: "completeGeometry" });
+  completeGeometry(options?: PeriodicGeometryOptions): void {
+    const valid = validPeriodicGeometryOptions(options);
+    this.#cell.completeGeometry(valid);
+    this.#calls.push(recordedCall({ method: "completeGeometry", argument: valid }));
   }
 
   definePorts(ports: readonly PortDefinition[]): void {

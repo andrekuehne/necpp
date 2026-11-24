@@ -366,22 +366,34 @@ void nec_context::stateful_check_periodic_ground_clearance() const
   // no ground image of a cell comes closer to a segment than the
   // corresponding direct image, so the close images of the direct source
   // also cover the ground images.
+  //
+  // An end that NEC connected to its image (GE 1: the end lies on the plane
+  // and is its own segment's neighbour) is exempt: the segment meets its
+  // image there as at any wire junction, through NEC's basis functions and
+  // its own ground image. Its other end must still stand high enough.
   const std::vector<nec_periodic::wire_segment> segments = periodic_wire_segments_m();
+  const bool interpolated = m_geometry->ground_connection() > 0;
   for (size_t index = 0; index < segments.size(); ++index) {
     const nec_periodic::wire_segment& segment = segments[index];
-    const nec_float lowest = std::min(segment.start[2], segment.end[2]);
+    const int64_t segment_index = static_cast<int64_t>(index);
+    const int64_t segment_number = segment_index + 1;
+    // Only the ground connection makes a segment its own neighbour.
+    const bool start_connected = interpolated && m_geometry->icon1[segment_index] == segment_number;
+    const bool end_connected = interpolated && m_geometry->icon2[segment_index] == segment_number;
+    const nec_float lowest = start_connected ? segment.end[2]
+      : end_connected ? segment.start[2] : std::min(segment.start[2], segment.end[2]);
     const nec_float length = std::hypot(segment.end[0] - segment.start[0],
       segment.end[1] - segment.start[1], segment.end[2] - segment.start[2]);
     const nec_float minimum = segment.radius + 0.5 * SMIN * length;
     if (lowest > minimum)
       continue;
-    char reason[320];
+    char reason[400];
     std::snprintf(reason, sizeof(reason),
       "CONDUCTOR TOO CLOSE TO THE GROUND PLANE: SEGMENT %lld (TAG %d) REACHES"
       " Z = %.4g M, AT LEAST %.4g M IS NEEDED (TOUCHING OR NEARLY TOUCHING ITS"
-      " GROUND IMAGE); GROUND CONNECTIONS ARE NOT SUPPORTED IN PERIODIC MODE",
-      static_cast<long long>(index + 1),
-      m_geometry->segment_tags[static_cast<int64_t>(index)], lowest, minimum);
+      " GROUND IMAGE); ONLY THE END OF A WIRE ON THE PLANE, WITH THE INTERPOLATED"
+      " GROUND CONNECTION, MAY REACH IT IN PERIODIC MODE",
+      static_cast<long long>(segment_number), m_geometry->segment_tags[segment_index], lowest, minimum);
     throw nec_geometry_exception(reason);
   }
 }
