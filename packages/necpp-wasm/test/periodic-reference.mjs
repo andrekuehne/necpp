@@ -91,6 +91,7 @@ export async function finiteArrayCentreImpedance({
   wires,
   ports,
   ground = { kind: "free-space" },
+  groundConnection = "none",
 }) {
   const elements = [];
   const phases = [];
@@ -114,6 +115,7 @@ export async function finiteArrayCentreImpedance({
     elements,
     patterns: [{ id: "cell", kind: "straight-wire-pattern", wires, ports }],
     ground,
+    groundConnection,
   }, { symmetry: "auto", symmetrizer: { positionEpsilonM: 1e-9 } });
   try {
     await solver.prepare({ frequencyMHz });

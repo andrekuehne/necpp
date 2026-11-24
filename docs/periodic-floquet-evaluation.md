@@ -120,7 +120,8 @@ Stage 2 so far:
   close-image list of the direct images serves both, since for conductors
   above the plane `|p - q'| >= |p - q|` for every pair of points; conductors
   that touch, nearly touch or cross the plane are refused by the image-contact
-  rule against their own ground image. Ground connections stay unsupported.
+  rule against their own ground image. Ground connections were not supported
+  here; issue #47 added them (below).
   Image theory: a dipole over ground equals a free-space cell with the dipole
   and its mirror driven oppositely, `Z = Z00 - Z01`, to 8e-14 (horizontal)
   and 5e-14 (tilted). A tapered 15 x 15 finite array over the same ground
@@ -459,6 +460,48 @@ Stage 2 so far:
   of the 162 s is the pool's start (one fill per worker) and the pattern's
   refinement rounds. Natively (g++ -O3) the scan change goes from 109 ms to
   0.91 ms and from 1.63 s to 16.9 ms.
+- issue #47: wires ending on perfect ground, with NEC's `GE 1` connection
+  (`groundConnection: "interpolate"`). NEC connects such an end to its own
+  image: the segment is its own neighbour (`icon = i`), so its basis
+  function continues into the image, and the field of the image half comes
+  from the segment's own ground image in the fill. Every fill part, the
+  periodic ones included, distributes a source segment's field over the
+  basis functions through the same coefficients in `cmww`, so the periodic
+  correction needed no change: the ground images of the other cells go
+  through it as in issue #26, the cell's own ground image through the
+  smooth origin term (the spatial term minus free space, with its series at
+  small R), and the tables of issue #52 start at zero distance and height
+  difference. Only the refusals changed. An end that NEC connected is
+  exempt from the own-image contact rule, but its other end must still
+  stand high enough above the plane; mirrored images never come closer than the direct ones, so
+  the close images of the direct source still cover them. Zero-current
+  connections (`GE -1`) and a connection over finite ground are refused.
+  Image theory: a grounded monopole equals half the free-space cell of the
+  monopole and its mirror, fed on both segments at the plane alike, to
+  6e-8, and a cell of two grounded inverted-L elements its P x P
+  counterpart, at broadside, oblique, grating-lobe and next-to-Wood scans:
+  NEC's own `GE 1` agrees with its image to 6.6e-8 without a lattice, and
+  the periodic cell adds nothing. Against tapered finite arrays of grounded
+  monopoles the centre element approaches the scan impedance as the array
+  grows (16 % at 11 x 11, 3.5 % at 19 x 19, 2.9 % at 27 x 27): the
+  monopoles couple through a field that falls only as 1 / R along the
+  ground. At large spacing the scan impedance approaches the isolated
+  monopole (52 %, 26 % and 14 % at spacings of sqrt 7, sqrt 47 and
+  sqrt 311 wavelengths), more slowly than a horizontal dipole, since the
+  monopole radiates most along the ground. The power budget closes to the
+  discretization error (8.7e-4, 1.8e-4 and 1.4e-5 for 6, 12 and 24
+  segments). Reciprocity holds to first order in the segment length
+  (2.3e-3 and 1.2e-3 for the inverted-L cell at two segmentations): the
+  free-space mirror cell is reciprocal to 3.2e-5 as a 4 x 4 matrix, but a
+  grounded port is the sum of its two gaps, which needs the mirror symmetry
+  that NEC's junctions keep only to first order; NEC's finite model with
+  `GE 1` is less reciprocal still (1.1e-2 for a tilted grounded pair). The
+  tabulated fill agrees with the reference fill within 1e-9 for a grounded
+  monopole, the inverted-L cell and an 84-segment helix rising from the
+  plane. In WASM a scan change takes 0.57 ms for a 6-segment monopole on a
+  0.5 wavelength square lattice and 28.3 ms for the grounded helix on 0.8;
+  a default scan element pattern on 8 workers takes 2.5 s (2055 scan
+  states) and 183 s (17456 scan states), as for the ungrounded helix.
 
 The design decisions taken after the evaluation are collected in
 [Decisions](#decisions). Where they change an earlier section, that section
@@ -772,6 +815,9 @@ point is the P x P scan admittance of the P unit-cell ports.
 - Wires only; no surface patches.
 - No conductor may touch its own periodic image, checked by image distance
   (see connected arrays).
+- Over perfect ground, wires may end on the plane with NEC's interpolated
+  ground connection (`GE 1`, issue #47); no other conductor may touch or
+  nearly touch it.
 - Free space, perfect ground or finite ground, with layered stacks above
   (issue #32) and below the wires (issue #33).
 - Geometry symmetry reduction disabled.

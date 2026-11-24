@@ -1179,6 +1179,50 @@ cell.dispose();
   `diagnostics.layeredStack` is the smallest one, to either stack or to
   finite ground, and it sets the mode count as above.
 
+### Wires on the ground plane
+
+Over perfect ground, wires of the unit cell may end on the plane z=0 with
+`completeGeometry({ groundConnection: "interpolate" })`, NEC's `GE 1`
+connection, as in a finite model: monopoles, grounded helices and bent or
+inverted-L elements, each fed on the segment at the plane.
+
+```ts
+import { createNecPeriodicModel, squareLattice } from "@necpp-engine/wasm";
+
+// Quarter-wave monopoles at 300 MHz, half a wavelength apart.
+const cell = await createNecPeriodicModel();
+cell.addWire({ tag: 1, segments: 6, start: [0, 0, 0], end: [0, 0, 0.25], radiusM: 0.001 });
+cell.completeGeometry({ groundConnection: "interpolate" });
+cell.definePorts([{ tag: 1, segment: 1 }]);
+cell.setGround({ kind: "perfect" });
+cell.setLattice(squareLattice({ spacingM: 0.5 }));
+const scan = cell.computeScanImpedance({ frequencyMHz: 300, scanDirection: { thetaDeg: 30, phiDeg: 0 } });
+cell.dispose();
+```
+
+- Everything works as for any cell over ground: scan impedance and
+  admittance, Floquet amplitudes, the power budget, sweeps and the scan
+  element pattern, with the same tolerance and estimated error. The modes
+  propagate above the cell only.
+- A grounded monopole's scan impedance agrees with image theory (half that
+  of the free-space cell holding the monopole and its mirror image) to
+  about 1e-7, as NEC's own ground connection does without a lattice.
+- With ports on segments at the plane, `Z(psi) = Z(-psi)^T` holds to first
+  order in the segment length (about 2e-3 for 0.03-wavelength segments),
+  like NEC's finite model with this connection.
+- Refused with a reason, leaving the cell unchanged:
+  - a wire lying in the plane or crossing it (`completeGeometry`, as in a
+    finite model);
+  - a wire that nearly touches the plane without ending on it, or that ends
+    on it without a ground connection (`setGround` or `setLattice`);
+  - a ground connection over finite ground (`setGround` or `setLattice`), or
+    in free space (at the first solve);
+  - `groundConnection: "zero-current"` (`completeGeometry`, a
+    `NecInputError`);
+  - a grounded wire touching a periodic image, as for any conductor.
+- A stack below the wires cannot be combined with grounded wires, since
+  wires must stay above it. A stack above the wires works as usual.
+
 ### Conventions and limits
 
 - Scan impedance is not the active impedance of any finite array: it belongs
@@ -1190,9 +1234,10 @@ cell.dispose();
   ground plane at z=0 under every cell) or finite ground (see above). Every
   conductor must stay above the ground; one that touches, nearly touches or
   crosses a perfect ground plane, or reaches finite ground, is refused with a
-  `NecGeometryError` (ground connections, such as monopoles on the plane,
-  are not supported). Layered stacks can sit above and below the wires (see
-  above). No geometry symmetry.
+  `NecGeometryError`. The exception is a wire that ends on a perfect ground
+  plane with the interpolated ground connection (see "Wires on the ground
+  plane"). Layered stacks can sit above and below the wires (see above). No
+  geometry symmetry.
 - Accuracy: one fixed internal tolerance, `1e-5` relative to the largest
   scan-impedance entry, and no numerical parameters. Each result carries
   `diagnostics.estimatedError` (the solver's numerical error: periodic

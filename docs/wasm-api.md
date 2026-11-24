@@ -685,8 +685,8 @@ radome) and below them (a substrate). It shares the loading options, error taxon
 | Method | Inputs and units | Output | Failures beyond illegal state |
 |---|---|---|---|
 | `addWire`, `definePorts`, `addLoad`, `clearLoads`, `dispose` | As for `NecModel` | As for `NecModel` | As for `NecModel` |
-| `completeGeometry()` | None; no symmetry and no ground connection | `void` | As for `NecModel` |
-| `setGround(ground)` | `{ kind: "free-space" }` (the default), `{ kind: "perfect" }` or finite ground `{ kind: "finite", method, relativePermittivity, conductivitySPerM }`, which each Floquet mode sees through its exact Fresnel reflection (`method` does not matter) | `void`; invalidates prepared data | `NecGeometryError` over perfect ground when a conductor touches, nearly touches or crosses the ground plane (see clearance below), over finite ground when a wire, radius included, reaches z=0, and over either when a stack below reaches below z=0; refused here while a lattice is set, otherwise by `setLattice` |
+| `completeGeometry(options?)` | `{ groundConnection? }`: `"none"` (the default) or `"interpolate"` (NEC `GE 1`, wire ends on z=0 joined to their ground images; needs perfect ground); no symmetry | `void` | `NecInputError` for `"zero-current"`, an unknown connection or any other option; otherwise as for `NecModel` |
+| `setGround(ground)` | `{ kind: "free-space" }` (the default), `{ kind: "perfect" }` or finite ground `{ kind: "finite", method, relativePermittivity, conductivitySPerM }`, which each Floquet mode sees through its exact Fresnel reflection (`method` does not matter) | `void`; invalidates prepared data | `NecGeometryError` over perfect ground when a conductor touches, nearly touches or crosses the ground plane other than at a connected wire end (see clearance below), over finite ground when a wire, radius included, reaches z=0 or a ground connection was made, and over either when a stack below reaches below z=0; refused here while a lattice is set, otherwise by `setLattice` |
 | `setLattice({ a1M, a2M })` | Two finite, non-parallel `[x, y]` vectors in m, in the xy-plane | `void`; resets the scan phases, invalidates prepared data | `NecInputError` for malformed or parallel vectors; `NecGeometryError` when a conductor touches or nearly touches a periodic image, or over perfect ground the ground plane (see clearance below) |
 | `setLayeredStacks({ above?, below? })` | `above`: `{ bottomZM, layers }`, the stack's lower face in m and at least one layer `{ thicknessM, relativePermittivity, lossTangent? }` from there up (thickness > 0, `relativePermittivity` >= 1, `lossTangent` >= 0, default 0), air above; `below`: `{ topZM, layers }`, the upper face and layers from there down, with the ground below them (air between the stack and z=0 unless it rests there) or, in free space, air; `{}` removes them | `void`; invalidates prepared data but keeps the scan-independent fill | `NecInputError` for malformed layers or a key other than `above` and `below`; `NecGeometryError` when a wire, radius included, reaches a stack's face, or over ground the stack below reaches below z=0; a gap too small for the tolerance is refused when solving (below) |
 | `computeScanImpedance({ frequencyMHz, scanPhasesRad })` | Positive MHz; finite `[psi1, psi2]` in radians per cell along `a1M`, `a2M` | P x P scan impedance and admittance, frequency, the scan phases and `diagnostics: { estimatedError, status }`; the model is `prepared` afterwards | `NecStateError` before `setLattice`; refusals of the accuracy policy below; otherwise as `prepare` and `computeImpedanceMatrix` |
@@ -859,9 +859,16 @@ image: the lowest point of the segment axis must lie higher than the wire
 radius plus half of `SMIN` times the segment length, so a conductor that
 touches, nearly touches or crosses the plane is refused, by `setGround` or
 `setLattice`, whichever comes second; the `NecGeometryError` names the
-segment, its tag, its lowest z and the least height. Ground connections
-(monopoles on the plane) are not supported. Above the plane, no ground image
-comes closer to a segment than the corresponding direct image.
+segment, its tag, its lowest z and the least height. The exception is a
+wire end that `completeGeometry({ groundConnection: "interpolate" })` joined
+to its ground image (NEC's `GE 1`: monopoles, grounded helices and bent
+elements fed at the plane); such a segment's other end must still stand
+high enough above the plane. The connected segment's own image is NEC's, through its basis
+functions and its own ground image, and the ground images of the other cells
+go through the periodic correction like any others. A ground connection over
+finite ground is refused by `setGround` or `setLattice`, and in free space at
+the first solve, as for `NecModel`. Above the plane, no ground image comes
+closer to a segment than the corresponding direct image.
 
 Perfect ground: the ground images of all cells form a second lattice of
 sources, mirrored in z=0 with the opposite current along the mirrored
@@ -947,7 +954,9 @@ types as the finite model. The periodic model has no patch, network or
 transmission-line methods; the native model refuses, as
 `NECPP_WASM_V1_GEOMETRY_ERROR`, a wire entering a layered stack or finite
 ground, a stack below reaching into the ground, a gap too small for the
-tolerance, conductors on or through a perfect ground plane, surface patches,
+tolerance, conductors on or through a perfect ground plane (other than wire
+ends joined to it by the interpolated ground connection), zero-current ground
+connections and ground connections over finite ground, surface patches,
 networks and transmission lines (untested in periodic mode) and symmetric
 geometry. NaN appears only for a genuine
 failure.

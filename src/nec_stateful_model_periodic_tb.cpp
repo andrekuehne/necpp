@@ -17,6 +17,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 // Declared a friend of nec_stateful_model and nec_context: the internal test
@@ -261,6 +262,122 @@ TEST_CASE("Over perfect ground, a conductor on or through the ground plane is re
   const nec_complex impedance = port_impedance(clear);
   REQUIRE(std::isfinite(impedance.real()));
   REQUIRE(std::isfinite(impedance.imag()));
+}
+
+namespace {
+
+// A quarter-wave monopole standing on the plane, 6 segments of 1 mm radius,
+// fed on the segment at the plane.
+void build_monopole_cell(nec_stateful_model& model,
+  nec_model_ground_connection connection = nec_model_ground_connection::interpolate,
+  nec_float z1 = 0.0)
+{
+  model.add_wire({1, 6, 0.0, 0.0, z1, 0.0, 0.0, z1 + 0.24, 0.001});
+  model.complete_geometry(connection);
+  model.define_ports({{1, 1}});
+}
+
+} // namespace
+
+TEST_CASE("Over perfect ground, a grounded monopole acts as its mirror image in free space", "[periodic_model]")
+{
+  // Image theory: the monopole and its image form a dipole of 12 segments
+  // whose two centre segments carry the monopole's source and its image,
+  // driven alike (the image of a vertical current runs the same way). So
+  // the monopole's scan impedance is Z66 + Z67 of the dipole cell.
+  //
+  // NEC's own ground connection agrees with its image to 6.6e-8 for this
+  // monopole without a lattice: the periodic cell must add nothing to that.
+  const auto relative_error = [](const nec_lattice_definition* lattice, nec_float psi1, nec_float psi2) {
+    nec_stateful_model grounded;
+    build_monopole_cell(grounded);
+    grounded.set_ground({nec_ground_kind::perfect});
+    nec_stateful_model pair;
+    pair.add_wire({1, 12, 0.0, 0.0, -0.24, 0.0, 0.0, 0.24, 0.001});
+    pair.complete_geometry();
+    pair.define_ports({{1, 7}, {1, 6}});
+    if (lattice) {
+      grounded.set_lattice(*lattice);
+      grounded.set_scan_phases(psi1, psi2);
+      pair.set_lattice(*lattice);
+      pair.set_scan_phases(psi1, psi2);
+    }
+    const nec_complex monopole = port_impedance(grounded);
+    pair.prepare(frequency_mhz);
+    const auto dipole = pair.compute_impedance_matrix().impedance;
+    const nec_complex image = dipole.at(0, 0) + dipole.at(0, 1);
+    return std::abs(monopole - image) / std::abs(image);
+  };
+  const nec_float finite_model_error = relative_error(nullptr, 0.0, 0.0);
+  REQUIRE(finite_model_error < 1e-7);
+  const nec_lattice_definition lattice = {0.6, 0.0, 0.1, 0.5};
+  for (const auto& [psi1, psi2] : {std::pair<nec_float, nec_float>{0.0, 0.0}, {0.8, -0.6}}) {
+    INFO("psi = (" << psi1 << ", " << psi2 << "), finite model " << finite_model_error);
+    CHECK(relative_error(&lattice, psi1, psi2) < 1.5 * finite_model_error);
+  }
+}
+
+TEST_CASE("Ground connections in periodic mode need perfect ground and interpolation", "[periodic_model]")
+{
+  nec_ground_definition perfect;
+  perfect.kind = nec_ground_kind::perfect;
+  nec_ground_definition finite;
+  finite.kind = nec_ground_kind::finite_reflection_coefficient;
+  finite.relative_permittivity = 13.0;
+  finite.conductivity_s_per_m = 0.005;
+
+  SECTION("zero current at the plane")
+  {
+    nec_stateful_model model;
+    build_monopole_cell(model, nec_model_ground_connection::zero_current, 0.0);
+    model.set_ground(perfect);
+    REQUIRE(mentions(refusal<nec_geometry_exception>(
+      [&] { model.set_lattice(square_lattice(0.7)); }), "ZERO-CURRENT GROUND CONNECTIONS"));
+    REQUIRE_FALSE(model.periodic());
+  }
+
+  SECTION("finite ground")
+  {
+    nec_stateful_model model;
+    build_monopole_cell(model);
+    model.set_ground(finite);
+    const std::string reason = refusal<nec_geometry_exception>(
+      [&] { model.set_lattice(square_lattice(0.7)); });
+    REQUIRE(mentions(reason, "GROUND CONNECTION"));
+    REQUIRE(mentions(reason, "PERFECT GROUND"));
+    REQUIRE_FALSE(model.periodic());
+
+    // In the other order the ground is refused and stays perfect.
+    model.set_ground(perfect);
+    model.set_lattice(square_lattice(0.7));
+    const nec_complex before = port_impedance(model);
+    const std::string again = refusal<nec_geometry_exception>([&] { model.set_ground(finite); });
+    REQUIRE(mentions(again, "GROUND CONNECTION"));
+    REQUIRE(mentions(again, "PERFECT GROUND"));
+    REQUIRE(port_impedance(model) == before);
+  }
+
+  SECTION("a wire nearly touching the plane without ending on it")
+  {
+    // Beyond the contact threshold, so not connected, but within the
+    // own-image clearance.
+    nec_stateful_model model;
+    build_monopole_cell(model, nec_model_ground_connection::interpolate, 0.0005);
+    model.set_ground(perfect);
+    REQUIRE(mentions(refusal<nec_geometry_exception>(
+      [&] { model.set_lattice(square_lattice(0.7)); }), "GROUND PLANE"));
+  }
+
+  SECTION("a grounded wire touching its periodic image")
+  {
+    nec_stateful_model model;
+    build_monopole_cell(model);
+    model.set_ground(perfect);
+    model.set_lattice(square_lattice(0.7));
+    const nec_complex before = port_impedance(model);
+    REQUIRE_THROWS_AS(model.set_lattice({0.7, 0.0, 0.0, 0.0015}), nec_geometry_exception);
+    REQUIRE(port_impedance(model) == before);
+  }
 }
 
 TEST_CASE("Periodic mode refuses single-cell fields", "[periodic_model]")

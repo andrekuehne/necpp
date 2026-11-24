@@ -1,6 +1,12 @@
 import { finiteNumber, inputError, positiveNumber, requireRecord } from "./model.js";
 import { necWavenumberPerM } from "./nec-constants.js";
-import type { LatticeVectorM, PeriodicLattice, ScanDirection, ScanPhasesRad } from "./types.js";
+import type {
+  LatticeVectorM,
+  PeriodicGeometryOptions,
+  PeriodicLattice,
+  ScanDirection,
+  ScanPhasesRad,
+} from "./types.js";
 
 // Named lattices exist only here: the engine and the C ABI take any two
 // lattice vectors. Every preset fixes the meaning of the scan phases through
@@ -123,4 +129,31 @@ export function scanPhasesForDirection(options: {
   const kx = transverse * Math.cos(phi);
   const ky = transverse * Math.sin(phi);
   return Object.freeze([-(kx * a1M[0] + ky * a1M[1]), -(kx * a2M[0] + ky * a2M[1])]);
+}
+
+/**
+ * The geometry options of a unit cell, validated: only `"none"` and
+ * `"interpolate"` ground connections, and no symmetry.
+ */
+export function validPeriodicGeometryOptions(options: unknown): PeriodicGeometryOptions {
+  const record = requireRecord(options ?? {}, "options");
+  for (const key of Object.keys(record)) {
+    if (key !== "groundConnection") {
+      inputError(`options.${key} is not supported in periodic mode`, { name: `options.${key}` });
+    }
+  }
+  const connection = record.groundConnection ?? "none";
+  if (connection === "zero-current") {
+    inputError(
+      'options.groundConnection "zero-current" is not supported in periodic mode; use "interpolate"',
+      { name: "options.groundConnection", value: connection },
+    );
+  }
+  if (connection !== "none" && connection !== "interpolate") {
+    inputError('options.groundConnection must be "none" or "interpolate"', {
+      name: "options.groundConnection",
+      value: connection,
+    });
+  }
+  return Object.freeze({ groundConnection: connection });
 }
